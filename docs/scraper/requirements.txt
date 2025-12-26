@@ -1,0 +1,33 @@
+# Odds Scraper - Python Dependencies
+# ==================================
+
+# Supabase Client
+supabase>=2.0.0
+
+# HTTP & Browser Automation
+httpx>=0.25.0
+playwright>=1.40.0
+
+# HTML Parsing
+selectolax>=0.3.0
+beautifulsoup4>=4.12.0
+
+# Environment & Config
+python-dotenv>=1.0.0
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+
+# Fuzzy Matching (Team Names)
+rapidfuzz>=3.5.0
+
+# Logging
+loguru>=0.7.0
+
+# Retry Logic
+tenacity>=8.2.0
+
+# Async Support
+asyncio>=3.4.3
+
+# Date/Time
+python-dateutil>=2.8.0
