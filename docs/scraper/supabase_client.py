@@ -98,7 +98,7 @@ class SupabaseClient:
         try:
             query = self.client.table("leagues").select("*")
             if active_only:
-            query = query.eq("status", "active")
+                query = query.eq("status", "active")
             response = query.execute()
             return response.data
         except Exception as e:
