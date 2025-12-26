@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 // These will be configured via environment or localStorage
 const getSupabaseConfig = () => {
@@ -11,9 +11,29 @@ const getSupabaseConfig = () => {
   };
 };
 
-const config = getSupabaseConfig();
+let supabaseInstance: SupabaseClient | null = null;
 
-export const supabase = createClient(config.url, config.anonKey);
+export const getSupabase = () => {
+  const config = getSupabaseConfig();
+  if (!config.url || !config.anonKey) {
+    return null;
+  }
+  if (!supabaseInstance) {
+    supabaseInstance = createClient(config.url, config.anonKey);
+  }
+  return supabaseInstance;
+};
+
+// For backward compatibility - but will throw if not configured
+export const supabase = new Proxy({} as SupabaseClient, {
+  get(_, prop) {
+    const instance = getSupabase();
+    if (!instance) {
+      throw new Error('Supabase not configured. Please configure your Supabase connection first.');
+    }
+    return (instance as any)[prop];
+  }
+});
 
 export const isSupabaseConfigured = () => {
   const config = getSupabaseConfig();
