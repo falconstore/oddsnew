@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import type { League, Team, Bookmaker, Match, TeamAlias, Alert, OddsComparison, MatchOddsGroup, BookmakerOdds } from '@/types/database';
 import { toast } from '@/hooks/use-toast';
+import { useOddsRealtimeSubscription, useAlertsRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 
 // =====================================================
 // LEAGUES
@@ -285,6 +286,9 @@ export const useOddsComparison = (filters?: {
   dateFrom?: string;
   dateTo?: string;
 }) => {
+  // Subscribe to realtime updates for odds_history
+  useOddsRealtimeSubscription();
+
   return useQuery({
     queryKey: ['odds_comparison', filters],
     queryFn: async () => {
@@ -310,7 +314,9 @@ export const useOddsComparison = (filters?: {
       const grouped = groupOddsByMatch(data as OddsComparison[]);
       return grouped;
     },
-    refetchInterval: 20000 // Refetch every 20 seconds
+    // Keep a fallback refetch in case realtime connection drops
+    refetchInterval: 60000, // Fallback: refetch every 60 seconds
+    staleTime: 5000 // Consider data stale after 5 seconds
   });
 };
 
@@ -369,6 +375,9 @@ function groupOddsByMatch(data: OddsComparison[]): MatchOddsGroup[] {
 // =====================================================
 
 export const useAlerts = (unreadOnly = false) => {
+  // Subscribe to realtime updates for alerts
+  useAlertsRealtimeSubscription();
+
   return useQuery({
     queryKey: ['alerts', unreadOnly],
     queryFn: async () => {
@@ -386,7 +395,9 @@ export const useAlerts = (unreadOnly = false) => {
       if (error) throw error;
       return data as Alert[];
     },
-    refetchInterval: 20000 // Refetch every 20 seconds
+    // Keep a fallback refetch in case realtime connection drops
+    refetchInterval: 60000, // Fallback: refetch every 60 seconds
+    staleTime: 5000 // Consider data stale after 5 seconds
   });
 };
 
