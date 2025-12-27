@@ -358,7 +358,8 @@ function groupOddsByMatch(data: OddsComparison[]): MatchOddsGroup[] {
       away_odd: row.away_odd,
       margin_percentage: row.margin_percentage,
       data_age_seconds: row.data_age_seconds,
-      scraped_at: row.scraped_at
+      scraped_at: row.scraped_at,
+      extra_data: row.extra_data
     };
 
     group.odds.push(bookmakerOdds);
