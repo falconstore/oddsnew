@@ -315,8 +315,8 @@ export const useOddsComparison = (filters?: {
       return grouped;
     },
     // Keep a fallback refetch in case realtime connection drops
-    refetchInterval: 60000, // Fallback: refetch every 60 seconds
-    staleTime: 5000 // Consider data stale after 5 seconds
+    refetchInterval: 15000, // Fallback: refetch every 15 seconds
+    staleTime: 3000 // Consider data stale after 3 seconds
   });
 };
 
