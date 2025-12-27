@@ -310,7 +310,7 @@ export const useOddsComparison = (filters?: {
       const grouped = groupOddsByMatch(data as OddsComparison[]);
       return grouped;
     },
-    refetchInterval: 30000 // Refetch every 30 seconds
+    refetchInterval: 20000 // Refetch every 20 seconds
   });
 };
 
@@ -386,7 +386,7 @@ export const useAlerts = (unreadOnly = false) => {
       if (error) throw error;
       return data as Alert[];
     },
-    refetchInterval: 10000
+    refetchInterval: 20000 // Refetch every 20 seconds
   });
 };
 
