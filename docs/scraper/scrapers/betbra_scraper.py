@@ -30,6 +30,16 @@ class BetbraScraper(BaseScraper):
             "country": "England",
             "tag_url_name": "english-premier-league",
         },
+        "serie_a": {
+            "name": "Serie A",
+            "country": "Italy",
+            "tag_url_name": "italy",
+        },
+        "la_liga": {
+            "name": "La Liga",
+            "country": "Spain",
+            "tag_url_name": "spain",
+        },
     }
     
     API_BASE = "https://mexchange-api.betbra.bet.br/api/events"
