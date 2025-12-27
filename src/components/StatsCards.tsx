@@ -1,18 +1,16 @@
-import { useLeagues, useBookmakers, useMatches } from '@/hooks/useOddsData';
+import { useLeagues, useBookmakers } from '@/hooks/useOddsData';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Trophy, Building2, CalendarDays, TrendingUp } from 'lucide-react';
+import { Trophy, Building2, TrendingUp } from 'lucide-react';
 
 export function StatsCards() {
   const { data: leagues } = useLeagues();
   const { data: bookmakers } = useBookmakers();
-  const { data: matches } = useMatches({ status: 'scheduled' });
 
   const activeLeagues = leagues?.filter(l => l.status === 'active').length || 0;
   const activeBookmakers = bookmakers?.filter(b => b.status === 'active').length || 0;
-  const upcomingMatches = matches?.length || 0;
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Ligas Ativas</CardTitle>
@@ -32,17 +30,6 @@ export function StatsCards() {
         <CardContent>
           <div className="text-2xl font-bold">{activeBookmakers}</div>
           <p className="text-xs text-muted-foreground">fontes de dados</p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Partidas Próximas</CardTitle>
-          <CalendarDays className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{upcomingMatches}</div>
-          <p className="text-xs text-muted-foreground">jogos agendados</p>
         </CardContent>
       </Card>
 

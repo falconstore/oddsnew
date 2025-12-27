@@ -322,8 +322,13 @@ export const useOddsComparison = (filters?: {
 
 function groupOddsByMatch(data: OddsComparison[]): MatchOddsGroup[] {
   const matchMap = new Map<string, MatchOddsGroup>();
+  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
 
   for (const row of data) {
+    // Skip matches that started more than 5 minutes ago
+    const matchDate = new Date(row.match_date);
+    if (matchDate < fiveMinutesAgo) continue;
+
     if (!matchMap.has(row.match_id)) {
       matchMap.set(row.match_id, {
         match_id: row.match_id,

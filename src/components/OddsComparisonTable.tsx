@@ -105,7 +105,6 @@ function MatchCard({ match }: { match: MatchOddsGroup }) {
               <TableHead className="text-center">Casa (1)</TableHead>
               <TableHead className="text-center">Empate (X)</TableHead>
               <TableHead className="text-center">Fora (2)</TableHead>
-              <TableHead className="text-center">Margem</TableHead>
               <TableHead className="text-right">Atualizado</TableHead>
             </TableRow>
           </TableHeader>
@@ -185,9 +184,6 @@ function OddsRow({
       </TableCell>
       <TableCell className="text-center">
         <OddCell value={odds.away_odd} isBest={odds.away_odd === bestAway} isWorst={odds.away_odd === worstAway} />
-      </TableCell>
-      <TableCell className="text-center text-muted-foreground">
-        {odds.margin_percentage ? `${odds.margin_percentage}%` : '-'}
       </TableCell>
       <TableCell className="text-right text-sm text-muted-foreground">
         {formatDistanceToNow(new Date(odds.scraped_at), { addSuffix: true, locale: ptBR })}
