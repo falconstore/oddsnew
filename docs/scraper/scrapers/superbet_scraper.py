@@ -122,7 +122,7 @@ class SuperbetScraper(BaseScraper):
                     self.logger.error(f"API error for {league.name}: {data}")
                     return []
                 
-                return self._parse_response(data, league.name)
+                return self._parse_response(data, league.name, league.league_id)
                 
         except aiohttp.ClientError as e:
             self.logger.error(f"Request failed for {league.name}: {e}")
@@ -131,7 +131,7 @@ class SuperbetScraper(BaseScraper):
             self.logger.error(f"Unexpected error for {league.name}: {e}")
             return []
     
-    def _parse_response(self, data: Dict[str, Any], league_name: str) -> List[ScrapedOdds]:
+    def _parse_response(self, data: Dict[str, Any], league_name: str, league_id: str) -> List[ScrapedOdds]:
         """
         Parse Superbet API response.
         
@@ -221,6 +221,7 @@ class SuperbetScraper(BaseScraper):
                 extra_data={
                     "superbet_event_id": event.get("eventId"),
                     "superbet_offer_id": event.get("offerId"),
+                    "superbet_league_id": league_id,
                 }
             )
             
