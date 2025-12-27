@@ -300,8 +300,8 @@ class SupabaseClient:
         self,
         match_id: str,
         alert_type: str,
-        message: str,
-        data: Dict[str, Any]
+        title: str,
+        details: Dict[str, Any]
     ) -> Optional[Dict[str, Any]]:
         """Create a new alert."""
         try:
@@ -310,8 +310,8 @@ class SupabaseClient:
                 .insert({
                     "match_id": match_id,
                     "alert_type": alert_type,
-                    "message": message,
-                    "data": data,
+                    "title": title,
+                    "details": details,
                     "is_read": False,
                 })
                 .execute()
