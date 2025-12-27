@@ -107,6 +107,7 @@ export interface OddsComparison {
   scraped_at: string;
   margin_percentage: number | null;
   data_age_seconds: number;
+  extra_data?: Record<string, unknown>;
 }
 
 // Grouped odds by match for dashboard display
@@ -136,4 +137,5 @@ export interface BookmakerOdds {
   margin_percentage: number | null;
   data_age_seconds: number;
   scraped_at: string;
+  extra_data?: Record<string, unknown>;
 }

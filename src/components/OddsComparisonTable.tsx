@@ -7,7 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { TrendingUp, TrendingDown, Clock, AlertTriangle } from 'lucide-react';
+import { TrendingUp, TrendingDown, Clock, AlertTriangle, ExternalLink } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 import type { MatchOddsGroup, BookmakerOdds } from '@/types/database';
 
@@ -170,7 +171,28 @@ function BestOddsSummary({ match, hasArbitrage, arbitrageValue }: { match: Match
   );
 }
 
-function OddsRow({ 
+// Função para gerar link da casa de apostas baseado no extra_data
+function generateBookmakerLink(bookmakerName: string, extraData?: Record<string, unknown>): string | null {
+  if (!extraData) return null;
+  
+  const name = bookmakerName.toLowerCase();
+  
+  // Betbra
+  if (name.includes('betbra')) {
+    const eventId = extraData.betbra_event_id;
+    const marketId = extraData.betbra_market_id;
+    if (eventId && marketId) {
+      return `https://betbra.bet.br/b/exchange/sport/soccer/event/${eventId}/market/${marketId}`;
+    }
+  }
+  
+  // Superbet (adicionar quando tivermos os dados)
+  // if (name.includes('superbet')) { ... }
+  
+  return null;
+}
+
+function OddsRow({
   odds, 
   bestHome, 
   bestDraw, 
@@ -190,11 +212,24 @@ function OddsRow({
   const isStale = odds.data_age_seconds > 30; // More than 30 seconds old
   const isVeryStale = odds.data_age_seconds > 120; // More than 2 minutes old
   
+  // Gerar link da casa de apostas
+  const bookmakerLink = generateBookmakerLink(odds.bookmaker_name, odds.extra_data);
+
   return (
     <TableRow className={cn(isStale && "opacity-60", isVeryStale && "opacity-40")}>
       <TableCell className="font-medium">
         <div className="flex items-center gap-2">
           {odds.bookmaker_name}
+          {bookmakerLink && (
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-6 w-6"
+              onClick={() => window.open(bookmakerLink, '_blank')}
+            >
+              <ExternalLink className="h-4 w-4 text-muted-foreground hover:text-primary" />
+            </Button>
+          )}
           {isVeryStale && <Badge variant="destructive" className="text-xs">DESATUALIZADO</Badge>}
           {isStale && !isVeryStale && <Clock className="h-3 w-3 text-muted-foreground" />}
         </div>
