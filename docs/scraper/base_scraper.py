@@ -86,7 +86,7 @@ class BaseScraper(ABC):
     def __init__(self, name: str, base_url: str):
         self.name = name
         self.base_url = base_url
-        self.logger = logger.bind(scraper=name)
+        self.logger = logger.bind(component=name)
         self._browser = None
         self._context = None
     
