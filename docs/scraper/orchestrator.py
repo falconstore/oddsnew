@@ -351,7 +351,7 @@ class Orchestrator:
             
             # Create normalized record
             normalized.append({
-    "match_id": match_id,
+                "match_id": match["id"],
     "bookmaker_id": bookmaker_id,
     "market_type": odds.market_type,
     "home_odd": odds.home_odd,
