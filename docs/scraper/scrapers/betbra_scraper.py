@@ -6,7 +6,7 @@ API: https://mexchange-api.betbra.bet.br/api/events
 """
 
 import aiohttp
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import List, Dict, Any, Optional
 
 from base_scraper import BaseScraper, ScrapedOdds, LeagueConfig
@@ -27,16 +27,6 @@ class BetbraScraper(BaseScraper):
             "name": "Premier League",
             "country": "England",
             "tag_url_name": "english-premier-league",
-        },
-        "brasileirao_a": {
-            "name": "Brasileirão Série A",
-            "country": "Brazil",
-            "tag_url_name": "brazilian-serie-a",
-        },
-        "la_liga": {
-            "name": "La Liga",
-            "country": "Spain",
-            "tag_url_name": "spanish-la-liga",
         },
     }
     
