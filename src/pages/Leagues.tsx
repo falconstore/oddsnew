@@ -67,9 +67,12 @@ const Leagues = () => {
                 Nova Liga
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent aria-describedby="league-dialog-description">
               <DialogHeader>
                 <DialogTitle>{editingLeague ? 'Editar Liga' : 'Nova Liga'}</DialogTitle>
+                <p id="league-dialog-description" className="text-sm text-muted-foreground">
+                  {editingLeague ? 'Altere os dados da liga abaixo.' : 'Preencha os dados para criar uma nova liga.'}
+                </p>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
