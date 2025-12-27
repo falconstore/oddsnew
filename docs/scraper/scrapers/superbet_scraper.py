@@ -92,8 +92,8 @@ class SuperbetScraper(BaseScraper):
             raise RuntimeError("Session not initialized. Call setup() first.")
         
         now = datetime.now(timezone.utc)
-        start_date = now.strftime("%Y-%m-%dT00:00:00Z")
-        end_date = (now + timedelta(days=30)).strftime("%Y-%m-%dT00:00:00Z")
+        start_date = now.strftime("%Y-%m-%d 00:00:00")
+        end_date = (now + timedelta(days=30)).strftime("%Y-%m-%d 00:00:00")
         
         url = (
             f"{self.API_BASE}?"
