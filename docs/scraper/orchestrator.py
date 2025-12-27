@@ -59,8 +59,8 @@ class AlertDetector:
             await self.supabase.create_alert(
                 match_id=alert["match_id"],
                 alert_type=alert["type"],
-                message=alert["message"],
-                data=alert["data"]
+                title=alert["message"],
+                details=alert["data"]
             )
         
         return alerts

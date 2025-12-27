@@ -188,6 +188,15 @@ class TeamMatcher:
         """
         import asyncio
         
+        # Check if alias already exists in cache to avoid duplicate key errors
+        key = (alias_name.lower(), bookmaker.lower())
+        if key in self.aliases_cache:
+            self.logger.debug(f"Alias already exists: '{alias_name}' ({bookmaker})")
+            return
+        
+        # Add to cache immediately to prevent duplicate attempts
+        self.aliases_cache[key] = team_id
+        
         async def _create():
             try:
                 await self.supabase.create_team_alias(
@@ -195,12 +204,14 @@ class TeamMatcher:
                     alias_name=alias_name,
                     bookmaker_source=bookmaker
                 )
-                # Update local cache
-                key = (alias_name.lower(), bookmaker.lower())
-                self.aliases_cache[key] = team_id
                 self.logger.info(f"Created alias: '{alias_name}' ({bookmaker}) -> {team_id}")
             except Exception as e:
-                self.logger.error(f"Failed to create alias: {e}")
+                # Remove from cache if creation failed (but keep if it's a duplicate key error)
+                if "duplicate key" not in str(e).lower():
+                    self.aliases_cache.pop(key, None)
+                    self.logger.error(f"Failed to create alias: {e}")
+                else:
+                    self.logger.debug(f"Alias already exists in DB: '{alias_name}' ({bookmaker})")
         
         # Schedule the async task
         try:
