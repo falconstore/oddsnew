@@ -34,6 +34,8 @@ class TeamMatcher:
         # Configuration
         self.min_score = 85  # Minimum similarity score for fuzzy match
         self.auto_create_alias = True  # Auto-create aliases for fuzzy matches
+        self.auto_create_team = True  # Auto-create teams from primary bookmaker
+        self.primary_bookmaker = "betano"  # Bookmaker that defines standard names
     
     async def load_cache(self):
         """
@@ -61,10 +63,11 @@ class TeamMatcher:
             f"{len(self.aliases_cache)} aliases"
         )
     
-    def find_team_id(
+    async def find_team_id(
         self, 
         raw_name: str, 
-        bookmaker: str
+        bookmaker: str,
+        league_id: str = None
     ) -> Optional[str]:
         """
         Find the team ID for a raw team name from a specific bookmaker.
@@ -72,6 +75,7 @@ class TeamMatcher:
         Args:
             raw_name: Team name as it appears on the bookmaker site
             bookmaker: Name of the bookmaker (e.g., "Betano")
+            league_id: League ID (required for auto-creating teams)
             
         Returns:
             Team ID if found, None otherwise
@@ -98,8 +102,30 @@ class TeamMatcher:
         if team_id and self.auto_create_alias:
             # Create alias for future exact matches
             self._create_alias_async(team_id, raw_name, bookmaker)
+            return team_id
         
-        return team_id
+        # Step 4: Auto-create team if primary bookmaker (Betano)
+        if self.auto_create_team and normalized_bookmaker == self.primary_bookmaker and league_id:
+            team_id = await self._create_team(raw_name.strip(), league_id)
+            if team_id:
+                return team_id
+        
+        return None
+    
+    async def _create_team(self, name: str, league_id: str) -> Optional[str]:
+        """Create a new team in the database and update cache."""
+        try:
+            team = await self.supabase.create_team(name, league_id)
+            if team:
+                team_id = team["id"]
+                # Update local caches
+                self.teams_cache[team_id] = name
+                self.reverse_cache[name.lower()] = team_id
+                self.logger.info(f"Auto-created team: '{name}' in league {league_id}")
+                return team_id
+        except Exception as e:
+            self.logger.error(f"Failed to create team '{name}': {e}")
+        return None
     
     def _fuzzy_match(self, raw_name: str) -> Optional[str]:
         """

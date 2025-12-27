@@ -314,14 +314,22 @@ class Orchestrator:
                 self.logger.warning(f"Unknown bookmaker: {odds.bookmaker_name}")
                 continue
             
-            # Match teams
-            home_team_id = self.team_matcher.find_team_id(
+            # Match league first (needed for auto-creating teams)
+            league_id = self.league_matcher.find_league_id(odds.league_raw)
+            if not league_id:
+                self.logger.warning(f"Unknown league: {odds.league_raw}")
+                continue
+            
+            # Match teams (pass league_id for auto-creation)
+            home_team_id = await self.team_matcher.find_team_id(
                 odds.home_team_raw, 
-                odds.bookmaker_name
+                odds.bookmaker_name,
+                league_id=league_id
             )
-            away_team_id = self.team_matcher.find_team_id(
+            away_team_id = await self.team_matcher.find_team_id(
                 odds.away_team_raw, 
-                odds.bookmaker_name
+                odds.bookmaker_name,
+                league_id=league_id
             )
             
             if not home_team_id:
@@ -330,13 +338,6 @@ class Orchestrator:
             if not away_team_id:
                 unmatched_teams.append((odds.away_team_raw, odds.bookmaker_name))
                 continue
-            
-            # Match league
-            league_id = self.league_matcher.find_league_id(odds.league_raw)
-            if not league_id:
-                self.logger.warning(f"Unknown league: {odds.league_raw}")
-                continue
-            
             # Find or create match
             match = await self.supabase.find_or_create_match(
                 league_id=league_id,

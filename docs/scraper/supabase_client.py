@@ -54,6 +54,26 @@ class SupabaseClient:
             self.logger.error(f"Error finding team: {e}")
             return None
     
+    async def create_team(
+        self, 
+        standard_name: str, 
+        league_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """Create a new team."""
+        try:
+            response = (
+                self.client.table("teams")
+                .insert({
+                    "standard_name": standard_name,
+                    "league_id": league_id,
+                })
+                .execute()
+            )
+            return response.data[0] if response.data else None
+        except Exception as e:
+            self.logger.error(f"Error creating team: {e}")
+            return None
+    
     # ==========================================
     # TEAM ALIASES
     # ==========================================
