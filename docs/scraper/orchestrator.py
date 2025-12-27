@@ -208,7 +208,7 @@ class Orchestrator:
         
         # Load bookmaker IDs
         bookmakers = await self.supabase.fetch_bookmakers()
-        self.bookmaker_ids = {b["name"]: b["id"] for b in bookmakers}
+        self.bookmaker_ids = {b["name"].lower(): b["id"] for b in bookmakers}
         
         self.logger.info(
             f"Initialized with {len(self.scrapers)} scrapers, "
@@ -308,8 +308,8 @@ class Orchestrator:
         unmatched_teams = []
         
         for odds in odds_list:
-            # Get bookmaker ID
-            bookmaker_id = self.bookmaker_ids.get(odds.bookmaker_name)
+            # Get bookmaker ID (case-insensitive)
+            bookmaker_id = self.bookmaker_ids.get(odds.bookmaker_name.lower())
             if not bookmaker_id:
                 self.logger.warning(f"Unknown bookmaker: {odds.bookmaker_name}")
                 continue
