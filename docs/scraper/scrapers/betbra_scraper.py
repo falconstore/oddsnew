@@ -74,7 +74,7 @@ class BetbraScraper(BaseScraper):
         """Return list of configured leagues."""
         return [
             LeagueConfig(
-                id=league_id,
+                league_id=league_id,
                 name=config["name"],
                 url=config["tag_url_name"],
                 country=config["country"]
