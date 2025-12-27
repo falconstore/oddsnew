@@ -80,8 +80,16 @@ function MatchCard({ match }: { match: MatchOddsGroup }) {
   const matchDate = new Date(match.match_date);
   const isLive = match.match_status === 'live';
   
+  // Calculate arbitrage value
+  const arbitrageValue = (1/match.best_home + 1/match.best_draw + 1/match.best_away);
+  const hasArbitrage = arbitrageValue < 1 && match.odds.length > 0;
+  const profitPercentage = hasArbitrage ? ((1 - arbitrageValue) * 100).toFixed(2) : null;
+  
   return (
-    <Card className={cn(isLive && "border-primary")}>
+    <Card className={cn(
+      isLive && "border-primary",
+      hasArbitrage && "border-2 border-green-500 shadow-lg shadow-green-500/20 animate-pulse"
+    )}>
       <CardHeader className="pb-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="space-y-1">
@@ -94,7 +102,12 @@ function MatchCard({ match }: { match: MatchOddsGroup }) {
               {isLive && <Badge className="bg-destructive">AO VIVO</Badge>}
             </div>
           </div>
-          <BestOddsSummary match={match} />
+          {hasArbitrage && (
+            <Badge className="bg-green-500 text-white animate-pulse text-sm px-3 py-1">
+              🎯 SUREBET +{profitPercentage}%
+            </Badge>
+          )}
+          <BestOddsSummary match={match} hasArbitrage={hasArbitrage} arbitrageValue={arbitrageValue} />
         </div>
       </CardHeader>
       <CardContent>
@@ -128,23 +141,31 @@ function MatchCard({ match }: { match: MatchOddsGroup }) {
   );
 }
 
-function BestOddsSummary({ match }: { match: MatchOddsGroup }) {
+function BestOddsSummary({ match, hasArbitrage, arbitrageValue }: { match: MatchOddsGroup; hasArbitrage: boolean; arbitrageValue: number }) {
   if (match.odds.length === 0) return null;
   
+  const marginPercentage = ((arbitrageValue - 1) * 100).toFixed(2);
+  
   return (
-    <div className="flex gap-4 text-sm">
+    <div className="flex gap-4 text-sm items-center">
       <div className="text-center">
         <div className="text-muted-foreground">Melhor Casa</div>
-        <div className="font-bold text-lg text-primary">{match.best_home.toFixed(2)}</div>
+        <div className={cn("font-bold text-lg", hasArbitrage ? "text-green-500" : "text-primary")}>{match.best_home.toFixed(2)}</div>
       </div>
       <div className="text-center">
         <div className="text-muted-foreground">Melhor Empate</div>
-        <div className="font-bold text-lg text-primary">{match.best_draw.toFixed(2)}</div>
+        <div className={cn("font-bold text-lg", hasArbitrage ? "text-green-500" : "text-primary")}>{match.best_draw.toFixed(2)}</div>
       </div>
       <div className="text-center">
         <div className="text-muted-foreground">Melhor Fora</div>
-        <div className="font-bold text-lg text-primary">{match.best_away.toFixed(2)}</div>
+        <div className={cn("font-bold text-lg", hasArbitrage ? "text-green-500" : "text-primary")}>{match.best_away.toFixed(2)}</div>
       </div>
+      {!hasArbitrage && (
+        <div className="text-center border-l pl-4">
+          <div className="text-muted-foreground">Margem</div>
+          <div className="font-bold text-lg text-muted-foreground">{marginPercentage}%</div>
+        </div>
+      )}
     </div>
   );
 }
@@ -166,14 +187,16 @@ function OddsRow({
   worstDraw: number;
   worstAway: number;
 }) {
-  const isStale = odds.data_age_seconds > 60; // More than 1 minute old
+  const isStale = odds.data_age_seconds > 30; // More than 30 seconds old
+  const isVeryStale = odds.data_age_seconds > 120; // More than 2 minutes old
   
   return (
-    <TableRow className={cn(isStale && "opacity-50")}>
+    <TableRow className={cn(isStale && "opacity-60", isVeryStale && "opacity-40")}>
       <TableCell className="font-medium">
         <div className="flex items-center gap-2">
           {odds.bookmaker_name}
-          {isStale && <Clock className="h-3 w-3 text-muted-foreground" />}
+          {isVeryStale && <Badge variant="destructive" className="text-xs">DESATUALIZADO</Badge>}
+          {isStale && !isVeryStale && <Clock className="h-3 w-3 text-muted-foreground" />}
         </div>
       </TableCell>
       <TableCell className="text-center">
