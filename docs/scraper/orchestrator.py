@@ -351,13 +351,13 @@ class Orchestrator:
             
             # Create normalized record
             normalized.append({
-                "match_id": match["id"],
-                "bookmaker_id": bookmaker_id,
-                "home_odd": odds.home_odd,
-                "draw_odd": odds.draw_odd,
-                "away_odd": odds.away_odd,
-                "margin": odds.calculate_margin(),
-                "scraped_at": odds.scraped_at.isoformat(),
+    "match_id": match_id,
+    "bookmaker_id": bookmaker_id,
+    "market_type": odds.market_type,
+    "home_odd": odds.home_odd,
+    "draw_odd": odds.draw_odd,
+    "away_odd": odds.away_odd,
+    "scraped_at": odds.scraped_at.isoformat(),
             })
         
         # Log unmatched teams for review
