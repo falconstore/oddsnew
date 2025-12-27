@@ -54,29 +54,35 @@ BOOKMAKERS = {
         "enabled": True,
         "priority": 1,
     },
+    "superbet": {
+        "name": "Superbet",
+        "base_url": "https://superbet.bet.br",
+        "enabled": True,
+        "priority": 2,
+    },
     "bet365": {
         "name": "Bet365",
         "base_url": "https://www.bet365.com",
         "enabled": True,
-        "priority": 2,
+        "priority": 3,
     },
     "sportingbet": {
         "name": "Sportingbet",
         "base_url": "https://www.sportingbet.com",
         "enabled": True,
-        "priority": 3,
+        "priority": 4,
     },
     "betfair": {
         "name": "Betfair",
         "base_url": "https://www.betfair.com",
         "enabled": True,
-        "priority": 4,
+        "priority": 5,
     },
     "1xbet": {
         "name": "1xBet",
         "base_url": "https://www.1xbet.com",
         "enabled": True,
-        "priority": 5,
+        "priority": 6,
     },
 }
 
