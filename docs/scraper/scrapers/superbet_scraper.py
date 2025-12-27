@@ -185,7 +185,12 @@ class SuperbetScraper(BaseScraper):
             draw_odd = None
             away_odd = None
             
-            for odd in event.get("odds", []):
+            event_odds = event.get("odds") or []
+            if not event_odds:
+                self.logger.debug(f"No odds available for: {match_name}")
+                continue
+            
+            for odd in event_odds:
                 if odd.get("marketId") == 547:
                     code = odd.get("code")
                     price = odd.get("price")
