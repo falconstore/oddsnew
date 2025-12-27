@@ -85,6 +85,7 @@ CREATE TABLE public.odds_history (
     over_line DECIMAL(4,2), -- Para over/under
     over_odd DECIMAL(6,3),
     under_odd DECIMAL(6,3),
+    extra_data JSONB DEFAULT '{}'::jsonb, -- Links e metadados (betbra_event_id, betbra_market_id, etc.)
     scraped_at TIMESTAMPTZ DEFAULT NOW(),
     is_latest BOOLEAN DEFAULT TRUE
 );
@@ -140,6 +141,7 @@ SELECT
     oh.home_odd,
     oh.draw_odd,
     oh.away_odd,
+    oh.extra_data, -- Links das partidas (betbra_event_id, betbra_market_id, etc.)
     oh.scraped_at,
     -- Cálculo de margem
     CASE 
