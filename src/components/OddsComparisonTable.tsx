@@ -133,6 +133,8 @@ function MatchCard({ match }: { match: MatchOddsGroup }) {
                 worstHome={match.worst_home}
                 worstDraw={match.worst_draw}
                 worstAway={match.worst_away}
+                homeTeam={match.home_team}
+                awayTeam={match.away_team}
               />
             ))}
           </TableBody>
@@ -172,7 +174,12 @@ function BestOddsSummary({ match, hasArbitrage, arbitrageValue }: { match: Match
 }
 
 // Função para gerar link da casa de apostas baseado no extra_data
-function generateBookmakerLink(bookmakerName: string, extraData?: Record<string, unknown>): string | null {
+function generateBookmakerLink(
+  bookmakerName: string, 
+  extraData?: Record<string, unknown>,
+  homeTeam?: string,
+  awayTeam?: string
+): string | null {
   if (!extraData) return null;
   
   const name = bookmakerName.toLowerCase();
@@ -186,8 +193,20 @@ function generateBookmakerLink(bookmakerName: string, extraData?: Record<string,
     }
   }
   
-  // Superbet (adicionar quando tivermos os dados)
-  // if (name.includes('superbet')) { ... }
+  // Betano
+  if (name.includes('betano')) {
+    const eventId = extraData.betano_event_id;
+    if (eventId && homeTeam && awayTeam) {
+      // Gerar slug: "Chelsea" + "Aston Villa" -> "chelsea-aston-villa"
+      const slug = `${homeTeam}-${awayTeam}`
+        .toLowerCase()
+        .replace(/\s+/g, '-')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+      
+      return `https://www.betano.bet.br/odds/${slug}/${eventId}/`;
+    }
+  }
   
   return null;
 }
@@ -199,7 +218,9 @@ function OddsRow({
   bestAway,
   worstHome,
   worstDraw,
-  worstAway
+  worstAway,
+  homeTeam,
+  awayTeam
 }: { 
   odds: BookmakerOdds;
   bestHome: number;
@@ -208,12 +229,14 @@ function OddsRow({
   worstHome: number;
   worstDraw: number;
   worstAway: number;
+  homeTeam: string;
+  awayTeam: string;
 }) {
   const isStale = odds.data_age_seconds > 30; // More than 30 seconds old
   const isVeryStale = odds.data_age_seconds > 120; // More than 2 minutes old
   
   // Gerar link da casa de apostas
-  const bookmakerLink = generateBookmakerLink(odds.bookmaker_name, odds.extra_data);
+  const bookmakerLink = generateBookmakerLink(odds.bookmaker_name, odds.extra_data, homeTeam, awayTeam);
 
   return (
     <TableRow className={cn(isStale && "opacity-60", isVeryStale && "opacity-40")}>
