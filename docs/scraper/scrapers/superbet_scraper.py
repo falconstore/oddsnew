@@ -25,12 +25,16 @@ class SuperbetScraper(BaseScraper):
             "name": "Premier League",
             "country": "Inglaterra",
         },
-        # Future leagues can be added here
-        # "brasileirao_a": {
-        #     "id": "XXX",
-        #     "name": "Brasileirão Série A",
-        #     "country": "Brasil",
-        # },
+        "serie_a": {
+            "id": "104",
+            "name": "Serie A",
+            "country": "Itália",
+        },
+        "la_liga": {
+            "id": "98",
+            "name": "La Liga",
+            "country": "Espanha",
+        },
     }
     
     API_BASE = "https://production-superbet-offer-br.freetls.fastly.net/v2/pt-BR/events/by-date"
