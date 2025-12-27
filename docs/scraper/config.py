@@ -84,6 +84,13 @@ BOOKMAKERS = {
         "enabled": True,
         "priority": 6,
     },
+    "betbra": {
+        "name": "Betbra",
+        "base_url": "https://betbra.bet.br",
+        "enabled": True,
+        "priority": 7,
+        "type": "exchange",  # Exchange - only uses BACK odds
+    },
 }
 
 # League mappings (URL paths for each bookmaker)
