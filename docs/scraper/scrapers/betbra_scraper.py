@@ -182,61 +182,113 @@ class BetbraScraper(BaseScraper):
     
     async def _scrape_with_playwright(self, league: LeagueConfig) -> List[ScrapedOdds]:
         """
-        Fallback method: Use Playwright to make API request.
+        Fallback method: Use Playwright APIRequestContext to make API request.
         
-        Executes fetch() within the browser context, which has valid cookies.
+        Uses context.request (not page.evaluate fetch) to bypass CORS issues.
         """
-        if not self._page:
-            self._log.error("Playwright page not available")
+        if not self._context:
+            self._log.error("Playwright context not available")
             return []
         
         try:
-            # Ensure we're on the betbra domain
-            current_url = self._page.url
-            if "betbra.bet.br" not in current_url:
-                await self._page.goto(self.base_url, wait_until="domcontentloaded", timeout=30000)
-                await self._page.wait_for_timeout(1000)
-            
             # Build full URL with query params
             params = f"offset=0&per-page=100&tag-url-names={league.url},soccer&sort-by=volume&sort-direction=desc&en-market-names=Moneyline,Match Odds,Winner"
             full_url = f"{self.API_BASE}?{params}"
             
-            self._log.debug(f"Playwright fetching: {full_url}")
+            self._log.debug(f"Playwright APIRequest fetching: {full_url}")
             
-            data = await self._page.evaluate(f"""
-                async () => {{
-                    try {{
-                        const response = await fetch("{full_url}", {{
-                            headers: {{
-                                "Accept": "application/json",
-                                "Accept-Language": "pt-BR,pt;q=0.8,en-US;q=0.5,en;q=0.3",
-                            }},
-                            credentials: "include"
-                        }});
-                        if (!response.ok) {{
-                            return {{ error: response.status }};
-                        }}
-                        return await response.json();
-                    }} catch (e) {{
-                        return {{ error: e.message }};
-                    }}
-                }}
-            """)
+            # Use Playwright's APIRequestContext (bypasses CORS)
+            response = await self._context.request.get(
+                full_url,
+                headers={
+                    "Accept": "application/json",
+                    "Accept-Language": "pt-BR,pt;q=0.8,en-US;q=0.5,en;q=0.3",
+                    "Accept-Encoding": "gzip, deflate, br",
+                    "Origin": "https://betbra.bet.br",
+                    "Referer": "https://betbra.bet.br/",
+                }
+            )
             
-            if isinstance(data, dict) and "error" in data:
-                self._log.error(f"Playwright fetch error for {league.name}: {data['error']}")
-                return []
+            status = response.status
+            self._log.debug(f"Playwright APIRequest status: {status}")
+            
+            if status != 200:
+                body_text = await response.text()
+                self._log.error(f"Playwright API error {status} for {league.name}: {body_text[:300]}")
+                
+                # Final fallback: use page.goto to navigate directly to API URL
+                return await self._scrape_with_page_goto(league)
+            
+            data = await response.json()
             
             if "events" not in data:
                 self._log.warning(f"No events in Playwright response for {league.name}")
                 return []
             
             odds_list = self._parse_response(data, league.name)
-            self._log.info(f"{league.name}: {len(odds_list)} matches parsed (via Playwright)")
+            self._log.info(f"{league.name}: {len(odds_list)} matches parsed (via Playwright APIRequest)")
             return odds_list
             
         except Exception as e:
-            self._log.error(f"Playwright scrape failed for {league.name}: {e}")
+            self._log.error(f"Playwright APIRequest failed for {league.name}: {e}")
+            # Final fallback: use page.goto
+            return await self._scrape_with_page_goto(league)
+    
+    async def _scrape_with_page_goto(self, league: LeagueConfig) -> List[ScrapedOdds]:
+        """
+        Final fallback: Navigate directly to API URL using page.goto.
+        
+        This method bypasses CORS entirely as it's a direct navigation.
+        """
+        if not self._page:
+            self._log.error("Playwright page not available")
+            return []
+        
+        try:
+            params = f"offset=0&per-page=100&tag-url-names={league.url},soccer&sort-by=volume&sort-direction=desc&en-market-names=Moneyline,Match Odds,Winner"
+            full_url = f"{self.API_BASE}?{params}"
+            
+            self._log.debug(f"Playwright page.goto fetching: {full_url}")
+            
+            response = await self._page.goto(full_url, wait_until="domcontentloaded", timeout=30000)
+            
+            if not response:
+                self._log.error(f"No response from page.goto for {league.name}")
+                return []
+            
+            status = response.status
+            self._log.debug(f"Playwright page.goto status: {status}")
+            
+            if status != 200:
+                body_text = await self._page.content()
+                self._log.error(f"page.goto error {status} for {league.name}: {body_text[:300]}")
+                return []
+            
+            # Get JSON from page content
+            body_text = await self._page.content()
+            
+            # The response might be wrapped in HTML tags, extract JSON
+            import json
+            import re
+            
+            # Try to find JSON in the page content
+            json_match = re.search(r'\{.*\}', body_text, re.DOTALL)
+            if not json_match:
+                self._log.error(f"No JSON found in page.goto response for {league.name}")
+                return []
+            
+            data = json.loads(json_match.group())
+            
+            if "events" not in data:
+                self._log.warning(f"No events in page.goto response for {league.name}")
+                return []
+            
+            odds_list = self._parse_response(data, league.name)
+            self._log.info(f"{league.name}: {len(odds_list)} matches parsed (via page.goto)")
+            return odds_list
+            
+        except Exception as e:
+            self._log.error(f"page.goto scrape failed for {league.name}: {e}")
             return []
     
     def _parse_response(self, data: Dict[str, Any], league_name: str) -> List[ScrapedOdds]:

@@ -72,9 +72,12 @@ const Bookmakers = () => {
                 Nova Casa
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent aria-describedby="bookmaker-dialog-description">
               <DialogHeader>
                 <DialogTitle>{editing ? 'Editar Casa de Apostas' : 'Nova Casa de Apostas'}</DialogTitle>
+                <p id="bookmaker-dialog-description" className="text-sm text-muted-foreground">
+                  {editing ? 'Altere os dados da casa de apostas.' : 'Preencha os dados para cadastrar uma nova casa.'}
+                </p>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">

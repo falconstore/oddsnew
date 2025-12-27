@@ -90,9 +90,12 @@ const Teams = () => {
                 Novo Time
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent aria-describedby="team-dialog-description">
               <DialogHeader>
                 <DialogTitle>{editingTeam ? 'Editar Time' : 'Novo Time'}</DialogTitle>
+                <p id="team-dialog-description" className="text-sm text-muted-foreground">
+                  {editingTeam ? 'Altere os dados do time abaixo.' : 'Preencha os dados para criar um novo time.'}
+                </p>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
@@ -220,9 +223,12 @@ const Teams = () => {
 
         {/* Alias Dialog */}
         <Dialog open={isAliasDialogOpen} onOpenChange={setIsAliasDialogOpen}>
-          <DialogContent>
+          <DialogContent aria-describedby="alias-dialog-description">
             <DialogHeader>
               <DialogTitle>Adicionar Alias para {selectedTeamForAlias?.standard_name}</DialogTitle>
+              <p id="alias-dialog-description" className="text-sm text-muted-foreground">
+                Adicione um nome alternativo usado por casas de apostas.
+              </p>
             </DialogHeader>
             <form onSubmit={handleAddAlias} className="space-y-4">
               <div className="space-y-2">
