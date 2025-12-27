@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     supabase_service_key: str
     
     # Scraping Configuration
-    scrape_interval_seconds: int = 60
+    scrape_interval_seconds: int = 20
     stale_data_threshold_minutes: int = 30
     request_timeout_seconds: int = 30
     max_retries: int = 3
