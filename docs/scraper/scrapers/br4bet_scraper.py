@@ -1,24 +1,28 @@
 """
 Br4bet Scraper - Scrapes odds from Br4bet via Altenar API.
 
-Uses simple REST API - requires Authorization header.
+Uses Playwright to establish browser session (required for anti-bot protection).
 API endpoint: https://sb2frontend-altenar2.biahosted.com/api/widget/GetEvents
 
-Environment Variables:
-    BR4BET_AUTHORIZATION: Authorization token captured from browser DevTools
+Note: No Authorization token needed - Playwright handles session/cookies automatically.
 """
 
-import aiohttp
+import json
+import re
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 
+from playwright.async_api import async_playwright, Playwright, Browser, BrowserContext, Page
+
 from base_scraper import BaseScraper, ScrapedOdds, LeagueConfig
-from config import settings
 
 
 class Br4betScraper(BaseScraper):
     """
     Scraper for Br4bet (uses Altenar backend).
+    
+    Uses Playwright to bypass anti-bot protection by establishing
+    a real browser session before making API calls.
     
     API Structure:
     - events: List of matches with competitors
@@ -56,76 +60,64 @@ class Br4betScraper(BaseScraper):
             name="br4bet",
             base_url="https://br4.bet.br"
         )
-        self._session: Optional[aiohttp.ClientSession] = None
+        self._playwright: Optional[Playwright] = None
+        self._browser: Optional[Browser] = None
+        self._context: Optional[BrowserContext] = None
+        self._page: Optional[Page] = None
     
     async def setup(self):
-        """Initialize aiohttp session with required headers."""
+        """Initialize Playwright browser and establish session."""
         await super().setup()
         
-        # Get Authorization token from settings and normalize it
-        auth_token = (settings.br4bet_authorization or "").strip()
+        self.logger.info("Starting Playwright browser...")
+        self._playwright = await async_playwright().start()
         
-        # Remove common prefixes if accidentally included
-        for prefix in ["Bearer ", "bearer ", "Authorization: ", "authorization: "]:
-            if auth_token.startswith(prefix):
-                auth_token = auth_token[len(prefix):].strip()
-                self.logger.info(f"Removed '{prefix.strip()}' prefix from token")
+        self._browser = await self._playwright.chromium.launch(
+            headless=True,
+            args=['--no-sandbox', '--disable-dev-shm-usage']
+        )
         
-        if not auth_token:
-            self.logger.warning(
-                "BR4BET_AUTHORIZATION not set. API may return 400 errors. "
-                "Capture the Authorization header from br4.bet.br DevTools."
-            )
-        else:
-            # Log token info for debugging (first/last 10 chars only for security)
-            token_preview = f"{auth_token[:10]}...{auth_token[-10:]}" if len(auth_token) > 20 else "[short token]"
-            self.logger.info(f"Authorization token configured: {token_preview} (length: {len(auth_token)})")
+        self._context = await self._browser.new_context(
+            user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:133.0) Gecko/20100101 Firefox/133.0",
+            locale="pt-BR",
+            timezone_id="America/Sao_Paulo",
+            extra_http_headers={
+                "Accept-Language": "pt-BR,pt;q=0.8,en-US;q=0.5,en;q=0.3",
+            }
+        )
         
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:146.0) Gecko/20100101 Firefox/146.0",
-            "Accept": "*/*",
-            "Accept-Language": "pt-BR,pt;q=0.8,en-US;q=0.5,en;q=0.3",
-            "Accept-Encoding": "gzip, deflate, br, zstd",
-            "Origin": "https://br4.bet.br",
-            "Referer": "https://br4.bet.br/",
-            "Connection": "keep-alive",
-            "Sec-Fetch-Dest": "empty",
-            "Sec-Fetch-Mode": "cors",
-            "Sec-Fetch-Site": "cross-site",
-        }
+        self._page = await self._context.new_page()
         
-        if auth_token:
-            headers["Authorization"] = auth_token
-        
-        self._session = aiohttp.ClientSession(headers=headers)
-        
-        # Warm-up request to establish cookies/session
-        await self._warmup_session()
-    
-    async def _warmup_session(self):
-        """Make a warm-up request to establish cookies/session before API calls."""
+        # Navigate to main site to establish session/cookies
+        self.logger.info("Establishing session at br4.bet.br...")
         try:
-            self.logger.info("Performing warm-up request to br4.bet.br...")
-            async with self._session.get(self.base_url, allow_redirects=True) as response:
-                self.logger.info(f"Warm-up response: {response.status}")
-                # Read body to ensure cookies are captured
-                await response.text()
-                
-                # Log cookies captured
-                cookies = self._session.cookie_jar.filter_cookies(self.base_url)
-                if cookies:
-                    cookie_names = list(cookies.keys())
-                    self.logger.info(f"Cookies captured: {cookie_names}")
-                else:
-                    self.logger.warning("No cookies captured from warm-up request")
+            await self._page.goto(self.base_url, wait_until="domcontentloaded", timeout=30000)
+            await self._page.wait_for_timeout(2000)  # Wait for any JS to execute
+            
+            # Log cookies captured
+            cookies = await self._context.cookies()
+            if cookies:
+                cookie_names = [c["name"] for c in cookies]
+                self.logger.info(f"Session established. Cookies: {cookie_names}")
+            else:
+                self.logger.warning("No cookies captured from session")
         except Exception as e:
-            self.logger.warning(f"Warm-up request failed (continuing anyway): {e}")
+            self.logger.warning(f"Session setup warning (continuing anyway): {e}")
     
     async def teardown(self):
-        """Clean up aiohttp session."""
-        if self._session:
-            await self._session.close()
-            self._session = None
+        """Clean up Playwright resources."""
+        if self._page:
+            await self._page.close()
+            self._page = None
+        if self._context:
+            await self._context.close()
+            self._context = None
+        if self._browser:
+            await self._browser.close()
+            self._browser = None
+        if self._playwright:
+            await self._playwright.stop()
+            self._playwright = None
         await super().teardown()
     
     async def get_available_leagues(self) -> List[LeagueConfig]:
@@ -141,9 +133,9 @@ class Br4betScraper(BaseScraper):
         ]
     
     async def scrape_league(self, league: LeagueConfig) -> List[ScrapedOdds]:
-        """Scrape odds for a specific league."""
-        if not self._session:
-            raise RuntimeError("Session not initialized. Call setup() first.")
+        """Scrape odds for a specific league using Playwright."""
+        if not self._page:
+            raise RuntimeError("Page not initialized. Call setup() first.")
         
         url = (
             f"{self.API_BASE}?"
@@ -154,29 +146,45 @@ class Br4betScraper(BaseScraper):
             f"&numFormat=en-GB"
             f"&countryCode=BR"
             f"&eventCount=0"
-            f"&sportId=0"
+            f"&sportId=66"
             f"&champIds={league.league_id}"
         )
         
         try:
             self.logger.debug(f"Requesting: {url}")
-            async with self._session.get(url) as response:
-                if response.status != 200:
-                    error_text = await response.text()
-                    self.logger.error(f"HTTP {response.status} for {league.name}")
-                    # Use INFO level so it shows without --debug flag
-                    self.logger.info(f"Response body: {error_text[:500]}")
-                    
-                    # Additional diagnostics for 400 errors
-                    if response.status == 400:
-                        self.logger.info(f"Request headers: Authorization={'[SET]' if 'Authorization' in self._session.headers else '[NOT SET]'}")
+            
+            response = await self._page.goto(url, wait_until="domcontentloaded", timeout=30000)
+            
+            if not response:
+                self.logger.error(f"No response for {league.name}")
+                return []
+            
+            if response.status != 200:
+                self.logger.error(f"HTTP {response.status} for {league.name}")
+                return []
+            
+            # Get page content and extract JSON
+            body_text = await self._page.content()
+            
+            # The response might be wrapped in HTML tags, extract JSON
+            json_match = re.search(r'<pre[^>]*>(.*?)</pre>', body_text, re.DOTALL)
+            if json_match:
+                json_text = json_match.group(1)
+            else:
+                # Try to find raw JSON in body
+                json_match = re.search(r'(\{.*\})', body_text, re.DOTALL)
+                if json_match:
+                    json_text = json_match.group(1)
+                else:
+                    self.logger.error(f"Could not extract JSON from response for {league.name}")
+                    self.logger.debug(f"Response body preview: {body_text[:500]}")
                     return []
+            
+            data = json.loads(json_text)
+            return self._parse_response(data, league)
                 
-                data = await response.json()
-                return self._parse_response(data, league)
-                
-        except aiohttp.ClientError as e:
-            self.logger.error(f"Request failed for {league.name}: {e}")
+        except json.JSONDecodeError as e:
+            self.logger.error(f"JSON parse error for {league.name}: {e}")
             return []
         except Exception as e:
             self.logger.error(f"Unexpected error for {league.name}: {e}")
