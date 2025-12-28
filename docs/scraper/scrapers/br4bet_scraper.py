@@ -8,12 +8,12 @@ Environment Variables:
     BR4BET_AUTHORIZATION: Authorization token captured from browser DevTools
 """
 
-import os
 import aiohttp
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 
 from base_scraper import BaseScraper, ScrapedOdds, LeagueConfig
+from config import settings
 
 
 class Br4betScraper(BaseScraper):
@@ -62,8 +62,8 @@ class Br4betScraper(BaseScraper):
         """Initialize aiohttp session with required headers."""
         await super().setup()
         
-        # Get Authorization token from environment
-        auth_token = os.environ.get("BR4BET_AUTHORIZATION", "")
+        # Get Authorization token from settings
+        auth_token = settings.br4bet_authorization or ""
         if not auth_token:
             self.logger.warning(
                 "BR4BET_AUTHORIZATION not set. API may return 400 errors. "
