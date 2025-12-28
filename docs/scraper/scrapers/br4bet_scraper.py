@@ -1,18 +1,21 @@
 """
 Br4bet Scraper - Scrapes odds from Br4bet via Altenar API.
 
-Uses Playwright to establish browser session (required for anti-bot protection).
-API endpoint: https://sb2frontend-altenar2.biahosted.com/api/widget/GetEvents
+Uses Playwright to navigate to league pages and capture the real API calls
+made by the website's frontend. This bypasses anti-bot protection by using
+the exact requests the site makes.
 
-Note: No Authorization token needed - Playwright handles session/cookies automatically.
+API endpoint: https://sb2frontend-altenar2.biahosted.com/api/widget/GetEvents
 """
 
+import asyncio
 import json
+import os
 import re
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 
-from playwright.async_api import async_playwright, Playwright, Browser, BrowserContext, Page
+from playwright.async_api import async_playwright, Playwright, Browser, BrowserContext, Page, Response
 
 from base_scraper import BaseScraper, ScrapedOdds, LeagueConfig
 
@@ -21,13 +24,9 @@ class Br4betScraper(BaseScraper):
     """
     Scraper for Br4bet (uses Altenar backend).
     
-    Uses Playwright to bypass anti-bot protection by establishing
-    a real browser session before making API calls.
-    
-    API Structure:
-    - events: List of matches with competitors
-    - odds: List of all odds with typeId (1=home, 2=draw, 3=away)
-    - markets: Links odds to events via oddIds
+    Strategy: Navigate to actual league pages and intercept the API calls
+    made by the website's JavaScript. This ensures all cookies, headers,
+    and request parameters match exactly what the site uses.
     """
     
     LEAGUES = {
@@ -35,25 +34,29 @@ class Br4betScraper(BaseScraper):
             "id": "2942",
             "name": "Serie A",
             "country": "italia",
+            "slug": "italia/serie-a",
         },
         "premier_league": {
             "id": "2936",
             "name": "Premier League", 
             "country": "inglaterra",
+            "slug": "inglaterra/premier-league",
         },
         "la_liga": {
             "id": "2941",
             "name": "La Liga",
             "country": "espanha",
+            "slug": "espanha/laliga",
         },
         "brasileirao_a": {
             "id": "2912",
             "name": "Brasileirão Série A",
             "country": "brasil",
+            "slug": "brasil/campeonato-brasileiro-serie-a",
         },
     }
     
-    API_BASE = "https://sb2frontend-altenar2.biahosted.com/api/widget/GetEvents"
+    API_PATTERN = "sb2frontend-altenar2.biahosted.com/api/widget/GetEvents"
     
     def __init__(self):
         super().__init__(
@@ -66,33 +69,91 @@ class Br4betScraper(BaseScraper):
         self._page: Optional[Page] = None
     
     async def setup(self):
-        """Initialize Playwright browser and establish session."""
+        """Initialize Playwright browser with stealth settings."""
         await super().setup()
         
-        self.logger.info("Starting Playwright browser...")
+        self.logger.info("Starting Playwright browser with stealth...")
         self._playwright = await async_playwright().start()
+        
+        # Browser launch args for stealth
+        launch_args = [
+            '--no-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-blink-features=AutomationControlled',
+            '--disable-features=IsolateOrigins,site-per-process',
+        ]
+        
+        # Check for proxy configuration
+        proxy_server = os.environ.get('BR4BET_PROXY_SERVER')
+        proxy_config = None
+        if proxy_server:
+            proxy_config = {
+                'server': proxy_server,
+            }
+            proxy_user = os.environ.get('BR4BET_PROXY_USER')
+            proxy_pass = os.environ.get('BR4BET_PROXY_PASS')
+            if proxy_user and proxy_pass:
+                proxy_config['username'] = proxy_user
+                proxy_config['password'] = proxy_pass
+            self.logger.info(f"Using proxy: {proxy_server}")
         
         self._browser = await self._playwright.chromium.launch(
             headless=True,
-            args=['--no-sandbox', '--disable-dev-shm-usage']
+            args=launch_args,
         )
         
-        self._context = await self._browser.new_context(
-            user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:133.0) Gecko/20100101 Firefox/133.0",
-            locale="pt-BR",
-            timezone_id="America/Sao_Paulo",
-            extra_http_headers={
-                "Accept-Language": "pt-BR,pt;q=0.8,en-US;q=0.5,en;q=0.3",
+        # Create context with realistic settings
+        context_options = {
+            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'viewport': {'width': 1920, 'height': 1080},
+            'locale': 'pt-BR',
+            'timezone_id': 'America/Sao_Paulo',
+            'extra_http_headers': {
+                'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
             }
-        )
+        }
+        
+        if proxy_config:
+            context_options['proxy'] = proxy_config
+        
+        self._context = await self._browser.new_context(**context_options)
+        
+        # Add stealth script to hide webdriver
+        await self._context.add_init_script("""
+            // Hide webdriver
+            Object.defineProperty(navigator, 'webdriver', {
+                get: () => undefined,
+            });
+            
+            // Hide automation indicators
+            delete window.cdc_adoQpoasnfa76pfcZLmcfl_Array;
+            delete window.cdc_adoQpoasnfa76pfcZLmcfl_Promise;
+            delete window.cdc_adoQpoasnfa76pfcZLmcfl_Symbol;
+            
+            // Fake plugins
+            Object.defineProperty(navigator, 'plugins', {
+                get: () => [1, 2, 3, 4, 5],
+            });
+            
+            // Fake languages
+            Object.defineProperty(navigator, 'languages', {
+                get: () => ['pt-BR', 'pt', 'en-US', 'en'],
+            });
+        """)
         
         self._page = await self._context.new_page()
         
-        # Navigate to main site to establish session/cookies
+        # Navigate to main site to warm up session
         self.logger.info("Establishing session at br4.bet.br...")
         try:
-            await self._page.goto(self.base_url, wait_until="domcontentloaded", timeout=30000)
-            await self._page.wait_for_timeout(2000)  # Wait for any JS to execute
+            await self._page.goto(self.base_url, wait_until="networkidle", timeout=45000)
+            await self._page.wait_for_timeout(3000)  # Wait for JS initialization
+            
+            # Check if we're blocked
+            title = await self._page.title()
+            if 'challenge' in title.lower() or 'blocked' in title.lower():
+                self.logger.warning(f"Possible challenge page detected: {title}")
             
             # Log cookies captured
             cookies = await self._context.cookies()
@@ -101,6 +162,7 @@ class Br4betScraper(BaseScraper):
                 self.logger.info(f"Session established. Cookies: {cookie_names}")
             else:
                 self.logger.warning("No cookies captured from session")
+                
         except Exception as e:
             self.logger.warning(f"Session setup warning (continuing anyway): {e}")
     
@@ -126,21 +188,94 @@ class Br4betScraper(BaseScraper):
             LeagueConfig(
                 league_id=cfg["id"],
                 name=cfg["name"],
-                url=f"{self.base_url}/sports/futebol",
+                url=f"{self.base_url}/sports/futebol/{cfg['slug']}",
                 country=cfg["country"]
             )
             for cfg in self.LEAGUES.values()
         ]
     
     async def scrape_league(self, league: LeagueConfig) -> List[ScrapedOdds]:
-        """Scrape odds for a specific league using Playwright."""
+        """
+        Scrape odds by navigating to the league page and capturing the API call.
+        
+        Strategy:
+        1. Set up response listener for GetEvents API
+        2. Navigate to the league page
+        3. Wait for the API response
+        4. Parse and return odds
+        """
         if not self._page:
             raise RuntimeError("Page not initialized. Call setup() first.")
         
+        # Find the slug for this league
+        league_slug = None
+        for cfg in self.LEAGUES.values():
+            if cfg["id"] == league.league_id:
+                league_slug = cfg["slug"]
+                break
+        
+        if not league_slug:
+            self.logger.error(f"Unknown league ID: {league.league_id}")
+            return []
+        
+        league_url = f"{self.base_url}/sports/futebol/{league_slug}"
+        self.logger.debug(f"Navigating to: {league_url}")
+        
+        # Variable to store captured response
+        captured_data: Optional[Dict] = None
+        captured_url: Optional[str] = None
+        
+        async def handle_response(response: Response):
+            nonlocal captured_data, captured_url
+            if self.API_PATTERN in response.url and f"champIds={league.league_id}" in response.url:
+                try:
+                    captured_url = response.url
+                    if response.status == 200:
+                        captured_data = await response.json()
+                        self.logger.debug(f"Captured API response for {league.name}")
+                    else:
+                        self.logger.error(f"API returned {response.status} for {league.name}")
+                        self.logger.debug(f"Failed URL: {response.url}")
+                except Exception as e:
+                    self.logger.error(f"Error capturing response: {e}")
+        
+        # Register response listener
+        self._page.on("response", handle_response)
+        
+        try:
+            # Navigate to league page
+            await self._page.goto(league_url, wait_until="domcontentloaded", timeout=30000)
+            
+            # Wait for API call to complete (max 10 seconds)
+            for _ in range(20):
+                if captured_data is not None:
+                    break
+                await self._page.wait_for_timeout(500)
+            
+            # Remove listener
+            self._page.remove_listener("response", handle_response)
+            
+            if captured_data:
+                self.logger.debug(f"Successfully captured data for {league.name}")
+                return self._parse_response(captured_data, league)
+            
+            # Fallback: try direct API call with context.request (shares cookies)
+            self.logger.debug(f"No captured response, trying context.request fallback for {league.name}")
+            return await self._fallback_request(league)
+                
+        except Exception as e:
+            self.logger.error(f"Error scraping {league.name}: {e}")
+            self._page.remove_listener("response", handle_response)
+            return []
+    
+    async def _fallback_request(self, league: LeagueConfig) -> List[ScrapedOdds]:
+        """
+        Fallback: Use context.request.get() which shares cookies with the browser.
+        """
         url = (
-            f"{self.API_BASE}?"
+            f"https://sb2frontend-altenar2.biahosted.com/api/widget/GetEvents?"
             f"culture=pt-BR"
-            f"&timezoneOffset=180"
+            f"&timezoneOffset=-180"
             f"&integration=br4bet"
             f"&deviceType=1"
             f"&numFormat=en-GB"
@@ -151,42 +286,26 @@ class Br4betScraper(BaseScraper):
         )
         
         try:
-            self.logger.debug(f"Requesting: {url}")
+            self.logger.debug(f"Fallback request: {url}")
             
-            # Use page.evaluate() with fetch() to make request from within page context
-            # This ensures cookies and headers are sent correctly
-            result = await self._page.evaluate("""
-                async (url) => {
-                    try {
-                        const response = await fetch(url, {
-                            method: 'GET',
-                            headers: {
-                                'Accept': 'application/json',
-                            }
-                        });
-                        return {
-                            status: response.status,
-                            body: await response.text()
-                        };
-                    } catch (e) {
-                        return { status: 0, body: e.message };
-                    }
+            response = await self._context.request.get(
+                url,
+                headers={
+                    'Accept': 'application/json, text/plain, */*',
+                    'Origin': 'https://br4.bet.br',
+                    'Referer': 'https://br4.bet.br/',
                 }
-            """, url)
+            )
             
-            if result['status'] != 200:
-                self.logger.error(f"HTTP {result['status']} for {league.name}")
+            if response.status != 200:
+                self.logger.error(f"Fallback HTTP {response.status} for {league.name}")
                 return []
             
-            self.logger.debug(f"Fetch successful for {league.name}")
-            data = json.loads(result['body'])
+            data = await response.json()
             return self._parse_response(data, league)
-                
-        except json.JSONDecodeError as e:
-            self.logger.error(f"JSON parse error for {league.name}: {e}")
-            return []
+            
         except Exception as e:
-            self.logger.error(f"Unexpected error for {league.name}: {e}")
+            self.logger.error(f"Fallback error for {league.name}: {e}")
             return []
     
     def _parse_response(self, data: Dict[str, Any], league: LeagueConfig) -> List[ScrapedOdds]:
