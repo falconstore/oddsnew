@@ -91,6 +91,12 @@ BOOKMAKERS = {
         "priority": 7,
         "type": "exchange",  # Exchange - only uses BACK odds
     },
+    "br4bet": {
+        "name": "Br4bet",
+        "base_url": "https://br4.bet.br",
+        "enabled": True,
+        "priority": 8,
+    },
 }
 
 # League mappings (URL paths for each bookmaker)

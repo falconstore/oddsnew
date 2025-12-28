@@ -1,10 +1,14 @@
 """
 Br4bet Scraper - Scrapes odds from Br4bet via Altenar API.
 
-Uses simple REST API - no anti-bot protection needed.
+Uses simple REST API - requires Authorization header.
 API endpoint: https://sb2frontend-altenar2.biahosted.com/api/widget/GetEvents
+
+Environment Variables:
+    BR4BET_AUTHORIZATION: Authorization token captured from browser DevTools
 """
 
+import os
 import aiohttp
 from datetime import datetime
 from typing import List, Dict, Any, Optional
@@ -58,15 +62,26 @@ class Br4betScraper(BaseScraper):
         """Initialize aiohttp session with required headers."""
         await super().setup()
         
-        self._session = aiohttp.ClientSession(
-            headers={
-                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:146.0) Gecko/20100101 Firefox/146.0",
-                "Accept": "application/json",
-                "Accept-Language": "pt-BR,pt;q=0.8,en-US;q=0.5,en;q=0.3",
-                "Origin": "https://br4.bet.br",
-                "Referer": "https://br4.bet.br/",
-            }
-        )
+        # Get Authorization token from environment
+        auth_token = os.environ.get("BR4BET_AUTHORIZATION", "")
+        if not auth_token:
+            self.logger.warning(
+                "BR4BET_AUTHORIZATION not set. API may return 400 errors. "
+                "Capture the Authorization header from br4.bet.br DevTools."
+            )
+        
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:146.0) Gecko/20100101 Firefox/146.0",
+            "Accept": "application/json",
+            "Accept-Language": "pt-BR,pt;q=0.8,en-US;q=0.5,en;q=0.3",
+            "Origin": "https://br4.bet.br",
+            "Referer": "https://br4.bet.br/",
+        }
+        
+        if auth_token:
+            headers["Authorization"] = auth_token
+        
+        self._session = aiohttp.ClientSession(headers=headers)
     
     async def teardown(self):
         """Clean up aiohttp session."""
