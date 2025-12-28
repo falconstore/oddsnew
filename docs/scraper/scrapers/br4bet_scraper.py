@@ -72,10 +72,15 @@ class Br4betScraper(BaseScraper):
         
         headers = {
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:146.0) Gecko/20100101 Firefox/146.0",
-            "Accept": "application/json",
+            "Accept": "*/*",
             "Accept-Language": "pt-BR,pt;q=0.8,en-US;q=0.5,en;q=0.3",
+            "Accept-Encoding": "gzip, deflate, br, zstd",
             "Origin": "https://br4.bet.br",
             "Referer": "https://br4.bet.br/",
+            "Connection": "keep-alive",
+            "Sec-Fetch-Dest": "empty",
+            "Sec-Fetch-Mode": "cors",
+            "Sec-Fetch-Site": "cross-site",
         }
         
         if auth_token:
