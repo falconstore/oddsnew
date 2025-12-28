@@ -112,16 +112,16 @@ class Br4betScraper(BaseScraper):
         )
         
         # Create context with realistic settings
-         context_options = {
-             'user_agent': self.USER_AGENT,
-             'viewport': {'width': 1920, 'height': 1080},
-             'locale': 'pt-BR',
-             'timezone_id': 'America/Sao_Paulo',
-             'extra_http_headers': {
-                 'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
-                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-             }
-         }
+        context_options = {
+            'user_agent': self.USER_AGENT,
+            'viewport': {'width': 1920, 'height': 1080},
+            'locale': 'pt-BR',
+            'timezone_id': 'America/Sao_Paulo',
+            'extra_http_headers': {
+                'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+            }
+        }
         
         if proxy_config:
             context_options['proxy'] = proxy_config
