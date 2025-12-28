@@ -69,6 +69,10 @@ class Br4betScraper(BaseScraper):
                 "BR4BET_AUTHORIZATION not set. API may return 400 errors. "
                 "Capture the Authorization header from br4.bet.br DevTools."
             )
+        else:
+            # Log token info for debugging (first/last 10 chars only for security)
+            token_preview = f"{auth_token[:10]}...{auth_token[-10:]}" if len(auth_token) > 20 else "[short token]"
+            self.logger.info(f"Authorization token configured: {token_preview} (length: {len(auth_token)})")
         
         headers = {
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:146.0) Gecko/20100101 Firefox/146.0",
@@ -128,7 +132,9 @@ class Br4betScraper(BaseScraper):
         try:
             async with self._session.get(url) as response:
                 if response.status != 200:
+                    error_text = await response.text()
                     self.logger.error(f"HTTP {response.status} for {league.name}")
+                    self.logger.debug(f"Response body: {error_text[:500]}")
                     return []
                 
                 data = await response.json()
