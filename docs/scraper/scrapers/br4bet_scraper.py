@@ -56,8 +56,9 @@ class Br4betScraper(BaseScraper):
         },
     }
     
-    API_PATTERN = "sb2frontend-altenar2.biahosted.com/api/widget/GetEvents"
-    API_TIMEOUT_MS = 15000
+    API_PATTERN = "GetEvents"  # Loosened pattern to catch any GetEvents call
+    API_TIMEOUT_MS = 45000  # Increased from 15s to 45s
+    SCREENSHOT_DIR = "debug_screenshots"  # Directory for diagnostic screenshots
     USER_AGENT = (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -235,17 +236,44 @@ class Br4betScraper(BaseScraper):
         league_url = f"{self.base_url}/sports/futebol/{league_slug}"
         self.logger.debug(f"Navigating to: {league_url}")
 
-        def _is_target_response(resp: Response) -> bool:
-            return self.API_PATTERN in resp.url and f"champIds={league.league_id}" in resp.url
+        # Loosened filter: capture any GetEvents response
+        captured_responses: List[Response] = []
+        
+        def _on_response(resp: Response):
+            if self.API_PATTERN in resp.url:
+                self.logger.debug(f"Captured API call: {resp.status} {resp.request.method} {resp.url[:150]}...")
+                captured_responses.append(resp)
 
-        captured_response: Optional[Response] = None
-
+        self._page.on("response", _on_response)
+        
         try:
-            async with self._page.expect_response(_is_target_response, timeout=self.API_TIMEOUT_MS) as resp_info:
-                await self._page.goto(league_url, wait_until="domcontentloaded", timeout=30000)
-            captured_response = await resp_info.value
+            # Use networkidle and longer timeout
+            await self._page.goto(league_url, wait_until="networkidle", timeout=60000)
+            await self._page.wait_for_timeout(5000)  # Extra wait for JS to fire XHR
         except Exception as e:
-            self.logger.error(f"Timeout/error waiting GetEvents for {league.name}: {e}")
+            self.logger.warning(f"Navigation issue for {league.name}: {e}")
+        
+        self._page.remove_listener("response", _on_response)
+        
+        # Diagnostic: log page state
+        await self._diagnose_page(league.name)
+        
+        # Find the best matching response for this league
+        captured_response: Optional[Response] = None
+        for resp in captured_responses:
+            if f"champIds={league.league_id}" in resp.url:
+                captured_response = resp
+                break
+        
+        # If no exact match, use any GetEvents response as fallback
+        if not captured_response and captured_responses:
+            captured_response = captured_responses[0]
+            self.logger.warning(f"Using non-exact GetEvents response for {league.name}")
+        
+        if not captured_response:
+            self.logger.error(f"No GetEvents API calls captured for {league.name}")
+            # Try localStorage fallback
+            return await self._fallback_from_storage(league, league_url)
 
         # If we saw a response (even 400), capture URL + Authorization for reuse
         if captured_response:
@@ -312,6 +340,71 @@ class Br4betScraper(BaseScraper):
         except Exception as e:
             self.logger.error(f"Context.request error for {league_name}: {e}")
             return None
+
+    async def _diagnose_page(self, league_name: str):
+        """Log diagnostic info about the current page state."""
+        try:
+            final_url = self._page.url
+            title = await self._page.title()
+            self.logger.debug(f"Page state for {league_name}: URL={final_url}, Title={title}")
+            
+            # Check for anti-bot indicators in HTML
+            html = await self._page.content()
+            antibot_indicators = ['datadome', 'captcha', 'challenge', 'blocked', 'access denied', 'enable javascript', 'cloudflare']
+            for indicator in antibot_indicators:
+                if indicator.lower() in html.lower():
+                    self.logger.warning(f"Anti-bot indicator found: '{indicator}' in {league_name}")
+            
+            # Save screenshot for debugging
+            os.makedirs(self.SCREENSHOT_DIR, exist_ok=True)
+            safe_name = league_name.replace(" ", "_").lower()
+            screenshot_path = f"{self.SCREENSHOT_DIR}/br4bet_{safe_name}.png"
+            await self._page.screenshot(path=screenshot_path)
+            self.logger.debug(f"Screenshot saved: {screenshot_path}")
+            
+        except Exception as e:
+            self.logger.warning(f"Diagnostic error for {league_name}: {e}")
+
+    async def _fallback_from_storage(self, league: LeagueConfig, referer: str) -> List[ScrapedOdds]:
+        """Try to extract auth token from storage and make direct API call."""
+        try:
+            # Try to get auth token from localStorage/sessionStorage
+            local_storage = await self._page.evaluate("() => JSON.stringify(localStorage)")
+            session_storage = await self._page.evaluate("() => JSON.stringify(sessionStorage)")
+            
+            self.logger.debug(f"localStorage keys: {list(json.loads(local_storage).keys())[:10]}")
+            self.logger.debug(f"sessionStorage keys: {list(json.loads(session_storage).keys())[:10]}")
+            
+            # Look for token-like values
+            for storage_str in [local_storage, session_storage]:
+                storage = json.loads(storage_str)
+                for key, value in storage.items():
+                    if any(tok in key.lower() for tok in ['token', 'auth', 'jwt', 'bearer']):
+                        self.logger.debug(f"Found potential auth key: {key}")
+                        if isinstance(value, str) and len(value) > 20:
+                            self._auth_header = f"Bearer {value}" if not value.startswith("Bearer") else value
+                            break
+            
+            # If we have a previous URL for this league, try it
+            fallback_url = self._last_api_url_by_league.get(league.league_id)
+            if fallback_url:
+                self.logger.info(f"Trying fallback API call for {league.name}")
+                data = await self._request_json_with_context(fallback_url, referer, league.name)
+                if data:
+                    return self._parse_response(data, league)
+            
+            # Build URL from scratch if we have no cached URL
+            api_base = "https://sb2frontend-altenar2.biahosted.com/api/widget/GetEvents"
+            api_url = f"{api_base}?champIds={league.league_id}&count=50&sportId=66"
+            self.logger.info(f"Trying constructed API URL for {league.name}")
+            data = await self._request_json_with_context(api_url, referer, league.name)
+            if data:
+                return self._parse_response(data, league)
+                
+        except Exception as e:
+            self.logger.error(f"Storage fallback error for {league.name}: {e}")
+        
+        return []
     
     def _parse_response(self, data: Dict[str, Any], league: LeagueConfig) -> List[ScrapedOdds]:
         """
