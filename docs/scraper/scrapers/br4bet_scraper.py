@@ -153,34 +153,33 @@ class Br4betScraper(BaseScraper):
         try:
             self.logger.debug(f"Requesting: {url}")
             
-            response = await self._page.goto(url, wait_until="domcontentloaded", timeout=30000)
+            # Use page.evaluate() with fetch() to make request from within page context
+            # This ensures cookies and headers are sent correctly
+            result = await self._page.evaluate("""
+                async (url) => {
+                    try {
+                        const response = await fetch(url, {
+                            method: 'GET',
+                            headers: {
+                                'Accept': 'application/json',
+                            }
+                        });
+                        return {
+                            status: response.status,
+                            body: await response.text()
+                        };
+                    } catch (e) {
+                        return { status: 0, body: e.message };
+                    }
+                }
+            """, url)
             
-            if not response:
-                self.logger.error(f"No response for {league.name}")
+            if result['status'] != 200:
+                self.logger.error(f"HTTP {result['status']} for {league.name}")
                 return []
             
-            if response.status != 200:
-                self.logger.error(f"HTTP {response.status} for {league.name}")
-                return []
-            
-            # Get page content and extract JSON
-            body_text = await self._page.content()
-            
-            # The response might be wrapped in HTML tags, extract JSON
-            json_match = re.search(r'<pre[^>]*>(.*?)</pre>', body_text, re.DOTALL)
-            if json_match:
-                json_text = json_match.group(1)
-            else:
-                # Try to find raw JSON in body
-                json_match = re.search(r'(\{.*\})', body_text, re.DOTALL)
-                if json_match:
-                    json_text = json_match.group(1)
-                else:
-                    self.logger.error(f"Could not extract JSON from response for {league.name}")
-                    self.logger.debug(f"Response body preview: {body_text[:500]}")
-                    return []
-            
-            data = json.loads(json_text)
+            self.logger.debug(f"Fetch successful for {league.name}")
+            data = json.loads(result['body'])
             return self._parse_response(data, league)
                 
         except json.JSONDecodeError as e:
