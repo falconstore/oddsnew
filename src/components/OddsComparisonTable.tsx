@@ -236,6 +236,28 @@ function generateBookmakerLink(
     }
   }
   
+  // Br4bet
+  if (name.includes('br4bet')) {
+    const eventId = extraData.br4bet_event_id;
+    const country = extraData.br4bet_country || 'italia';
+    if (eventId && homeTeam && awayTeam) {
+      const homeSlug = homeTeam
+        .toLowerCase()
+        .replace(/\s+/g, '-')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+      
+      const awaySlug = awayTeam
+        .toLowerCase()
+        .replace(/\s+/g, '-')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+      
+      // Format: /sports/futebol/italia/bologna-fc-vs-sassuolo-calcio/e-13781468
+      return `https://br4.bet.br/sports/futebol/${country}/${homeSlug}-vs-${awaySlug}/e-${eventId}`;
+    }
+  }
+  
   return null;
 }
 
