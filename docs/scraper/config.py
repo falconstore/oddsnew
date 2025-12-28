@@ -37,9 +37,13 @@ class Settings(BaseSettings):
     value_bet_threshold: float = 5.0  # % edge over fair odds
     arbitrage_threshold: float = 0.0  # % guaranteed profit
     
+    # Bookmaker-specific tokens (optional)
+    br4bet_authorization: Optional[str] = None
+    
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
+        extra = "ignore"  # Allow extra env vars without error
 
 
 # Global settings instance
