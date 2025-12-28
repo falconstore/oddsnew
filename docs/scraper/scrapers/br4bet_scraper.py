@@ -62,8 +62,15 @@ class Br4betScraper(BaseScraper):
         """Initialize aiohttp session with required headers."""
         await super().setup()
         
-        # Get Authorization token from settings
-        auth_token = settings.br4bet_authorization or ""
+        # Get Authorization token from settings and normalize it
+        auth_token = (settings.br4bet_authorization or "").strip()
+        
+        # Remove common prefixes if accidentally included
+        for prefix in ["Bearer ", "bearer ", "Authorization: ", "authorization: "]:
+            if auth_token.startswith(prefix):
+                auth_token = auth_token[len(prefix):].strip()
+                self.logger.info(f"Removed '{prefix.strip()}' prefix from token")
+        
         if not auth_token:
             self.logger.warning(
                 "BR4BET_AUTHORIZATION not set. API may return 400 errors. "
@@ -91,6 +98,28 @@ class Br4betScraper(BaseScraper):
             headers["Authorization"] = auth_token
         
         self._session = aiohttp.ClientSession(headers=headers)
+        
+        # Warm-up request to establish cookies/session
+        await self._warmup_session()
+    
+    async def _warmup_session(self):
+        """Make a warm-up request to establish cookies/session before API calls."""
+        try:
+            self.logger.info("Performing warm-up request to br4.bet.br...")
+            async with self._session.get(self.base_url, allow_redirects=True) as response:
+                self.logger.info(f"Warm-up response: {response.status}")
+                # Read body to ensure cookies are captured
+                await response.text()
+                
+                # Log cookies captured
+                cookies = self._session.cookie_jar.filter_cookies(self.base_url)
+                if cookies:
+                    cookie_names = list(cookies.keys())
+                    self.logger.info(f"Cookies captured: {cookie_names}")
+                else:
+                    self.logger.warning("No cookies captured from warm-up request")
+        except Exception as e:
+            self.logger.warning(f"Warm-up request failed (continuing anyway): {e}")
     
     async def teardown(self):
         """Clean up aiohttp session."""
@@ -130,11 +159,17 @@ class Br4betScraper(BaseScraper):
         )
         
         try:
+            self.logger.debug(f"Requesting: {url}")
             async with self._session.get(url) as response:
                 if response.status != 200:
                     error_text = await response.text()
                     self.logger.error(f"HTTP {response.status} for {league.name}")
-                    self.logger.debug(f"Response body: {error_text[:500]}")
+                    # Use INFO level so it shows without --debug flag
+                    self.logger.info(f"Response body: {error_text[:500]}")
+                    
+                    # Additional diagnostics for 400 errors
+                    if response.status == 400:
+                        self.logger.info(f"Request headers: Authorization={'[SET]' if 'Authorization' in self._session.headers else '[NOT SET]'}")
                     return []
                 
                 data = await response.json()
