@@ -57,7 +57,12 @@ class Br4betScraper(BaseScraper):
     }
     
     API_PATTERN = "sb2frontend-altenar2.biahosted.com/api/widget/GetEvents"
-    
+    API_TIMEOUT_MS = 15000
+    USER_AGENT = (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/120.0.0.0 Safari/537.36"
+    )
     def __init__(self):
         super().__init__(
             name="br4bet",
@@ -67,6 +72,10 @@ class Br4betScraper(BaseScraper):
         self._browser: Optional[Browser] = None
         self._context: Optional[BrowserContext] = None
         self._page: Optional[Page] = None
+
+        # Captured from real frontend requests
+        self._auth_header: Optional[str] = None
+        self._last_api_url_by_league: Dict[str, str] = {}
     
     async def setup(self):
         """Initialize Playwright browser with stealth settings."""
@@ -103,16 +112,16 @@ class Br4betScraper(BaseScraper):
         )
         
         # Create context with realistic settings
-        context_options = {
-            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'viewport': {'width': 1920, 'height': 1080},
-            'locale': 'pt-BR',
-            'timezone_id': 'America/Sao_Paulo',
-            'extra_http_headers': {
-                'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-            }
-        }
+         context_options = {
+             'user_agent': self.USER_AGENT,
+             'viewport': {'width': 1920, 'height': 1080},
+             'locale': 'pt-BR',
+             'timezone_id': 'America/Sao_Paulo',
+             'extra_http_headers': {
+                 'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+             }
+         }
         
         if proxy_config:
             context_options['proxy'] = proxy_config
@@ -194,119 +203,115 @@ class Br4betScraper(BaseScraper):
             for cfg in self.LEAGUES.values()
         ]
     
+    def _build_api_headers(self, referer: str) -> Dict[str, str]:
+        headers: Dict[str, str] = {
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+            'Origin': 'https://br4.bet.br',
+            'Referer': referer,
+            'User-Agent': self.USER_AGENT,
+        }
+        if self._auth_header:
+            # Don't log/print this value anywhere (token)
+            headers['Authorization'] = self._auth_header
+        return headers
+
     async def scrape_league(self, league: LeagueConfig) -> List[ScrapedOdds]:
-        """
-        Scrape odds by navigating to the league page and capturing the API call.
-        
-        Strategy:
-        1. Set up response listener for GetEvents API
-        2. Navigate to the league page
-        3. Wait for the API response
-        4. Parse and return odds
-        """
-        if not self._page:
-            raise RuntimeError("Page not initialized. Call setup() first.")
-        
+        """Scrape odds by capturing the real GetEvents call from the league page."""
+        if not self._page or not self._context:
+            raise RuntimeError("Page/context not initialized. Call setup() first.")
+
         # Find the slug for this league
         league_slug = None
         for cfg in self.LEAGUES.values():
             if cfg["id"] == league.league_id:
                 league_slug = cfg["slug"]
                 break
-        
+
         if not league_slug:
             self.logger.error(f"Unknown league ID: {league.league_id}")
             return []
-        
+
         league_url = f"{self.base_url}/sports/futebol/{league_slug}"
         self.logger.debug(f"Navigating to: {league_url}")
-        
-        # Variable to store captured response
-        captured_data: Optional[Dict] = None
-        captured_url: Optional[str] = None
-        
-        async def handle_response(response: Response):
-            nonlocal captured_data, captured_url
-            if self.API_PATTERN in response.url and f"champIds={league.league_id}" in response.url:
+
+        def _is_target_response(resp: Response) -> bool:
+            return self.API_PATTERN in resp.url and f"champIds={league.league_id}" in resp.url
+
+        captured_response: Optional[Response] = None
+
+        try:
+            async with self._page.expect_response(_is_target_response, timeout=self.API_TIMEOUT_MS) as resp_info:
+                await self._page.goto(league_url, wait_until="domcontentloaded", timeout=30000)
+            captured_response = await resp_info.value
+        except Exception as e:
+            self.logger.error(f"Timeout/error waiting GetEvents for {league.name}: {e}")
+
+        # If we saw a response (even 400), capture URL + Authorization for reuse
+        if captured_response:
+            self._last_api_url_by_league[league.league_id] = captured_response.url
+
+            try:
+                req_headers = captured_response.request.headers or {}
+                auth = req_headers.get("authorization") or req_headers.get("Authorization")
+                if auth:
+                    self._auth_header = auth
+            except Exception:
+                pass
+
+            if captured_response.status == 200:
                 try:
-                    captured_url = response.url
-                    if response.status == 200:
-                        captured_data = await response.json()
-                        self.logger.debug(f"Captured API response for {league.name}")
-                    else:
-                        self.logger.error(f"API returned {response.status} for {league.name}")
-                        self.logger.debug(f"Failed URL: {response.url}")
+                    data = await captured_response.json()
+                    return self._parse_response(data, league)
                 except Exception as e:
-                    self.logger.error(f"Error capturing response: {e}")
-        
-        # Register response listener
-        self._page.on("response", handle_response)
-        
-        try:
-            # Navigate to league page
-            await self._page.goto(league_url, wait_until="domcontentloaded", timeout=30000)
-            
-            # Wait for API call to complete (max 10 seconds)
-            for _ in range(20):
-                if captured_data is not None:
-                    break
-                await self._page.wait_for_timeout(500)
-            
-            # Remove listener
-            self._page.remove_listener("response", handle_response)
-            
-            if captured_data:
-                self.logger.debug(f"Successfully captured data for {league.name}")
-                return self._parse_response(captured_data, league)
-            
-            # Fallback: try direct API call with context.request (shares cookies)
-            self.logger.debug(f"No captured response, trying context.request fallback for {league.name}")
-            return await self._fallback_request(league)
-                
-        except Exception as e:
-            self.logger.error(f"Error scraping {league.name}: {e}")
-            self._page.remove_listener("response", handle_response)
+                    self.logger.error(f"Error parsing JSON for {league.name}: {e}")
+            else:
+                # Diagnostics (don't print token)
+                auth_present = bool(self._auth_header)
+                self.logger.error(f"GetEvents HTTP {captured_response.status} for {league.name}")
+                self.logger.debug(f"GetEvents URL: {captured_response.url}")
+                self.logger.debug(f"Authorization header present: {auth_present}")
+                try:
+                    cookies = await self._context.cookies()
+                    self.logger.debug(f"Cookie names: {[c['name'] for c in cookies]}")
+                except Exception:
+                    pass
+                try:
+                    body = await captured_response.text()
+                    self.logger.debug(f"Body preview: {body[:200]}")
+                except Exception:
+                    pass
+
+        # Fallback: retry the exact captured URL using context.request (same cookies)
+        fallback_url = self._last_api_url_by_league.get(league.league_id)
+        if not fallback_url:
+            self.logger.error(f"No captured GetEvents URL available for {league.name}; skipping.")
             return []
-    
-    async def _fallback_request(self, league: LeagueConfig) -> List[ScrapedOdds]:
-        """
-        Fallback: Use context.request.get() which shares cookies with the browser.
-        """
-        url = (
-            f"https://sb2frontend-altenar2.biahosted.com/api/widget/GetEvents?"
-            f"culture=pt-BR"
-            f"&timezoneOffset=-180"
-            f"&integration=br4bet"
-            f"&deviceType=1"
-            f"&numFormat=en-GB"
-            f"&countryCode=BR"
-            f"&eventCount=0"
-            f"&sportId=66"
-            f"&champIds={league.league_id}"
-        )
-        
-        try:
-            self.logger.debug(f"Fallback request: {url}")
-            
-            response = await self._context.request.get(
-                url,
-                headers={
-                    'Accept': 'application/json, text/plain, */*',
-                    'Origin': 'https://br4.bet.br',
-                    'Referer': 'https://br4.bet.br/',
-                }
-            )
-            
-            if response.status != 200:
-                self.logger.error(f"Fallback HTTP {response.status} for {league.name}")
-                return []
-            
-            data = await response.json()
-            return self._parse_response(data, league)
-            
-        except Exception as e:
-            self.logger.error(f"Fallback error for {league.name}: {e}")
+
+        data = await self._request_json_with_context(fallback_url, referer=league_url, league_name=league.name)
+        if not data:
             return []
+        return self._parse_response(data, league)
+
+    async def _request_json_with_context(self, url: str, referer: str, league_name: str) -> Optional[Dict[str, Any]]:
+        """Request JSON using the browser context cookies + captured headers (Authorization)."""
+        try:
+            self.logger.debug(f"Context.request URL: {url}")
+            resp = await self._context.request.get(url, headers=self._build_api_headers(referer))
+
+            if resp.status != 200:
+                self.logger.error(f"Context.request HTTP {resp.status} for {league_name}")
+                try:
+                    txt = await resp.text()
+                    self.logger.debug(f"Context.request body preview: {txt[:200]}")
+                except Exception:
+                    pass
+                return None
+
+            return await resp.json()
+        except Exception as e:
+            self.logger.error(f"Context.request error for {league_name}: {e}")
+            return None
     
     def _parse_response(self, data: Dict[str, Any], league: LeagueConfig) -> List[ScrapedOdds]:
         """
