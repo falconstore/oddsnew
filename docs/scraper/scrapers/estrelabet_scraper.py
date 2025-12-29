@@ -125,8 +125,9 @@ class EstrelabetScraper(BaseScraper):
         Parse Altenar API response format.
         
         Structure:
-        - events: list of matches with id, startDate, competitors
-        - markets: list of markets with typeId and oddIds
+        - events: list of matches with id, startDate, competitorIds, marketIds
+        - competitors: list with id and name (separate from events)
+        - markets: list of markets with id, typeId and oddIds
         - odds: list of odds with id, price, typeId (1=Home, 2=Draw, 3=Away)
         """
         results = []
@@ -134,36 +135,32 @@ class EstrelabetScraper(BaseScraper):
         events = data.get("events", [])
         markets = data.get("markets", [])
         odds_data = data.get("odds", [])
+        competitors = data.get("competitors", [])
         
         if not events:
             self.logger.debug("No events in response")
             return results
         
-        # Create lookup maps for faster access
+        # Create lookup maps
         odds_by_id = {odd["id"]: odd for odd in odds_data}
+        markets_by_id = {m["id"]: m for m in markets}
+        competitors_by_id = {c["id"]: c["name"] for c in competitors}
         
-        # Find 1x2 markets (typeId = 1 for Match Result)
-        markets_1x2 = [m for m in markets if m.get("typeId") == 1]
-        
-        # Create mapping: event_id -> market
-        event_markets = {}
-        for market in markets_1x2:
-            event_id = market.get("eventId")
-            if event_id:
-                event_markets[event_id] = market
+        self.logger.debug(f"Events: {len(events)}, Markets: {len(markets)}, Odds: {len(odds_data)}, Competitors: {len(competitors)}")
         
         for event in events:
             try:
                 event_id = event.get("id")
-                competitors = event.get("competitors", [])
+                competitor_ids = event.get("competitorIds", [])
+                market_ids = event.get("marketIds", [])
                 start_date_str = event.get("startDate")
                 
-                if len(competitors) < 2:
+                if len(competitor_ids) < 2:
                     continue
                 
-                # Get team names (first competitor is home, second is away)
-                home_team = competitors[0].get("name", "")
-                away_team = competitors[1].get("name", "")
+                # Get team names from competitors mapping
+                home_team = competitors_by_id.get(competitor_ids[0], "")
+                away_team = competitors_by_id.get(competitor_ids[1], "")
                 
                 if not home_team or not away_team:
                     continue
@@ -172,17 +169,22 @@ class EstrelabetScraper(BaseScraper):
                 match_date = datetime.now()
                 if start_date_str:
                     try:
-                        # Format: "2025-12-29T20:00:00Z"
                         match_date = datetime.fromisoformat(start_date_str.replace("Z", "+00:00"))
                     except:
                         pass
                 
-                # Find the 1x2 market for this event
-                market = event_markets.get(event_id)
-                if not market:
+                # Find the 1x2 market (typeId == 1) from this event's marketIds
+                market_1x2 = None
+                for market_id in market_ids:
+                    market = markets_by_id.get(market_id)
+                    if market and market.get("typeId") == 1:
+                        market_1x2 = market
+                        break
+                
+                if not market_1x2:
                     continue
                 
-                odd_ids = market.get("oddIds", [])
+                odd_ids = market_1x2.get("oddIds", [])
                 if len(odd_ids) < 3:
                     continue
                 
