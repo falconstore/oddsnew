@@ -1,3 +1,4 @@
+import { useState, useCallback } from 'react';
 import { Layout } from '@/components/Layout';
 import { OddsComparisonTable } from '@/components/OddsComparisonTable';
 import { AlertsPanel } from '@/components/AlertsPanel';
@@ -5,8 +6,25 @@ import { StatsCards } from '@/components/StatsCards';
 import { SupabaseConfig } from '@/components/SupabaseConfig';
 import { isSupabaseConfigured } from '@/lib/supabase';
 
+interface DashboardStats {
+  surebetCount: number;
+  valueBetCount: number;
+  totalMatches: number;
+  lastUpdate: Date | null;
+}
+
 const Dashboard = () => {
   const configured = isSupabaseConfigured();
+  const [stats, setStats] = useState<DashboardStats>({
+    surebetCount: 0,
+    valueBetCount: 0,
+    totalMatches: 0,
+    lastUpdate: null,
+  });
+
+  const handleStatsUpdate = useCallback((newStats: DashboardStats) => {
+    setStats(newStats);
+  }, []);
 
   if (!configured) {
     return (
@@ -30,11 +48,16 @@ const Dashboard = () => {
           <p className="text-muted-foreground">Comparação de odds em tempo real</p>
         </div>
 
-        <StatsCards />
+        <StatsCards
+          surebetCount={stats.surebetCount}
+          valueBetCount={stats.valueBetCount}
+          totalMatches={stats.totalMatches}
+          lastUpdate={stats.lastUpdate}
+        />
 
-        <div className="grid gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-2">
-            <OddsComparisonTable />
+        <div className="grid gap-6 xl:grid-cols-4">
+          <div className="xl:col-span-3">
+            <OddsComparisonTable onStatsUpdate={handleStatsUpdate} />
           </div>
           <div>
             <AlertsPanel />
