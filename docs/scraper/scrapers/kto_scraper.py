@@ -32,15 +32,10 @@ class KtoScraper(BaseScraper):
             "country": "Inglaterra"
         },
         "la_liga": {
-            "path": "football/spain/laliga", 
+            "path": "football/spain/la_liga", 
             "name": "La Liga",
             "country": "Espanha"
         },
-        "brasileirao": {
-            "path": "football/brazil/brasileirao_serie_a", 
-            "name": "Brasileirão Série A",
-            "country": "Brasil"
-        }
     }
     
     def __init__(self):
@@ -204,6 +199,7 @@ if __name__ == "__main__":
         for o in odds[:5]:  # Mostra os 5 primeiros
             print(f"{o.home_team_raw} x {o.away_team_raw} | ID: {o.extra_data['event_id']}")
             print(f"Odds: {o.home_odd:.2f} - {o.draw_odd:.2f} - {o.away_odd:.2f}")
+            print(f"Path: {o.extra_data.get('league_path')}")
             print("-" * 30)
             
     asyncio.run(run())
