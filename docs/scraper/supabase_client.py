@@ -234,6 +234,90 @@ class SupabaseClient:
             self.logger.error(f"Error finding/creating match: {e}")
             return None
     
+    async def find_or_create_matches_batch(
+        self,
+        matches_data: List[Dict[str, Any]]
+    ) -> Dict[str, Dict[str, Any]]:
+        """
+        Find or create multiple matches in batch.
+        
+        Args:
+            matches_data: List of dicts with league_id, home_team_id, away_team_id, match_date
+            
+        Returns:
+            Dict mapping (league_id, home_team_id, away_team_id) -> match record
+        """
+        if not matches_data:
+            return {}
+        
+        result_map = {}
+        
+        try:
+            # Get unique match keys
+            unique_keys = set()
+            for m in matches_data:
+                key = (m["league_id"], m["home_team_id"], m["away_team_id"])
+                unique_keys.add(key)
+            
+            # Fetch all potentially matching matches in one query
+            # Using a time window of the past day to future week
+            now = datetime.utcnow()
+            date_min = now - timedelta(days=1)
+            date_max = now + timedelta(days=7)
+            
+            response = (
+                self.client.table("matches")
+                .select("*")
+                .gte("match_date", date_min.isoformat())
+                .lte("match_date", date_max.isoformat())
+                .execute()
+            )
+            
+            # Index existing matches by key
+            existing = {}
+            for match in response.data or []:
+                key = (match["league_id"], match["home_team_id"], match["away_team_id"])
+                if key not in existing:
+                    existing[key] = match
+            
+            # Find matches that need to be created
+            to_create = []
+            for m in matches_data:
+                key = (m["league_id"], m["home_team_id"], m["away_team_id"])
+                if key in result_map:
+                    continue  # Already processed
+                
+                if key in existing:
+                    result_map[key] = existing[key]
+                else:
+                    to_create.append({
+                        "league_id": m["league_id"],
+                        "home_team_id": m["home_team_id"],
+                        "away_team_id": m["away_team_id"],
+                        "match_date": m["match_date"].isoformat() if isinstance(m["match_date"], datetime) else m["match_date"],
+                        "status": "scheduled",
+                    })
+                    result_map[key] = None  # Mark as pending
+            
+            # Batch insert new matches
+            if to_create:
+                insert_response = (
+                    self.client.table("matches")
+                    .insert(to_create)
+                    .execute()
+                )
+                
+                for match in insert_response.data or []:
+                    key = (match["league_id"], match["home_team_id"], match["away_team_id"])
+                    result_map[key] = match
+            
+            self.logger.info(f"Batch matches: {len(existing)} found, {len(to_create)} created")
+            return result_map
+            
+        except Exception as e:
+            self.logger.error(f"Error in batch match lookup: {e}")
+            return {}
+    
     # ==========================================
     # ODDS HISTORY
     # ==========================================

@@ -298,38 +298,38 @@ class Orchestrator:
         odds_list: List[ScrapedOdds]
     ) -> List[Dict[str, Any]]:
         """
-        Normalize scraped odds:
-        - Match team names to team IDs
-        - Match league names to league IDs
-        - Add bookmaker IDs
-        - Find or create match records
+        Normalize scraped odds with optimized batch processing:
+        - Uses cache-only team lookup (no DB calls per team)
+        - Batches match lookups/creation
         """
-        normalized = []
+        if not odds_list:
+            return []
+        
+        # Phase 1: Fast normalization using cache only
+        pre_normalized = []
         unmatched_teams = []
         
         for odds in odds_list:
-            # Get bookmaker ID (case-insensitive)
+            # Get bookmaker ID (cache lookup)
             bookmaker_id = self.bookmaker_ids.get(odds.bookmaker_name.lower())
             if not bookmaker_id:
                 self.logger.warning(f"Unknown bookmaker: {odds.bookmaker_name}")
                 continue
             
-            # Match league first (needed for auto-creating teams)
+            # Match league (cache lookup)
             league_id = self.league_matcher.find_league_id(odds.league_raw)
             if not league_id:
                 self.logger.warning(f"Unknown league: {odds.league_raw}")
                 continue
             
-            # Match teams (pass league_id for auto-creation)
-            home_team_id = await self.team_matcher.find_team_id(
+            # Match teams using cache-only method (no DB calls)
+            home_team_id = self.team_matcher.find_team_id_cached(
                 odds.home_team_raw, 
-                odds.bookmaker_name,
-                league_id=league_id
+                odds.bookmaker_name
             )
-            away_team_id = await self.team_matcher.find_team_id(
+            away_team_id = self.team_matcher.find_team_id_cached(
                 odds.away_team_raw, 
-                odds.bookmaker_name,
-                league_id=league_id
+                odds.bookmaker_name
             )
             
             if not home_team_id:
@@ -338,30 +338,50 @@ class Orchestrator:
             if not away_team_id:
                 unmatched_teams.append((odds.away_team_raw, odds.bookmaker_name))
                 continue
-            # Find or create match
-            match = await self.supabase.find_or_create_match(
-                league_id=league_id,
-                home_team_id=home_team_id,
-                away_team_id=away_team_id,
-                match_date=odds.match_date
-            )
+            
+            pre_normalized.append({
+                "odds": odds,
+                "bookmaker_id": bookmaker_id,
+                "league_id": league_id,
+                "home_team_id": home_team_id,
+                "away_team_id": away_team_id,
+            })
+        
+        # Phase 2: Batch match lookup/creation
+        matches_to_find = [
+            {
+                "league_id": item["league_id"],
+                "home_team_id": item["home_team_id"],
+                "away_team_id": item["away_team_id"],
+                "match_date": item["odds"].match_date,
+            }
+            for item in pre_normalized
+        ]
+        
+        match_map = await self.supabase.find_or_create_matches_batch(matches_to_find)
+        
+        # Phase 3: Build final normalized records
+        normalized = []
+        for item in pre_normalized:
+            key = (item["league_id"], item["home_team_id"], item["away_team_id"])
+            match = match_map.get(key)
             
             if not match:
                 continue
             
-            # Create normalized record
+            odds = item["odds"]
             normalized.append({
                 "match_id": match["id"],
-                "bookmaker_id": bookmaker_id,
+                "bookmaker_id": item["bookmaker_id"],
                 "market_type": odds.market_type,
                 "home_odd": odds.home_odd,
                 "draw_odd": odds.draw_odd,
                 "away_odd": odds.away_odd,
                 "scraped_at": odds.scraped_at.isoformat(),
-                "extra_data": odds.extra_data or {},  # Links das partidas (betbra_event_id, etc.)
+                "extra_data": odds.extra_data or {},
             })
         
-        # Log unmatched teams for review
+        # Log unmatched teams
         if unmatched_teams:
             unique_unmatched = list(set(unmatched_teams))
             self.logger.warning(

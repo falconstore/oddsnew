@@ -63,6 +63,29 @@ class TeamMatcher:
             f"{len(self.aliases_cache)} aliases"
         )
     
+    def find_team_id_cached(self, raw_name: str, bookmaker: str) -> Optional[str]:
+        """
+        Find team ID using only in-memory cache (no DB calls).
+        Fast path for batch processing.
+        """
+        if not raw_name:
+            return None
+        
+        normalized_name = raw_name.strip().lower()
+        normalized_bookmaker = bookmaker.strip().lower()
+        
+        # Step 1: Exact match in aliases
+        alias_key = (normalized_name, normalized_bookmaker)
+        if alias_key in self.aliases_cache:
+            return self.aliases_cache[alias_key]
+        
+        # Step 2: Exact match in standard names
+        if normalized_name in self.reverse_cache:
+            return self.reverse_cache[normalized_name]
+        
+        # Step 3: Fuzzy match (uses only cache)
+        return self._fuzzy_match(raw_name)
+    
     async def find_team_id(
         self, 
         raw_name: str, 
