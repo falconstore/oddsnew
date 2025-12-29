@@ -474,7 +474,14 @@ function generateBookmakerLink(
     const eventId = extraData.event_id;
     const leaguePath = extraData.league_path as string;
     
-    if (eventId && leaguePath && homeTeam && awayTeam) {
+    // Usar nomes originais da API KTO se disponíveis
+    const homeOriginal = extraData.home_team_slug as string;
+    const awayOriginal = extraData.away_team_slug as string;
+    
+    const homeName = homeOriginal || homeTeam;
+    const awayName = awayOriginal || awayTeam;
+    
+    if (eventId && leaguePath && homeName && awayName) {
       // Converter "football/italy/serie_a" para "futebol/italia/serie-a"
       const pathParts = leaguePath.split('/');
       const sport = pathParts[0] === 'football' ? 'futebol' : pathParts[0];
@@ -492,14 +499,14 @@ function generateBookmakerLink(
       
       const leagueSlug = pathParts[2]?.replace(/_/g, '-') || '';
       
-      // Slug dos times (3 traços entre eles)
-      const homeSlug = homeTeam
+      // Slug dos times usando nomes originais da API
+      const homeSlug = homeName
         .toLowerCase()
         .replace(/\s+/g, '-')
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '');
       
-      const awaySlug = awayTeam
+      const awaySlug = awayName
         .toLowerCase()
         .replace(/\s+/g, '-')
         .normalize('NFD')
