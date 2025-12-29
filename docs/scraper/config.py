@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     
     # Bookmaker-specific tokens (optional)
     br4bet_authorization: Optional[str] = None
+    estrelabet_authorization: Optional[str] = None
     
     class Config:
         env_file = ".env"
@@ -100,6 +101,12 @@ BOOKMAKERS = {
         "base_url": "https://br4.bet.br",
         "enabled": True,
         "priority": 8,
+    },
+    "estrelabet": {
+        "name": "Estrelabet",
+        "base_url": "https://www.estrelabet.bet.br",
+        "enabled": True,
+        "priority": 9,
     },
 }
 
