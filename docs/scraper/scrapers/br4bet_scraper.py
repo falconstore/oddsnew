@@ -31,28 +31,22 @@ class Br4betScraper(BaseScraper):
     
     LEAGUES = {
         "serie_a": {
-            "cat_id": "502",
+            "champ_id": "2942",
             "name": "Serie A",
             "country": "italia",
             "slug": "italia/serie-a",
         },
         "premier_league": {
-            "cat_id": "497",
+            "champ_id": "2936",
             "name": "Premier League", 
             "country": "inglaterra",
             "slug": "inglaterra/premier-league",
         },
         "la_liga": {
-            "cat_id": "501",
+            "champ_id": "2941",
             "name": "La Liga",
             "country": "espanha",
             "slug": "espanha/laliga",
-        },
-        "brasileirao_a": {
-            "cat_id": "593",
-            "name": "Brasileirão Série A",
-            "country": "brasil",
-            "slug": "brasil/campeonato-brasileiro-serie-a",
         },
     }
     
@@ -196,7 +190,7 @@ class Br4betScraper(BaseScraper):
         """Return list of supported leagues."""
         return [
             LeagueConfig(
-                league_id=cfg["cat_id"],
+                league_id=cfg["champ_id"],
                 name=cfg["name"],
                 url=f"{self.base_url}/sports/futebol/{cfg['slug']}",
                 country=cfg["country"]
@@ -225,7 +219,7 @@ class Br4betScraper(BaseScraper):
         # Find the slug for this league
         league_slug = None
         for cfg in self.LEAGUES.values():
-            if cfg["cat_id"] == league.league_id:
+            if cfg["champ_id"] == league.league_id:
                 league_slug = cfg["slug"]
                 break
 
@@ -261,7 +255,7 @@ class Br4betScraper(BaseScraper):
         # Find the best matching response for this league
         captured_response: Optional[Response] = None
         for resp in captured_responses:
-            if f"catIds={league.league_id}" in resp.url:
+            if f"champIds={league.league_id}" in resp.url:
                 captured_response = resp
                 break
         
@@ -395,7 +389,7 @@ class Br4betScraper(BaseScraper):
             
             # Build URL from scratch if we have no cached URL
             api_base = "https://sb2frontend-altenar2.biahosted.com/api/widget/GetEvents"
-            api_url = f"{api_base}?culture=pt-BR&timezoneOffset=180&integration=br4bet&deviceType=1&numFormat=en-GB&countryCode=BR&eventCount=0&sportId=0&catIds={league.league_id}"
+            api_url = f"{api_base}?culture=pt-BR&timezoneOffset=180&integration=br4bet&deviceType=1&numFormat=en-GB&countryCode=BR&eventCount=0&sportId=0&champIds={league.league_id}"
             self.logger.info(f"Trying constructed API URL for {league.name}")
             data = await self._request_json_with_context(api_url, referer, league.name)
             if data:
