@@ -1,23 +1,129 @@
-import { format, formatDistanceToNow } from 'date-fns';
+import { format, formatDistanceToNow, isToday, isTomorrow, addDays, isWithinInterval } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-import { useOddsComparison, useLeagues } from '@/hooks/useOddsData';
+import { useOddsComparison } from '@/hooks/useOddsData';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { TrendingUp, TrendingDown, Clock, AlertTriangle, ExternalLink } from 'lucide-react';
+import { TrendingUp, TrendingDown, Clock, AlertTriangle, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useState } from 'react';
+import { useState, useMemo, useCallback } from 'react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { SurebetCalculator } from './SurebetCalculator';
+import { OddsFilters, OddsFiltersState, defaultFilters } from './OddsFilters';
+import { ViewToggle, ViewMode } from './ViewToggle';
 import type { MatchOddsGroup, BookmakerOdds } from '@/types/database';
 
-export function OddsComparisonTable() {
-  const [selectedLeague, setSelectedLeague] = useState<string>('all');
-  const { data: leagues } = useLeagues();
+interface OddsComparisonTableProps {
+  onStatsUpdate?: (stats: { surebetCount: number; valueBetCount: number; totalMatches: number; lastUpdate: Date | null }) => void;
+}
+
+export function OddsComparisonTable({ onStatsUpdate }: OddsComparisonTableProps) {
+  const [filters, setFilters] = useState<OddsFiltersState>(defaultFilters);
+  const [viewMode, setViewMode] = useState<ViewMode>('cards');
+  
   const { data: matches, isLoading, error } = useOddsComparison(
-    selectedLeague !== 'all' ? { leagueName: selectedLeague } : undefined
+    filters.league !== 'all' ? { leagueName: filters.league } : undefined
   );
+
+  // Filter and sort matches
+  const filteredMatches = useMemo(() => {
+    if (!matches) return [];
+    
+    let result = [...matches];
+    
+    // Date filter
+    if (filters.dateFilter !== 'all') {
+      const now = new Date();
+      result = result.filter(m => {
+        const matchDate = new Date(m.match_date);
+        if (filters.dateFilter === 'today') return isToday(matchDate);
+        if (filters.dateFilter === 'tomorrow') return isTomorrow(matchDate);
+        if (filters.dateFilter === 'week') {
+          return isWithinInterval(matchDate, { start: now, end: addDays(now, 7) });
+        }
+        return true;
+      });
+    }
+    
+    // Bookmaker filter
+    if (filters.bookmaker !== 'all') {
+      result = result.filter(m => 
+        m.odds.some(o => o.bookmaker_name.toLowerCase() === filters.bookmaker.toLowerCase())
+      );
+    }
+    
+    // Opportunity type filter
+    if (filters.opportunityType !== 'all') {
+      result = result.filter(m => {
+        const arbitrageValue = 1/m.best_home + 1/m.best_draw + 1/m.best_away;
+        if (filters.opportunityType === 'surebet') return arbitrageValue < 1;
+        if (filters.opportunityType === 'value') return arbitrageValue >= 1 && arbitrageValue < 1.05;
+        return true;
+      });
+    }
+    
+    // Margin filter
+    result = result.filter(m => {
+      const arbitrageValue = 1/m.best_home + 1/m.best_draw + 1/m.best_away;
+      const margin = (arbitrageValue - 1) * 100;
+      return margin <= filters.maxMargin;
+    });
+    
+    // Sorting
+    result.sort((a, b) => {
+      let comparison = 0;
+      
+      switch (filters.sortBy) {
+        case 'date':
+          comparison = new Date(a.match_date).getTime() - new Date(b.match_date).getTime();
+          break;
+        case 'margin':
+          const marginA = 1/a.best_home + 1/a.best_draw + 1/a.best_away;
+          const marginB = 1/b.best_home + 1/b.best_draw + 1/b.best_away;
+          comparison = marginA - marginB;
+          break;
+        case 'team':
+          comparison = a.home_team.localeCompare(b.home_team);
+          break;
+        case 'bookmakers':
+          comparison = b.odds.length - a.odds.length;
+          break;
+      }
+      
+      return filters.sortOrder === 'asc' ? comparison : -comparison;
+    });
+    
+    return result;
+  }, [matches, filters]);
+
+  // Calculate stats
+  useMemo(() => {
+    if (!matches || !onStatsUpdate) return;
+    
+    let surebetCount = 0;
+    let valueBetCount = 0;
+    let lastUpdate: Date | null = null;
+    
+    matches.forEach(m => {
+      const arbitrageValue = 1/m.best_home + 1/m.best_draw + 1/m.best_away;
+      if (arbitrageValue < 1) surebetCount++;
+      else if (arbitrageValue < 1.05) valueBetCount++;
+      
+      m.odds.forEach(o => {
+        const oddsDate = new Date(o.scraped_at);
+        if (!lastUpdate || oddsDate > lastUpdate) lastUpdate = oddsDate;
+      });
+    });
+    
+    onStatsUpdate({ surebetCount, valueBetCount, totalMatches: matches.length, lastUpdate });
+  }, [matches, onStatsUpdate]);
+
+  // For surebet-only view
+  const displayMatches = viewMode === 'surebets' 
+    ? filteredMatches.filter(m => (1/m.best_home + 1/m.best_draw + 1/m.best_away) < 1)
+    : filteredMatches;
 
   if (error) {
     return (
@@ -35,20 +141,14 @@ export function OddsComparisonTable() {
   return (
     <div className="space-y-4">
       {/* Filters */}
-      <div className="flex flex-wrap gap-4">
-        <Select value={selectedLeague} onValueChange={setSelectedLeague}>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Filtrar por liga" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas as ligas</SelectItem>
-            {leagues?.map((league) => (
-              <SelectItem key={league.id} value={league.name}>
-                {league.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <OddsFilters filters={filters} onFiltersChange={setFilters} />
+
+      {/* View Toggle */}
+      <div className="flex items-center justify-between">
+        <div className="text-sm text-muted-foreground">
+          {displayMatches.length} partida{displayMatches.length !== 1 ? 's' : ''} encontrada{displayMatches.length !== 1 ? 's' : ''}
+        </div>
+        <ViewToggle value={viewMode} onChange={setViewMode} />
       </div>
 
       {/* Loading state */}
@@ -61,23 +161,97 @@ export function OddsComparisonTable() {
       )}
 
       {/* Empty state */}
-      {!isLoading && (!matches || matches.length === 0) && (
+      {!isLoading && displayMatches.length === 0 && (
         <Card>
           <CardContent className="pt-6 text-center text-muted-foreground">
-            Nenhuma partida encontrada. Configure seu scraper para popular o banco de dados.
+            {viewMode === 'surebets' 
+              ? 'Nenhuma surebet encontrada no momento.'
+              : 'Nenhuma partida encontrada com os filtros atuais.'}
           </CardContent>
         </Card>
       )}
 
-      {/* Matches */}
-      {matches?.map((match) => (
+      {/* Compact Table View */}
+      {viewMode === 'compact' && displayMatches.length > 0 && (
+        <CompactTableView matches={displayMatches} />
+      )}
+
+      {/* Card View */}
+      {(viewMode === 'cards' || viewMode === 'surebets') && displayMatches.map((match) => (
         <MatchCard key={match.match_id} match={match} />
       ))}
     </div>
   );
 }
 
+function CompactTableView({ matches }: { matches: MatchOddsGroup[] }) {
+  return (
+    <Card>
+      <CardContent className="pt-4 overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Partida</TableHead>
+              <TableHead>Liga</TableHead>
+              <TableHead className="text-center">Casa</TableHead>
+              <TableHead className="text-center">Empate</TableHead>
+              <TableHead className="text-center">Fora</TableHead>
+              <TableHead className="text-center">Margem</TableHead>
+              <TableHead className="text-center">Casas</TableHead>
+              <TableHead>Data</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {matches.map((match) => {
+              const arbitrageValue = 1/match.best_home + 1/match.best_draw + 1/match.best_away;
+              const hasArbitrage = arbitrageValue < 1;
+              const margin = ((arbitrageValue - 1) * 100).toFixed(2);
+              
+              return (
+                <TableRow 
+                  key={match.match_id} 
+                  className={hasArbitrage ? 'bg-green-500/10' : ''}
+                >
+                  <TableCell className="font-medium">
+                    {match.home_team} vs {match.away_team}
+                    {hasArbitrage && (
+                      <Badge className="ml-2 bg-green-500 text-white text-xs">SUREBET</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className="text-xs">{match.league_name}</Badge>
+                  </TableCell>
+                  <TableCell className="text-center font-mono font-bold text-primary">
+                    {match.best_home.toFixed(2)}
+                  </TableCell>
+                  <TableCell className="text-center font-mono font-bold text-primary">
+                    {match.best_draw.toFixed(2)}
+                  </TableCell>
+                  <TableCell className="text-center font-mono font-bold text-primary">
+                    {match.best_away.toFixed(2)}
+                  </TableCell>
+                  <TableCell className={cn(
+                    "text-center font-mono",
+                    hasArbitrage ? "text-green-500 font-bold" : "text-muted-foreground"
+                  )}>
+                    {hasArbitrage ? `+${(Math.abs(Number(margin))).toFixed(2)}%` : `${margin}%`}
+                  </TableCell>
+                  <TableCell className="text-center">{match.odds.length}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {format(new Date(match.match_date), "dd/MM HH:mm")}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
 function MatchCard({ match }: { match: MatchOddsGroup }) {
+  const [isExpanded, setIsExpanded] = useState(false);
   const matchDate = new Date(match.match_date);
   const isLive = match.match_status === 'live';
   
@@ -85,11 +259,17 @@ function MatchCard({ match }: { match: MatchOddsGroup }) {
   const arbitrageValue = (1/match.best_home + 1/match.best_draw + 1/match.best_away);
   const hasArbitrage = arbitrageValue < 1 && match.odds.length > 0;
   const profitPercentage = hasArbitrage ? ((1 - arbitrageValue) * 100).toFixed(2) : null;
+
+  // Find which bookmaker has the best odds for each outcome
+  const bestHomeBookmaker = match.odds.find(o => o.home_odd === match.best_home)?.bookmaker_name;
+  const bestDrawBookmaker = match.odds.find(o => o.draw_odd === match.best_draw)?.bookmaker_name;
+  const bestAwayBookmaker = match.odds.find(o => o.away_odd === match.best_away)?.bookmaker_name;
   
   return (
     <Card className={cn(
+      "transition-shadow",
       isLive && "border-primary",
-      hasArbitrage && "border-2 border-green-500 shadow-lg shadow-green-500/20 animate-pulse"
+      hasArbitrage && "border-2 border-green-500 shadow-lg shadow-green-500/20"
     )}>
       <CardHeader className="pb-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -104,14 +284,37 @@ function MatchCard({ match }: { match: MatchOddsGroup }) {
             </div>
           </div>
           {hasArbitrage && (
-            <Badge className="bg-green-500 text-white animate-pulse text-sm px-3 py-1">
+            <Badge className="bg-green-500 text-white text-sm px-3 py-1">
               🎯 SUREBET +{profitPercentage}%
             </Badge>
           )}
           <BestOddsSummary match={match} hasArbitrage={hasArbitrage} arbitrageValue={arbitrageValue} />
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
+        {/* Surebet Calculator (collapsible) */}
+        {hasArbitrage && (
+          <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
+            <CollapsibleTrigger asChild>
+              <Button variant="outline" size="sm" className="w-full justify-between">
+                <span>Calculadora de Surebet</span>
+                {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pt-4">
+              <SurebetCalculator
+                homeOdd={match.best_home}
+                drawOdd={match.best_draw}
+                awayOdd={match.best_away}
+                homeBookmaker={bestHomeBookmaker}
+                drawBookmaker={bestDrawBookmaker}
+                awayBookmaker={bestAwayBookmaker}
+              />
+            </CollapsibleContent>
+          </Collapsible>
+        )}
+
+        {/* Odds Table */}
         <Table>
           <TableHeader>
             <TableRow>
