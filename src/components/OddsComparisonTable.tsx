@@ -469,6 +469,46 @@ function generateBookmakerLink(
     }
   }
   
+  // KTO
+  if (name.includes('kto')) {
+    const eventId = extraData.event_id;
+    const leaguePath = extraData.league_path as string;
+    
+    if (eventId && leaguePath && homeTeam && awayTeam) {
+      // Converter "football/italy/serie_a" para "futebol/italia/serie-a"
+      const pathParts = leaguePath.split('/');
+      const sport = pathParts[0] === 'football' ? 'futebol' : pathParts[0];
+      
+      const countryMap: Record<string, string> = {
+        'italy': 'italia',
+        'england': 'inglaterra',
+        'spain': 'espanha',
+        'brazil': 'brasil',
+        'germany': 'alemanha',
+        'france': 'franca',
+        'portugal': 'portugal'
+      };
+      const country = countryMap[pathParts[1]] || pathParts[1];
+      
+      const leagueSlug = pathParts[2]?.replace(/_/g, '-') || '';
+      
+      // Slug dos times (3 traços entre eles)
+      const homeSlug = homeTeam
+        .toLowerCase()
+        .replace(/\s+/g, '-')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+      
+      const awaySlug = awayTeam
+        .toLowerCase()
+        .replace(/\s+/g, '-')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+      
+      return `https://www.kto.bet.br/esportes/${sport}/${country}/${leagueSlug}/${homeSlug}---${awaySlug}/${eventId}`;
+    }
+  }
+  
   return null;
 }
 
