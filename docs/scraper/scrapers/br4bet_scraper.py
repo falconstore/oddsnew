@@ -1,9 +1,10 @@
 """
 Br4bet Scraper - Scrapes odds from Br4bet via Altenar API.
 
-Uses Playwright to navigate to league pages and capture the real API calls
-made by the website's frontend. This bypasses anti-bot protection by using
-the exact requests the site makes.
+Supports two modes:
+1. Direct API mode (preferred): Uses BR4BET_AUTHORIZATION env var to call API directly.
+   No browser needed, avoids Cloudflare/captcha entirely.
+2. Playwright mode (fallback): Uses browser to navigate and capture API calls.
 
 API endpoint: https://sb2frontend-altenar2.biahosted.com/api/widget/GetEvents
 """
@@ -15,9 +16,11 @@ import re
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 
+import httpx
 from playwright.async_api import async_playwright, Playwright, Browser, BrowserContext, Page, Response
 
 from base_scraper import BaseScraper, ScrapedOdds, LeagueConfig
+from config import settings
 
 
 class Br4betScraper(BaseScraper):
@@ -58,6 +61,11 @@ class Br4betScraper(BaseScraper):
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/120.0.0.0 Safari/537.36"
     )
+    
+    # Direct API mode constants
+    API_BASE_URL = "https://sb2frontend-altenar2.biahosted.com/api/widget/GetEvents"
+    API_PARAMS = "culture=pt-BR&timezoneOffset=180&integration=br4bet&deviceType=1&numFormat=en-GB&countryCode=BR&eventCount=0&sportId=0"
+    
     def __init__(self):
         super().__init__(
             name="br4bet",
@@ -71,10 +79,26 @@ class Br4betScraper(BaseScraper):
         # Captured from real frontend requests
         self._auth_header: Optional[str] = None
         self._last_api_url_by_league: Dict[str, str] = {}
+        
+        # Check for direct mode via env or settings
+        self._direct_mode = False
+        auth_from_env = os.environ.get("BR4BET_AUTHORIZATION")
+        auth_from_settings = getattr(settings, "br4bet_authorization", None)
+        if auth_from_env:
+            self._auth_header = auth_from_env
+            self._direct_mode = True
+        elif auth_from_settings:
+            self._auth_header = auth_from_settings
+            self._direct_mode = True
     
     async def setup(self):
-        """Initialize Playwright browser with stealth settings."""
+        """Initialize scraper - skip Playwright if direct mode is enabled."""
         await super().setup()
+        
+        if self._direct_mode:
+            self.logger.info("Direct API mode enabled (BR4BET_AUTHORIZATION configured)")
+            self.logger.info("Skipping Playwright browser initialization")
+            return
         
         self.logger.info("Starting Playwright browser with stealth...")
         self._playwright = await async_playwright().start()
@@ -171,7 +195,11 @@ class Br4betScraper(BaseScraper):
             self.logger.warning(f"Session setup warning (continuing anyway): {e}")
     
     async def teardown(self):
-        """Clean up Playwright resources."""
+        """Clean up Playwright resources (skipped in direct mode)."""
+        if self._direct_mode:
+            await super().teardown()
+            return
+            
         if self._page:
             await self._page.close()
             self._page = None
@@ -211,8 +239,48 @@ class Br4betScraper(BaseScraper):
             headers['Authorization'] = self._auth_header
         return headers
 
+    async def _request_direct_api(self, champ_id: str, league_name: str) -> Optional[Dict[str, Any]]:
+        """Make direct API call using httpx with configured Authorization header."""
+        url = f"{self.API_BASE_URL}?{self.API_PARAMS}&champIds={champ_id}"
+        
+        headers = {
+            "Accept": "*/*",
+            "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+            "Authorization": self._auth_header,
+            "Origin": "https://br4.bet.br",
+            "Referer": "https://br4.bet.br/",
+            "User-Agent": self.USER_AGENT,
+        }
+        
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                self.logger.debug(f"Direct API request for {league_name}: champIds={champ_id}")
+                response = await client.get(url, headers=headers)
+                
+                if response.status_code == 200:
+                    self.logger.debug(f"Direct API success for {league_name}")
+                    return response.json()
+                else:
+                    self.logger.error(f"Direct API HTTP {response.status_code} for {league_name}")
+                    self.logger.debug(f"Response body: {response.text[:200]}")
+                    return None
+        except Exception as e:
+            self.logger.error(f"Direct API error for {league_name}: {e}")
+            return None
+
     async def scrape_league(self, league: LeagueConfig) -> List[ScrapedOdds]:
-        """Scrape odds by capturing the real GetEvents call from the league page."""
+        """Scrape odds - uses direct API if available, otherwise Playwright."""
+        
+        # Direct mode: skip browser entirely
+        if self._direct_mode:
+            data = await self._request_direct_api(league.league_id, league.name)
+            if data:
+                return self._parse_response(data, league)
+            else:
+                self.logger.warning(f"Direct API failed for {league.name}, no fallback available")
+                return []
+        
+        # Playwright mode (existing code)
         if not self._page or not self._context:
             raise RuntimeError("Page/context not initialized. Call setup() first.")
 
