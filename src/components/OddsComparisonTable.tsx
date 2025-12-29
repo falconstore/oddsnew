@@ -463,7 +463,7 @@ function generateBookmakerLink(
   
   // Estrelabet
   if (name.includes('estrelabet')) {
-    const eventId = extraData.estrelabet_event_id;
+    const eventId = extraData.event_id;
     if (eventId) {
       return `https://www.estrelabet.bet.br/aposta-esportiva?page=event&eventId=${eventId}&sportId=66`;
     }
