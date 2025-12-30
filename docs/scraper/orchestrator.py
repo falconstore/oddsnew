@@ -54,14 +54,9 @@ class AlertDetector:
             value_alerts = self._check_value_bets(match_id, odds_list)
             alerts.extend(value_alerts)
         
-        # Save alerts to database
-        for alert in alerts:
-            await self.supabase.create_alert(
-                match_id=alert["match_id"],
-                alert_type=alert["type"],
-                title=alert["message"],
-                details=alert["data"]
-            )
+        # Batch insert all alerts in a single database call
+        if alerts:
+            await self.supabase.insert_alerts_batch(alerts)
         
         return alerts
     

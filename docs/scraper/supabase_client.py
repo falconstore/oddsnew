@@ -405,6 +405,46 @@ class SupabaseClient:
             self.logger.error(f"Error creating alert: {e}")
             return None
     
+    async def insert_alerts_batch(
+        self,
+        alerts: List[Dict[str, Any]]
+    ) -> int:
+        """
+        Insert multiple alerts in a single batch operation.
+        
+        Args:
+            alerts: List of alert dicts with match_id, type, message, data
+            
+        Returns:
+            Number of alerts inserted
+        """
+        if not alerts:
+            return 0
+        
+        try:
+            alert_records = [
+                {
+                    "match_id": alert["match_id"],
+                    "alert_type": alert["type"],
+                    "title": alert["message"],
+                    "details": alert["data"],
+                    "is_read": False,
+                }
+                for alert in alerts
+            ]
+            
+            response = (
+                self.client.table("alerts")
+                .insert(alert_records)
+                .execute()
+            )
+            count = len(response.data) if response.data else 0
+            self.logger.info(f"Inserted {count} alert records")
+            return count
+        except Exception as e:
+            self.logger.error(f"Error inserting alerts batch: {e}")
+            return 0
+    
     async def fetch_unread_alerts(self) -> List[Dict[str, Any]]:
         """Fetch all unread alerts."""
         try:
