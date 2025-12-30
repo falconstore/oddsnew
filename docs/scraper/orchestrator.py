@@ -250,6 +250,9 @@ class Orchestrator:
         match_odds = self._group_by_match(normalized)
         alerts = await self.alert_detector.check_for_alerts(match_odds)
         
+        # Cleanup old matches
+        cleaned = await self._cleanup_old_matches()
+        
         # Summary
         elapsed = (datetime.utcnow() - start_time).total_seconds()
         summary = {
@@ -261,12 +264,13 @@ class Orchestrator:
             "odds_normalized": len(normalized),
             "odds_inserted": inserted,
             "alerts_created": len(alerts),
+            "matches_cleaned": cleaned,
             "errors": errors,
         }
         
         self.logger.info(
             f"Cycle complete: {inserted} odds inserted, "
-            f"{len(alerts)} alerts created in {elapsed:.2f}s"
+            f"{len(alerts)} alerts created, {cleaned} old matches cleaned in {elapsed:.2f}s"
         )
         
         return summary
@@ -414,3 +418,15 @@ class Orchestrator:
             grouped[match_id].append(odds)
         
         return grouped
+    
+    async def _cleanup_old_matches(self) -> int:
+        """Remove matches that have already started from the database."""
+        try:
+            result = self.supabase.client.rpc('cleanup_started_matches').execute()
+            deleted = result.data if result.data else 0
+            if deleted > 0:
+                self.logger.info(f"Cleaned up {deleted} old matches")
+            return deleted
+        except Exception as e:
+            self.logger.warning(f"Failed to cleanup old matches: {e}")
+            return 0
