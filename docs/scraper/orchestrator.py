@@ -248,6 +248,9 @@ class Orchestrator:
         # Cleanup old matches
         cleaned = await self._cleanup_old_matches()
         
+        # Generate and upload JSON for frontend
+        json_uploaded = await self._generate_and_upload_json()
+        
         # Summary
         elapsed = (datetime.utcnow() - start_time).total_seconds()
         summary = {
@@ -260,12 +263,14 @@ class Orchestrator:
             "odds_inserted": inserted,
             "alerts_created": len(alerts),
             "matches_cleaned": cleaned,
+            "json_uploaded": json_uploaded,
             "errors": errors,
         }
         
         self.logger.info(
             f"Cycle complete: {inserted} odds inserted, "
-            f"{len(alerts)} alerts created, {cleaned} old matches cleaned in {elapsed:.2f}s"
+            f"{len(alerts)} alerts created, {cleaned} old matches cleaned, "
+            f"JSON uploaded: {json_uploaded} in {elapsed:.2f}s"
         )
         
         return summary
@@ -425,3 +430,138 @@ class Orchestrator:
         except Exception as e:
             self.logger.warning(f"Failed to cleanup old matches: {e}")
             return 0
+    
+    async def _generate_and_upload_json(self) -> bool:
+        """
+        Generate odds JSON and upload to Supabase Storage.
+        This provides the frontend with a static JSON file instead of direct DB queries.
+        """
+        try:
+            # Fetch all current odds from the view
+            raw_data = await self.supabase.fetch_odds_for_json()
+            
+            if not raw_data:
+                self.logger.warning("No odds data to export to JSON")
+                return False
+            
+            # Group by match (similar to frontend groupOddsByMatch)
+            matches = self._group_odds_for_json(raw_data)
+            
+            # Build final JSON structure
+            json_data = {
+                "generated_at": datetime.utcnow().isoformat(),
+                "matches_count": len(matches),
+                "matches": matches
+            }
+            
+            # Upload to storage
+            success = self.supabase.upload_odds_json(json_data)
+            
+            if success:
+                self.logger.info(f"Uploaded odds.json with {len(matches)} matches")
+            
+            return success
+            
+        except Exception as e:
+            self.logger.error(f"Failed to generate/upload JSON: {e}")
+            return False
+    
+    def _group_odds_for_json(self, raw_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Group raw odds data by match for JSON export.
+        Similar logic to frontend's groupOddsByMatch function.
+        """
+        from datetime import timezone
+        
+        match_map: Dict[str, Dict[str, Any]] = {}
+        now = datetime.now(timezone.utc)
+        five_minutes_ago = now - timedelta(minutes=5)
+        
+        for row in raw_data:
+            match_date_str = row.get("match_date", "")
+            try:
+                # Parse the match date
+                if "T" in match_date_str:
+                    match_date = datetime.fromisoformat(match_date_str.replace("Z", "+00:00"))
+                else:
+                    match_date = datetime.fromisoformat(match_date_str)
+                
+                # Make timezone-aware if not
+                if match_date.tzinfo is None:
+                    match_date = match_date.replace(tzinfo=timezone.utc)
+                
+                # Skip matches that started more than 5 minutes ago
+                if match_date < five_minutes_ago:
+                    continue
+            except (ValueError, TypeError):
+                continue
+            
+            match_id = row.get("match_id", "")
+            
+            if match_id not in match_map:
+                match_map[match_id] = {
+                    "match_id": match_id,
+                    "match_date": row.get("match_date"),
+                    "match_status": row.get("match_status"),
+                    "league_name": row.get("league_name"),
+                    "league_country": row.get("league_country"),
+                    "home_team": row.get("home_team"),
+                    "away_team": row.get("away_team"),
+                    "odds": [],
+                    "best_home": 0,
+                    "best_draw": 0,
+                    "best_away": 0,
+                    "worst_home": float('inf'),
+                    "worst_draw": float('inf'),
+                    "worst_away": float('inf')
+                }
+            
+            group = match_map[match_id]
+            
+            home_odd = row.get("home_odd", 0) or 0
+            draw_odd = row.get("draw_odd", 0) or 0
+            away_odd = row.get("away_odd", 0) or 0
+            
+            bookmaker_odds = {
+                "bookmaker_id": row.get("bookmaker_id"),
+                "bookmaker_name": row.get("bookmaker_name"),
+                "home_odd": home_odd,
+                "draw_odd": draw_odd,
+                "away_odd": away_odd,
+                "margin_percentage": row.get("margin_percentage"),
+                "data_age_seconds": row.get("data_age_seconds"),
+                "scraped_at": row.get("scraped_at"),
+                "extra_data": row.get("extra_data")
+            }
+            
+            group["odds"].append(bookmaker_odds)
+            
+            # Track best/worst odds
+            if home_odd > group["best_home"]:
+                group["best_home"] = home_odd
+            if draw_odd > group["best_draw"]:
+                group["best_draw"] = draw_odd
+            if away_odd > group["best_away"]:
+                group["best_away"] = away_odd
+            if home_odd > 0 and home_odd < group["worst_home"]:
+                group["worst_home"] = home_odd
+            if draw_odd > 0 and draw_odd < group["worst_draw"]:
+                group["worst_draw"] = draw_odd
+            if away_odd > 0 and away_odd < group["worst_away"]:
+                group["worst_away"] = away_odd
+        
+        # Convert infinity to 0 for JSON serialization
+        result = []
+        for match in match_map.values():
+            if match["worst_home"] == float('inf'):
+                match["worst_home"] = 0
+            if match["worst_draw"] == float('inf'):
+                match["worst_draw"] = 0
+            if match["worst_away"] == float('inf'):
+                match["worst_away"] = 0
+            result.append(match)
+        
+        # Sort by match_date
+        result.sort(key=lambda x: x.get("match_date", ""))
+        
+        return result
