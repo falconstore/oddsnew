@@ -2,7 +2,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import type { League, Team, Bookmaker, Match, TeamAlias, Alert, OddsComparison, MatchOddsGroup, BookmakerOdds } from '@/types/database';
 import { toast } from '@/hooks/use-toast';
-import { useOddsRealtimeSubscription, useAlertsRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
+import { useAlertsRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
+
+// Get Supabase URL for storage access
+const getSupabaseUrl = () => {
+  const storedUrl = localStorage.getItem('supabase_url');
+  return storedUrl || import.meta.env.VITE_SUPABASE_URL || '';
+};
 
 // =====================================================
 // LEAGUES
@@ -278,47 +284,90 @@ export const useDeleteBookmaker = () => {
 };
 
 // =====================================================
-// ODDS COMPARISON (Main Dashboard Data)
+// ODDS COMPARISON (Main Dashboard Data) - Fetches from Static JSON
 // =====================================================
+
+interface OddsJsonResponse {
+  generated_at: string;
+  matches_count: number;
+  matches: MatchOddsGroup[];
+}
 
 export const useOddsComparison = (filters?: {
   leagueName?: string;
   dateFrom?: string;
   dateTo?: string;
 }) => {
-  // Subscribe to realtime updates for odds_history
-  useOddsRealtimeSubscription();
-
   return useQuery({
     queryKey: ['odds_comparison', filters],
     queryFn: async () => {
-      let query = supabase
-        .from('odds_comparison')
-        .select('*')
-        .order('match_date', { ascending: true });
+      const supabaseUrl = getSupabaseUrl();
+      if (!supabaseUrl) {
+        throw new Error('Supabase not configured');
+      }
 
+      // Fetch from Supabase Storage instead of direct database query
+      const jsonUrl = `${supabaseUrl}/storage/v1/object/public/odds-data/odds.json`;
+      
+      const response = await fetch(jsonUrl, {
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
+      });
+
+      if (!response.ok) {
+        // Fallback to database query if JSON not available yet
+        console.warn('JSON not available, falling back to database query');
+        return await fallbackDatabaseQuery(filters);
+      }
+
+      const data: OddsJsonResponse = await response.json();
+      let matches = data.matches;
+
+      // Apply filters locally (data is already grouped)
       if (filters?.leagueName) {
-        query = query.eq('league_name', filters.leagueName);
+        matches = matches.filter(m => m.league_name === filters.leagueName);
       }
       if (filters?.dateFrom) {
-        query = query.gte('match_date', filters.dateFrom);
+        matches = matches.filter(m => m.match_date >= filters.dateFrom!);
       }
       if (filters?.dateTo) {
-        query = query.lte('match_date', filters.dateTo);
+        matches = matches.filter(m => m.match_date <= filters.dateTo!);
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
-
-      // Group by match
-      const grouped = groupOddsByMatch(data as OddsComparison[]);
-      return grouped;
+      return matches;
     },
-    // Keep a fallback refetch in case realtime connection drops
-    refetchInterval: 15000, // Fallback: refetch every 15 seconds
-    staleTime: 3000 // Consider data stale after 3 seconds
+    refetchInterval: 15000, // Fetch new JSON every 15 seconds
+    staleTime: 5000
   });
 };
+
+// Fallback function for when JSON is not available
+async function fallbackDatabaseQuery(filters?: {
+  leagueName?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}): Promise<MatchOddsGroup[]> {
+  let query = supabase
+    .from('odds_comparison')
+    .select('*')
+    .order('match_date', { ascending: true });
+
+  if (filters?.leagueName) {
+    query = query.eq('league_name', filters.leagueName);
+  }
+  if (filters?.dateFrom) {
+    query = query.gte('match_date', filters.dateFrom);
+  }
+  if (filters?.dateTo) {
+    query = query.lte('match_date', filters.dateTo);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  return groupOddsByMatch(data as OddsComparison[]);
+}
 
 function groupOddsByMatch(data: OddsComparison[]): MatchOddsGroup[] {
   const matchMap = new Map<string, MatchOddsGroup>();

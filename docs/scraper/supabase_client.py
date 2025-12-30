@@ -3,6 +3,7 @@ Supabase Client - Database operations for the Odds Scraper.
 Handles all interactions with the Supabase database.
 """
 
+import json
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 from supabase import create_client, Client
@@ -459,3 +460,47 @@ class SupabaseClient:
         except Exception as e:
             self.logger.error(f"Error fetching alerts: {e}")
             return []
+    
+    # ==========================================
+    # JSON EXPORT (for frontend)
+    # ==========================================
+    
+    async def fetch_odds_for_json(self) -> List[Dict[str, Any]]:
+        """Fetch all odds data from the comparison view for JSON export."""
+        try:
+            response = (
+                self.client.table("odds_comparison")
+                .select("*")
+                .order("match_date", desc=False)
+                .execute()
+            )
+            return response.data or []
+        except Exception as e:
+            self.logger.error(f"Error fetching odds for JSON: {e}")
+            return []
+    
+    def upload_odds_json(self, data: Dict[str, Any]) -> bool:
+        """
+        Upload odds JSON to Supabase Storage.
+        
+        Args:
+            data: The structured odds data to upload
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            json_content = json.dumps(data, ensure_ascii=False, default=str)
+            
+            # Upload/overwrite the file using upsert
+            self.client.storage.from_("odds-data").upload(
+                path="odds.json",
+                file=json_content.encode("utf-8"),
+                file_options={"content-type": "application/json", "upsert": "true"}
+            )
+            
+            self.logger.info(f"Uploaded odds.json ({len(json_content)} bytes)")
+            return True
+        except Exception as e:
+            self.logger.error(f"Error uploading odds JSON: {e}")
+            return False
