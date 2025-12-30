@@ -5,7 +5,7 @@ Manages parallel execution of scrapers, normalization, and database insertion.
 
 import asyncio
 from typing import List, Dict, Any, Optional, Type
-from datetime import datetime
+from datetime import datetime, timedelta
 from loguru import logger
 
 from config import settings, BOOKMAKERS
