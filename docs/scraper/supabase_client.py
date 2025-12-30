@@ -300,13 +300,30 @@ class SupabaseClient:
                     })
                     result_map[key] = None  # Mark as pending
             
-            # Batch insert new matches
+            # Batch insert new matches with conflict handling
             if to_create:
-                insert_response = (
-                    self.client.table("matches")
-                    .insert(to_create)
-                    .execute()
-                )
+                try:
+                    insert_response = (
+                        self.client.table("matches")
+                        .insert(to_create)
+                        .execute()
+                    )
+                except Exception as insert_error:
+                    # Handle potential duplicate key errors gracefully
+                    self.logger.warning(f"Some matches may already exist: {insert_error}")
+                    insert_response = type('obj', (object,), {'data': []})()
+                    # Re-fetch to get the existing records
+                    refetch = (
+                        self.client.table("matches")
+                        .select("*")
+                        .gte("match_date", date_min.isoformat())
+                        .lte("match_date", date_max.isoformat())
+                        .execute()
+                    )
+                    for match in refetch.data or []:
+                        key = (match["league_id"], match["home_team_id"], match["away_team_id"])
+                        if key in result_map and result_map[key] is None:
+                            result_map[key] = match
                 
                 for match in insert_response.data or []:
                     key = (match["league_id"], match["home_team_id"], match["away_team_id"])

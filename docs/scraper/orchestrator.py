@@ -469,7 +469,7 @@ class Orchestrator:
     def _group_odds_for_json(self, raw_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
         Group raw odds data by match for JSON export.
-        Similar logic to frontend's groupOddsByMatch function.
+        Uses composite key (home_team + away_team + date) to prevent duplicates.
         """
         from datetime import timezone
         
@@ -496,17 +496,21 @@ class Orchestrator:
             except (ValueError, TypeError):
                 continue
             
-            match_id = row.get("match_id", "")
+            # Use composite key to prevent duplicates from different match_ids
+            home_team = row.get("home_team", "")
+            away_team = row.get("away_team", "")
+            match_date_key = match_date.date().isoformat()
+            composite_key = f"{home_team}_{away_team}_{match_date_key}"
             
-            if match_id not in match_map:
-                match_map[match_id] = {
-                    "match_id": match_id,
+            if composite_key not in match_map:
+                match_map[composite_key] = {
+                    "match_id": row.get("match_id", ""),
                     "match_date": row.get("match_date"),
                     "match_status": row.get("match_status"),
                     "league_name": row.get("league_name"),
                     "league_country": row.get("league_country"),
-                    "home_team": row.get("home_team"),
-                    "away_team": row.get("away_team"),
+                    "home_team": home_team,
+                    "away_team": away_team,
                     "odds": [],
                     "best_home": 0,
                     "best_draw": 0,
@@ -516,7 +520,7 @@ class Orchestrator:
                     "worst_away": float('inf')
                 }
             
-            group = match_map[match_id]
+            group = match_map[composite_key]
             
             home_odd = row.get("home_odd", 0) or 0
             draw_odd = row.get("draw_odd", 0) or 0
