@@ -516,6 +516,14 @@ function generateBookmakerLink(
     }
   }
   
+  // Sportingbet
+  if (name.includes('sportingbet')) {
+    const fixtureId = extraData.fixture_id;
+    if (fixtureId) {
+      return `https://www.sportingbet.bet.br/pt-br/sports/futebol-4/apostas/evento/2:${fixtureId}`;
+    }
+  }
+  
   return null;
 }
 
