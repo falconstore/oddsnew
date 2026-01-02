@@ -519,8 +519,26 @@ function generateBookmakerLink(
   // Sportingbet
   if (name.includes('sportingbet')) {
     const fixtureId = extraData.fixture_id;
-    if (fixtureId) {
-      return `https://www.sportingbet.bet.br/pt-br/sports/futebol-4/apostas/evento/2:${fixtureId}`;
+    const homeOriginal = extraData.home_team_raw as string;
+    const awayOriginal = extraData.away_team_raw as string;
+    
+    const homeName = homeOriginal || homeTeam;
+    const awayName = awayOriginal || awayTeam;
+    
+    if (fixtureId && homeName && awayName) {
+      const homeSlug = homeName
+        .toLowerCase()
+        .replace(/\s+/g, '-')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+      
+      const awaySlug = awayName
+        .toLowerCase()
+        .replace(/\s+/g, '-')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+      
+      return `https://www.sportingbet.bet.br/pt-br/sports/eventos/${homeSlug}-${awaySlug}-2:${fixtureId}?tab=score`;
     }
   }
   
