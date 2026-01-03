@@ -443,12 +443,14 @@ function generateBookmakerLink(
     }
   }
   
-  // Superbet
+  // Superbet (football and basketball)
   if (name.includes('superbet')) {
     const eventId = extraData.superbet_event_id;
     const leagueId = extraData.superbet_league_id;
+    const sportType = extraData.sport_type as string;
+    
     if (eventId && homeTeam && awayTeam) {
-      // Gerar slug: "Chelsea" + "Aston Villa" -> "chelsea-x-aston-villa"
+      // Gerar slug: "Miami Heat" + "Minnesota Timberwolves" -> "miami-heat-x-minnesota-timberwolves"
       const homeSlug = homeTeam
         .toLowerCase()
         .replace(/\s+/g, '-')
@@ -461,7 +463,10 @@ function generateBookmakerLink(
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '');
       
-      let url = `https://superbet.bet.br/odds/futebol/${homeSlug}-x-${awaySlug}-${eventId}/`;
+      // Detect sport: basketball or football
+      const sportPath = sportType === 'basketball' ? 'basquete' : 'futebol';
+      
+      let url = `https://superbet.bet.br/odds/${sportPath}/${homeSlug}-x-${awaySlug}-${eventId}/`;
       
       if (leagueId) {
         url += `?t=offer-prematch-${leagueId}&mdt=o`;

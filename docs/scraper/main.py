@@ -29,6 +29,7 @@ from orchestrator import Orchestrator
 # Import scrapers
 from scrapers.betano_scraper import BetanoScraper
 from scrapers.superbet_scraper import SuperbetScraper
+from scrapers.superbet_nba_scraper import SuperbetNBAScraper
 from scrapers.betbra_scraper import BetbraScraper
 # from scrapers.br4bet_scraper import Br4betScraper  # Pausado - problemas com Cloudflare
 from scrapers.estrelabet_scraper import EstrelabetScraper
@@ -83,6 +84,7 @@ def create_orchestrator() -> Orchestrator:
     # Register scrapers
     orchestrator.register_scraper(BetanoScraper())
     orchestrator.register_scraper(SuperbetScraper())
+    orchestrator.register_scraper(SuperbetNBAScraper())  # NBA Basketball
     orchestrator.register_scraper(BetbraScraper())  # Exchange - only BACK odds
     # orchestrator.register_scraper(Br4betScraper())  # Pausado - problemas com Cloudflare
     orchestrator.register_scraper(EstrelabetScraper())
