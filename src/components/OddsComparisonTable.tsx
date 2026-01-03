@@ -327,7 +327,7 @@ function MatchCard({ match }: { match: MatchOddsGroup }) {
           <TableBody>
             {match.odds.map((odds) => (
               <OddsRow 
-                key={odds.bookmaker_id} 
+                key={`${odds.bookmaker_id}-${odds.odds_type ?? 'PA'}`}
                 odds={odds} 
                 bestHome={match.best_home}
                 bestDraw={match.best_draw}
