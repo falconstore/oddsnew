@@ -23,16 +23,19 @@ class SportingbetScraper(BaseScraper):
     LEAGUES = {
         "premier_league": {
             "region_id": "14",
+            "competition_id": "102841",
             "name": "Premier League",
             "country": "Inglaterra"
         },
         "la_liga": {
             "region_id": "28",
+            "competition_id": "102829",
             "name": "La Liga",
             "country": "Espanha"
         },
         "serie_a": {
             "region_id": "20",
+            "competition_id": "102846",
             "name": "Serie A",
             "country": "Itália"
         },
@@ -81,7 +84,8 @@ class SportingbetScraper(BaseScraper):
         
         league_config = self.LEAGUES.get(league.league_id, {})
         region_id = league_config.get("region_id")
-        if not region_id:
+        competition_id = league_config.get("competition_id")
+        if not region_id or not competition_id:
             self.logger.warning(f"Liga não configurada: {league.league_id}")
             return []
         
@@ -97,6 +101,7 @@ class SportingbetScraper(BaseScraper):
             "fixtureCategories": "Gridable,NonGridable,Other",
             "sportIds": "4",  # Futebol
             "regionIds": region_id,
+            "competitionIds": competition_id,  # Filtra pela liga específica
             "isPriceBoost": "false",
             "statisticsModes": "None",
             "skip": "0",
