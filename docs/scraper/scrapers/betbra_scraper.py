@@ -276,6 +276,7 @@ class BetbraScraper(BaseScraper):
                     draw_odd=draw_odd,
                     away_odd=away_odd,
                     market_type="1x2",
+                    odds_type="SO",  # Betbra = Super Odds (exchange, sem pagamento antecipado)
                     extra_data={
                         "betbra_event_id": event.get("id"),
                         "betbra_market_id": one_x_two_market.get("id"),

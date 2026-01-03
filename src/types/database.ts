@@ -4,6 +4,7 @@ export type EntityStatus = 'active' | 'inactive';
 export type AlertType = 'value_bet' | 'line_movement' | 'arbitrage';
 export type MarketType = '1x2' | 'over_under' | 'both_teams_score' | 'handicap';
 export type MatchStatus = 'scheduled' | 'live' | 'finished' | 'postponed';
+export type OddsType = 'SO' | 'PA'; // SO = Super Odds (sem pagamento antecipado), PA = Pagamento Antecipado
 
 export interface League {
   id: string;
@@ -138,4 +139,5 @@ export interface BookmakerOdds {
   data_age_seconds: number;
   scraped_at: string;
   extra_data?: Record<string, unknown>;
+  odds_type?: OddsType; // SO = Super Odds, PA = Pagamento Antecipado
 }

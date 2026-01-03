@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { TrendingUp, TrendingDown, Clock, AlertTriangle, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
+import { Clock, AlertTriangle, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState, useMemo, useCallback } from 'react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -196,7 +196,7 @@ function CompactTableView({ matches }: { matches: MatchOddsGroup[] }) {
               <TableHead className="text-center">Casa</TableHead>
               <TableHead className="text-center">Empate</TableHead>
               <TableHead className="text-center">Fora</TableHead>
-              <TableHead className="text-center">Margem</TableHead>
+              <TableHead className="text-center">ROI</TableHead>
               <TableHead className="text-center">Casas</TableHead>
               <TableHead>Data</TableHead>
             </TableRow>
@@ -205,7 +205,7 @@ function CompactTableView({ matches }: { matches: MatchOddsGroup[] }) {
             {matches.map((match) => {
               const arbitrageValue = 1/match.best_home + 1/match.best_draw + 1/match.best_away;
               const hasArbitrage = arbitrageValue < 1;
-              const margin = ((arbitrageValue - 1) * 100).toFixed(2);
+              const roi = ((1 - arbitrageValue) * 100).toFixed(2);
               
               return (
                 <TableRow 
@@ -234,7 +234,7 @@ function CompactTableView({ matches }: { matches: MatchOddsGroup[] }) {
                     "text-center font-mono",
                     hasArbitrage ? "text-green-500 font-bold" : "text-muted-foreground"
                   )}>
-                    {hasArbitrage ? `+${(Math.abs(Number(margin))).toFixed(2)}%` : `${margin}%`}
+                    {Number(roi) > 0 ? `+${roi}%` : `${roi}%`}
                   </TableCell>
                   <TableCell className="text-center">{match.odds.length}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">
@@ -322,7 +322,6 @@ function MatchCard({ match }: { match: MatchOddsGroup }) {
               <TableHead className="text-center">Casa (1)</TableHead>
               <TableHead className="text-center">Empate (X)</TableHead>
               <TableHead className="text-center">Fora (2)</TableHead>
-              <TableHead className="text-right">Atualizado</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -350,7 +349,7 @@ function MatchCard({ match }: { match: MatchOddsGroup }) {
 function BestOddsSummary({ match, hasArbitrage, arbitrageValue }: { match: MatchOddsGroup; hasArbitrage: boolean; arbitrageValue: number }) {
   if (match.odds.length === 0) return null;
   
-  const marginPercentage = ((arbitrageValue - 1) * 100).toFixed(2);
+  const roiPercentage = ((1 - arbitrageValue) * 100).toFixed(2);
   
   return (
     <div className="flex gap-4 text-sm items-center">
@@ -368,8 +367,8 @@ function BestOddsSummary({ match, hasArbitrage, arbitrageValue }: { match: Match
       </div>
       {!hasArbitrage && (
         <div className="text-center border-l pl-4">
-          <div className="text-muted-foreground">Margem</div>
-          <div className="font-bold text-lg text-muted-foreground">{marginPercentage}%</div>
+          <div className="text-muted-foreground">ROI</div>
+          <div className="font-bold text-lg text-muted-foreground">{roiPercentage}%</div>
         </div>
       )}
     </div>
@@ -583,11 +582,31 @@ function OddsRow({
   // Gerar link da casa de apostas
   const bookmakerLink = generateBookmakerLink(odds.bookmaker_name, odds.extra_data, homeTeam, awayTeam);
 
+  // Determinar tipo de odds baseado no nome da casa
+  const getOddsType = (bookmakerName: string): 'SO' | 'PA' => {
+    const name = bookmakerName.toLowerCase();
+    if (name.includes('novibet') || name.includes('betbra')) {
+      return 'SO';
+    }
+    return 'PA';
+  };
+  
+  const oddsType = odds.odds_type || getOddsType(odds.bookmaker_name);
+
   return (
     <TableRow className={cn(isStale && "opacity-60", isVeryStale && "opacity-40")}>
       <TableCell className="font-medium">
         <div className="flex items-center gap-2">
           {odds.bookmaker_name}
+          <Badge 
+            variant="outline" 
+            className={cn(
+              "text-[10px] px-1.5 py-0",
+              oddsType === 'SO' ? "border-amber-500 text-amber-500" : "border-emerald-500 text-emerald-500"
+            )}
+          >
+            {oddsType}
+          </Badge>
           {bookmakerLink && (
             <Button 
               variant="ghost" 
@@ -611,9 +630,6 @@ function OddsRow({
       <TableCell className="text-center">
         <OddCell value={odds.away_odd} isBest={odds.away_odd === bestAway} isWorst={odds.away_odd === worstAway} />
       </TableCell>
-      <TableCell className="text-right text-sm text-muted-foreground">
-        {formatDistanceToNow(new Date(odds.scraped_at), { addSuffix: true, locale: ptBR })}
-      </TableCell>
     </TableRow>
   );
 }
@@ -625,8 +641,6 @@ function OddCell({ value, isBest, isWorst }: { value: number; isBest: boolean; i
       isBest && "bg-primary/10 text-primary font-bold",
       isWorst && "bg-destructive/10 text-destructive"
     )}>
-      {isBest && <TrendingUp className="h-3 w-3" />}
-      {isWorst && <TrendingDown className="h-3 w-3" />}
       {value.toFixed(2)}
     </div>
   );
