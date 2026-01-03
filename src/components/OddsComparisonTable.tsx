@@ -544,11 +544,23 @@ function generateBookmakerLink(
   // Novibet
   if (name.includes('novibet')) {
     const eventId = extraData.event_id;
-    const path = extraData.path as string;
     
-    if (eventId && path) {
-      // Formato: /apostas-esportivas/{path}/e{eventId}
-      return `https://www.novibet.bet.br/apostas-esportivas/${path}/e${eventId}`;
+    if (eventId && homeTeam && awayTeam) {
+      // Gerar slug: "Espanyol" + "Barcelona" -> "espanyol-barcelona"
+      const homeSlug = homeTeam
+        .toLowerCase()
+        .replace(/\s+/g, '-')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+      
+      const awaySlug = awayTeam
+        .toLowerCase()
+        .replace(/\s+/g, '-')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+      
+      // Formato: /apostas-esportivas/matches/{home}-{away}/e{eventId}
+      return `https://www.novibet.bet.br/apostas-esportivas/matches/${homeSlug}-${awaySlug}/e${eventId}`;
     }
   }
   
