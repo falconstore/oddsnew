@@ -266,142 +266,110 @@ class NovibetScraper(BaseScraper):
 
 
 
+    # Tags conhecidas da Novibet para identificar tipo de mercado
+    TAG_SUPER_ODDS = "ODDS_KEY_0"  # SO - Super Odds (0% margem)
+    TAG_EARLY_PAYOUT = "SOCCER_2_GOALS_AHEAD_EARLY_PAYOUT"  # PA - 2 gols = Green
+
     def _parse_response(self, data: List[Dict[str, Any]], league_name: str) -> List[ScrapedOdds]:
-
         results = []
-
-        if not data: return results
-
+        if not data:
+            return results
         
-
         bet_views = data[0].get("betViews", [])
-
-        if not bet_views: return results
-
+        if not bet_views:
+            return results
         
-
         items = bet_views[0].get("items", [])
-
         
-
         for item in items:
-
             try:
-
                 captions = item.get("additionalCaptions", {})
-
                 home = captions.get("competitor1")
-
                 away = captions.get("competitor2")
-
                 
-
-                if not home or not away: continue
-
+                if not home or not away:
+                    continue
                 # Filtro anti-virtual
+                if "SRL" in home or "Esports" in home:
+                    continue
+                if item.get("isLive", False):
+                    continue
 
-                if "SRL" in home or "Esports" in home: continue
-
-                if item.get("isLive", False): continue
-
-
+                # Construir mapa: marketId -> tag
+                market_tags = item.get("marketTags", [])
+                tag_map = {t["marketId"]: t["tag"] for t in market_tags}
 
                 markets = item.get("markets", [])
-
-                home_odd, draw_odd, away_odd = 0.0, 0.0, 0.0
-
+                odds_by_type = {}  # {"SO": {...}, "PA": {...}}
                 
-
-                # Busca a melhor odd (Normal vs Early Payout)
-
-                best_market_val = 0.0
-
-                
-
                 for market in markets:
-
-                    if market.get("betTypeSysname") == "SOCCER_MATCH_RESULT":
-
-                        temp_h, temp_d, temp_a = 0.0, 0.0, 0.0
-
+                    if market.get("betTypeSysname") != "SOCCER_MATCH_RESULT":
+                        continue
+                    
+                    market_id = market.get("marketId")
+                    tag = tag_map.get(market_id, "")
+                    
+                    # Identificar tipo baseado na tag
+                    if tag == self.TAG_SUPER_ODDS:
+                        odds_type = "SO"
+                    elif tag == self.TAG_EARLY_PAYOUT:
+                        odds_type = "PA"
+                    else:
+                        # Log para descobrir novas tags
+                        if tag:
+                            self.logger.debug(f"Tag desconhecida: {tag}")
+                        continue
+                    
+                    temp_h, temp_d, temp_a = 0.0, 0.0, 0.0
+                    for bet in market.get("betItems", []):
+                        if not bet.get("isAvailable", True):
+                            continue
+                        price = float(bet.get("price", 0))
+                        code = bet.get("code")
                         
+                        if code == "1":
+                            temp_h = price
+                        elif code == "X":
+                            temp_d = price
+                        elif code == "2":
+                            temp_a = price
+                    
+                    if temp_h > 1.0:
+                        odds_by_type[odds_type] = {
+                            "home": temp_h,
+                            "draw": temp_d,
+                            "away": temp_a
+                        }
 
-                        for bet in market.get("betItems", []):
+                # Parse da data
+                try:
+                    dt = datetime.fromisoformat(item.get("startDate").replace("Z", "+00:00"))
+                except:
+                    dt = datetime.now()
 
-                            if not bet.get("isAvailable", True): continue
-
-                            price = float(bet.get("price", 0))
-
-                            code = bet.get("code")
-
-                            
-
-                            if code == "1": temp_h = price
-
-                            elif code == "X": temp_d = price
-
-                            elif code == "2": temp_a = price
-
-                        
-
-                        # Se a odd da casa for maior que a anterior, assumimos este mercado como o melhor
-
-                        if temp_h > best_market_val:
-
-                            best_market_val = temp_h
-
-                            home_odd, draw_odd, away_odd = temp_h, temp_d, temp_a
-
-
-
-                if home_odd > 1.0:
-
-                    try:
-
-                        dt = datetime.fromisoformat(item.get("startDate").replace("Z", "+00:00"))
-
-                    except:
-
-                        dt = datetime.now()
-
-
-
+                # Criar ScrapedOdds para cada tipo encontrado
+                for odds_type, odds in odds_by_type.items():
                     scraped = ScrapedOdds(
-
                         bookmaker_name="novibet",
-
                         home_team_raw=home,
-
                         away_team_raw=away,
-
                         league_raw=league_name,
-
                         match_date=dt,
-
-                        home_odd=home_odd,
-
-                        draw_odd=draw_odd,
-
-                        away_odd=away_odd,
-
+                        home_odd=odds["home"],
+                        draw_odd=odds["draw"],
+                        away_odd=odds["away"],
                         market_type="1x2",
-
-                        odds_type="SO",  # Novibet = Super Odds (sem pagamento antecipado)
-
+                        odds_type=odds_type,
                         extra_data={"event_id": str(item.get("eventBetContextId"))}
-
                     )
-
                     results.append(scraped)
 
-
-
-            except Exception:
-
+            except Exception as e:
+                self.logger.debug(f"Erro processando item: {e}")
                 continue
-
-                
-
-        self.logger.info(f"Novibet {league_name}: {len(results)} jogos encontrados.")
-
+        
+        so_count = len([r for r in results if r.odds_type == "SO"])
+        pa_count = len([r for r in results if r.odds_type == "PA"])
+        self.logger.info(f"Novibet {league_name}: {so_count} SO + {pa_count} PA = {len(results)} total")
+        
         return results
