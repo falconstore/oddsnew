@@ -105,6 +105,7 @@ export interface OddsComparison {
   home_odd: number;
   draw_odd: number;
   away_odd: number;
+  odds_type?: OddsType; // SO = Super Odds, PA = Pagamento Antecipado
   scraped_at: string;
   margin_percentage: number | null;
   data_age_seconds: number;

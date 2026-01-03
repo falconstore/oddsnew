@@ -79,6 +79,7 @@ CREATE TABLE public.odds_history (
     match_id UUID REFERENCES public.matches(id) ON DELETE CASCADE NOT NULL,
     bookmaker_id UUID REFERENCES public.bookmakers(id) ON DELETE CASCADE NOT NULL,
     market_type market_type DEFAULT '1x2',
+    odds_type TEXT DEFAULT 'PA', -- PA = Pagamento Antecipado, SO = Super Odds
     home_odd DECIMAL(6,3),
     draw_odd DECIMAL(6,3),
     away_odd DECIMAL(6,3),
@@ -120,6 +121,7 @@ CREATE INDEX idx_odds_match ON public.odds_history(match_id);
 CREATE INDEX idx_odds_bookmaker ON public.odds_history(bookmaker_id);
 CREATE INDEX idx_odds_scraped ON public.odds_history(scraped_at);
 CREATE INDEX idx_odds_latest ON public.odds_history(is_latest) WHERE is_latest = TRUE;
+CREATE INDEX idx_odds_type ON public.odds_history(odds_type);
 CREATE INDEX idx_team_aliases_name ON public.team_aliases(alias_name);
 CREATE INDEX idx_alerts_unread ON public.alerts(is_read) WHERE is_read = FALSE;
 
@@ -141,6 +143,7 @@ SELECT
     oh.home_odd,
     oh.draw_odd,
     oh.away_odd,
+    oh.odds_type, -- SO = Super Odds, PA = Pagamento Antecipado
     oh.extra_data, -- Links das partidas (betbra_event_id, betbra_market_id, etc.)
     oh.scraped_at,
     -- Cálculo de margem
@@ -157,13 +160,15 @@ JOIN public.teams ht ON m.home_team_id = ht.id
 JOIN public.teams at ON m.away_team_id = at.id
 JOIN public.odds_history oh ON m.id = oh.match_id AND oh.is_latest = TRUE
 JOIN public.bookmakers b ON oh.bookmaker_id = b.id
-WHERE l.status = 'active' AND b.status = 'active';
+WHERE l.status = 'active' AND b.status = 'active'
+  AND m.match_date > (NOW() - INTERVAL '30 minutes');
 
 -- =====================================================
 -- FUNÇÕES AUXILIARES
 -- =====================================================
 
 -- Função para marcar odds antigas como não-latest
+-- Separada por odds_type para manter SO e PA como registros independentes
 CREATE OR REPLACE FUNCTION public.mark_old_odds_not_latest()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -171,6 +176,7 @@ BEGIN
     SET is_latest = FALSE
     WHERE match_id = NEW.match_id 
       AND bookmaker_id = NEW.bookmaker_id 
+      AND odds_type = NEW.odds_type  -- Separar por tipo (SO vs PA)
       AND id != NEW.id
       AND is_latest = TRUE;
     RETURN NEW;
