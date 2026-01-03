@@ -28,17 +28,17 @@ class BetbraScraper(BaseScraper):
         "premier_league": {
             "name": "Premier League",
             "country": "England",
-            "tag_url_name": "english-premier-league",
+            "tag_url_name": "england",  # API uses "england" for Premier League
         },
         "serie_a": {
             "name": "Serie A",
             "country": "Italy",
-            "tag_url_name": "italy",
+            "tag_url_name": "italy-serie-a",  # Specific Serie A tag
         },
         "la_liga": {
             "name": "La Liga",
             "country": "Spain",
-            "tag_url_name": "spain",
+            "tag_url_name": "spain-la-liga",  # Specific La Liga tag
         },
     }
     
