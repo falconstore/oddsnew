@@ -3,6 +3,7 @@ Scraper para Novibet Brasil.
 API REST simples sem bloqueios.
 """
 
+import os
 import httpx
 from datetime import datetime
 from typing import List, Optional, Dict, Any
@@ -13,14 +14,14 @@ from base_scraper import BaseScraper, ScrapedOdds, LeagueConfig
 class NovibetScraper(BaseScraper):
     """
     Scraper para Novibet usando API REST direta.
-    
+
     Endpoint: /spt/feed/marketviews/location/v2/{sportId}/{competitionId}/
     Retorna JSON com eventos e odds.
     """
-    
+
     API_BASE = "https://www.novibet.bet.br/spt/feed/marketviews/location/v2"
     SPORT_ID = "4324"  # Futebol
-    
+
     # Mapeamento de ligas
     # IDs descobertos via navegação no site
     LEAGUES = {
@@ -40,42 +41,53 @@ class NovibetScraper(BaseScraper):
             "country": "Italia"
         },
     }
-    
+
     def __init__(self):
         super().__init__(name="novibet", base_url="https://www.novibet.bet.br")
         self.client: Optional[httpx.AsyncClient] = None
         self.logger = logger.bind(component="novibet")
-    
+
     async def setup(self):
         """Inicializa o cliente HTTP com headers completos."""
+
+        cookies = os.getenv("NOVIBET_COOKIES") or os.getenv("NOVIBET_COOKIE")
+
+        headers: Dict[str, str] = {
+            "accept": "application/json, text/plain, */*",
+            "accept-language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+            "accept-encoding": "gzip, deflate, br",
+            "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+            "referer": "https://www.novibet.bet.br/apostas-esportivas/futebol/4372606/england/premier-league/5908949",
+            "priority": "u=1, i",
+            "sec-ch-ua": '"Chromium";v="142", "Google Chrome";v="142", "Not_A Brand";v="99"',
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": '"macOS"',
+            "sec-fetch-dest": "empty",
+            "sec-fetch-mode": "cors",
+            "sec-fetch-site": "same-origin",
+            "x-gw-application-name": "NoviBR",
+            "x-gw-channel": "WebPC",
+            "x-gw-client-timezone": "America/Sao_Paulo",
+            "x-gw-cms-key": "_BR",
+            "x-gw-country-sysname": "BR",
+            "x-gw-currency-sysname": "BRL",
+            "x-gw-domain-key": "_BR",
+            "x-gw-language-sysname": "pt-BR",
+            "x-gw-odds-representation": "Decimal",
+            "x-gw-state-sysname": "",
+        }
+
+        # Se o seu IP estiver sendo desafiado pelo Cloudflare, pode ser necessário
+        # enviar cookies de sessão (ex.: cf_clearance). Observação: expiram.
+        if cookies:
+            headers["cookie"] = cookies
+            self.logger.info("Novibet: usando cookies fornecidos via NOVIBET_COOKIES")
+
         self.client = httpx.AsyncClient(
             timeout=30.0,
             follow_redirects=True,
             http2=True,
-            headers={
-                "accept": "application/json, text/plain, */*",
-                "accept-language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
-                "accept-encoding": "gzip, deflate, br",
-                "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
-                "referer": "https://www.novibet.bet.br/apostas-esportivas/futebol/4372606/england/premier-league/5908949",
-                "priority": "u=1, i",
-                "sec-ch-ua": '"Chromium";v="142", "Google Chrome";v="142", "Not_A Brand";v="99"',
-                "sec-ch-ua-mobile": "?0",
-                "sec-ch-ua-platform": '"macOS"',
-                "sec-fetch-dest": "empty",
-                "sec-fetch-mode": "cors",
-                "sec-fetch-site": "same-origin",
-                "x-gw-application-name": "NoviBR",
-                "x-gw-channel": "WebPC",
-                "x-gw-client-timezone": "America/Sao_Paulo",
-                "x-gw-cms-key": "_BR",
-                "x-gw-country-sysname": "BR",
-                "x-gw-currency-sysname": "BRL",
-                "x-gw-domain-key": "_BR",
-                "x-gw-language-sysname": "pt-BR",
-                "x-gw-odds-representation": "Decimal",
-                "x-gw-state-sysname": "",
-            }
+            headers=headers,
         )
         self.logger.info("Novibet scraper initialized")
     
