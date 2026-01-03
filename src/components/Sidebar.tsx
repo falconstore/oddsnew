@@ -5,11 +5,10 @@ import {
   Trophy, 
   Users, 
   Building2, 
-  Bell, 
-  BarChart3, 
   Settings,
   Menu,
-  X
+  X,
+  BarChart3
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
@@ -19,8 +18,6 @@ const navigation = [
   { name: 'Ligas', href: '/leagues', icon: Trophy },
   { name: 'Times', href: '/teams', icon: Users },
   { name: 'Casas de Apostas', href: '/bookmakers', icon: Building2 },
-  { name: 'Alertas', href: '/alerts', icon: Bell },
-  { name: 'Analytics', href: '/analytics', icon: BarChart3 },
   { name: 'Configurações', href: '/settings', icon: Settings },
 ];
 

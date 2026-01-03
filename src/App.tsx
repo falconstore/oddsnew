@@ -9,8 +9,6 @@ import Dashboard from "./pages/Dashboard";
 import Leagues from "./pages/Leagues";
 import Teams from "./pages/Teams";
 import Bookmakers from "./pages/Bookmakers";
-import Alerts from "./pages/Alerts";
-import Analytics from "./pages/Analytics";
 import Settings from "./pages/Settings";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
@@ -30,8 +28,6 @@ const App = () => (
             <Route path="/leagues" element={<RequireAuth requireAdmin><Leagues /></RequireAuth>} />
             <Route path="/teams" element={<RequireAuth requireAdmin><Teams /></RequireAuth>} />
             <Route path="/bookmakers" element={<RequireAuth requireAdmin><Bookmakers /></RequireAuth>} />
-            <Route path="/alerts" element={<Alerts />} />
-            <Route path="/analytics" element={<Analytics />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
