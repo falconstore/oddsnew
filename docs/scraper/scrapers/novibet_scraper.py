@@ -315,10 +315,10 @@ class NovibetScraper(BaseScraper):
                     elif tag == self.TAG_EARLY_PAYOUT:
                         odds_type = "PA"
                     else:
-                        # Log para descobrir novas tags
+                        # Tag vazia ou desconhecida = assume PA (mercado padrão)
                         if tag:
-                            self.logger.debug(f"Tag desconhecida: {tag}")
-                        continue
+                            self.logger.info(f"Nova tag encontrada: {tag} - usando PA como default")
+                        odds_type = "PA"
                     
                     temp_h, temp_d, temp_a = 0.0, 0.0, 0.0
                     for bet in market.get("betItems", []):
