@@ -33,6 +33,11 @@ export function OddsComparisonTable({ onStatsUpdate }: OddsComparisonTableProps)
     
     let result = [...matches];
     
+    // Sport filter
+    if (filters.sport !== 'all') {
+      result = result.filter(m => (m.sport_type || 'football') === filters.sport);
+    }
+    
     // Date filter
     if (filters.dateFilter !== 'all') {
       const now = new Date();
@@ -54,10 +59,13 @@ export function OddsComparisonTable({ onStatsUpdate }: OddsComparisonTableProps)
       );
     }
     
-    // Opportunity type filter
+    // Opportunity type filter (surebet)
     if (filters.opportunityType === 'surebet') {
       result = result.filter(m => {
-        const arbitrageValue = 1/m.best_home + 1/m.best_draw + 1/m.best_away;
+        const isBasketball = (m.sport_type || 'football') === 'basketball';
+        const arbitrageValue = isBasketball || m.best_draw === null || m.best_draw === 0
+          ? 1/m.best_home + 1/m.best_away
+          : 1/m.best_home + 1/m.best_draw + 1/m.best_away;
         return arbitrageValue < 1;
       });
     }
@@ -70,11 +78,18 @@ export function OddsComparisonTable({ onStatsUpdate }: OddsComparisonTableProps)
         case 'date':
           comparison = new Date(a.match_date).getTime() - new Date(b.match_date).getTime();
           break;
-        case 'margin':
-          const marginA = 1/a.best_home + 1/a.best_draw + 1/a.best_away;
-          const marginB = 1/b.best_home + 1/b.best_draw + 1/b.best_away;
+        case 'margin': {
+          const isBasketballA = (a.sport_type || 'football') === 'basketball';
+          const isBasketballB = (b.sport_type || 'football') === 'basketball';
+          const marginA = isBasketballA || a.best_draw === null || a.best_draw === 0
+            ? 1/a.best_home + 1/a.best_away
+            : 1/a.best_home + 1/a.best_draw + 1/a.best_away;
+          const marginB = isBasketballB || b.best_draw === null || b.best_draw === 0
+            ? 1/b.best_home + 1/b.best_away
+            : 1/b.best_home + 1/b.best_draw + 1/b.best_away;
           comparison = marginA - marginB;
           break;
+        }
         case 'team':
           comparison = a.home_team.localeCompare(b.home_team);
           break;
@@ -96,7 +111,10 @@ export function OddsComparisonTable({ onStatsUpdate }: OddsComparisonTableProps)
     let surebetCount = 0;
     
     matches.forEach(m => {
-      const arbitrageValue = 1/m.best_home + 1/m.best_draw + 1/m.best_away;
+      const isBasketball = (m.sport_type || 'football') === 'basketball';
+      const arbitrageValue = isBasketball || m.best_draw === null || m.best_draw === 0
+        ? 1/m.best_home + 1/m.best_away
+        : 1/m.best_home + 1/m.best_draw + 1/m.best_away;
       if (arbitrageValue < 1) surebetCount++;
     });
     
@@ -105,7 +123,13 @@ export function OddsComparisonTable({ onStatsUpdate }: OddsComparisonTableProps)
 
   // For surebet-only view
   const displayMatches = viewMode === 'surebets' 
-    ? filteredMatches.filter(m => (1/m.best_home + 1/m.best_draw + 1/m.best_away) < 1)
+    ? filteredMatches.filter(m => {
+        const isBasketball = (m.sport_type || 'football') === 'basketball';
+        const arbitrageValue = isBasketball || m.best_draw === null || m.best_draw === 0
+          ? 1/m.best_home + 1/m.best_away
+          : 1/m.best_home + 1/m.best_draw + 1/m.best_away;
+        return arbitrageValue < 1;
+      })
     : filteredMatches;
 
   if (error) {
@@ -168,6 +192,11 @@ export function OddsComparisonTable({ onStatsUpdate }: OddsComparisonTableProps)
 }
 
 function CompactTableView({ matches }: { matches: MatchOddsGroup[] }) {
+  // Check if we have any basketball matches to determine if we need a flexible layout
+  const hasBasketball = matches.some(m => (m.sport_type || 'football') === 'basketball');
+  const hasFootball = matches.some(m => (m.sport_type || 'football') === 'football');
+  const showDrawColumn = hasFootball && !hasBasketball; // Only show draw if all are football
+  
   return (
     <Card>
       <CardContent className="pt-4 overflow-x-auto">
@@ -177,7 +206,7 @@ function CompactTableView({ matches }: { matches: MatchOddsGroup[] }) {
               <TableHead>Partida</TableHead>
               <TableHead>Liga</TableHead>
               <TableHead className="text-center">Casa</TableHead>
-              <TableHead className="text-center">Empate</TableHead>
+              {showDrawColumn && <TableHead className="text-center">Empate</TableHead>}
               <TableHead className="text-center">Fora</TableHead>
               <TableHead className="text-center">ROI</TableHead>
               <TableHead className="text-center">Casas</TableHead>
@@ -186,9 +215,13 @@ function CompactTableView({ matches }: { matches: MatchOddsGroup[] }) {
           </TableHeader>
           <TableBody>
             {matches.map((match) => {
-              const arbitrageValue = 1/match.best_home + 1/match.best_draw + 1/match.best_away;
+              const isBasketball = (match.sport_type || 'football') === 'basketball';
+              const arbitrageValue = isBasketball || match.best_draw === null || match.best_draw === 0
+                ? 1/match.best_home + 1/match.best_away
+                : 1/match.best_home + 1/match.best_draw + 1/match.best_away;
               const hasArbitrage = arbitrageValue < 1;
               const roi = ((1 - arbitrageValue) * 100).toFixed(2);
+              const sportIcon = isBasketball ? '🏀' : '⚽';
               
               return (
                 <TableRow 
@@ -196,6 +229,7 @@ function CompactTableView({ matches }: { matches: MatchOddsGroup[] }) {
                   className={hasArbitrage ? 'bg-green-500/10' : ''}
                 >
                   <TableCell className="font-medium">
+                    <span className="mr-1">{sportIcon}</span>
                     {match.home_team} vs {match.away_team}
                     {hasArbitrage && (
                       <Badge className="ml-2 bg-green-500 text-white text-xs">SUREBET</Badge>
@@ -207,9 +241,11 @@ function CompactTableView({ matches }: { matches: MatchOddsGroup[] }) {
                   <TableCell className="text-center font-mono font-bold text-primary">
                     {match.best_home.toFixed(2)}
                   </TableCell>
-                  <TableCell className="text-center font-mono font-bold text-primary">
-                    {match.best_draw.toFixed(2)}
-                  </TableCell>
+                  {showDrawColumn && (
+                    <TableCell className="text-center font-mono font-bold text-primary">
+                      {isBasketball || match.best_draw === null ? '-' : match.best_draw.toFixed(2)}
+                    </TableCell>
+                  )}
                   <TableCell className="text-center font-mono font-bold text-primary">
                     {match.best_away.toFixed(2)}
                   </TableCell>
@@ -237,15 +273,19 @@ function MatchCard({ match }: { match: MatchOddsGroup }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const matchDate = new Date(match.match_date);
   const isLive = match.match_status === 'live';
+  const isBasketball = (match.sport_type || 'football') === 'basketball';
+  const sportIcon = isBasketball ? '🏀' : '⚽';
   
-  // Calculate arbitrage value
-  const arbitrageValue = (1/match.best_home + 1/match.best_draw + 1/match.best_away);
+  // Calculate arbitrage value (2-way for basketball, 3-way for football)
+  const arbitrageValue = isBasketball || match.best_draw === null || match.best_draw === 0
+    ? (1/match.best_home + 1/match.best_away)
+    : (1/match.best_home + 1/match.best_draw + 1/match.best_away);
   const hasArbitrage = arbitrageValue < 1 && match.odds.length > 0;
   const profitPercentage = hasArbitrage ? ((1 - arbitrageValue) * 100).toFixed(2) : null;
 
   // Find which bookmaker has the best odds for each outcome
   const bestHomeBookmaker = match.odds.find(o => o.home_odd === match.best_home)?.bookmaker_name;
-  const bestDrawBookmaker = match.odds.find(o => o.draw_odd === match.best_draw)?.bookmaker_name;
+  const bestDrawBookmaker = !isBasketball ? match.odds.find(o => o.draw_odd === match.best_draw)?.bookmaker_name : undefined;
   const bestAwayBookmaker = match.odds.find(o => o.away_odd === match.best_away)?.bookmaker_name;
   
   return (
@@ -258,6 +298,7 @@ function MatchCard({ match }: { match: MatchOddsGroup }) {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="space-y-1">
             <CardTitle className="text-lg">
+              <span className="mr-1">{sportIcon}</span>
               {match.home_team} vs {match.away_team}
             </CardTitle>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -271,7 +312,7 @@ function MatchCard({ match }: { match: MatchOddsGroup }) {
               🎯 SUREBET +{profitPercentage}%
             </Badge>
           )}
-          <BestOddsSummary match={match} hasArbitrage={hasArbitrage} arbitrageValue={arbitrageValue} />
+          <BestOddsSummary match={match} hasArbitrage={hasArbitrage} arbitrageValue={arbitrageValue} isBasketball={isBasketball} />
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -287,11 +328,12 @@ function MatchCard({ match }: { match: MatchOddsGroup }) {
             <CollapsibleContent className="pt-4">
               <SurebetCalculator
                 homeOdd={match.best_home}
-                drawOdd={match.best_draw}
+                drawOdd={isBasketball ? null : match.best_draw}
                 awayOdd={match.best_away}
                 homeBookmaker={bestHomeBookmaker}
                 drawBookmaker={bestDrawBookmaker}
                 awayBookmaker={bestAwayBookmaker}
+                isBasketball={isBasketball}
               />
             </CollapsibleContent>
           </Collapsible>
@@ -302,9 +344,9 @@ function MatchCard({ match }: { match: MatchOddsGroup }) {
           <TableHeader>
             <TableRow>
               <TableHead className="w-[150px]">Casa</TableHead>
-              <TableHead className="text-center">Casa (1)</TableHead>
-              <TableHead className="text-center">Empate (X)</TableHead>
-              <TableHead className="text-center">Fora (2)</TableHead>
+              <TableHead className="text-center">{isBasketball ? 'Time 1' : 'Casa (1)'}</TableHead>
+              {!isBasketball && <TableHead className="text-center">Empate (X)</TableHead>}
+              <TableHead className="text-center">{isBasketball ? 'Time 2' : 'Fora (2)'}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -320,6 +362,7 @@ function MatchCard({ match }: { match: MatchOddsGroup }) {
                 worstAway={match.worst_away}
                 homeTeam={match.home_team}
                 awayTeam={match.away_team}
+                isBasketball={isBasketball}
               />
             ))}
           </TableBody>
@@ -329,7 +372,12 @@ function MatchCard({ match }: { match: MatchOddsGroup }) {
   );
 }
 
-function BestOddsSummary({ match, hasArbitrage, arbitrageValue }: { match: MatchOddsGroup; hasArbitrage: boolean; arbitrageValue: number }) {
+function BestOddsSummary({ match, hasArbitrage, arbitrageValue, isBasketball }: { 
+  match: MatchOddsGroup; 
+  hasArbitrage: boolean; 
+  arbitrageValue: number;
+  isBasketball: boolean;
+}) {
   if (match.odds.length === 0) return null;
   
   const roiPercentage = ((1 - arbitrageValue) * 100).toFixed(2);
@@ -337,15 +385,17 @@ function BestOddsSummary({ match, hasArbitrage, arbitrageValue }: { match: Match
   return (
     <div className="flex gap-4 text-sm items-center">
       <div className="text-center">
-        <div className="text-muted-foreground">Melhor Casa</div>
+        <div className="text-muted-foreground">{isBasketball ? 'Melhor T1' : 'Melhor Casa'}</div>
         <div className={cn("font-bold text-lg", hasArbitrage ? "text-green-500" : "text-primary")}>{match.best_home.toFixed(2)}</div>
       </div>
+      {!isBasketball && match.best_draw !== null && match.best_draw > 0 && (
+        <div className="text-center">
+          <div className="text-muted-foreground">Melhor Empate</div>
+          <div className={cn("font-bold text-lg", hasArbitrage ? "text-green-500" : "text-primary")}>{match.best_draw.toFixed(2)}</div>
+        </div>
+      )}
       <div className="text-center">
-        <div className="text-muted-foreground">Melhor Empate</div>
-        <div className={cn("font-bold text-lg", hasArbitrage ? "text-green-500" : "text-primary")}>{match.best_draw.toFixed(2)}</div>
-      </div>
-      <div className="text-center">
-        <div className="text-muted-foreground">Melhor Fora</div>
+        <div className="text-muted-foreground">{isBasketball ? 'Melhor T2' : 'Melhor Fora'}</div>
         <div className={cn("font-bold text-lg", hasArbitrage ? "text-green-500" : "text-primary")}>{match.best_away.toFixed(2)}</div>
       </div>
       {!hasArbitrage && (
@@ -559,17 +609,19 @@ function OddsRow({
   worstDraw,
   worstAway,
   homeTeam,
-  awayTeam
+  awayTeam,
+  isBasketball = false
 }: { 
   odds: BookmakerOdds;
   bestHome: number;
-  bestDraw: number;
+  bestDraw: number | null;
   bestAway: number;
   worstHome: number;
-  worstDraw: number;
+  worstDraw: number | null;
   worstAway: number;
   homeTeam: string;
   awayTeam: string;
+  isBasketball?: boolean;
 }) {
   // Gerar link da casa de apostas
   const bookmakerLink = generateBookmakerLink(odds.bookmaker_name, odds.extra_data, homeTeam, awayTeam);
@@ -614,9 +666,11 @@ function OddsRow({
       <TableCell className="text-center">
         <OddCell value={odds.home_odd} isBest={odds.home_odd === bestHome} isWorst={odds.home_odd === worstHome} />
       </TableCell>
-      <TableCell className="text-center">
-        <OddCell value={odds.draw_odd} isBest={odds.draw_odd === bestDraw} isWorst={odds.draw_odd === worstDraw} />
-      </TableCell>
+      {!isBasketball && (
+        <TableCell className="text-center">
+          <OddCell value={odds.draw_odd} isBest={odds.draw_odd === bestDraw} isWorst={odds.draw_odd === worstDraw} />
+        </TableCell>
+      )}
       <TableCell className="text-center">
         <OddCell value={odds.away_odd} isBest={odds.away_odd === bestAway} isWorst={odds.away_odd === worstAway} />
       </TableCell>
@@ -624,7 +678,11 @@ function OddsRow({
   );
 }
 
-function OddCell({ value, isBest, isWorst }: { value: number; isBest: boolean; isWorst: boolean }) {
+function OddCell({ value, isBest, isWorst }: { value: number | null; isBest: boolean; isWorst: boolean }) {
+  if (value === null || value === undefined) {
+    return <span className="text-muted-foreground">-</span>;
+  }
+  
   return (
     <div className={cn(
       "inline-flex items-center gap-1 px-2 py-1 rounded font-mono",

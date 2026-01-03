@@ -374,10 +374,14 @@ class Orchestrator:
                 continue
             
             odds = item["odds"]
+            
+            # Determine market_type based on sport
+            market_type = "moneyline" if odds.sport == "basketball" else odds.market_type
+            
             normalized.append({
                 "match_id": match["id"],
                 "bookmaker_id": item["bookmaker_id"],
-                "market_type": odds.market_type,
+                "market_type": market_type,
                 "home_odd": odds.home_odd,
                 "draw_odd": odds.draw_odd,
                 "away_odd": odds.away_odd,
@@ -510,6 +514,7 @@ class Orchestrator:
                     "match_status": row.get("match_status"),
                     "league_name": row.get("league_name"),
                     "league_country": row.get("league_country"),
+                    "sport_type": row.get("sport_type", "football"),  # Include sport_type
                     "home_team": home_team,
                     "away_team": away_team,
                     "odds": [],

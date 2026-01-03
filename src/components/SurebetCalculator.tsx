@@ -7,11 +7,12 @@ import { Calculator, DollarSign, TrendingUp } from 'lucide-react';
 
 interface SurebetCalculatorProps {
   homeOdd: number;
-  drawOdd: number;
+  drawOdd: number | null;
   awayOdd: number;
   homeBookmaker?: string;
   drawBookmaker?: string;
   awayBookmaker?: string;
+  isBasketball?: boolean;
 }
 
 export function SurebetCalculator({
@@ -21,17 +22,20 @@ export function SurebetCalculator({
   homeBookmaker,
   drawBookmaker,
   awayBookmaker,
+  isBasketball = false,
 }: SurebetCalculatorProps) {
   const [totalStake, setTotalStake] = useState<number>(100);
 
-  // Calculate arbitrage
-  const arbitrageValue = 1 / homeOdd + 1 / drawOdd + 1 / awayOdd;
+  // Calculate arbitrage (2-way for basketball, 3-way for football)
+  const arbitrageValue = isBasketball || drawOdd === null || drawOdd === 0
+    ? 1 / homeOdd + 1 / awayOdd
+    : 1 / homeOdd + 1 / drawOdd + 1 / awayOdd;
   const isArbitrage = arbitrageValue < 1;
   const profitPercentage = isArbitrage ? ((1 - arbitrageValue) * 100) : 0;
 
   // Calculate optimal stakes
   const homeStake = isArbitrage ? (totalStake / (homeOdd * arbitrageValue)) : 0;
-  const drawStake = isArbitrage ? (totalStake / (drawOdd * arbitrageValue)) : 0;
+  const drawStake = isArbitrage && !isBasketball && drawOdd ? (totalStake / (drawOdd * arbitrageValue)) : 0;
   const awayStake = isArbitrage ? (totalStake / (awayOdd * arbitrageValue)) : 0;
 
   // Calculate guaranteed profit
@@ -46,7 +50,7 @@ export function SurebetCalculator({
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <Calculator className="h-4 w-4" />
-          Calculadora Surebet
+          Calculadora Surebet {isBasketball ? '(2-way)' : '(3-way)'}
           <Badge className="bg-green-500 text-white ml-auto">
             +{profitPercentage.toFixed(2)}% garantido
           </Badge>
@@ -72,25 +76,27 @@ export function SurebetCalculator({
         </div>
 
         {/* Stakes Distribution */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className={`grid gap-3 ${isBasketball ? 'grid-cols-2' : 'grid-cols-3'}`}>
           <div className="rounded-lg border bg-card p-3 text-center">
-            <div className="text-xs text-muted-foreground mb-1">Casa (1)</div>
+            <div className="text-xs text-muted-foreground mb-1">{isBasketball ? 'Time 1' : 'Casa (1)'}</div>
             <div className="font-bold text-lg">R$ {homeStake.toFixed(2)}</div>
             <div className="text-xs text-muted-foreground">@ {homeOdd.toFixed(2)}</div>
             {homeBookmaker && (
               <div className="text-xs text-primary mt-1 truncate">{homeBookmaker}</div>
             )}
           </div>
+          {!isBasketball && drawOdd !== null && drawOdd > 0 && (
+            <div className="rounded-lg border bg-card p-3 text-center">
+              <div className="text-xs text-muted-foreground mb-1">Empate (X)</div>
+              <div className="font-bold text-lg">R$ {drawStake.toFixed(2)}</div>
+              <div className="text-xs text-muted-foreground">@ {drawOdd.toFixed(2)}</div>
+              {drawBookmaker && (
+                <div className="text-xs text-primary mt-1 truncate">{drawBookmaker}</div>
+              )}
+            </div>
+          )}
           <div className="rounded-lg border bg-card p-3 text-center">
-            <div className="text-xs text-muted-foreground mb-1">Empate (X)</div>
-            <div className="font-bold text-lg">R$ {drawStake.toFixed(2)}</div>
-            <div className="text-xs text-muted-foreground">@ {drawOdd.toFixed(2)}</div>
-            {drawBookmaker && (
-              <div className="text-xs text-primary mt-1 truncate">{drawBookmaker}</div>
-            )}
-          </div>
-          <div className="rounded-lg border bg-card p-3 text-center">
-            <div className="text-xs text-muted-foreground mb-1">Fora (2)</div>
+            <div className="text-xs text-muted-foreground mb-1">{isBasketball ? 'Time 2' : 'Fora (2)'}</div>
             <div className="font-bold text-lg">R$ {awayStake.toFixed(2)}</div>
             <div className="text-xs text-muted-foreground">@ {awayOdd.toFixed(2)}</div>
             {awayBookmaker && (

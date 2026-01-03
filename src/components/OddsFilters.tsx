@@ -5,6 +5,7 @@ import { X, Filter, ArrowUpDown } from 'lucide-react';
 import { useLeagues, useBookmakers } from '@/hooks/useOddsData';
 
 export interface OddsFiltersState {
+  sport: string;
   league: string;
   dateFilter: string;
   bookmaker: string;
@@ -30,6 +31,12 @@ const OPPORTUNITY_OPTIONS = [
   { value: 'surebet', label: 'Apenas Surebets' },
 ];
 
+const SPORT_OPTIONS = [
+  { value: 'all', label: 'Todos' },
+  { value: 'football', label: '⚽ Futebol' },
+  { value: 'basketball', label: '🏀 Basquete' },
+];
+
 const SORT_OPTIONS = [
   { value: 'date', label: 'Data' },
   { value: 'margin', label: 'Margem' },
@@ -38,6 +45,7 @@ const SORT_OPTIONS = [
 ];
 
 export const defaultFilters: OddsFiltersState = {
+  sport: 'all',
   league: 'all',
   dateFilter: 'all',
   bookmaker: 'all',
@@ -59,6 +67,7 @@ export function OddsFilters({ filters, onFiltersChange }: OddsFiltersProps) {
   };
 
   const hasActiveFilters = 
+    filters.sport !== 'all' ||
     filters.league !== 'all' ||
     filters.dateFilter !== 'all' ||
     filters.bookmaker !== 'all' ||
@@ -76,6 +85,20 @@ export function OddsFilters({ filters, onFiltersChange }: OddsFiltersProps) {
           <Filter className="h-4 w-4" />
           <span>Filtros:</span>
         </div>
+
+        {/* Sport Filter */}
+        <Select value={filters.sport} onValueChange={(v) => updateFilter('sport', v)}>
+          <SelectTrigger className="w-[140px]">
+            <SelectValue placeholder="Esporte" />
+          </SelectTrigger>
+          <SelectContent>
+            {SPORT_OPTIONS.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
         {/* League Filter */}
         <Select value={filters.league} onValueChange={(v) => updateFilter('league', v)}>
