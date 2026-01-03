@@ -237,8 +237,19 @@ class Orchestrator:
                 all_odds.extend(result)
                 self.logger.info(f"{scraper_name}: collected {len(result)} odds")
         
+        # Log pre-normalization NBA count
+        nba_pre = [o for o in all_odds if o.league_raw.upper() == "NBA"]
+        if nba_pre:
+            self.logger.info(f"NBA pre-normalization: {len(nba_pre)} odds from scrapers")
+        
         # Normalize and insert odds
         normalized = await self._normalize_odds(all_odds)
+        
+        # Log post-normalization NBA count
+        nba_post = [o for o in normalized if o.get("market_type") == "moneyline"]
+        if nba_pre:
+            self.logger.info(f"NBA post-normalization: {len(nba_post)} odds passed through")
+        
         inserted = await self._insert_odds(normalized)
         
         # Check for alerts
