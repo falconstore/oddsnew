@@ -51,12 +51,14 @@ class NovibetScraper(BaseScraper):
         self.client = httpx.AsyncClient(
             timeout=30.0,
             follow_redirects=True,
+            http2=True,
             headers={
                 "accept": "application/json, text/plain, */*",
                 "accept-language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+                "accept-encoding": "gzip, deflate, br",
                 "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
-                "referer": "https://www.novibet.bet.br/eventos-do-dia",
-                "origin": "https://www.novibet.bet.br",
+                "referer": "https://www.novibet.bet.br/apostas-esportivas/futebol/4372606/england/premier-league/5908949",
+                "priority": "u=1, i",
                 "sec-ch-ua": '"Chromium";v="142", "Google Chrome";v="142", "Not_A Brand";v="99"',
                 "sec-ch-ua-mobile": "?0",
                 "sec-ch-ua-platform": '"macOS"',
@@ -72,6 +74,7 @@ class NovibetScraper(BaseScraper):
                 "x-gw-domain-key": "_BR",
                 "x-gw-language-sysname": "pt-BR",
                 "x-gw-odds-representation": "Decimal",
+                "x-gw-state-sysname": "",
             }
         )
         self.logger.info("Novibet scraper initialized")
