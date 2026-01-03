@@ -638,8 +638,7 @@ function OddCell({ value, isBest, isWorst }: { value: number; isBest: boolean; i
   return (
     <div className={cn(
       "inline-flex items-center gap-1 px-2 py-1 rounded font-mono",
-      isBest && "bg-primary/10 text-primary font-bold",
-      isWorst && "bg-destructive/10 text-destructive"
+      isBest && "bg-emerald-500/10 text-emerald-500 font-bold"
     )}>
       {value.toFixed(2)}
     </div>
