@@ -47,14 +47,22 @@ class NovibetScraper(BaseScraper):
         self.logger = logger.bind(component="novibet")
     
     async def setup(self):
-        """Inicializa o cliente HTTP."""
+        """Inicializa o cliente HTTP com headers completos."""
         self.client = httpx.AsyncClient(
             timeout=30.0,
+            follow_redirects=True,
             headers={
                 "accept": "application/json, text/plain, */*",
                 "accept-language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
                 "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
-                "referer": "https://www.novibet.bet.br/apostas-esportivas",
+                "referer": "https://www.novibet.bet.br/eventos-do-dia",
+                "origin": "https://www.novibet.bet.br",
+                "sec-ch-ua": '"Chromium";v="142", "Google Chrome";v="142", "Not_A Brand";v="99"',
+                "sec-ch-ua-mobile": "?0",
+                "sec-ch-ua-platform": '"macOS"',
+                "sec-fetch-dest": "empty",
+                "sec-fetch-mode": "cors",
+                "sec-fetch-site": "same-origin",
                 "x-gw-application-name": "NoviBR",
                 "x-gw-channel": "WebPC",
                 "x-gw-client-timezone": "America/Sao_Paulo",
