@@ -479,11 +479,146 @@ class SupabaseClient:
             return []
     
     # ==========================================
+    # NBA MATCHES (Basketball - Separate Tables)
+    # ==========================================
+    
+    async def find_or_create_nba_matches_batch(
+        self,
+        matches_data: List[Dict[str, Any]]
+    ) -> Dict[str, Dict[str, Any]]:
+        """
+        Find or create multiple NBA matches in batch.
+        Uses the nba_matches table (separate from football).
+        
+        Args:
+            matches_data: List of dicts with league_id, home_team_id, away_team_id, match_date
+            
+        Returns:
+            Dict mapping (league_id, home_team_id, away_team_id) -> match record
+        """
+        if not matches_data:
+            return {}
+        
+        result_map = {}
+        
+        try:
+            # Get unique match keys
+            unique_keys = set()
+            for m in matches_data:
+                key = (m["league_id"], m["home_team_id"], m["away_team_id"])
+                unique_keys.add(key)
+            
+            # Fetch all potentially matching matches in one query
+            now = datetime.utcnow()
+            date_min = now - timedelta(days=1)
+            date_max = now + timedelta(days=7)
+            
+            response = (
+                self.client.table("nba_matches")
+                .select("*")
+                .gte("match_date", date_min.isoformat())
+                .lte("match_date", date_max.isoformat())
+                .execute()
+            )
+            
+            # Index existing matches by key
+            existing = {}
+            for match in response.data or []:
+                key = (match["league_id"], match["home_team_id"], match["away_team_id"])
+                if key not in existing:
+                    existing[key] = match
+            
+            # Find matches that need to be created
+            to_create = []
+            for m in matches_data:
+                key = (m["league_id"], m["home_team_id"], m["away_team_id"])
+                if key in result_map:
+                    continue  # Already processed
+                
+                if key in existing:
+                    result_map[key] = existing[key]
+                else:
+                    to_create.append({
+                        "league_id": m["league_id"],
+                        "home_team_id": m["home_team_id"],
+                        "away_team_id": m["away_team_id"],
+                        "match_date": m["match_date"].isoformat() if isinstance(m["match_date"], datetime) else m["match_date"],
+                        "status": "scheduled",
+                    })
+                    result_map[key] = None  # Mark as pending
+            
+            # Batch insert new matches with conflict handling
+            if to_create:
+                try:
+                    insert_response = (
+                        self.client.table("nba_matches")
+                        .insert(to_create)
+                        .execute()
+                    )
+                except Exception as insert_error:
+                    # Handle potential duplicate key errors gracefully
+                    self.logger.warning(f"Some NBA matches may already exist: {insert_error}")
+                    insert_response = type('obj', (object,), {'data': []})()
+                    # Re-fetch to get the existing records
+                    refetch = (
+                        self.client.table("nba_matches")
+                        .select("*")
+                        .gte("match_date", date_min.isoformat())
+                        .lte("match_date", date_max.isoformat())
+                        .execute()
+                    )
+                    for match in refetch.data or []:
+                        key = (match["league_id"], match["home_team_id"], match["away_team_id"])
+                        if key in result_map and result_map[key] is None:
+                            result_map[key] = match
+                
+                for match in insert_response.data or []:
+                    key = (match["league_id"], match["home_team_id"], match["away_team_id"])
+                    result_map[key] = match
+            
+            self.logger.info(f"NBA batch matches: {len(existing)} found, {len(to_create)} created")
+            return result_map
+            
+        except Exception as e:
+            self.logger.error(f"Error in NBA batch match lookup: {e}")
+            return {}
+    
+    # ==========================================
+    # NBA ODDS HISTORY
+    # ==========================================
+    
+    async def insert_nba_odds(self, odds_list: List[Dict[str, Any]]) -> int:
+        """
+        Insert NBA odds into the nba_odds_history table.
+        
+        Args:
+            odds_list: List of normalized NBA odds dictionaries
+            
+        Returns:
+            Number of records inserted
+        """
+        if not odds_list:
+            return 0
+        
+        try:
+            response = (
+                self.client.table("nba_odds_history")
+                .insert(odds_list)
+                .execute()
+            )
+            count = len(response.data) if response.data else 0
+            self.logger.info(f"Inserted {count} NBA odds records")
+            return count
+        except Exception as e:
+            self.logger.error(f"Error inserting NBA odds: {e}")
+            return 0
+    
+    # ==========================================
     # JSON EXPORT (for frontend)
     # ==========================================
     
     async def fetch_odds_for_json(self) -> List[Dict[str, Any]]:
-        """Fetch all odds data from the comparison view for JSON export."""
+        """Fetch all football odds data from the comparison view for JSON export."""
         try:
             response = (
                 self.client.table("odds_comparison")
@@ -494,6 +629,20 @@ class SupabaseClient:
             return response.data or []
         except Exception as e:
             self.logger.error(f"Error fetching odds for JSON: {e}")
+            return []
+    
+    async def fetch_nba_odds_for_json(self) -> List[Dict[str, Any]]:
+        """Fetch all NBA odds data from the nba_odds_comparison view for JSON export."""
+        try:
+            response = (
+                self.client.table("nba_odds_comparison")
+                .select("*")
+                .order("match_date", desc=False)
+                .execute()
+            )
+            return response.data or []
+        except Exception as e:
+            self.logger.error(f"Error fetching NBA odds for JSON: {e}")
             return []
     
     def upload_odds_json(self, data: Dict[str, Any]) -> bool:
