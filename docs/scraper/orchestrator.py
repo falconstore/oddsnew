@@ -286,12 +286,7 @@ class Orchestrator:
             "matches_cleaned": cleaned,
             "json_uploaded": json_uploaded,
             "errors": errors,
-        }
-            "alerts_created": len(alerts),
-            "matches_cleaned": cleaned,
-            "json_uploaded": json_uploaded,
-            "errors": errors,
-        }
+}
         
         self.logger.info(
             f"Cycle complete: {inserted} odds inserted, "
