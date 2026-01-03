@@ -69,12 +69,3 @@ export const useOddsRealtimeSubscription = () => {
     event: 'INSERT'
   });
 };
-
-// Hook to subscribe to alerts changes
-export const useAlertsRealtimeSubscription = () => {
-  useRealtimeSubscription({
-    tableName: 'alerts',
-    queryKeys: [['alerts']],
-    event: 'INSERT'
-  });
-};

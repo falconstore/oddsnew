@@ -16,7 +16,7 @@ import { ViewToggle, ViewMode } from './ViewToggle';
 import type { MatchOddsGroup, BookmakerOdds } from '@/types/database';
 
 interface OddsComparisonTableProps {
-  onStatsUpdate?: (stats: { surebetCount: number; valueBetCount: number; totalMatches: number; lastUpdate: Date | null }) => void;
+  onStatsUpdate?: (stats: { surebetCount: number; totalMatches: number }) => void;
 }
 
 export function OddsComparisonTable({ onStatsUpdate }: OddsComparisonTableProps) {
@@ -55,21 +55,12 @@ export function OddsComparisonTable({ onStatsUpdate }: OddsComparisonTableProps)
     }
     
     // Opportunity type filter
-    if (filters.opportunityType !== 'all') {
+    if (filters.opportunityType === 'surebet') {
       result = result.filter(m => {
         const arbitrageValue = 1/m.best_home + 1/m.best_draw + 1/m.best_away;
-        if (filters.opportunityType === 'surebet') return arbitrageValue < 1;
-        if (filters.opportunityType === 'value') return arbitrageValue >= 1 && arbitrageValue < 1.05;
-        return true;
+        return arbitrageValue < 1;
       });
     }
-    
-    // Margin filter
-    result = result.filter(m => {
-      const arbitrageValue = 1/m.best_home + 1/m.best_draw + 1/m.best_away;
-      const margin = (arbitrageValue - 1) * 100;
-      return margin <= filters.maxMargin;
-    });
     
     // Sorting
     result.sort((a, b) => {
@@ -103,21 +94,13 @@ export function OddsComparisonTable({ onStatsUpdate }: OddsComparisonTableProps)
     if (!matches || !onStatsUpdate) return;
     
     let surebetCount = 0;
-    let valueBetCount = 0;
-    let lastUpdate: Date | null = null;
     
     matches.forEach(m => {
       const arbitrageValue = 1/m.best_home + 1/m.best_draw + 1/m.best_away;
       if (arbitrageValue < 1) surebetCount++;
-      else if (arbitrageValue < 1.05) valueBetCount++;
-      
-      m.odds.forEach(o => {
-        const oddsDate = new Date(o.scraped_at);
-        if (!lastUpdate || oddsDate > lastUpdate) lastUpdate = oddsDate;
-      });
     });
     
-    onStatsUpdate({ surebetCount, valueBetCount, totalMatches: matches.length, lastUpdate });
+    onStatsUpdate({ surebetCount, totalMatches: matches.length });
   }, [matches, onStatsUpdate]);
 
   // For surebet-only view
@@ -588,9 +571,6 @@ function OddsRow({
   homeTeam: string;
   awayTeam: string;
 }) {
-  const isStale = odds.data_age_seconds > 30; // More than 30 seconds old
-  const isVeryStale = odds.data_age_seconds > 120; // More than 2 minutes old
-  
   // Gerar link da casa de apostas
   const bookmakerLink = generateBookmakerLink(odds.bookmaker_name, odds.extra_data, homeTeam, awayTeam);
 
@@ -606,7 +586,7 @@ function OddsRow({
   const oddsType = odds.odds_type || getOddsType(odds.bookmaker_name);
 
   return (
-    <TableRow className={cn(isStale && "opacity-60", isVeryStale && "opacity-40")}>
+    <TableRow>
       <TableCell className="font-medium">
         <div className="flex items-center gap-2">
           {odds.bookmaker_name}
@@ -629,8 +609,6 @@ function OddsRow({
               <ExternalLink className="h-4 w-4 text-muted-foreground hover:text-primary" />
             </Button>
           )}
-          {isVeryStale && <Badge variant="destructive" className="text-xs">DESATUALIZADO</Badge>}
-          {isStale && !isVeryStale && <Clock className="h-3 w-3 text-muted-foreground" />}
         </div>
       </TableCell>
       <TableCell className="text-center">
