@@ -1,8 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import type { League, Team, Bookmaker, Match, TeamAlias, Alert, OddsComparison, MatchOddsGroup, BookmakerOdds } from '@/types/database';
+import type { League, Team, Bookmaker, Match, TeamAlias, OddsComparison, MatchOddsGroup, BookmakerOdds } from '@/types/database';
 import { toast } from '@/hooks/use-toast';
-import { useAlertsRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 
 // Get Supabase URL for storage access
 const getSupabaseUrl = () => {
@@ -425,63 +424,6 @@ function groupOddsByMatch(data: OddsComparison[]): MatchOddsGroup[] {
   return Array.from(matchMap.values());
 }
 
-// =====================================================
-// ALERTS
-// =====================================================
-
-export const useAlerts = (unreadOnly = false) => {
-  // Subscribe to realtime updates for alerts
-  useAlertsRealtimeSubscription();
-
-  return useQuery({
-    queryKey: ['alerts', unreadOnly],
-    queryFn: async () => {
-      let query = supabase
-        .from('alerts')
-        .select('*, match:matches(*, home_team:teams!matches_home_team_id_fkey(*), away_team:teams!matches_away_team_id_fkey(*)), bookmaker:bookmakers(*)')
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      if (unreadOnly) {
-        query = query.eq('is_read', false);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-      return data as Alert[];
-    },
-    // Keep a fallback refetch in case realtime connection drops
-    refetchInterval: 60000, // Fallback: refetch every 60 seconds
-    staleTime: 5000 // Consider data stale after 5 seconds
-  });
-};
-
-export const useMarkAlertRead = () => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from('alerts').update({ is_read: true }).eq('id', id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['alerts'] });
-    }
-  });
-};
-
-export const useMarkAllAlertsRead = () => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase.from('alerts').update({ is_read: true }).eq('is_read', false);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['alerts'] });
-      toast({ title: 'Todos os alertas marcados como lidos' });
-    }
-  });
-};
 
 // =====================================================
 // MATCHES (for management)

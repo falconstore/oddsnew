@@ -1,6 +1,5 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
 import { X, Filter, ArrowUpDown } from 'lucide-react';
 import { useLeagues, useBookmakers } from '@/hooks/useOddsData';
@@ -10,7 +9,6 @@ export interface OddsFiltersState {
   dateFilter: string;
   bookmaker: string;
   opportunityType: string;
-  maxMargin: number;
   sortBy: string;
   sortOrder: 'asc' | 'desc';
 }
@@ -30,7 +28,6 @@ const DATE_OPTIONS = [
 const OPPORTUNITY_OPTIONS = [
   { value: 'all', label: 'Todas' },
   { value: 'surebet', label: 'Apenas Surebets' },
-  { value: 'value', label: 'Value Bets (<5%)' },
 ];
 
 const SORT_OPTIONS = [
@@ -45,7 +42,6 @@ export const defaultFilters: OddsFiltersState = {
   dateFilter: 'all',
   bookmaker: 'all',
   opportunityType: 'all',
-  maxMargin: 20,
   sortBy: 'date',
   sortOrder: 'asc',
 };
@@ -66,8 +62,7 @@ export function OddsFilters({ filters, onFiltersChange }: OddsFiltersProps) {
     filters.league !== 'all' ||
     filters.dateFilter !== 'all' ||
     filters.bookmaker !== 'all' ||
-    filters.opportunityType !== 'all' ||
-    filters.maxMargin !== 20;
+    filters.opportunityType !== 'all';
 
   const toggleSortOrder = () => {
     updateFilter('sortOrder', filters.sortOrder === 'asc' ? 'desc' : 'asc');
@@ -149,9 +144,8 @@ export function OddsFilters({ filters, onFiltersChange }: OddsFiltersProps) {
         )}
       </div>
 
-      {/* Sort & Margin Row */}
+      {/* Sort Row */}
       <div className="flex flex-wrap items-center gap-4">
-        {/* Sort */}
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">Ordenar:</span>
           <Select value={filters.sortBy} onValueChange={(v) => updateFilter('sortBy', v)}>
@@ -169,22 +163,6 @@ export function OddsFilters({ filters, onFiltersChange }: OddsFiltersProps) {
           <Button variant="ghost" size="icon" className="h-9 w-9" onClick={toggleSortOrder}>
             <ArrowUpDown className={`h-4 w-4 transition-transform ${filters.sortOrder === 'desc' ? 'rotate-180' : ''}`} />
           </Button>
-        </div>
-
-        {/* Margin Slider */}
-        <div className="flex items-center gap-3 min-w-[200px]">
-          <span className="text-sm text-muted-foreground whitespace-nowrap">Margem máx:</span>
-          <Slider
-            value={[filters.maxMargin]}
-            onValueChange={([v]) => updateFilter('maxMargin', v)}
-            max={20}
-            min={0}
-            step={1}
-            className="w-24"
-          />
-          <Badge variant="secondary" className="min-w-[40px] justify-center">
-            {filters.maxMargin}%
-          </Badge>
         </div>
       </div>
     </div>
