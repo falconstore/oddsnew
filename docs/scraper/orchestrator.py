@@ -381,6 +381,7 @@ class Orchestrator:
                 "home_odd": odds.home_odd,
                 "draw_odd": odds.draw_odd,
                 "away_odd": odds.away_odd,
+                "odds_type": odds.odds_type,  # SO = Super Odds, PA = Pagamento Antecipado
                 "scraped_at": odds.scraped_at.isoformat(),
                 "extra_data": odds.extra_data or {},
             })
@@ -532,6 +533,7 @@ class Orchestrator:
                 "home_odd": home_odd,
                 "draw_odd": draw_odd,
                 "away_odd": away_odd,
+                "odds_type": row.get("odds_type", "PA"),  # SO = Super Odds, PA = Pagamento Antecipado
                 "margin_percentage": row.get("margin_percentage"),
                 "data_age_seconds": row.get("data_age_seconds"),
                 "scraped_at": row.get("scraped_at"),
