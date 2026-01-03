@@ -9,8 +9,21 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Pencil, Trash2, ExternalLink } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Plus, Pencil, Trash2, ExternalLink, ChevronDown, Trophy } from 'lucide-react';
 import type { Bookmaker, EntityStatus } from '@/types/database';
+
+// Dados das ligas por bookmaker (baseado nos scrapers)
+const BOOKMAKER_LEAGUES: Record<string, string[]> = {
+  'superbet': ['Premier League', 'Serie A', 'La Liga'],
+  'sportingbet': ['Premier League', 'La Liga', 'Serie A'],
+  'novibet': ['Premier League', 'La Liga', 'Serie A', 'Bundesliga', 'Ligue 1', 'Brasileirão A'],
+  'kto': ['Serie A', 'Premier League', 'La Liga'],
+  'betbra': ['Premier League', 'Serie A', 'La Liga'],
+  'betano': ['Premier League', 'La Liga', 'Serie A'],
+  'estrelabet': ['Serie A'],
+  'br4bet': ['Serie A', 'La Liga', 'Premier League', 'Bundesliga'],
+};
 
 const Bookmakers = () => {
   const { data: bookmakers, isLoading } = useBookmakers();
@@ -21,6 +34,17 @@ const Bookmakers = () => {
   const [editing, setEditing] = useState<Bookmaker | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [formData, setFormData] = useState({ name: '', website_url: '', priority: 0, status: 'active' as EntityStatus });
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+
+  const toggleRow = (id: string) => {
+    const newExpanded = new Set(expandedRows);
+    if (newExpanded.has(id)) {
+      newExpanded.delete(id);
+    } else {
+      newExpanded.add(id);
+    }
+    setExpandedRows(newExpanded);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,6 +73,11 @@ const Bookmakers = () => {
     if (confirm('Tem certeza?')) {
       deleteBookmaker.mutate(id);
     }
+  };
+
+  const getLeaguesForBookmaker = (name: string): string[] => {
+    const normalizedName = name.toLowerCase().trim();
+    return BOOKMAKER_LEAGUES[normalizedName] || [];
   };
 
   return (
@@ -138,45 +167,82 @@ const Bookmakers = () => {
                   <TableHead>Website</TableHead>
                   <TableHead>Prioridade</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Ligas</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading && (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center">Carregando...</TableCell>
+                    <TableCell colSpan={6} className="text-center">Carregando...</TableCell>
                   </TableRow>
                 )}
-                {bookmakers?.map((bookmaker) => (
-                  <TableRow key={bookmaker.id}>
-                    <TableCell className="font-medium">{bookmaker.name}</TableCell>
-                    <TableCell>
-                      {bookmaker.website_url ? (
-                        <a href={bookmaker.website_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-primary hover:underline">
-                          {new URL(bookmaker.website_url).hostname}
-                          <ExternalLink className="h-3 w-3" />
-                        </a>
-                      ) : '-'}
-                    </TableCell>
-                    <TableCell>{bookmaker.priority}</TableCell>
-                    <TableCell>
-                      <Badge variant={bookmaker.status === 'active' ? 'default' : 'secondary'}>
-                        {bookmaker.status === 'active' ? 'Ativo' : 'Inativo'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" onClick={() => handleEdit(bookmaker)}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleDelete(bookmaker.id)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {bookmakers?.map((bookmaker) => {
+                  const leagues = getLeaguesForBookmaker(bookmaker.name);
+                  const hasLeagues = leagues.length > 0;
+                  const isExpanded = expandedRows.has(bookmaker.id);
+                  
+                  return (
+                    <Collapsible key={bookmaker.id} open={isExpanded} onOpenChange={() => toggleRow(bookmaker.id)} asChild>
+                      <>
+                        <TableRow>
+                          <TableCell className="font-medium">{bookmaker.name}</TableCell>
+                          <TableCell>
+                            {bookmaker.website_url ? (
+                              <a href={bookmaker.website_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-primary hover:underline">
+                                {new URL(bookmaker.website_url).hostname}
+                                <ExternalLink className="h-3 w-3" />
+                              </a>
+                            ) : '-'}
+                          </TableCell>
+                          <TableCell>{bookmaker.priority}</TableCell>
+                          <TableCell>
+                            <Badge variant={bookmaker.status === 'active' ? 'default' : 'secondary'}>
+                              {bookmaker.status === 'active' ? 'Ativo' : 'Inativo'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {hasLeagues ? (
+                              <CollapsibleTrigger asChild>
+                                <Button variant="ghost" size="sm" className="gap-1 h-7 px-2">
+                                  <Trophy className="h-3 w-3" />
+                                  <span>{leagues.length} {leagues.length === 1 ? 'liga' : 'ligas'}</span>
+                                  <ChevronDown className={`h-3 w-3 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                                </Button>
+                              </CollapsibleTrigger>
+                            ) : (
+                              <span className="text-muted-foreground text-sm">Não configurado</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button variant="ghost" size="icon" onClick={() => handleEdit(bookmaker)}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => handleDelete(bookmaker.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                        <CollapsibleContent asChild>
+                          <TableRow className="bg-muted/30 hover:bg-muted/30">
+                            <TableCell colSpan={6} className="py-3">
+                              <div className="flex flex-wrap gap-2 pl-4">
+                                {leagues.map((league) => (
+                                  <Badge key={league} variant="outline" className="text-xs">
+                                    {league}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        </CollapsibleContent>
+                      </>
+                    </Collapsible>
+                  );
+                })}
                 {!isLoading && (!bookmakers || bookmakers.length === 0) && (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground">
+                    <TableCell colSpan={6} className="text-center text-muted-foreground">
                       Nenhuma casa de apostas cadastrada
                     </TableCell>
                   </TableRow>
