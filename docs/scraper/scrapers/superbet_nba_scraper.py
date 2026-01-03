@@ -39,7 +39,7 @@ class SuperbetNBAScraper(BaseScraper):
     
     def __init__(self):
         super().__init__(
-            name="superbet",
+            name="superbet_nba",
             base_url="https://superbet.bet.br"
         )
         self._session: Optional[aiohttp.ClientSession] = None

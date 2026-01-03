@@ -326,6 +326,13 @@ class Orchestrator:
                 self.logger.warning(f"Unknown league: {odds.league_raw}")
                 continue
             
+            # Debug NBA odds flow
+            if odds.league_raw.upper() == "NBA":
+                self.logger.debug(
+                    f"NBA normalization: {odds.home_team_raw} vs {odds.away_team_raw} | "
+                    f"bookmaker={odds.bookmaker_name}, league_id={league_id}"
+                )
+            
             # Match teams using cache-only method (no DB calls)
             home_team_id = self.team_matcher.find_team_id_cached(
                 odds.home_team_raw, 
@@ -338,9 +345,13 @@ class Orchestrator:
             
             if not home_team_id:
                 unmatched_teams.append((odds.home_team_raw, odds.bookmaker_name))
+                if odds.league_raw.upper() == "NBA":
+                    self.logger.debug(f"NBA team not found: {odds.home_team_raw}")
                 continue
             if not away_team_id:
                 unmatched_teams.append((odds.away_team_raw, odds.bookmaker_name))
+                if odds.league_raw.upper() == "NBA":
+                    self.logger.debug(f"NBA team not found: {odds.away_team_raw}")
                 continue
             
             pre_normalized.append({
