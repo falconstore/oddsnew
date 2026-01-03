@@ -28,7 +28,7 @@ class BetbraScraper(BaseScraper):
         "premier_league": {
             "name": "Premier League",
             "country": "England",
-            "tag_url_name": "england",  # API uses "england" for Premier League
+            "tag_url_name": "english-premier-league",
         },
         "serie_a": {
             "name": "Serie A",
