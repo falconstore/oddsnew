@@ -2,14 +2,16 @@
 
 export type EntityStatus = 'active' | 'inactive';
 export type AlertType = 'value_bet' | 'line_movement' | 'arbitrage';
-export type MarketType = '1x2' | 'over_under' | 'both_teams_score' | 'handicap';
+export type MarketType = '1x2' | 'over_under' | 'both_teams_score' | 'handicap' | 'moneyline';
 export type MatchStatus = 'scheduled' | 'live' | 'finished' | 'postponed';
 export type OddsType = 'SO' | 'PA'; // SO = Super Odds (sem pagamento antecipado), PA = Pagamento Antecipado
+export type SportType = 'football' | 'basketball';
 
 export interface League {
   id: string;
   name: string;
   country: string | null;
+  sport_type: SportType;
   status: EntityStatus;
   created_at: string;
   updated_at: string;
@@ -98,13 +100,15 @@ export interface OddsComparison {
   match_status: string;
   league_name: string;
   league_country: string | null;
+  sport_type: SportType;
   home_team: string;
   away_team: string;
   bookmaker_name: string;
   bookmaker_id: string;
   home_odd: number;
-  draw_odd: number;
+  draw_odd: number | null;
   away_odd: number;
+  market_type?: MarketType;
   odds_type?: OddsType; // SO = Super Odds, PA = Pagamento Antecipado
   scraped_at: string;
   margin_percentage: number | null;
@@ -119,14 +123,15 @@ export interface MatchOddsGroup {
   match_status: string;
   league_name: string;
   league_country: string | null;
+  sport_type?: SportType;
   home_team: string;
   away_team: string;
   odds: BookmakerOdds[];
   best_home: number;
-  best_draw: number;
+  best_draw: number | null;
   best_away: number;
   worst_home: number;
-  worst_draw: number;
+  worst_draw: number | null;
   worst_away: number;
 }
 
@@ -134,7 +139,7 @@ export interface BookmakerOdds {
   bookmaker_id: string;
   bookmaker_name: string;
   home_odd: number;
-  draw_odd: number;
+  draw_odd: number | null;
   away_odd: number;
   margin_percentage: number | null;
   data_age_seconds: number;

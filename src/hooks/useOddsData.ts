@@ -378,31 +378,34 @@ function groupOddsByMatch(data: OddsComparison[]): MatchOddsGroup[] {
     if (matchDate < fiveMinutesAgo) continue;
 
     if (!matchMap.has(row.match_id)) {
+      const isBasketball = row.sport_type === 'basketball';
       matchMap.set(row.match_id, {
         match_id: row.match_id,
         match_date: row.match_date,
         match_status: row.match_status,
         league_name: row.league_name,
         league_country: row.league_country,
+        sport_type: row.sport_type,
         home_team: row.home_team,
         away_team: row.away_team,
         odds: [],
         best_home: 0,
-        best_draw: 0,
+        best_draw: isBasketball ? null : 0,
         best_away: 0,
         worst_home: Infinity,
-        worst_draw: Infinity,
+        worst_draw: isBasketball ? null : Infinity,
         worst_away: Infinity
       });
     }
 
     const group = matchMap.get(row.match_id)!;
+    const isBasketball = group.sport_type === 'basketball';
     
     const bookmakerOdds: BookmakerOdds = {
       bookmaker_id: row.bookmaker_id,
       bookmaker_name: row.bookmaker_name,
       home_odd: row.home_odd,
-      draw_odd: row.draw_odd,
+      draw_odd: isBasketball ? null : row.draw_odd,
       away_odd: row.away_odd,
       margin_percentage: row.margin_percentage,
       data_age_seconds: row.data_age_seconds,
@@ -414,10 +417,14 @@ function groupOddsByMatch(data: OddsComparison[]): MatchOddsGroup[] {
 
     // Track best/worst odds
     if (row.home_odd > group.best_home) group.best_home = row.home_odd;
-    if (row.draw_odd > group.best_draw) group.best_draw = row.draw_odd;
+    if (!isBasketball && row.draw_odd !== null && group.best_draw !== null && row.draw_odd > group.best_draw) {
+      group.best_draw = row.draw_odd;
+    }
     if (row.away_odd > group.best_away) group.best_away = row.away_odd;
     if (row.home_odd < group.worst_home) group.worst_home = row.home_odd;
-    if (row.draw_odd < group.worst_draw) group.worst_draw = row.draw_odd;
+    if (!isBasketball && row.draw_odd !== null && group.worst_draw !== null && row.draw_odd < group.worst_draw) {
+      group.worst_draw = row.draw_odd;
+    }
     if (row.away_odd < group.worst_away) group.worst_away = row.away_odd;
   }
 

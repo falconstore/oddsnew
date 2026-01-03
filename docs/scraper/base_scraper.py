@@ -17,6 +17,10 @@ class ScrapedOdds:
     Data class representing scraped odds from a bookmaker.
     This is the standardized format for all scrapers.
     
+    sport: 
+        - "football" = default, 3-way market (1x2)
+        - "basketball" = 2-way market (moneyline)
+    
     odds_type: 
         - "PA" = Pagamento Antecipado (default, maioria das casas)
         - "SO" = Super Odds (sem pagamento antecipado, ex: Novibet, Betbra)
@@ -29,7 +33,8 @@ class ScrapedOdds:
     home_odd: float
     draw_odd: Optional[float]  # None for markets without draw (e.g., basketball)
     away_odd: float
-    market_type: str = "1x2"
+    sport: str = "football"   # "football" or "basketball"
+    market_type: str = "1x2"  # "1x2" for football, "moneyline" for basketball
     odds_type: str = "PA"     # PA = Pagamento Antecipado, SO = Super Odds
     scraped_at: datetime = field(default_factory=datetime.utcnow)
     extra_data: Dict[str, Any] = field(default_factory=dict)
@@ -38,6 +43,7 @@ class ScrapedOdds:
         """
         Calculate the bookmaker's margin (overround).
         Formula: (1/home + 1/draw + 1/away - 1) * 100
+        For basketball (2-way): (1/home + 1/away - 1) * 100
         """
         try:
             total = (1 / self.home_odd)
@@ -59,6 +65,7 @@ class ScrapedOdds:
             "home_odd": self.home_odd,
             "draw_odd": self.draw_odd,
             "away_odd": self.away_odd,
+            "sport": self.sport,
             "market_type": self.market_type,
             "odds_type": self.odds_type,
             "scraped_at": self.scraped_at.isoformat(),
