@@ -16,6 +16,10 @@ class ScrapedOdds:
     """
     Data class representing scraped odds from a bookmaker.
     This is the standardized format for all scrapers.
+    
+    odds_type: 
+        - "PA" = Pagamento Antecipado (default, maioria das casas)
+        - "SO" = Super Odds (sem pagamento antecipado, ex: Novibet, Betbra)
     """
     bookmaker_name: str
     home_team_raw: str        # Team name as it appears on the bookmaker site
@@ -26,6 +30,7 @@ class ScrapedOdds:
     draw_odd: Optional[float]  # None for markets without draw (e.g., basketball)
     away_odd: float
     market_type: str = "1x2"
+    odds_type: str = "PA"     # PA = Pagamento Antecipado, SO = Super Odds
     scraped_at: datetime = field(default_factory=datetime.utcnow)
     extra_data: Dict[str, Any] = field(default_factory=dict)
     
@@ -55,6 +60,7 @@ class ScrapedOdds:
             "draw_odd": self.draw_odd,
             "away_odd": self.away_odd,
             "market_type": self.market_type,
+            "odds_type": self.odds_type,
             "scraped_at": self.scraped_at.isoformat(),
             "margin": self.calculate_margin(),
             "extra_data": self.extra_data,

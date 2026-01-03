@@ -386,6 +386,8 @@ class NovibetScraper(BaseScraper):
 
                         market_type="1x2",
 
+                        odds_type="SO",  # Novibet = Super Odds (sem pagamento antecipado)
+
                         extra_data={"event_id": str(item.get("eventBetContextId"))}
 
                     )
