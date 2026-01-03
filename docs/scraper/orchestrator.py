@@ -446,6 +446,7 @@ class Orchestrator:
             })
         
         # Process NBA (different structure - no draw_odd)
+        # IMPORTANT: Handle inverted matches from bookmakers that swap home/away
         for item in nba_pre:
             key = (item["league_id"], item["home_team_id"], item["away_team_id"])
             match = nba_match_map.get(key)
@@ -454,14 +455,27 @@ class Orchestrator:
                 continue
             
             odds = item["odds"]
+            home_odd = odds.home_odd
+            away_odd = odds.away_odd
+            extra_data = odds.extra_data.copy() if odds.extra_data else {}
+            
+            # Check if this match was found via inverted lookup
+            # If so, swap the odds to align with the correct match orientation
+            if match.get("_is_inverted"):
+                home_odd, away_odd = away_odd, home_odd
+                extra_data["teams_swapped"] = True
+                self.logger.debug(
+                    f"Swapped odds for inverted match: {item['home_team_id']} vs {item['away_team_id']}"
+                )
+            
             nba_normalized.append({
                 "match_id": match["id"],
                 "bookmaker_id": item["bookmaker_id"],
-                "home_odd": odds.home_odd,
-                "away_odd": odds.away_odd,
+                "home_odd": home_odd,
+                "away_odd": away_odd,
                 "odds_type": odds.odds_type,
                 "scraped_at": odds.scraped_at.isoformat(),
-                "extra_data": odds.extra_data or {},
+                "extra_data": extra_data,
             })
         
         # Log unmatched teams

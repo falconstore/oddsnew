@@ -490,11 +490,15 @@ class SupabaseClient:
         Find or create multiple NBA matches in batch.
         Uses the nba_matches table (separate from football).
         
+        IMPORTANT: Also checks for inverted matches (away_team <-> home_team)
+        to prevent duplicate match creation from bookmakers that invert team order.
+        
         Args:
             matches_data: List of dicts with league_id, home_team_id, away_team_id, match_date
             
         Returns:
             Dict mapping (league_id, home_team_id, away_team_id) -> match record
+            Note: If an inverted match exists, returns that match with a flag.
         """
         if not matches_data:
             return {}
@@ -521,12 +525,17 @@ class SupabaseClient:
                 .execute()
             )
             
-            # Index existing matches by key
+            # Index existing matches by BOTH normal and inverted keys
             existing = {}
+            existing_inverted = {}  # Maps inverted key -> original match
             for match in response.data or []:
                 key = (match["league_id"], match["home_team_id"], match["away_team_id"])
+                inverted_key = (match["league_id"], match["away_team_id"], match["home_team_id"])
                 if key not in existing:
                     existing[key] = match
+                # Also store inverted mapping for lookups
+                if inverted_key not in existing_inverted:
+                    existing_inverted[inverted_key] = match
             
             # Find matches that need to be created
             to_create = []
@@ -536,7 +545,17 @@ class SupabaseClient:
                     continue  # Already processed
                 
                 if key in existing:
+                    # Found exact match
                     result_map[key] = existing[key]
+                elif key in existing_inverted:
+                    # Found inverted match - use it instead of creating duplicate
+                    inverted_match = existing_inverted[key]
+                    # Mark that this is inverted so orchestrator can swap odds
+                    inverted_match["_is_inverted"] = True
+                    result_map[key] = inverted_match
+                    self.logger.debug(
+                        f"Using inverted match for {m['home_team_id']} vs {m['away_team_id']}"
+                    )
                 else:
                     to_create.append({
                         "league_id": m["league_id"],
@@ -569,8 +588,12 @@ class SupabaseClient:
                     )
                     for match in refetch.data or []:
                         key = (match["league_id"], match["home_team_id"], match["away_team_id"])
+                        inverted_key = (match["league_id"], match["away_team_id"], match["home_team_id"])
                         if key in result_map and result_map[key] is None:
                             result_map[key] = match
+                        elif inverted_key in result_map and result_map[inverted_key] is None:
+                            match["_is_inverted"] = True
+                            result_map[inverted_key] = match
                 
                 for match in insert_response.data or []:
                     key = (match["league_id"], match["home_team_id"], match["away_team_id"])

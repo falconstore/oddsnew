@@ -170,6 +170,10 @@ class BetbraNBAScraper(BaseScraper):
         """
         Parse API response and extract BACK odds only for NBA Moneyline.
         
+        IMPORTANT: Betbra uses "Away em Home" naming convention in event names,
+        meaning the first team listed is the AWAY team and second is the HOME team.
+        We parse the event["name"] to correctly identify home/away.
+        
         Filters:
         - Only matches (not outrights like "NBA Championship")
         - Only Moneyline markets (money_line type)
@@ -196,22 +200,42 @@ class BetbraNBAScraper(BaseScraper):
                     # No Moneyline market found, skip this event
                     continue
                 
-                # Extract team names from event participants
-                participants = {}
-                for p in event.get("event-participants", []):
-                    number = p.get("number", "")
-                    name = p.get("participant-name", "")
-                    if number and name:
-                        participants[number] = name
+                # CRITICAL: Parse event name to get correct home/away orientation
+                # Betbra format: "Away em Home" (e.g., "Minnesota Timberwolves em Miami Heat")
+                # "em" means "at" in Portuguese, so first team is AWAY, second is HOME
+                event_name = event.get("name", "")
+                home_team = None
+                away_team = None
                 
-                home_team = participants.get("1", "")
-                away_team = participants.get("2", "")
+                if " em " in event_name:
+                    # Use "em" pattern to correctly identify teams
+                    parts = event_name.split(" em ", 1)
+                    if len(parts) == 2:
+                        away_team = parts[0].strip()
+                        home_team = parts[1].strip()
+                        self._log.debug(f"Parsed 'em' pattern: away={away_team}, home={home_team}")
+                
+                # Fallback: use event-participants if "em" pattern not found
+                if not home_team or not away_team:
+                    participants = {}
+                    for p in event.get("event-participants", []):
+                        number = p.get("number", "")
+                        name = p.get("participant-name", "")
+                        if number and name:
+                            participants[number] = name
+                    
+                    # In fallback, assume number 2 is home (based on observed data)
+                    home_team = participants.get("2", "")
+                    away_team = participants.get("1", "")
+                    
+                    if home_team and away_team:
+                        self._log.debug(f"Fallback participants: away={away_team}, home={home_team}")
                 
                 if not home_team or not away_team:
-                    self._log.debug(f"Missing team names in event: {event.get('name')}")
+                    self._log.debug(f"Missing team names in event: {event_name}")
                     continue
                 
-                # Extract BACK odds from runners
+                # Extract BACK odds from runners - match by name
                 home_odd = None
                 away_odd = None
                 
@@ -228,7 +252,7 @@ class BetbraNBAScraper(BaseScraper):
                     if back_price is None:
                         continue
                     
-                    # Match runner to outcome
+                    # Match runner to outcome by name
                     if runner_name == home_team:
                         home_odd = float(back_price)
                     elif runner_name == away_team:
@@ -264,7 +288,7 @@ class BetbraNBAScraper(BaseScraper):
                     away_odd=away_odd,
                     sport="basketball",
                     market_type="moneyline",
-                    odds_type="SO",  # Betbra = Super Odds (exchange, sem pagamento antecipado)
+                    odds_type="SO",  # Betbra = Super Odds (exchange)
                     extra_data={
                         "betbra_event_id": event.get("id"),
                         "betbra_market_id": moneyline_market.get("id"),
