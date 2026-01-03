@@ -112,7 +112,9 @@ class EstrelabetScraper(BaseScraper):
         for event in events:
             try:
                 event_id = event.get("id")
-                event_name = event.get("name")  # Ex: "Roma vs Genoa"
+                event_name = event.get("name", "")
+                # Limpar tabs, quebras de linha e espaços múltiplos
+                event_name = ' '.join(event_name.split())
                 market_ids = event.get("marketIds", [])
                 
                 # Extrair nomes dos times pelo nome do evento
