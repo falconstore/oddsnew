@@ -238,22 +238,31 @@ class Orchestrator:
                 self.logger.info(f"{scraper_name}: collected {len(result)} odds")
         
         # Log pre-normalization NBA count
-        nba_pre = [o for o in all_odds if o.league_raw.upper() == "NBA"]
+        nba_pre = [o for o in all_odds if o.league_raw.upper() == "NBA" or o.sport == "basketball"]
         if nba_pre:
             self.logger.info(f"NBA pre-normalization: {len(nba_pre)} odds from scrapers")
         
-        # Normalize and insert odds
-        normalized = await self._normalize_odds(all_odds)
+        # Normalize odds - returns separate lists for football and NBA
+        football_normalized, nba_normalized = await self._normalize_odds(all_odds)
         
-        # Log post-normalization NBA count
-        nba_post = [o for o in normalized if o.get("market_type") == "moneyline"]
-        if nba_pre:
-            self.logger.info(f"NBA post-normalization: {len(nba_post)} odds passed through")
+        # Log post-normalization counts
+        self.logger.info(f"Football normalized: {len(football_normalized)} odds")
+        if nba_normalized:
+            self.logger.info(f"NBA normalized: {len(nba_normalized)} odds")
         
-        inserted = await self._insert_odds(normalized)
+        # Insert football odds into matches/odds_history tables
+        football_inserted = await self._insert_odds(football_normalized)
         
-        # Check for alerts
-        match_odds = self._group_by_match(normalized)
+        # Insert NBA odds into nba_matches/nba_odds_history tables
+        nba_inserted = await self.supabase.insert_nba_odds(nba_normalized)
+        
+        inserted = football_inserted + nba_inserted
+        
+        # Check for alerts (combine both for detection)
+        all_normalized = football_normalized + [
+            {**o, "draw_odd": None} for o in nba_normalized  # Add draw_odd for compatibility
+        ]
+        match_odds = self._group_by_match(all_normalized)
         alerts = await self.alert_detector.check_for_alerts(match_odds)
         
         # Cleanup old matches
@@ -270,8 +279,14 @@ class Orchestrator:
             "scrapers_run": len(self.scrapers),
             "scrapers_failed": len(errors),
             "odds_collected": len(all_odds),
-            "odds_normalized": len(normalized),
+            "football_normalized": len(football_normalized),
+            "nba_normalized": len(nba_normalized),
             "odds_inserted": inserted,
+            "alerts_created": len(alerts),
+            "matches_cleaned": cleaned,
+            "json_uploaded": json_uploaded,
+            "errors": errors,
+        }
             "alerts_created": len(alerts),
             "matches_cleaned": cleaned,
             "json_uploaded": json_uploaded,
@@ -311,17 +326,20 @@ class Orchestrator:
     async def _normalize_odds(
         self, 
         odds_list: List[ScrapedOdds]
-    ) -> List[Dict[str, Any]]:
+    ) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
         """
-        Normalize scraped odds with optimized batch processing:
-        - Uses cache-only team lookup (no DB calls per team)
-        - Batches match lookups/creation
+        Normalize scraped odds with optimized batch processing.
+        Separates football and basketball into different flows.
+        
+        Returns:
+            Tuple of (football_odds, nba_odds)
         """
         if not odds_list:
-            return []
+            return [], []
         
-        # Phase 1: Fast normalization using cache only
-        pre_normalized = []
+        # Phase 1: Fast normalization using cache only - separate by sport
+        football_pre = []
+        nba_pre = []
         unmatched_teams = []
         
         for odds in odds_list:
@@ -337,8 +355,11 @@ class Orchestrator:
                 self.logger.warning(f"Unknown league: {odds.league_raw}")
                 continue
             
+            # Determine if this is basketball
+            is_basketball = odds.sport == "basketball" or odds.league_raw.upper() == "NBA"
+            
             # Debug NBA odds flow
-            if odds.league_raw.upper() == "NBA":
+            if is_basketball:
                 self.logger.debug(
                     f"NBA normalization: {odds.home_team_raw} vs {odds.away_team_raw} | "
                     f"bookmaker={odds.bookmaker_name}, league_id={league_id}"
@@ -356,58 +377,94 @@ class Orchestrator:
             
             if not home_team_id:
                 unmatched_teams.append((odds.home_team_raw, odds.bookmaker_name))
-                if odds.league_raw.upper() == "NBA":
+                if is_basketball:
                     self.logger.debug(f"NBA team not found: {odds.home_team_raw}")
                 continue
             if not away_team_id:
                 unmatched_teams.append((odds.away_team_raw, odds.bookmaker_name))
-                if odds.league_raw.upper() == "NBA":
+                if is_basketball:
                     self.logger.debug(f"NBA team not found: {odds.away_team_raw}")
                 continue
             
-            pre_normalized.append({
+            item = {
                 "odds": odds,
                 "bookmaker_id": bookmaker_id,
                 "league_id": league_id,
                 "home_team_id": home_team_id,
                 "away_team_id": away_team_id,
-            })
+            }
+            
+            if is_basketball:
+                nba_pre.append(item)
+            else:
+                football_pre.append(item)
         
-        # Phase 2: Batch match lookup/creation
-        matches_to_find = [
+        # Phase 2: Batch match lookup/creation - SEPARATE for football and NBA
+        
+        # Football matches
+        football_matches_to_find = [
             {
                 "league_id": item["league_id"],
                 "home_team_id": item["home_team_id"],
                 "away_team_id": item["away_team_id"],
                 "match_date": item["odds"].match_date,
             }
-            for item in pre_normalized
+            for item in football_pre
         ]
+        football_match_map = await self.supabase.find_or_create_matches_batch(football_matches_to_find)
         
-        match_map = await self.supabase.find_or_create_matches_batch(matches_to_find)
+        # NBA matches (uses separate table)
+        nba_matches_to_find = [
+            {
+                "league_id": item["league_id"],
+                "home_team_id": item["home_team_id"],
+                "away_team_id": item["away_team_id"],
+                "match_date": item["odds"].match_date,
+            }
+            for item in nba_pre
+        ]
+        nba_match_map = await self.supabase.find_or_create_nba_matches_batch(nba_matches_to_find)
         
         # Phase 3: Build final normalized records
-        normalized = []
-        for item in pre_normalized:
+        football_normalized = []
+        nba_normalized = []
+        
+        # Process football
+        for item in football_pre:
             key = (item["league_id"], item["home_team_id"], item["away_team_id"])
-            match = match_map.get(key)
+            match = football_match_map.get(key)
             
             if not match:
                 continue
             
             odds = item["odds"]
-            
-            # Determine market_type based on sport
-            market_type = "moneyline" if odds.sport == "basketball" else odds.market_type
-            
-            normalized.append({
+            football_normalized.append({
                 "match_id": match["id"],
                 "bookmaker_id": item["bookmaker_id"],
-                "market_type": market_type,
+                "market_type": odds.market_type,
                 "home_odd": odds.home_odd,
                 "draw_odd": odds.draw_odd,
                 "away_odd": odds.away_odd,
-                "odds_type": odds.odds_type,  # SO = Super Odds, PA = Pagamento Antecipado
+                "odds_type": odds.odds_type,
+                "scraped_at": odds.scraped_at.isoformat(),
+                "extra_data": odds.extra_data or {},
+            })
+        
+        # Process NBA (different structure - no draw_odd)
+        for item in nba_pre:
+            key = (item["league_id"], item["home_team_id"], item["away_team_id"])
+            match = nba_match_map.get(key)
+            
+            if not match:
+                continue
+            
+            odds = item["odds"]
+            nba_normalized.append({
+                "match_id": match["id"],
+                "bookmaker_id": item["bookmaker_id"],
+                "home_odd": odds.home_odd,
+                "away_odd": odds.away_odd,
+                "odds_type": odds.odds_type,
                 "scraped_at": odds.scraped_at.isoformat(),
                 "extra_data": odds.extra_data or {},
             })
@@ -422,7 +479,7 @@ class Orchestrator:
             for name, bookmaker in unique_unmatched[:10]:
                 self.logger.debug(f"  - '{name}' ({bookmaker})")
         
-        return normalized
+        return football_normalized, nba_normalized
     
     async def _insert_odds(self, odds_list: List[Dict[str, Any]]) -> int:
         """Insert normalized odds into the database."""
@@ -447,32 +504,51 @@ class Orchestrator:
         return grouped
     
     async def _cleanup_old_matches(self) -> int:
-        """Remove matches that have already started from the database."""
+        """Remove matches that have already started from the database (football + NBA)."""
+        football_cleaned = 0
+        nba_cleaned = 0
+        
         try:
             result = self.supabase.client.rpc('cleanup_started_matches').execute()
-            deleted = result.data if result.data else 0
-            if deleted > 0:
-                self.logger.info(f"Cleaned up {deleted} old matches")
-            return deleted
+            football_cleaned = result.data if result.data else 0
+            if football_cleaned > 0:
+                self.logger.info(f"Cleaned up {football_cleaned} old football matches")
         except Exception as e:
-            self.logger.warning(f"Failed to cleanup old matches: {e}")
-            return 0
+            self.logger.warning(f"Failed to cleanup old football matches: {e}")
+        
+        try:
+            result = self.supabase.client.rpc('cleanup_started_nba_matches').execute()
+            nba_cleaned = result.data if result.data else 0
+            if nba_cleaned > 0:
+                self.logger.info(f"Cleaned up {nba_cleaned} old NBA matches")
+        except Exception as e:
+            self.logger.warning(f"Failed to cleanup old NBA matches: {e}")
+        
+        return football_cleaned + nba_cleaned
     
     async def _generate_and_upload_json(self) -> bool:
         """
         Generate odds JSON and upload to Supabase Storage.
-        This provides the frontend with a static JSON file instead of direct DB queries.
+        Combines football and NBA data into a single JSON file.
         """
         try:
-            # Fetch all current odds from the view
-            raw_data = await self.supabase.fetch_odds_for_json()
+            # Fetch football odds from the football view
+            football_data = await self.supabase.fetch_odds_for_json()
             
-            if not raw_data:
+            # Fetch NBA odds from the NBA view
+            nba_data = await self.supabase.fetch_nba_odds_for_json()
+            
+            self.logger.info(f"JSON export: {len(football_data)} football, {len(nba_data)} NBA odds")
+            
+            # Combine all data
+            all_data = football_data + nba_data
+            
+            if not all_data:
                 self.logger.warning("No odds data to export to JSON")
                 return False
             
             # Group by match (similar to frontend groupOddsByMatch)
-            matches = self._group_odds_for_json(raw_data)
+            matches = self._group_odds_for_json(all_data)
             
             # Build final JSON structure
             json_data = {
@@ -485,7 +561,9 @@ class Orchestrator:
             success = self.supabase.upload_odds_json(json_data)
             
             if success:
-                self.logger.info(f"Uploaded odds.json with {len(matches)} matches")
+                football_count = len([m for m in matches if m.get("sport_type") != "basketball"])
+                nba_count = len([m for m in matches if m.get("sport_type") == "basketball"])
+                self.logger.info(f"Uploaded odds.json with {football_count} football + {nba_count} NBA matches")
             
             return success
             
