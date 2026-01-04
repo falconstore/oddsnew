@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import List, Optional, Dict, Any
 from loguru import logger
 
-from ..base_scraper import BaseScraper, ScrapedOdds, LeagueConfig
+from base_scraper import BaseScraper, ScrapedOdds, LeagueConfig
 
 
 class StakeScraper(BaseScraper):
