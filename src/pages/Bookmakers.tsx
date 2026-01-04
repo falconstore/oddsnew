@@ -23,7 +23,8 @@ const BOOKMAKER_LEAGUES: Record<string, string[]> = {
   'betano': ['Premier League', 'La Liga', 'Serie A'],
   'estrelabet': ['Serie A'],
   'br4bet': ['Serie A', 'La Liga', 'Premier League', 'Bundesliga'],
-  'betnacional': ['Premier League'],
+  'betnacional': ['Premier League', 'Serie A', 'La Liga'],
+  'stake': ['Premier League', 'Serie A', 'La Liga'],
 };
 
 const Bookmakers = () => {

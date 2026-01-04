@@ -611,6 +611,14 @@ function generateBookmakerLink(
     }
   }
   
+  // Stake
+  if (name.includes('stake')) {
+    const eventId = extraData.event_id;
+    if (eventId) {
+      return `https://stake.bet.br/esportes/${eventId}`;
+    }
+  }
+  
   return null;
 }
 

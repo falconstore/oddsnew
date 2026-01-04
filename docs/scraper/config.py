@@ -108,6 +108,12 @@ BOOKMAKERS = {
         "enabled": True,
         "priority": 9,
     },
+    "stake": {
+        "name": "Stake",
+        "base_url": "https://stake.bet.br",
+        "enabled": True,
+        "priority": 10,
+    },
 }
 
 # League mappings (URL paths for each bookmaker)
