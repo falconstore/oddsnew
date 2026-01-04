@@ -1,13 +1,10 @@
 """
-Betnacional Scraper - Direct API access with Playwright fallback.
+Betnacional Scraper - Playwright only (Cloudflare bypass).
 
-Betnacional uses a REST API protected by Cloudflare.
-Strategy: Try httpx first, fallback to Playwright if 403.
-
+Betnacional's API is protected by Cloudflare, requiring browser automation.
 API: https://prod-global-bff-events.bet6.com.br/api/odds/1/events-by-seasons
 """
 
-import httpx
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 from loguru import logger
@@ -15,17 +12,12 @@ from collections import defaultdict
 
 from base_scraper import BaseScraper, ScrapedOdds, LeagueConfig
 
-# Playwright imports (optional, for fallback)
-try:
-    from playwright.async_api import async_playwright, Browser, BrowserContext, Page
-    PLAYWRIGHT_AVAILABLE = True
-except ImportError:
-    PLAYWRIGHT_AVAILABLE = False
+from playwright.async_api import async_playwright, Browser, BrowserContext, Page
 
 
 class BetnacionalScraper(BaseScraper):
     """
-    Scraper para Betnacional (API Direta com fallback Playwright).
+    Scraper para Betnacional usando Playwright.
     
     A API retorna uma lista de odds individuais que precisam ser
     agrupadas por event_id para montar o 1x2 completo.
@@ -45,54 +37,18 @@ class BetnacionalScraper(BaseScraper):
         # "la_liga": {"tournament_id": "?", "name": "La Liga", "country": "Espanha"},
     }
     
-    # Headers que imitam o navegador Chrome
-    BROWSER_HEADERS = {
-        "accept": "application/json, text/plain, */*",
-        "accept-language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
-        "accept-encoding": "gzip, deflate, br",
-        "referer": "",  # Explicitamente vazio (importante!)
-        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
-        # Chrome Client Hints
-        "sec-ch-ua": '"Chromium";v="142", "Google Chrome";v="142", "Not_A Brand";v="99"',
-        "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-platform": '"macOS"',
-        # Fetch Metadata
-        "sec-fetch-dest": "empty",
-        "sec-fetch-mode": "cors",
-        "sec-fetch-site": "cross-site",
-        # Sentry headers (capturados do navegador)
-        "sentry-trace": "f572248759ee49288b1b8cf51bf4af09-b6fe74ffebecd129-0",
-        "baggage": "sentry-environment=production,sentry-release=5.0.3,sentry-public_key=4de4f26e4dce052125e7ea124a3c310c,sentry-trace_id=a3e4f9fe6b8c4ee592f1e498dd8017f1,sentry-sample_rate=0.05,sentry-transaction=POST%20%2Fapi%2Frevalidate,sentry-sampled=false",
-        "connection": "keep-alive",
-    }
-    
     def __init__(self):
         super().__init__(name="betnacional", base_url="https://betnacional.bet.br")
-        self.client: Optional[httpx.AsyncClient] = None
         self.logger = logger.bind(component="betnacional")
         # Playwright resources
         self._playwright = None
         self._browser: Optional[Browser] = None
         self._context: Optional[BrowserContext] = None
         self._page: Optional[Page] = None
-        self._use_playwright = False
     
     async def setup(self):
-        self.logger.info("Iniciando sessão HTTP Betnacional (HTTP/2)...")
-        self.client = httpx.AsyncClient(
-            timeout=30.0,
-            http2=True,
-            follow_redirects=True,
-            headers=self.BROWSER_HEADERS
-        )
-    
-    async def _setup_playwright(self):
-        """Inicializa Playwright como fallback."""
-        if not PLAYWRIGHT_AVAILABLE:
-            self.logger.error("Playwright não está instalado!")
-            return False
-        
-        self.logger.info("Iniciando Playwright (fallback anti-bot)...")
+        """Inicializa Playwright para acessar a API."""
+        self.logger.info("Iniciando Playwright Betnacional...")
         self._playwright = await async_playwright().start()
         
         self._browser = await self._playwright.chromium.launch(
@@ -105,7 +61,7 @@ class BetnacionalScraper(BaseScraper):
         )
         
         self._context = await self._browser.new_context(
-            user_agent=self.BROWSER_HEADERS["user-agent"],
+            user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
             locale="pt-BR",
             timezone_id="America/Sao_Paulo",
             viewport={"width": 1920, "height": 1080},
@@ -119,14 +75,9 @@ class BetnacionalScraper(BaseScraper):
         """)
         
         self._page = await self._context.new_page()
-        self._use_playwright = True
-        return True
     
     async def teardown(self):
-        if self.client:
-            await self.client.aclose()
-            self.client = None
-        
+        """Fecha recursos do Playwright."""
         if self._page:
             await self._page.close()
         if self._context:
@@ -143,7 +94,7 @@ class BetnacionalScraper(BaseScraper):
         ]
     
     async def scrape_league(self, league: LeagueConfig) -> List[ScrapedOdds]:
-        if not self.client:
+        if not self._page:
             await self.setup()
         
         # Encontra o tournament_id da liga
@@ -169,67 +120,16 @@ class BetnacionalScraper(BaseScraper):
             "filter_time_event": ""
         }
         
-        # Tentar httpx primeiro
-        data = await self._request_httpx(params)
-        
-        # Fallback para Playwright se 403
-        if data is None and not self._use_playwright:
-            self.logger.warning("httpx falhou, tentando Playwright...")
-            if await self._setup_playwright():
-                data = await self._request_playwright(params)
-        elif data is None and self._use_playwright:
-            data = await self._request_playwright(params)
+        data = await self._request_playwright(params)
         
         if data is None:
             return []
         
         return self._parse_odds(data, league.name)
     
-    async def _request_httpx(self, params: Dict[str, str]) -> Optional[Dict]:
-        """Tenta fazer request via httpx."""
-        try:
-            response = await self.client.get(self.API_BASE_URL, params=params)
-            
-            if response.status_code == 403:
-                self._log_403_details(response)
-                return None
-            
-            response.raise_for_status()
-            return response.json()
-            
-        except httpx.HTTPStatusError as e:
-            self.logger.error(f"Erro HTTP {e.response.status_code}")
-            if e.response.status_code == 403:
-                self._log_403_details(e.response)
-            return None
-        except Exception as e:
-            self.logger.error(f"Erro httpx: {e}")
-            return None
-    
-    def _log_403_details(self, response):
-        """Log detalhado para diagnosticar 403."""
-        content_type = response.headers.get("content-type", "")
-        cf_ray = response.headers.get("cf-ray", "N/A")
-        server = response.headers.get("server", "N/A")
-        
-        body_preview = response.text[:500] if response.text else "(vazio)"
-        
-        self.logger.error(f"""
-╔══════════════════════════════════════════════════════════════
-║ 🚫 403 FORBIDDEN - Cloudflare bloqueou a request
-╠══════════════════════════════════════════════════════════════
-║ Content-Type: {content_type}
-║ Server: {server}
-║ CF-Ray: {cf_ray}
-╠══════════════════════════════════════════════════════════════
-║ Body (preview):
-║ {body_preview}
-╚══════════════════════════════════════════════════════════════
-        """)
-    
     async def _request_playwright(self, params: Dict[str, str]) -> Optional[Dict]:
         """Faz request usando contexto do Playwright."""
-        if not self._context or not self._page:
+        if not self._page:
             self.logger.error("Playwright não inicializado")
             return None
         
@@ -244,11 +144,9 @@ class BetnacionalScraper(BaseScraper):
             response = await self._page.goto(full_url, wait_until="networkidle", timeout=30000)
             
             if response and response.status == 200:
-                content = await self._page.content()
-                # Extrair JSON do body (geralmente em <pre> ou direto)
                 import json
                 
-                # Tentar parsear o texto da página como JSON
+                # Extrair JSON do body
                 body_text = await self._page.evaluate("() => document.body.innerText")
                 data = json.loads(body_text)
                 self.logger.info("✅ Playwright: dados obtidos com sucesso")
