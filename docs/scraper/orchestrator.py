@@ -258,12 +258,13 @@ class Orchestrator:
         
         inserted = football_inserted + nba_inserted
         
-        # Check for alerts (combine both for detection)
-        all_normalized = football_normalized + [
-            {**o, "draw_odd": None} for o in nba_normalized  # Add draw_odd for compatibility
-        ]
-        match_odds = self._group_by_match(all_normalized)
-        alerts = await self.alert_detector.check_for_alerts(match_odds)
+        # Check for alerts (only football for now - NBA uses nba_matches table,
+        # but alerts.match_id references matches table, causing FK violations)
+        if football_normalized:
+            match_odds = self._group_by_match(football_normalized)
+            alerts = await self.alert_detector.check_for_alerts(match_odds)
+        else:
+            alerts = []
         
         # Cleanup old matches
         cleaned = await self._cleanup_old_matches()
