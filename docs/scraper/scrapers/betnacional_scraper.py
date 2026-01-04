@@ -48,9 +48,15 @@ class BetnacionalScraper(BaseScraper):
             headers={
                 "accept": "*/*",
                 "accept-language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
-                "origin": "https://betnacional.bet.br",
-                "referer": "https://betnacional.bet.br/",
+                # NÃO enviar origin/referer - a API espera que estejam vazios
                 "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+                # Headers Chrome Client Hints
+                "sec-ch-ua": '"Chromium";v="142", "Google Chrome";v="142", "Not_A Brand";v="99"',
+                "sec-ch-ua-mobile": "?0",
+                "sec-ch-ua-platform": '"macOS"',
+                # Headers Sentry (obrigatórios pelo Cloudflare)
+                "sentry-trace": "f572248759ee49288b1b8cf51bf4af09-b6fe74ffebecd129-0",
+                "baggage": "sentry-environment=production,sentry-release=5.0.3,sentry-public_key=4de4f26e4dce052125e7ea124a3c310c,sentry-trace_id=a3e4f9fe6b8c4ee592f1e498dd8017f1,sentry-sample_rate=0.05,sentry-transaction=POST%20%2Fapi%2Frevalidate,sentry-sampled=false",
             }
         )
     
