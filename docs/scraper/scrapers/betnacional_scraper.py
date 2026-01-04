@@ -32,9 +32,16 @@ class BetnacionalScraper(BaseScraper):
             "name": "Premier League",
             "country": "Inglaterra"
         },
-        # Adicionar mais ligas conforme necessário:
-        # "serie_a": {"tournament_id": "?", "name": "Serie A", "country": "Italia"},
-        # "la_liga": {"tournament_id": "?", "name": "La Liga", "country": "Espanha"},
+        "serie_a": {
+            "tournament_id": "23",
+            "name": "Serie A",
+            "country": "Italia"
+        },
+        "la_liga": {
+            "tournament_id": "8",
+            "name": "La Liga",
+            "country": "Espanha"
+        },
     }
     
     def __init__(self):
@@ -249,6 +256,7 @@ class BetnacionalScraper(BaseScraper):
                     draw_odd=odds["2"],
                     away_odd=odds["3"],
                     market_type="1x2",
+                    odds_type="SO",
                     extra_data={
                         "event_id": str(event_id)
                     }
