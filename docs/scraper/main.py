@@ -37,6 +37,7 @@ from scrapers.estrelabet_scraper import EstrelabetScraper
 from scrapers.kto_scraper import KtoScraper
 from scrapers.sportingbet_scraper import SportingbetScraper
 from scrapers.novibet_scraper import NovibetScraper
+from scrapers.betnacional_scraper import BetnacionalScraper
 # from scrapers.bet365 import Bet365Scraper
 # from scrapers.betfair import BetfairScraper
 # from scrapers.onexbet import OneXBetScraper
@@ -93,6 +94,7 @@ def create_orchestrator() -> Orchestrator:
     orchestrator.register_scraper(KtoScraper())
     orchestrator.register_scraper(SportingbetScraper())
     orchestrator.register_scraper(NovibetScraper())
+    orchestrator.register_scraper(BetnacionalScraper())
     # orchestrator.register_scraper(Bet365Scraper())
     # orchestrator.register_scraper(BetfairScraper())
     # orchestrator.register_scraper(OneXBetScraper())

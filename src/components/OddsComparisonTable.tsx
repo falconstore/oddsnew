@@ -602,6 +602,15 @@ function generateBookmakerLink(
     }
   }
   
+  // Betnacional
+  if (name.includes('betnacional')) {
+    const eventId = extraData.event_id;
+    if (eventId) {
+      // Formato: /event/1/0/{eventId}
+      return `https://betnacional.bet.br/event/1/0/${eventId}`;
+    }
+  }
+  
   return null;
 }
 
