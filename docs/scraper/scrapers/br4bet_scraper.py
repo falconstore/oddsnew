@@ -1,35 +1,30 @@
 """
 Br4bet Scraper - Scrapes odds from Br4bet via Altenar API.
 
-Supports two modes:
-1. Direct API mode (preferred): Uses BR4BET_AUTHORIZATION env var to call API directly.
-   No browser needed, avoids Cloudflare/captcha entirely.
-2. Playwright mode (fallback): Uses browser to navigate and capture API calls.
+Uses Playwright to navigate to real pages and execute fetch() from within
+the browser's JavaScript context. This allows API calls to inherit all
+cookies, headers, and fingerprints that the real frontend uses.
 
 API endpoint: https://sb2frontend-altenar2.biahosted.com/api/widget/GetEvents
 """
 
 import asyncio
-import json
 import os
-import re
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 
-import httpx
-from playwright.async_api import async_playwright, Playwright, Browser, BrowserContext, Page, Response
+from playwright.async_api import async_playwright, Playwright, Browser, BrowserContext, Page
 
 from base_scraper import BaseScraper, ScrapedOdds, LeagueConfig
-from config import settings
 
 
 class Br4betScraper(BaseScraper):
     """
     Scraper for Br4bet (uses Altenar backend).
     
-    Strategy: Navigate to actual league pages and intercept the API calls
-    made by the website's JavaScript. This ensures all cookies, headers,
-    and request parameters match exactly what the site uses.
+    Strategy: Navigate to league pages to establish session, then use
+    page.evaluate(fetch) to call the API from within the browser context.
+    This ensures all cookies/tokens are properly included.
     """
     
     LEAGUES = {
@@ -53,18 +48,14 @@ class Br4betScraper(BaseScraper):
         },
     }
     
-    API_PATTERN = "GetEvents"  # Loosened pattern to catch any GetEvents call
-    API_TIMEOUT_MS = 45000  # Increased from 15s to 45s
-    SCREENSHOT_DIR = "debug_screenshots"  # Directory for diagnostic screenshots
-    USER_AGENT = (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/120.0.0.0 Safari/537.36"
-    )
-    
-    # Direct API mode constants
     API_BASE_URL = "https://sb2frontend-altenar2.biahosted.com/api/widget/GetEvents"
     API_PARAMS = "culture=pt-BR&timezoneOffset=180&integration=br4bet&deviceType=1&numFormat=en-GB&countryCode=BR&eventCount=0&sportId=0"
+    
+    USER_AGENT = (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/142.0.0.0 Safari/537.36"
+    )
     
     def __init__(self):
         super().__init__(
@@ -75,30 +66,10 @@ class Br4betScraper(BaseScraper):
         self._browser: Optional[Browser] = None
         self._context: Optional[BrowserContext] = None
         self._page: Optional[Page] = None
-
-        # Captured from real frontend requests
-        self._auth_header: Optional[str] = None
-        self._last_api_url_by_league: Dict[str, str] = {}
-        
-        # Check for direct mode via env or settings
-        self._direct_mode = False
-        auth_from_env = os.environ.get("BR4BET_AUTHORIZATION")
-        auth_from_settings = getattr(settings, "br4bet_authorization", None)
-        if auth_from_env:
-            self._auth_header = auth_from_env
-            self._direct_mode = True
-        elif auth_from_settings:
-            self._auth_header = auth_from_settings
-            self._direct_mode = True
     
     async def setup(self):
-        """Initialize scraper - skip Playwright if direct mode is enabled."""
+        """Initialize Playwright browser with stealth settings."""
         await super().setup()
-        
-        if self._direct_mode:
-            self.logger.info("Direct API mode enabled (BR4BET_AUTHORIZATION configured)")
-            self.logger.info("Skipping Playwright browser initialization")
-            return
         
         self.logger.info("Starting Playwright browser with stealth...")
         self._playwright = await async_playwright().start()
@@ -111,60 +82,37 @@ class Br4betScraper(BaseScraper):
             '--disable-features=IsolateOrigins,site-per-process',
         ]
         
-        # Check for proxy configuration
-        proxy_server = os.environ.get('BR4BET_PROXY_SERVER')
-        proxy_config = None
-        if proxy_server:
-            proxy_config = {
-                'server': proxy_server,
-            }
-            proxy_user = os.environ.get('BR4BET_PROXY_USER')
-            proxy_pass = os.environ.get('BR4BET_PROXY_PASS')
-            if proxy_user and proxy_pass:
-                proxy_config['username'] = proxy_user
-                proxy_config['password'] = proxy_pass
-            self.logger.info(f"Using proxy: {proxy_server}")
-        
         self._browser = await self._playwright.chromium.launch(
             headless=True,
             args=launch_args,
         )
         
         # Create context with realistic settings
-        context_options = {
-            'user_agent': self.USER_AGENT,
-            'viewport': {'width': 1920, 'height': 1080},
-            'locale': 'pt-BR',
-            'timezone_id': 'America/Sao_Paulo',
-            'extra_http_headers': {
+        self._context = await self._browser.new_context(
+            user_agent=self.USER_AGENT,
+            viewport={'width': 1920, 'height': 1080},
+            locale='pt-BR',
+            timezone_id='America/Sao_Paulo',
+            extra_http_headers={
                 'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
             }
-        }
-        
-        if proxy_config:
-            context_options['proxy'] = proxy_config
-        
-        self._context = await self._browser.new_context(**context_options)
+        )
         
         # Add stealth script to hide webdriver
         await self._context.add_init_script("""
-            // Hide webdriver
             Object.defineProperty(navigator, 'webdriver', {
                 get: () => undefined,
             });
             
-            // Hide automation indicators
             delete window.cdc_adoQpoasnfa76pfcZLmcfl_Array;
             delete window.cdc_adoQpoasnfa76pfcZLmcfl_Promise;
             delete window.cdc_adoQpoasnfa76pfcZLmcfl_Symbol;
             
-            // Fake plugins
             Object.defineProperty(navigator, 'plugins', {
                 get: () => [1, 2, 3, 4, 5],
             });
             
-            // Fake languages
             Object.defineProperty(navigator, 'languages', {
                 get: () => ['pt-BR', 'pt', 'en-US', 'en'],
             });
@@ -172,34 +120,23 @@ class Br4betScraper(BaseScraper):
         
         self._page = await self._context.new_page()
         
-        # Navigate to main site to warm up session
+        # Navigate to main site to establish session
         self.logger.info("Establishing session at br4.bet.br...")
         try:
-            await self._page.goto(self.base_url, wait_until="networkidle", timeout=45000)
-            await self._page.wait_for_timeout(3000)  # Wait for JS initialization
+            await self._page.goto(self.base_url, wait_until="networkidle", timeout=60000)
+            await self._page.wait_for_timeout(3000)
             
-            # Check if we're blocked
-            title = await self._page.title()
-            if 'challenge' in title.lower() or 'blocked' in title.lower():
-                self.logger.warning(f"Possible challenge page detected: {title}")
-            
-            # Log cookies captured
             cookies = await self._context.cookies()
             if cookies:
-                cookie_names = [c["name"] for c in cookies]
-                self.logger.info(f"Session established. Cookies: {cookie_names}")
+                self.logger.info(f"Session established. Cookies: {[c['name'] for c in cookies]}")
             else:
                 self.logger.warning("No cookies captured from session")
                 
         except Exception as e:
-            self.logger.warning(f"Session setup warning (continuing anyway): {e}")
+            self.logger.warning(f"Session setup warning: {e}")
     
     async def teardown(self):
-        """Clean up Playwright resources (skipped in direct mode)."""
-        if self._direct_mode:
-            await super().teardown()
-            return
-            
+        """Clean up Playwright resources."""
         if self._page:
             await self._page.close()
             self._page = None
@@ -226,246 +163,74 @@ class Br4betScraper(BaseScraper):
             for cfg in self.LEAGUES.values()
         ]
     
-    def _build_api_headers(self, referer: str) -> Dict[str, str]:
-        headers: Dict[str, str] = {
-            'Accept': 'application/json, text/plain, */*',
-            'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
-            'Origin': 'https://br4.bet.br',
-            'Referer': referer,
-            'User-Agent': self.USER_AGENT,
-        }
-        if self._auth_header:
-            # Don't log/print this value anywhere (token)
-            headers['Authorization'] = self._auth_header
-        return headers
-
-    async def _request_direct_api(self, champ_id: str, league_name: str) -> Optional[Dict[str, Any]]:
-        """Make direct API call using httpx with configured Authorization header."""
-        url = f"{self.API_BASE_URL}?{self.API_PARAMS}&champIds={champ_id}"
-        
-        headers = {
-            "Accept": "*/*",
-            "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
-            "Authorization": self._auth_header,
-            "Origin": "https://br4.bet.br",
-            "Referer": "https://br4.bet.br/",
-            "User-Agent": self.USER_AGENT,
-        }
-        
+    async def _fetch_from_browser(self, api_url: str, league_name: str) -> Optional[Dict[str, Any]]:
+        """
+        Execute fetch() from within the browser's JavaScript context.
+        This inherits all cookies, headers, and session tokens automatically.
+        """
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                self.logger.debug(f"Direct API request for {league_name}: champIds={champ_id}")
-                response = await client.get(url, headers=headers)
-                
-                if response.status_code == 200:
-                    self.logger.debug(f"Direct API success for {league_name}")
-                    return response.json()
-                else:
-                    self.logger.error(f"Direct API HTTP {response.status_code} for {league_name}")
-                    self.logger.debug(f"Response body: {response.text[:200]}")
-                    return None
-        except Exception as e:
-            self.logger.error(f"Direct API error for {league_name}: {e}")
-            return None
-
-    async def scrape_league(self, league: LeagueConfig) -> List[ScrapedOdds]:
-        """Scrape odds - uses direct API if available, otherwise Playwright."""
-        
-        # Direct mode: skip browser entirely
-        if self._direct_mode:
-            data = await self._request_direct_api(league.league_id, league.name)
-            if data:
-                return self._parse_response(data, league)
+            result = await self._page.evaluate(f"""
+                async () => {{
+                    try {{
+                        const resp = await fetch("{api_url}", {{
+                            method: 'GET',
+                            credentials: 'include'
+                        }});
+                        if (resp.ok) {{
+                            return await resp.json();
+                        }}
+                        return {{ error: resp.status, message: await resp.text() }};
+                    }} catch (e) {{
+                        return {{ error: 'exception', message: e.toString() }};
+                    }}
+                }}
+            """)
+            
+            if result and 'error' not in result:
+                self.logger.info(f"Browser fetch success for {league_name}")
+                return result
             else:
-                self.logger.warning(f"Direct API failed for {league.name}, no fallback available")
-                return []
+                self.logger.warning(f"Browser fetch failed for {league_name}: {result}")
+                return None
+        except Exception as e:
+            self.logger.error(f"Browser fetch exception for {league_name}: {e}")
+            return None
+    
+    async def scrape_league(self, league: LeagueConfig) -> List[ScrapedOdds]:
+        """Scrape odds by navigating to league page and fetching API from browser context."""
+        if not self._page:
+            raise RuntimeError("Page not initialized. Call setup() first.")
         
-        # Playwright mode (existing code)
-        if not self._page or not self._context:
-            raise RuntimeError("Page/context not initialized. Call setup() first.")
-
         # Find the slug for this league
         league_slug = None
         for cfg in self.LEAGUES.values():
             if cfg["champ_id"] == league.league_id:
                 league_slug = cfg["slug"]
                 break
-
+        
         if not league_slug:
             self.logger.error(f"Unknown league ID: {league.league_id}")
             return []
-
+        
+        # Navigate to the league page to establish proper session/context
         league_url = f"{self.base_url}/sports/futebol/{league_slug}"
         self.logger.debug(f"Navigating to: {league_url}")
-
-        # Loosened filter: capture any GetEvents response
-        captured_responses: List[Response] = []
-        
-        def _on_response(resp: Response):
-            if self.API_PATTERN in resp.url:
-                self.logger.debug(f"Captured API call: {resp.status} {resp.request.method} {resp.url[:150]}...")
-                captured_responses.append(resp)
-
-        self._page.on("response", _on_response)
         
         try:
-            # Use networkidle and longer timeout
             await self._page.goto(league_url, wait_until="networkidle", timeout=60000)
-            await self._page.wait_for_timeout(5000)  # Extra wait for JS to fire XHR
+            await self._page.wait_for_timeout(3000)
         except Exception as e:
             self.logger.warning(f"Navigation issue for {league.name}: {e}")
         
-        self._page.remove_listener("response", _on_response)
+        # Build API URL and fetch from within browser context
+        api_url = f"{self.API_BASE_URL}?{self.API_PARAMS}&champIds={league.league_id}"
         
-        # Diagnostic: log page state
-        await self._diagnose_page(league.name)
+        data = await self._fetch_from_browser(api_url, league.name)
         
-        # Find the best matching response for this league
-        captured_response: Optional[Response] = None
-        for resp in captured_responses:
-            if f"champIds={league.league_id}" in resp.url:
-                captured_response = resp
-                break
+        if data:
+            return self._parse_response(data, league)
         
-        # If no exact match, use any GetEvents response as fallback
-        if not captured_response and captured_responses:
-            captured_response = captured_responses[0]
-            self.logger.warning(f"Using non-exact GetEvents response for {league.name}")
-        
-        if not captured_response:
-            self.logger.error(f"No GetEvents API calls captured for {league.name}")
-            # Try localStorage fallback
-            return await self._fallback_from_storage(league, league_url)
-
-        # If we saw a response (even 400), capture URL + Authorization for reuse
-        if captured_response:
-            self._last_api_url_by_league[league.league_id] = captured_response.url
-
-            try:
-                req_headers = captured_response.request.headers or {}
-                auth = req_headers.get("authorization") or req_headers.get("Authorization")
-                if auth:
-                    self._auth_header = auth
-            except Exception:
-                pass
-
-            if captured_response.status == 200:
-                try:
-                    data = await captured_response.json()
-                    return self._parse_response(data, league)
-                except Exception as e:
-                    self.logger.error(f"Error parsing JSON for {league.name}: {e}")
-            else:
-                # Diagnostics (don't print token)
-                auth_present = bool(self._auth_header)
-                self.logger.error(f"GetEvents HTTP {captured_response.status} for {league.name}")
-                self.logger.debug(f"GetEvents URL: {captured_response.url}")
-                self.logger.debug(f"Authorization header present: {auth_present}")
-                try:
-                    cookies = await self._context.cookies()
-                    self.logger.debug(f"Cookie names: {[c['name'] for c in cookies]}")
-                except Exception:
-                    pass
-                try:
-                    body = await captured_response.text()
-                    self.logger.debug(f"Body preview: {body[:200]}")
-                except Exception:
-                    pass
-
-        # Fallback: retry the exact captured URL using context.request (same cookies)
-        fallback_url = self._last_api_url_by_league.get(league.league_id)
-        if not fallback_url:
-            self.logger.error(f"No captured GetEvents URL available for {league.name}; skipping.")
-            return []
-
-        data = await self._request_json_with_context(fallback_url, referer=league_url, league_name=league.name)
-        if not data:
-            return []
-        return self._parse_response(data, league)
-
-    async def _request_json_with_context(self, url: str, referer: str, league_name: str) -> Optional[Dict[str, Any]]:
-        """Request JSON using the browser context cookies + captured headers (Authorization)."""
-        try:
-            self.logger.debug(f"Context.request URL: {url}")
-            resp = await self._context.request.get(url, headers=self._build_api_headers(referer))
-
-            if resp.status != 200:
-                self.logger.error(f"Context.request HTTP {resp.status} for {league_name}")
-                try:
-                    txt = await resp.text()
-                    self.logger.debug(f"Context.request body preview: {txt[:200]}")
-                except Exception:
-                    pass
-                return None
-
-            return await resp.json()
-        except Exception as e:
-            self.logger.error(f"Context.request error for {league_name}: {e}")
-            return None
-
-    async def _diagnose_page(self, league_name: str):
-        """Log diagnostic info about the current page state."""
-        try:
-            final_url = self._page.url
-            title = await self._page.title()
-            self.logger.debug(f"Page state for {league_name}: URL={final_url}, Title={title}")
-            
-            # Check for anti-bot indicators in HTML
-            html = await self._page.content()
-            antibot_indicators = ['datadome', 'captcha', 'challenge', 'blocked', 'access denied', 'enable javascript', 'cloudflare']
-            for indicator in antibot_indicators:
-                if indicator.lower() in html.lower():
-                    self.logger.warning(f"Anti-bot indicator found: '{indicator}' in {league_name}")
-            
-            # Save screenshot for debugging
-            os.makedirs(self.SCREENSHOT_DIR, exist_ok=True)
-            safe_name = league_name.replace(" ", "_").lower()
-            screenshot_path = f"{self.SCREENSHOT_DIR}/br4bet_{safe_name}.png"
-            await self._page.screenshot(path=screenshot_path)
-            self.logger.debug(f"Screenshot saved: {screenshot_path}")
-            
-        except Exception as e:
-            self.logger.warning(f"Diagnostic error for {league_name}: {e}")
-
-    async def _fallback_from_storage(self, league: LeagueConfig, referer: str) -> List[ScrapedOdds]:
-        """Try to extract auth token from storage and make direct API call."""
-        try:
-            # Try to get auth token from localStorage/sessionStorage
-            local_storage = await self._page.evaluate("() => JSON.stringify(localStorage)")
-            session_storage = await self._page.evaluate("() => JSON.stringify(sessionStorage)")
-            
-            self.logger.debug(f"localStorage keys: {list(json.loads(local_storage).keys())[:10]}")
-            self.logger.debug(f"sessionStorage keys: {list(json.loads(session_storage).keys())[:10]}")
-            
-            # Look for token-like values
-            for storage_str in [local_storage, session_storage]:
-                storage = json.loads(storage_str)
-                for key, value in storage.items():
-                    if any(tok in key.lower() for tok in ['token', 'auth', 'jwt', 'bearer']):
-                        self.logger.debug(f"Found potential auth key: {key}")
-                        if isinstance(value, str) and len(value) > 20:
-                            self._auth_header = f"Bearer {value}" if not value.startswith("Bearer") else value
-                            break
-            
-            # If we have a previous URL for this league, try it
-            fallback_url = self._last_api_url_by_league.get(league.league_id)
-            if fallback_url:
-                self.logger.info(f"Trying fallback API call for {league.name}")
-                data = await self._request_json_with_context(fallback_url, referer, league.name)
-                if data:
-                    return self._parse_response(data, league)
-            
-            # Build URL from scratch if we have no cached URL
-            api_base = "https://sb2frontend-altenar2.biahosted.com/api/widget/GetEvents"
-            api_url = f"{api_base}?culture=pt-BR&timezoneOffset=180&integration=br4bet&deviceType=1&numFormat=en-GB&countryCode=BR&eventCount=0&sportId=0&champIds={league.league_id}"
-            self.logger.info(f"Trying constructed API URL for {league.name}")
-            data = await self._request_json_with_context(api_url, referer, league.name)
-            if data:
-                return self._parse_response(data, league)
-                
-        except Exception as e:
-            self.logger.error(f"Storage fallback error for {league.name}: {e}")
-        
+        self.logger.error(f"Failed to get data for {league.name}")
         return []
     
     def _parse_response(self, data: Dict[str, Any], league: LeagueConfig) -> List[ScrapedOdds]:
@@ -486,15 +251,14 @@ class Br4betScraper(BaseScraper):
         all_odds = {o["id"]: o for o in data.get("odds", [])}
         all_markets = data.get("markets", [])
         
-        # Build map: event_id -> {home, draw, away odds}
-        # First, map competitor_id -> event_id
+        # Build map: competitor_id -> event_id
         competitor_to_event = {}
         for event in events:
             event_id = event.get("id")
             for comp in event.get("competitors", []):
                 competitor_to_event[comp.get("id")] = event_id
         
-        # Now process markets to get 1X2 odds per event
+        # Process markets to get 1X2 odds per event
         event_odds_map = {}
         
         for market in all_markets:
