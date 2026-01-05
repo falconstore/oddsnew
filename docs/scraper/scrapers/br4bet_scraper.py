@@ -16,17 +16,17 @@ class Br4betScraper(BaseScraper):
         "serie_a": {
             "champ_id": "2942",
             "name": "Serie A",
-            "country": "Brasil"
+            "country": "italia"
         },
         "premier_league": {
             "champ_id": "2936",
             "name": "Premier League", 
-            "country": "Inglaterra"
+            "country": "inglaterra"
         },
         "la_liga": {
             "champ_id": "2941",
             "name": "La Liga",
-            "country": "Espanha"
+            "country": "espanha"
         },
     }
     
@@ -223,8 +223,8 @@ class Br4betScraper(BaseScraper):
                     away_odd=away_odd,
                     market_type="1x2",
                     extra_data={
-                        "market_id": str(market.get("id")),
-                        "market_name": market.get("name")
+                        "br4bet_event_id": str(market.get("id")),  # Usando market_id como event_id por enquanto
+                        "br4bet_country": league.country.lower()
                     }
                 )
                 odds_list.append(scraped)
