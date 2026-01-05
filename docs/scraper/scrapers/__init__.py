@@ -12,5 +12,6 @@ from .sportingbet_scraper import SportingbetScraper
 from .novibet_scraper import NovibetScraper
 from .betnacional_scraper import BetnacionalScraper
 from .stake_scraper import StakeScraper
+from .mcgames_scraper import McgamesScraper
 
-__all__ = ["BetanoScraper", "SuperbetScraper", "SuperbetNBAScraper", "BetbraNBAScraper", "KtoScraper", "SportingbetScraper", "NovibetScraper", "BetnacionalScraper", "StakeScraper"]
+__all__ = ["BetanoScraper", "SuperbetScraper", "SuperbetNBAScraper", "BetbraNBAScraper", "KtoScraper", "SportingbetScraper", "NovibetScraper", "BetnacionalScraper", "StakeScraper", "McgamesScraper"]
