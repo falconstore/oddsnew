@@ -53,25 +53,25 @@ class McgamesScraper(BaseScraper):
             self.session = None
         logger.info("🔒 Mcgames: Session closed")
     
-    def get_available_leagues(self) -> List[LeagueConfig]:
+    async def get_available_leagues(self) -> List[LeagueConfig]:
         """Return list of supported leagues."""
         return [
             LeagueConfig(
-                name=key,
-                display_name=league.name,
-                country=league.country,
-                sport="football"
+                league_id=key,
+                name=league.name,
+                url=f"{self.API_BASE}?champIds={league.champ_id}",
+                country=league.country
             )
             for key, league in self.LEAGUES.items()
         ]
     
     async def scrape_league(self, league: LeagueConfig) -> List[ScrapedOdds]:
         """Scrape odds for a specific league."""
-        if league.name not in self.LEAGUES:
-            logger.warning(f"⚠️ Mcgames: Unknown league {league.name}")
+        if league.league_id not in self.LEAGUES:
+            logger.warning(f"⚠️ Mcgames: Unknown league {league.league_id}")
             return []
         
-        mcgames_league = self.LEAGUES[league.name]
+        mcgames_league = self.LEAGUES[league.league_id]
         
         try:
             # Build API URL
@@ -107,14 +107,14 @@ class McgamesScraper(BaseScraper):
             )
             
             if response.status_code != 200:
-                logger.error(f"❌ Mcgames {league.display_name}: HTTP {response.status_code}")
+                logger.error(f"❌ Mcgames {league.name}: HTTP {response.status_code}")
                 return []
             
             data = response.json()
             return self._parse_response(data, mcgames_league)
             
         except Exception as e:
-            logger.error(f"❌ Mcgames {league.display_name}: {e}")
+            logger.error(f"❌ Mcgames {league.name}: {e}")
             return []
     
     def _parse_response(self, data: Dict[str, Any], league: McgamesLeague) -> List[ScrapedOdds]:
@@ -212,14 +212,21 @@ class McgamesScraper(BaseScraper):
                 if not all(found_odds.values()):
                     continue
                 
+                # Parse match_date to datetime
+                from dateutil import parser as date_parser
+                from datetime import datetime
+                parsed_date = date_parser.parse(match_date) if match_date else datetime.utcnow()
+                
                 scraped = ScrapedOdds(
-                    home_team=home_team,
-                    away_team=away_team,
-                    league=league.name,
-                    match_date=match_date,
+                    bookmaker_name="mcgames",
+                    home_team_raw=home_team,
+                    away_team_raw=away_team,
+                    league_raw=league.name,
+                    match_date=parsed_date,
                     home_odd=found_odds["home"],
                     draw_odd=found_odds["draw"],
                     away_odd=found_odds["away"],
+                    sport="football",
                     market_type="1x2",
                     extra_data={
                         "event_id": str(event_id),
@@ -244,12 +251,12 @@ async def main():
     await scraper.setup()
     
     try:
-        leagues = scraper.get_available_leagues()
+        leagues = await scraper.get_available_leagues()
         for league in leagues:
-            print(f"\n--- {league.display_name} ---")
+            print(f"\n--- {league.name} ---")
             odds = await scraper.scrape_league(league)
             for odd in odds[:3]:
-                print(f"  {odd.home_team} vs {odd.away_team}: {odd.home_odd}/{odd.draw_odd}/{odd.away_odd}")
+                print(f"  {odd.home_team_raw} vs {odd.away_team_raw}: {odd.home_odd}/{odd.draw_odd}/{odd.away_odd}")
                 print(f"    event_id: {odd.extra_data.get('event_id')}, country: {odd.extra_data.get('country')}")
     finally:
         await scraper.teardown()
