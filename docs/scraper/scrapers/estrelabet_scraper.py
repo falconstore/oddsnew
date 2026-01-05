@@ -24,7 +24,8 @@ class EstrelabetScraper(BaseScraper):
     
     LEAGUES = {
         "serie_a": {"champ_id": "2942", "name": "Serie A", "country": "Italia"},
-        # Adicione outras ligas aqui pegando o ID na URL do site
+        "premier_league": {"champ_id": "2936", "name": "Premier League", "country": "Inglaterra"},
+        "la_liga": {"champ_id": "2941", "name": "La Liga", "country": "Espanha"},
     }
     
     def __init__(self):
@@ -173,7 +174,7 @@ class EstrelabetScraper(BaseScraper):
                         draw_odd=found_odds['draw'],
                         away_odd=found_odds['away'],
                         market_type="1x2",
-                        extra_data={"estrelabet_event_id": str(event_id)}
+                        extra_data={"event_id": str(event_id)}
                     )
                     results.append(scraped)
             except Exception as e:
