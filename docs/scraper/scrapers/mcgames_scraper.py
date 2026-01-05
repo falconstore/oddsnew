@@ -1,18 +1,17 @@
 """
-Mcgames Scraper - Uses Altenar API (same as Br4bet/Estrelabet).
-Direct API access with httpx + curl_cffi for Cloudflare bypass.
+Mcgames Scraper - Uses Altenar API (same as Br4bet).
+Hybrid approach: Playwright captures token, curl_cffi fetches data.
 """
 
 import asyncio
-import logging
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
 
 from curl_cffi.requests import AsyncSession
+from playwright.async_api import async_playwright
+from loguru import logger
 
 from base_scraper import BaseScraper, ScrapedOdds, LeagueConfig
-
-logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -40,9 +39,60 @@ class McgamesScraper(BaseScraper):
         )
         self.session: Optional[AsyncSession] = None
         self.auth_token: Optional[str] = None
+        self.user_agent: Optional[str] = None
     
     async def setup(self) -> None:
-        """Initialize curl_cffi session with Cloudflare bypass."""
+        """Capture authorization token via Playwright."""
+        logger.info("Iniciando Playwright para capturar credenciais Mcgames...")
+        
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(
+                headless=True,
+                args=['--no-sandbox', '--disable-blink-features=AutomationControlled']
+            )
+            
+            context = await browser.new_context(
+                viewport={'width': 1920, 'height': 1080},
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+            )
+            
+            page = await context.new_page()
+            token_future = asyncio.get_event_loop().create_future()
+            
+            async def handle_request(request):
+                if "biahosted.com/api" in request.url:
+                    headers = request.headers
+                    if "authorization" in headers:
+                        token = headers["authorization"]
+                        if not token_future.done():
+                            token_future.set_result(token)
+                            logger.info("🔑 Mcgames: Token capturado via request")
+            
+            page.on("request", handle_request)
+            
+            try:
+                target_url = "https://mcgames.bet.br/sports/futebol/italia/serie-a/c-2942"
+                logger.info(f"Navegando para {target_url}...")
+                
+                await page.goto(target_url, wait_until="domcontentloaded", timeout=60000)
+                
+                try:
+                    self.auth_token = await asyncio.wait_for(token_future, timeout=15.0)
+                except asyncio.TimeoutError:
+                    logger.warning("Token demorou. Scrollando...")
+                    await page.evaluate("window.scrollTo(0, 500)")
+                    self.auth_token = await asyncio.wait_for(token_future, timeout=15.0)
+                
+                self.user_agent = await page.evaluate("navigator.userAgent")
+                
+            except asyncio.TimeoutError:
+                logger.error("❌ Mcgames: Timeout capturando token")
+            except Exception as e:
+                logger.error(f"❌ Mcgames Playwright: {e}")
+            finally:
+                await browser.close()
+        
+        # Initialize curl_cffi session after getting token
         self.session = AsyncSession(impersonate="chrome")
         logger.info("✅ Mcgames: Session initialized")
     
@@ -67,6 +117,14 @@ class McgamesScraper(BaseScraper):
     
     async def scrape_league(self, league: LeagueConfig) -> List[ScrapedOdds]:
         """Scrape odds for a specific league."""
+        # Capture token if not available
+        if not self.auth_token:
+            await self.setup()
+        
+        if not self.auth_token:
+            logger.error(f"❌ Mcgames: No token available for {league.name}")
+            return []
+        
         if league.league_id not in self.LEAGUES:
             logger.warning(f"⚠️ Mcgames: Unknown league {league.league_id}")
             return []
@@ -90,14 +148,11 @@ class McgamesScraper(BaseScraper):
             headers = {
                 "accept": "*/*",
                 "accept-language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+                "authorization": self.auth_token,
                 "origin": "https://mcgames.bet.br",
                 "referer": "https://mcgames.bet.br/",
-                "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+                "user-agent": self.user_agent or "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
             }
-            
-            # Add auth token if available
-            if self.auth_token:
-                headers["authorization"] = self.auth_token
             
             response = await self.session.get(
                 self.API_BASE,
