@@ -40,6 +40,7 @@ from scrapers.novibet_scraper import NovibetScraper
 from scrapers.betnacional_scraper import BetnacionalScraper
 from scrapers.stake_scraper import StakeScraper
 from scrapers.mcgames_scraper import McgamesScraper
+from scrapers.aposta1_scraper import Aposta1Scraper
 # from scrapers.bet365 import Bet365Scraper
 # from scrapers.betfair import BetfairScraper
 # from scrapers.onexbet import OneXBetScraper
@@ -99,6 +100,7 @@ def create_orchestrator() -> Orchestrator:
     orchestrator.register_scraper(BetnacionalScraper())
     orchestrator.register_scraper(StakeScraper())
     orchestrator.register_scraper(McgamesScraper())  # Altenar API - same pattern as Br4bet
+    orchestrator.register_scraper(Aposta1Scraper())  # Altenar API - same pattern as Mcgames
     # orchestrator.register_scraper(Bet365Scraper())
     # orchestrator.register_scraper(BetfairScraper())
     # orchestrator.register_scraper(OneXBetScraper())
