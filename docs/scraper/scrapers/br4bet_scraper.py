@@ -148,86 +148,111 @@ class Br4betScraper(BaseScraper):
             return []
 
     def _parse_response(self, data: Dict[str, Any], league: LeagueConfig) -> List[ScrapedOdds]:
-        odds_list = []
+        """Parse Altenar API response using events structure."""
+        results = []
         
-        # Dicionários de acesso rápido
-        all_odds_list = data.get("odds", [])
-        all_markets_list = data.get("markets", [])
-        dates_list = data.get("dates", [])
+        # Get all data structures
+        events_list = data.get("events", [])
+        markets_list = data.get("markets", [])
+        odds_list = data.get("odds", [])
+        competitors_list = data.get("competitors", [])
         
-        all_odds = {o["id"]: o for o in all_odds_list}
+        self.logger.info(f"📊 Br4bet {league.name}: {len(events_list)} events, {len(markets_list)} markets, {len(odds_list)} odds")
         
-        # Mapear eventId -> data a partir do dates array
-        event_dates = {}
-        for date_entry in dates_list:
-            date_str = date_entry.get("dateTime")
-            for eid in date_entry.get("eventIds", []):
-                event_dates[eid] = date_str
+        if not events_list:
+            self.logger.warning(f"⚠️ Br4bet {league.name}: No events found")
+            return []
         
-        self.logger.info(f"📊 Estrutura: {len(all_markets_list)} markets, {len(all_odds_list)} odds, {len(dates_list)} dates")
+        # Build lookup maps
+        events_map = {e["id"]: e for e in events_list}
+        competitors_map = {c["id"]: c["name"] for c in competitors_list}
+        odds_map = {o["id"]: o for o in odds_list}
         
-        # Processar apenas mercados "Vencedor do encontro" (typeId == 1)
-        for market in all_markets_list:
-            market_type_id = market.get("typeId")
-            market_name = market.get("name", "").lower()
-            
-            # Filtrar apenas mercado 1X2 (typeId=1 ou nome "vencedor")
-            is_1x2 = market_type_id == 1 or "vencedor" in market_name
-            if not is_1x2:
-                continue
-            
-            odd_ids = market.get("oddIds", [])
-            
-            home_odd = None
-            draw_odd = None
-            away_odd = None
-            home_name = None
-            away_name = None
-            
-            for odd_id in odd_ids:
-                odd = all_odds.get(odd_id)
-                if not odd:
+        # market_id -> event_id
+        market_to_event = {}
+        for event in events_list:
+            for mid in event.get("marketIds", []):
+                market_to_event[mid] = event["id"]
+        
+        # Process only 1x2 markets (typeId: 1)
+        for market in markets_list:
+            try:
+                if market.get("typeId") != 1:
                     continue
                 
-                price = odd.get("price")
-                if not price:
+                market_id = market.get("id")
+                event_id = market_to_event.get(market_id)
+                
+                if not event_id:
                     continue
                 
-                price = float(price)
-                type_id = odd.get("typeId")
-                odd_name = odd.get("name", "")
+                event = events_map.get(event_id, {})
+                event_name = event.get("name", "")
+                match_date = event.get("startDate")
+                competitor_ids = event.get("competitorIds", [])
                 
-                # typeId nas odds: 1=Home, 2=Draw, 3=Away
-                if type_id == 1:
-                    home_odd = price
-                    home_name = odd_name.strip()
-                elif type_id == 2:
-                    draw_odd = price
-                elif type_id == 3:
-                    away_odd = price
-                    away_name = odd_name.strip()
-            
-            # Se encontrou as 3 odds e os nomes dos times, criar o registro
-            if home_odd and draw_odd and away_odd and home_name and away_name:
-                # Tentar pegar a data do jogo
-                match_date = datetime.now()
+                if not event_name or len(competitor_ids) < 2:
+                    continue
+                
+                # Get team names
+                home_team = competitors_map.get(competitor_ids[0], "")
+                away_team = competitors_map.get(competitor_ids[1], "")
+                
+                if not home_team or not away_team:
+                    if " vs. " in event_name:
+                        parts = event_name.split(" vs. ")
+                        home_team = parts[0].strip()
+                        away_team = parts[1].strip() if len(parts) > 1 else ""
+                    elif " vs " in event_name:
+                        parts = event_name.split(" vs ")
+                        home_team = parts[0].strip()
+                        away_team = parts[1].strip() if len(parts) > 1 else ""
+                
+                if not home_team or not away_team:
+                    continue
+                
+                # Get odds
+                odd_ids = market.get("oddIds", [])
+                found_odds = {"home": None, "draw": None, "away": None}
+                
+                for odd_id in odd_ids:
+                    odd = odds_map.get(odd_id, {})
+                    type_id = odd.get("typeId")
+                    price = odd.get("price")
+                    
+                    if price is None:
+                        continue
+                    
+                    if type_id == 1:
+                        found_odds["home"] = float(price)
+                    elif type_id == 2:
+                        found_odds["draw"] = float(price)
+                    elif type_id == 3:
+                        found_odds["away"] = float(price)
+                
+                if not all(found_odds.values()):
+                    continue
                 
                 scraped = ScrapedOdds(
                     bookmaker_name="br4bet",
-                    home_team_raw=home_name,
-                    away_team_raw=away_name,
+                    home_team_raw=home_team,
+                    away_team_raw=away_team,
                     league_raw=league.name,
                     match_date=match_date,
-                    home_odd=home_odd,
-                    draw_odd=draw_odd,
-                    away_odd=away_odd,
+                    home_odd=found_odds["home"],
+                    draw_odd=found_odds["draw"],
+                    away_odd=found_odds["away"],
                     market_type="1x2",
                     extra_data={
-                        "br4bet_event_id": str(market.get("id")),  # Usando market_id como event_id por enquanto
+                        "br4bet_event_id": str(event_id),
                         "br4bet_country": league.country.lower()
                     }
                 )
-                odds_list.append(scraped)
+                results.append(scraped)
+                
+            except Exception as e:
+                self.logger.debug(f"⚠️ Br4bet: Error parsing market: {e}")
+                continue
         
-        self.logger.info(f"✅ Br4bet {league.name}: {len(odds_list)} odds processadas")
-        return odds_list
+        self.logger.info(f"✅ Br4bet {league.name}: {len(results)} odds processed")
+        return results
