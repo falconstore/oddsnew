@@ -619,6 +619,17 @@ function generateBookmakerLink(
     }
   }
   
+  // Aposta1 (same Altenar pattern as Br4bet/Mcgames)
+  if (name.includes('aposta1')) {
+    const eventId = extraData.event_id;
+    const country = extraData.country || 'italia';
+    if (eventId && homeTeam && awayTeam) {
+      const homeSlug = homeTeam.toLowerCase().replace(/\s+/g, '-').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const awaySlug = awayTeam.toLowerCase().replace(/\s+/g, '-').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      return `https://www.aposta1.bet.br/sports/futebol/${country}/${homeSlug}-vs-${awaySlug}/e-${eventId}`;
+    }
+  }
+  
   return null;
 }
 
