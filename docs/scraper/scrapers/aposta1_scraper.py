@@ -75,27 +75,37 @@ class Aposta1Scraper(BaseScraper):
                 target_url = "https://www.aposta1.bet.br/sports/futebol/italia/serie-a/c-2942"
                 self.logger.info(f"Navegando para {target_url}...")
                 
-                await page.goto(target_url, wait_until="domcontentloaded", timeout=60000)
+                await page.goto(target_url, wait_until="networkidle", timeout=90000)
                 
                 try:
-                    self.auth_token = await asyncio.wait_for(token_future, timeout=15.0)
+                    self.auth_token = await asyncio.wait_for(token_future, timeout=20.0)
                 except asyncio.TimeoutError:
-                    self.logger.warning("Token demorou. Scrollando...")
-                    await page.evaluate("window.scrollTo(0, 500)")
-                    self.auth_token = await asyncio.wait_for(token_future, timeout=15.0)
+                    self.logger.warning("Token demorou. Scrollando e esperando...")
+                    await page.evaluate("window.scrollTo(0, 300)")
+                    await asyncio.sleep(2)
+                    
+                    try:
+                        self.auth_token = await asyncio.wait_for(token_future, timeout=15.0)
+                    except asyncio.TimeoutError:
+                        self.logger.warning("Segundo scroll...")
+                        await page.evaluate("window.scrollTo(0, 800)")
+                        await asyncio.sleep(2)
+                        self.auth_token = await asyncio.wait_for(token_future, timeout=15.0)
                 
                 self.user_agent = await page.evaluate("navigator.userAgent")
                 
             except asyncio.TimeoutError:
-                self.logger.error("❌ Aposta1: Timeout capturando token")
+                self.logger.error("❌ Aposta1: Timeout capturando token após múltiplas tentativas")
             except Exception as e:
                 self.logger.error(f"❌ Aposta1 Playwright: {e}")
             finally:
                 await browser.close()
         
-        # Initialize curl_cffi session after getting token
-        self.session = AsyncSession(impersonate="chrome")
-        self.logger.info("✅ Aposta1: Session initialized")
+        if self.auth_token:
+            self.session = AsyncSession(impersonate="chrome")
+            self.logger.info("✅ Aposta1: Session initialized")
+        else:
+            self.logger.error("❌ Aposta1: Falha ao capturar token - session não inicializada")
     
     async def teardown(self) -> None:
         """Close the session."""
