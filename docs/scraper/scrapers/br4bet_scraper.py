@@ -1,19 +1,18 @@
 """
 Br4bet Scraper - Scrapes odds from Br4bet via Altenar API.
 
-Uses Playwright to navigate to real pages and execute fetch() from within
-the browser's JavaScript context. This allows API calls to inherit all
-cookies, headers, and fingerprints that the real frontend uses.
+Uses Playwright to navigate to league pages and passively capture API responses.
+When the page loads, the frontend makes calls to the Altenar API - we intercept
+those responses via page.on("response") to avoid CORS issues.
 
 API endpoint: https://sb2frontend-altenar2.biahosted.com/api/widget/GetEvents
 """
 
 import asyncio
-import os
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 
-from playwright.async_api import async_playwright, Playwright, Browser, BrowserContext, Page
+from playwright.async_api import async_playwright, Playwright, Browser, BrowserContext, Page, Response
 
 from base_scraper import BaseScraper, ScrapedOdds, LeagueConfig
 
@@ -22,9 +21,9 @@ class Br4betScraper(BaseScraper):
     """
     Scraper for Br4bet (uses Altenar backend).
     
-    Strategy: Navigate to league pages to establish session, then use
-    page.evaluate(fetch) to call the API from within the browser context.
-    This ensures all cookies/tokens are properly included.
+    Strategy: Navigate to league pages and passively capture the API responses
+    that the frontend automatically makes. This avoids CORS issues since
+    we're intercepting the site's own valid cross-origin requests.
     """
     
     LEAGUES = {
@@ -47,9 +46,6 @@ class Br4betScraper(BaseScraper):
             "slug": "espanha/laliga",
         },
     }
-    
-    API_BASE_URL = "https://sb2frontend-altenar2.biahosted.com/api/widget/GetEvents"
-    API_PARAMS = "culture=pt-BR&timezoneOffset=180&integration=br4bet&deviceType=1&numFormat=en-GB&countryCode=BR&eventCount=0&sportId=0"
     
     USER_AGENT = (
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -163,74 +159,78 @@ class Br4betScraper(BaseScraper):
             for cfg in self.LEAGUES.values()
         ]
     
-    async def _fetch_from_browser(self, api_url: str, league_name: str) -> Optional[Dict[str, Any]]:
+    def _get_league_slug(self, champ_id: str) -> str:
+        """Get URL slug for a league by its champ_id."""
+        for cfg in self.LEAGUES.values():
+            if cfg["champ_id"] == champ_id:
+                return cfg["slug"]
+        return ""
+    
+    async def _capture_api_response(self, league: LeagueConfig) -> Optional[Dict[str, Any]]:
         """
-        Execute fetch() from within the browser's JavaScript context.
-        This inherits all cookies, headers, and session tokens automatically.
+        Navigate to league page and passively capture the API response
+        that the frontend automatically makes.
         """
-        try:
-            result = await self._page.evaluate(f"""
-                async () => {{
-                    try {{
-                        const resp = await fetch("{api_url}", {{
-                            method: 'GET',
-                            credentials: 'include'
-                        }});
-                        if (resp.ok) {{
-                            return await resp.json();
-                        }}
-                        return {{ error: resp.status, message: await resp.text() }};
-                    }} catch (e) {{
-                        return {{ error: 'exception', message: e.toString() }};
-                    }}
-                }}
-            """)
+        captured_data: Dict[str, Any] = {}
+        target_champ_id = league.league_id
+        
+        async def on_response(response: Response):
+            nonlocal captured_data
+            url = response.url
             
-            if result and 'error' not in result:
-                self.logger.info(f"Browser fetch success for {league_name}")
-                return result
-            else:
-                self.logger.warning(f"Browser fetch failed for {league_name}: {result}")
-                return None
+            # Check if this is the GetEvents API call for our league
+            if "GetEvents" in url and f"champIds={target_champ_id}" in url:
+                if response.status == 200:
+                    try:
+                        data = await response.json()
+                        captured_data = data
+                        self.logger.info(f"Captured API response for {league.name}")
+                    except Exception as e:
+                        self.logger.warning(f"Failed to parse captured response: {e}")
+        
+        # Register listener
+        self._page.on("response", on_response)
+        
+        try:
+            # Navigate to league page - this triggers the API call
+            league_slug = self._get_league_slug(league.league_id)
+            league_url = f"{self.base_url}/sports/futebol/{league_slug}"
+            self.logger.debug(f"Navigating to: {league_url}")
+            
+            await self._page.goto(league_url, wait_until="networkidle", timeout=60000)
+            
+            # Wait for any lazy-loaded requests
+            await self._page.wait_for_timeout(3000)
+            
+            # If not captured yet, try scrolling to trigger more requests
+            if not captured_data:
+                self.logger.debug(f"No data captured yet for {league.name}, scrolling...")
+                await self._page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                await self._page.wait_for_timeout(2000)
+                
         except Exception as e:
-            self.logger.error(f"Browser fetch exception for {league_name}: {e}")
-            return None
+            self.logger.warning(f"Navigation error for {league.name}: {e}")
+        finally:
+            # Remove listener
+            self._page.remove_listener("response", on_response)
+        
+        return captured_data if captured_data else None
     
     async def scrape_league(self, league: LeagueConfig) -> List[ScrapedOdds]:
-        """Scrape odds by navigating to league page and fetching API from browser context."""
+        """Scrape odds by navigating to league page and capturing API response."""
         if not self._page:
             raise RuntimeError("Page not initialized. Call setup() first.")
         
-        # Find the slug for this league
-        league_slug = None
-        for cfg in self.LEAGUES.values():
-            if cfg["champ_id"] == league.league_id:
-                league_slug = cfg["slug"]
-                break
-        
-        if not league_slug:
-            self.logger.error(f"Unknown league ID: {league.league_id}")
-            return []
-        
-        # Navigate to the league page to establish proper session/context
-        league_url = f"{self.base_url}/sports/futebol/{league_slug}"
-        self.logger.debug(f"Navigating to: {league_url}")
-        
-        try:
-            await self._page.goto(league_url, wait_until="networkidle", timeout=60000)
-            await self._page.wait_for_timeout(3000)
-        except Exception as e:
-            self.logger.warning(f"Navigation issue for {league.name}: {e}")
-        
-        # Build API URL and fetch from within browser context
-        api_url = f"{self.API_BASE_URL}?{self.API_PARAMS}&champIds={league.league_id}"
-        
-        data = await self._fetch_from_browser(api_url, league.name)
+        # Capture API response passively
+        data = await self._capture_api_response(league)
         
         if data:
-            return self._parse_response(data, league)
+            result = self._parse_response(data, league)
+            # Small delay between leagues to avoid rate limiting
+            await asyncio.sleep(2)
+            return result
         
-        self.logger.error(f"Failed to get data for {league.name}")
+        self.logger.error(f"Failed to capture API data for {league.name}")
         return []
     
     def _parse_response(self, data: Dict[str, Any], league: LeagueConfig) -> List[ScrapedOdds]:
@@ -355,5 +355,5 @@ class Br4betScraper(BaseScraper):
             odds_list.append(scraped)
             self.logger.debug(f"Scraped: {home_team} vs {away_team}")
         
-        self.logger.info(f"Scraped {len(odds_list)} matches from {league.name}")
+        self.logger.info(f"{league.name}: {len(odds_list)} matches parsed")
         return odds_list
