@@ -152,6 +152,9 @@ class EsportivabetScraper(BaseScraper):
         if self.session:
             await self.session.close()
             self.session = None
+        # Reset flag para permitir novo setup no próximo ciclo
+        self._setup_attempted = False
+        self.auth_token = None
 
     async def get_available_leagues(self) -> List[LeagueConfig]:
         leagues = []
