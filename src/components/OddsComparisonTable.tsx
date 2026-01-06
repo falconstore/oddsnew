@@ -619,14 +619,15 @@ function generateBookmakerLink(
     }
   }
   
-  // Aposta1 (same Altenar pattern as Br4bet/Mcgames)
+  // Aposta1
   if (name.includes('aposta1')) {
-    const eventId = extraData.event_id;
-    const country = extraData.country || 'italia';
-    if (eventId && homeTeam && awayTeam) {
-      const homeSlug = homeTeam.toLowerCase().replace(/\s+/g, '-').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-      const awaySlug = awayTeam.toLowerCase().replace(/\s+/g, '-').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-      return `https://www.aposta1.bet.br/sports/futebol/${country}/${homeSlug}-vs-${awaySlug}/e-${eventId}`;
+    const eventId = extraData.aposta1_event_id;
+    const champId = extraData.aposta1_champ_id;
+    const categoryId = extraData.aposta1_category_id;
+    
+    if (eventId && champId && categoryId) {
+      // Formato: /esportes#/sport/66/category/{categoryId}/championship/{champId}/event/{eventId}
+      return `https://www.aposta1.bet.br/esportes#/sport/66/category/${categoryId}/championship/${champId}/event/${eventId}`;
     }
   }
   
