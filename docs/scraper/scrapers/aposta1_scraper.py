@@ -13,6 +13,7 @@ from base_scraper import BaseScraper, ScrapedOdds, LeagueConfig
 @dataclass
 class Aposta1League:
     champ_id: str
+    category_id: str
     name: str
     country: str
 
@@ -20,11 +21,11 @@ class Aposta1Scraper(BaseScraper):
     
     # IDs atualizados com base no JSON (ex: Premier League é champId 2936)
     LEAGUES = {
-        "serie_a": Aposta1League(champ_id="2942", name="Serie A", country="italia"),
-        "premier_league": Aposta1League(champ_id="2936", name="Premier League", country="inglaterra"),
-        "la_liga": Aposta1League(champ_id="2941", name="La Liga", country="espanha"),
-        "bundesliga": Aposta1League(champ_id="2943", name="Bundesliga", country="alemanha"),
-        "ligue_1": Aposta1League(champ_id="2944", name="Ligue 1", country="franca"),
+        "serie_a": Aposta1League(champ_id="2942", category_id="502", name="Serie A", country="italia"),
+        "premier_league": Aposta1League(champ_id="2936", category_id="497", name="Premier League", country="inglaterra"),
+        "la_liga": Aposta1League(champ_id="2941", category_id="501", name="La Liga", country="espanha"),
+        "bundesliga": Aposta1League(champ_id="2943", category_id="503", name="Bundesliga", country="alemanha"),
+        "ligue_1": Aposta1League(champ_id="2944", category_id="504", name="Ligue 1", country="franca"),
     }
     
     API_URL = "https://sb2frontend-altenar2.biahosted.com/api/widget/GetEvents"
@@ -153,6 +154,20 @@ class Aposta1Scraper(BaseScraper):
                 return val.country
         return ""
     
+    def _get_champ_id_for_league(self, league_name: str) -> str:
+        """Get championship ID for deep links."""
+        for val in self.LEAGUES.values():
+            if val.name == league_name:
+                return val.champ_id
+        return ""
+    
+    def _get_category_id_for_league(self, league_name: str) -> str:
+        """Get category ID for deep links."""
+        for val in self.LEAGUES.values():
+            if val.name == league_name:
+                return val.category_id
+        return ""
+    
     def _parse_response(self, data: Dict[str, Any], league: LeagueConfig) -> List[ScrapedOdds]:
         results = []
         
@@ -230,7 +245,8 @@ class Aposta1Scraper(BaseScraper):
                     market_type="1x2",
                     extra_data={
                         "aposta1_event_id": str(event_id),
-                        "aposta1_country": self._get_country_for_league(league.name)
+                        "aposta1_champ_id": self._get_champ_id_for_league(league.name),
+                        "aposta1_category_id": self._get_category_id_for_league(league.name)
                     }
                 )
                 results.append(scraped)
