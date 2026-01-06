@@ -40,6 +40,13 @@ class EsportivabetScraper(BaseScraper):
     async def setup(self) -> None:
         import os
         
+        # Se já temos token e user_agent, apenas reinicia a session se necessário
+        if self.auth_token and self.user_agent:
+            if not self.session:
+                self.logger.info("🔄 Esportivabet: Reusando token existente, reinicializando session")
+                self._init_session()
+            return
+        
         # Check for manual token override via env var
         manual_token = os.environ.get("ESPORTIVABET_AUTH_TOKEN")
         if manual_token:
@@ -47,7 +54,6 @@ class EsportivabetScraper(BaseScraper):
             self.auth_token = manual_token
             self.user_agent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
             self._init_session()
-            self._setup_attempted = True
             return
         
         if self._setup_attempted:
@@ -55,7 +61,7 @@ class EsportivabetScraper(BaseScraper):
             return
         
         self._setup_attempted = True
-        self.logger.info("🔑 Esportivabet: Iniciando captura de token...")
+        self.logger.info("🔑 Esportivabet: Iniciando captura de token via Playwright...")
         
         async with async_playwright() as p:
             browser = await p.chromium.launch(
@@ -152,9 +158,8 @@ class EsportivabetScraper(BaseScraper):
         if self.session:
             await self.session.close()
             self.session = None
-        # Reset flag para permitir novo setup no próximo ciclo
+        # Reset apenas o flag, mantém token para reutilização
         self._setup_attempted = False
-        self.auth_token = None
 
     async def get_available_leagues(self) -> List[LeagueConfig]:
         leagues = []
@@ -164,6 +169,9 @@ class EsportivabetScraper(BaseScraper):
         return leagues
 
     async def scrape_league(self, league: LeagueConfig) -> List[ScrapedOdds]:
+        return await self._scrape_league_impl(league, retry_on_auth_fail=True)
+    
+    async def _scrape_league_impl(self, league: LeagueConfig, retry_on_auth_fail: bool = True) -> List[ScrapedOdds]:
         if not self.auth_token:
             await self.setup()
         
@@ -213,7 +221,19 @@ class EsportivabetScraper(BaseScraper):
                 
                 if response.status_code in [401, 403]:
                     self.logger.warning(f"⚠️ Esportivabet: Token expirado (HTTP {response.status_code})")
-                    self.auth_token = None
+                    
+                    # Auto-retry: limpa token, recaptura e tenta novamente (1x)
+                    if retry_on_auth_fail:
+                        self.logger.info("🔄 Esportivabet: Tentando recapturar token...")
+                        self.auth_token = None
+                        self.user_agent = None
+                        if self.session:
+                            await self.session.close()
+                            self.session = None
+                        self._setup_attempted = False
+                        await self.setup()
+                        return await self._scrape_league_impl(league, retry_on_auth_fail=False)
+                    
                     return []
                 
                 self.logger.warning(f"⚠️ Esportivabet {league.name}: HTTP {response.status_code} em {endpoint.split('/')[-1]}")
