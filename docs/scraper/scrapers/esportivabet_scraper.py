@@ -17,14 +17,15 @@ class EsportivabetLeague:
     category_id: str
     name: str
     country: str
+    league_slug: str
 
 
 class EsportivabetScraper(BaseScraper):
     
     LEAGUES = {
-        "serie_a": EsportivabetLeague(champ_id="2942", category_id="502", name="Serie A", country="italia"),
-        "premier_league": EsportivabetLeague(champ_id="2936", category_id="497", name="Premier League", country="inglaterra"),
-        "la_liga": EsportivabetLeague(champ_id="2941", category_id="501", name="La Liga", country="espanha"),
+        "serie_a": EsportivabetLeague(champ_id="2942", category_id="502", name="Serie A", country="italia", league_slug="serie-a"),
+        "premier_league": EsportivabetLeague(champ_id="2936", category_id="497", name="Premier League", country="inglaterra", league_slug="premier-league"),
+        "la_liga": EsportivabetLeague(champ_id="2941", category_id="501", name="La Liga", country="espanha", league_slug="laliga"),
     }
     
     API_BASE = "https://sb2frontend-altenar2.biahosted.com/api/widget"
@@ -245,17 +246,17 @@ class EsportivabetScraper(BaseScraper):
         self.logger.warning(f"⚠️ Esportivabet {league.name}: Nenhum evento encontrado em ambos endpoints")
         return []
     
-    def _get_champ_id_for_league(self, league_name: str) -> str:
+    def _get_country_for_league(self, league_name: str) -> str:
         for val in self.LEAGUES.values():
             if val.name == league_name:
-                return val.champ_id
-        return ""
+                return val.country
+        return "italia"
     
-    def _get_category_id_for_league(self, league_name: str) -> str:
+    def _get_league_slug_for_league(self, league_name: str) -> str:
         for val in self.LEAGUES.values():
             if val.name == league_name:
-                return val.category_id
-        return ""
+                return val.league_slug
+        return "serie-a"
     
     def _parse_response(self, data: Dict[str, Any], league: LeagueConfig) -> List[ScrapedOdds]:
         results = []
@@ -331,8 +332,8 @@ class EsportivabetScraper(BaseScraper):
                     market_type="1x2",
                     extra_data={
                         "esportivabet_event_id": str(event_id),
-                        "esportivabet_champ_id": self._get_champ_id_for_league(league.name),
-                        "esportivabet_category_id": self._get_category_id_for_league(league.name)
+                        "country": self._get_country_for_league(league.name),
+                        "league_slug": self._get_league_slug_for_league(league.name)
                     }
                 )
                 results.append(scraped)

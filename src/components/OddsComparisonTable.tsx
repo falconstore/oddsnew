@@ -631,15 +631,26 @@ function generateBookmakerLink(
     }
   }
   
-  // Esportivabet
+  // Esportivabet (slug-based, igual Mcgames)
   if (name.includes('esportivabet')) {
     const eventId = extraData.esportivabet_event_id;
-    const champId = extraData.esportivabet_champ_id;
-    const categoryId = extraData.esportivabet_category_id;
+    const country = extraData.country || 'italia';
+    const leagueSlug = extraData.league_slug || 'serie-a';
     
-    if (eventId && champId && categoryId) {
-      // Formato: /esportes#/sport/66/category/{categoryId}/championship/{champId}/event/{eventId}
-      return `https://esportiva.bet.br/esportes#/sport/66/category/${categoryId}/championship/${champId}/event/${eventId}`;
+    if (eventId && homeTeam && awayTeam) {
+      const homeSlug = homeTeam
+        .toLowerCase()
+        .replace(/\s+/g, '-')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+      
+      const awaySlug = awayTeam
+        .toLowerCase()
+        .replace(/\s+/g, '-')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+      
+      return `https://esportiva.bet.br/sports/futebol/${country}/${leagueSlug}/${homeSlug}-vs-${awaySlug}/ev-${eventId}`;
     }
   }
   
