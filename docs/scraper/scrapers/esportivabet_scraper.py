@@ -35,8 +35,26 @@ class EsportivabetScraper(BaseScraper):
         self.auth_token: Optional[str] = None
         self.user_agent: Optional[str] = None
         self.logger = logger.bind(component="esportivabet")
+        self._setup_attempted = False
     
     async def setup(self) -> None:
+        import os
+        
+        # Check for manual token override via env var
+        manual_token = os.environ.get("ESPORTIVABET_AUTH_TOKEN")
+        if manual_token:
+            self.logger.info("🔑 Esportivabet: Usando token manual da env var")
+            self.auth_token = manual_token
+            self.user_agent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+            self._init_session()
+            self._setup_attempted = True
+            return
+        
+        if self._setup_attempted:
+            self.logger.warning("⚠️ Esportivabet: Setup já tentado nesta execução, pulando...")
+            return
+        
+        self._setup_attempted = True
         self.logger.info("🔑 Esportivabet: Iniciando captura de token...")
         
         async with async_playwright() as p:
@@ -53,43 +71,82 @@ class EsportivabetScraper(BaseScraper):
             
             async def handle_request(request):
                 if "biahosted.com/api" in request.url:
+                    self.logger.debug(f"📡 Request detectada: {request.url[:80]}...")
                     headers = request.headers
                     if "authorization" in headers:
                         token = headers["authorization"]
                         if token and len(token) > 20 and not token_future.done():
+                            self.logger.info("✅ Token encontrado na request!")
                             token_future.set_result(token)
             
             page.on("request", handle_request)
             
+            # URLs para tentar (paths reais em vez de hash routes)
+            target_urls = [
+                "https://esportiva.bet.br/sports/futebol/italia/serie-a",
+                "https://esportiva.bet.br/sports/futebol",
+                "https://esportiva.bet.br/sports",
+            ]
+            
             try:
-                # URL que força a SPA a carregar e disparar requests para a API
-                target_url = "https://esportiva.bet.br/esportes#/sport/66/category/502/championship/2942"
-                self.logger.info(f"🌍 Esportivabet: Navegando para {target_url}...")
-                await page.goto(target_url, wait_until="domcontentloaded", timeout=30000)
+                for target_url in target_urls:
+                    if token_future.done():
+                        break
+                    
+                    self.logger.info(f"🌍 Esportivabet: Navegando para {target_url}...")
+                    
+                    try:
+                        await page.goto(target_url, wait_until="domcontentloaded", timeout=60000)
+                    except Exception as nav_error:
+                        self.logger.warning(f"⚠️ Navegação falhou: {nav_error}")
+                        continue
+                    
+                    # Aguarda um pouco para requests carregarem
+                    await page.wait_for_timeout(3000)
+                    
+                    if not token_future.done():
+                        # Tenta scroll para forçar lazy-load
+                        self.logger.debug("📜 Fazendo scroll para forçar requests...")
+                        await page.evaluate("window.scrollTo(0, 500)")
+                        await page.wait_for_timeout(2000)
+                        await page.evaluate("window.scrollTo(0, 1000)")
+                        await page.wait_for_timeout(2000)
                 
-                # Aguarda token
-                self.auth_token = await asyncio.wait_for(token_future, timeout=25.0)
+                # Aguarda token com timeout total
+                if not token_future.done():
+                    self.auth_token = await asyncio.wait_for(token_future, timeout=10.0)
+                else:
+                    self.auth_token = token_future.result()
+                
                 self.user_agent = await page.evaluate("navigator.userAgent")
-                
                 self.logger.info(f"✅ Esportivabet: Token capturado! UA: {self.user_agent[:30]}...")
                 
             except asyncio.TimeoutError:
-                self.logger.error("❌ Esportivabet: Timeout capturando token.")
+                self.logger.error("❌ Esportivabet: Timeout capturando token após todas as tentativas.")
             except Exception as e:
                 self.logger.error(f"❌ Esportivabet: Erro no Playwright: {e}")
             finally:
                 await browser.close()
         
         if self.auth_token and self.user_agent:
-            self.session = AsyncSession(impersonate="chrome120")
-            self.session.headers = {
-                "Accept": "*/*",
-                "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
-                "Authorization": self.auth_token,
-                "Origin": "https://esportiva.bet.br",
-                "Referer": "https://esportiva.bet.br/",
-                "User-Agent": self.user_agent
-            }
+            self._init_session()
+    
+    def _init_session(self):
+        self.session = AsyncSession(impersonate="chrome120")
+        self.session.headers = {
+            "accept": "*/*",
+            "accept-language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+            "authorization": self.auth_token,
+            "origin": "https://esportiva.bet.br",
+            "referer": "https://esportiva.bet.br/",
+            "user-agent": self.user_agent,
+            "sec-ch-ua": '"Chromium";v="142", "Google Chrome";v="142", "Not_A Brand";v="99"',
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": '"macOS"',
+            "sec-fetch-dest": "empty",
+            "sec-fetch-mode": "cors",
+            "sec-fetch-site": "cross-site",
+        }
 
     async def teardown(self) -> None:
         if self.session:
