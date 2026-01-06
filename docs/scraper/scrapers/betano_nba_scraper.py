@@ -12,7 +12,7 @@ from datetime import datetime
 from typing import List, Dict, Any, Optional
 from playwright.async_api import async_playwright
 
-from ..base_scraper import BaseScraper, ScrapedOdds, LeagueConfig
+from base_scraper import BaseScraper, ScrapedOdds, LeagueConfig
 
 
 class BetanoNBAScraper(BaseScraper):
