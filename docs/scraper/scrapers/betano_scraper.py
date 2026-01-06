@@ -313,61 +313,63 @@ class BetanoScraper(BaseScraper):
             # Convert timestamp from milliseconds to datetime
             match_date = datetime.utcfromtimestamp(start_time_ms / 1000)
             
-            # Find MRES market (Resultado Final 1X2)
-            mres_market = None
+            # Process both SO (MR12) and PA (MRES) markets
             for market in markets:
-                if market.get("type") == "MRES":
-                    mres_market = market
-                    break
-            
-            if not mres_market:
-                self.logger.debug(f"No MRES market for: {match_name}")
-                continue
-            
-            # Extract odds from selections
-            selections = mres_market.get("selections", [])
-            home_odd = None
-            draw_odd = None
-            away_odd = None
-            
-            for selection in selections:
-                name = selection.get("name", "")
-                price = selection.get("price")
+                market_type = market.get("type", "")
                 
-                if name == "1":
-                    home_odd = price
-                elif name == "X":
-                    draw_odd = price
-                elif name == "2":
-                    away_odd = price
-            
-            # Validate all odds are present
-            if home_odd is None or draw_odd is None or away_odd is None:
-                self.logger.warning(f"Incomplete odds for: {match_name}")
-                continue
-            
-            # Create ScrapedOdds object
-            scraped = ScrapedOdds(
-                bookmaker_name="betano",
-                home_team_raw=home_team,
-                away_team_raw=away_team,
-                league_raw=league_name,
-                match_date=match_date,
-                home_odd=float(home_odd),
-                draw_odd=float(draw_odd),
-                away_odd=float(away_odd),
-                market_type="1x2",
-                extra_data={
-                    "betano_event_id": event.get("id"),
-                    "betano_market_id": mres_market.get("id"),
-                }
-            )
-            
-            odds_list.append(scraped)
-            self.logger.debug(
-                f"Parsed: {home_team} vs {away_team} | "
-                f"{home_odd:.2f} / {draw_odd:.2f} / {away_odd:.2f}"
-            )
+                # Identify odds_type based on market type
+                if market_type == "MR12":
+                    odds_type = "SO"  # Super Odds
+                elif market_type == "MRES":
+                    odds_type = "PA"  # Pagamento Antecipado
+                else:
+                    continue  # Skip other markets
+                
+                # Extract odds from selections
+                selections = market.get("selections", [])
+                home_odd = None
+                draw_odd = None
+                away_odd = None
+                
+                for selection in selections:
+                    name = selection.get("name", "")
+                    price = selection.get("price")
+                    
+                    if name == "1":
+                        home_odd = price
+                    elif name == "X":
+                        draw_odd = price
+                    elif name == "2":
+                        away_odd = price
+                
+                # Validate all odds are present
+                if home_odd is None or draw_odd is None or away_odd is None:
+                    self.logger.warning(f"Incomplete {odds_type} odds for: {match_name}")
+                    continue
+                
+                # Create ScrapedOdds object with odds_type
+                scraped = ScrapedOdds(
+                    bookmaker_name="betano",
+                    home_team_raw=home_team,
+                    away_team_raw=away_team,
+                    league_raw=league_name,
+                    match_date=match_date,
+                    home_odd=float(home_odd),
+                    draw_odd=float(draw_odd),
+                    away_odd=float(away_odd),
+                    market_type="1x2",
+                    odds_type=odds_type,
+                    extra_data={
+                        "betano_event_id": event.get("id"),
+                        "betano_market_id": market.get("id"),
+                    }
+                )
+                
+                odds_list.append(scraped)
+                self.logger.debug(
+                    f"Parsed [{odds_type}]: {home_team} vs {away_team} | "
+                    f"{home_odd:.2f} / {draw_odd:.2f} / {away_odd:.2f}"
+                )
         
         self.logger.info(f"{league_name}: {len(odds_list)} matches parsed")
         return odds_list
