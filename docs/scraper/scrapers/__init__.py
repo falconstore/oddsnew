@@ -3,6 +3,7 @@ Scrapers Package - All bookmaker-specific scrapers.
 """
 
 from .betano_scraper import BetanoScraper
+from .betano_nba_scraper import BetanoNBAScraper
 from .superbet_scraper import SuperbetScraper
 from .superbet_nba_scraper import SuperbetNBAScraper
 from .betbra_nba_scraper import BetbraNBAScraper
@@ -16,4 +17,4 @@ from .mcgames_scraper import McgamesScraper
 from .aposta1_scraper import Aposta1Scraper
 from .esportivabet_scraper import EsportivabetScraper
 
-__all__ = ["BetanoScraper", "SuperbetScraper", "SuperbetNBAScraper", "BetbraNBAScraper", "KtoScraper", "SportingbetScraper", "NovibetScraper", "BetnacionalScraper", "StakeScraper", "McgamesScraper", "Aposta1Scraper", "EsportivabetScraper"]
+__all__ = ["BetanoScraper", "BetanoNBAScraper", "SuperbetScraper", "SuperbetNBAScraper", "BetbraNBAScraper", "KtoScraper", "SportingbetScraper", "NovibetScraper", "BetnacionalScraper", "StakeScraper", "McgamesScraper", "Aposta1Scraper", "EsportivabetScraper"]
