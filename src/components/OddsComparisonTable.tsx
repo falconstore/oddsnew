@@ -631,6 +631,18 @@ function generateBookmakerLink(
     }
   }
   
+  // Esportivabet
+  if (name.includes('esportivabet')) {
+    const eventId = extraData.esportivabet_event_id;
+    const champId = extraData.esportivabet_champ_id;
+    const categoryId = extraData.esportivabet_category_id;
+    
+    if (eventId && champId && categoryId) {
+      // Formato: /esportes#/sport/66/category/{categoryId}/championship/{champId}/event/{eventId}
+      return `https://esportiva.bet.br/esportes#/sport/66/category/${categoryId}/championship/${champId}/event/${eventId}`;
+    }
+  }
+  
   return null;
 }
 

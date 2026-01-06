@@ -27,6 +27,7 @@ const BOOKMAKER_LEAGUES: Record<string, string[]> = {
   'stake': ['Premier League', 'Serie A', 'La Liga'],
   'mcgames': ['Premier League', 'Serie A', 'La Liga'],
   'aposta1': ['Premier League', 'Serie A', 'La Liga'],
+  'esportivabet': ['Premier League', 'Serie A', 'La Liga'],
 };
 
 const Bookmakers = () => {
