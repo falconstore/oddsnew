@@ -7,7 +7,6 @@ API Structure:
 - SO (Super Odds): sixPackBlocks[0].columns[] where type == "H2H1"
 """
 
-import aiohttp
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 from playwright.async_api import async_playwright
@@ -18,7 +17,7 @@ from base_scraper import BaseScraper, ScrapedOdds, LeagueConfig
 class BetanoNBAScraper(BaseScraper):
     """
     Scraper for Betano Brazil NBA odds.
-    Uses Playwright for session cookies and aiohttp for API requests.
+    Uses Playwright directly for API requests (aiohttp gets 403).
     """
     
     LEAGUES = {
@@ -39,11 +38,9 @@ class BetanoNBAScraper(BaseScraper):
         self._browser = None
         self._context = None
         self._page = None
-        self._session = None
-        self._cookies = {}
     
     async def setup(self):
-        """Initialize Playwright browser and capture session cookies."""
+        """Initialize Playwright browser."""
         self.logger.info("Starting Betano NBA scraper setup")
         
         self._playwright = await async_playwright().start()
@@ -55,30 +52,13 @@ class BetanoNBAScraper(BaseScraper):
         )
         self._page = await self._context.new_page()
         
-        # Navigate to Betano basketball page to capture cookies
+        # Navigate to Betano basketball page to establish session
         await self._page.goto(f"{self.base_url}/sport/basquete/", wait_until="networkidle", timeout=30000)
-        
-        # Capture cookies from browser context
-        cookies = await self._context.cookies()
-        self._cookies = {c["name"]: c["value"] for c in cookies}
-        
-        # Setup aiohttp session with captured cookies
-        cookie_header = "; ".join([f"{k}={v}" for k, v in self._cookies.items()])
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
-            "Accept": "application/json, text/plain, */*",
-            "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
-            "Referer": f"{self.base_url}/sport/basquete/",
-            "Cookie": cookie_header,
-        }
-        self._session = aiohttp.ClientSession(headers=headers)
         
         self.logger.info("Betano NBA scraper setup complete")
     
     async def teardown(self):
         """Cleanup resources."""
-        if self._session:
-            await self._session.close()
         if self._page:
             await self._page.close()
         if self._context:
@@ -102,27 +82,11 @@ class BetanoNBAScraper(BaseScraper):
         ]
     
     async def scrape_league(self, league: LeagueConfig) -> List[ScrapedOdds]:
-        """Scrape odds from a specific NBA league."""
+        """Scrape odds from a specific NBA league using Playwright."""
         api_url = f"{self.base_url}/api/sports/BASK/hot/trending/leagues/{league.league_id}/events/?req=s,stnf,c,mb"
         
         self.logger.info(f"Fetching NBA odds from: {api_url}")
         
-        try:
-            async with self._session.get(api_url) as response:
-                if response.status == 403:
-                    self.logger.warning("Got 403, falling back to Playwright")
-                    return await self._scrape_with_playwright(api_url, league.name)
-                
-                response.raise_for_status()
-                data = await response.json()
-                return self._parse_response(data, league.name)
-                
-        except Exception as e:
-            self.logger.error(f"Error fetching {league.name}: {e}")
-            return []
-    
-    async def _scrape_with_playwright(self, api_url: str, league_name: str) -> List[ScrapedOdds]:
-        """Fallback: use Playwright to fetch API data when session fails."""
         try:
             response = await self._page.evaluate(f"""
                 async () => {{
@@ -130,9 +94,9 @@ class BetanoNBAScraper(BaseScraper):
                     return await res.json();
                 }}
             """)
-            return self._parse_response(response, league_name)
+            return self._parse_response(response, league.name)
         except Exception as e:
-            self.logger.error(f"Playwright fallback failed: {e}")
+            self.logger.error(f"Error fetching {league.name}: {e}")
             return []
     
     def _parse_response(self, data: Dict[str, Any], league_name: str) -> List[ScrapedOdds]:
