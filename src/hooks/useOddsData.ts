@@ -410,7 +410,8 @@ function groupOddsByMatch(data: OddsComparison[]): MatchOddsGroup[] {
       margin_percentage: row.margin_percentage,
       data_age_seconds: row.data_age_seconds,
       scraped_at: row.scraped_at,
-      extra_data: row.extra_data
+      extra_data: row.extra_data,
+      odds_type: row.odds_type
     };
 
     group.odds.push(bookmakerOdds);
