@@ -183,20 +183,28 @@ class Aposta1Scraper(BaseScraper):
         Extrai odds 1x2 de um tipo especifico de mercado.
         
         Args:
-            is_super_odds: True para SO (sportMarketId=73990), False para PA (sportMarketId=70472)
+            is_super_odds: True para SO (sportMarketId=73990), False para PA (qualquer 1x2 que nao seja SO)
         """
-        target_sport_market_id = self.SO_SPORT_MARKET_ID if is_super_odds else self.PA_SPORT_MARKET_ID
-        
         for mid in market_ids:
             market = markets_map.get(mid)
             if not market:
                 continue
             
+            type_id = market.get("typeId")
             sport_market_id = market.get("sportMarketId")
             
-            # Usa sportMarketId como criterio principal
-            if sport_market_id != target_sport_market_id:
+            # Apenas mercados 1x2 (typeId == 1)
+            if type_id != 1:
                 continue
+            
+            if is_super_odds:
+                # SO: sportMarketId deve ser exatamente 73990
+                if sport_market_id != self.SO_SPORT_MARKET_ID:
+                    continue
+            else:
+                # PA: Qualquer mercado 1x2 que NAO seja Super Odds
+                if sport_market_id == self.SO_SPORT_MARKET_ID:
+                    continue
             
             # Extrair odds
             found_odds = {"home": None, "draw": None, "away": None}
