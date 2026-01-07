@@ -30,9 +30,9 @@ class Aposta1Scraper(BaseScraper):
     
     API_URL = "https://sb2frontend-altenar2.biahosted.com/api/widget/GetEvents"
     
-    # Identificacao de mercados SO vs PA
-    SO_MARKET_IDENTIFIER = "Odds Aumentadas"
-    PA_MARKET_NAME = "1x2"
+    # Identificacao de mercados SO vs PA por sportMarketId
+    SO_SPORT_MARKET_ID = 73990  # "1x2 Odds Aumentadas"
+    PA_SPORT_MARKET_ID = 70472  # "1x2" regular
     
     def __init__(self):
         super().__init__(name="aposta1", base_url="https://www.aposta1.bet.br")
@@ -183,31 +183,20 @@ class Aposta1Scraper(BaseScraper):
         Extrai odds 1x2 de um tipo especifico de mercado.
         
         Args:
-            is_super_odds: True para "Odds Aumentadas" (SO), False para "1x2" regular (PA)
+            is_super_odds: True para SO (sportMarketId=73990), False para PA (sportMarketId=70472)
         """
+        target_sport_market_id = self.SO_SPORT_MARKET_ID if is_super_odds else self.PA_SPORT_MARKET_ID
+        
         for mid in market_ids:
             market = markets_map.get(mid)
             if not market:
                 continue
             
-            market_name = market.get("name", "")
-            type_id = market.get("typeId")
+            sport_market_id = market.get("sportMarketId")
             
-            # So considera mercados 1x2 (typeId == 1)
-            if type_id != 1:
+            # Usa sportMarketId como criterio principal
+            if sport_market_id != target_sport_market_id:
                 continue
-            
-            # Filtra por tipo de mercado
-            if is_super_odds:
-                # SO: nome deve conter "Odds Aumentadas"
-                if self.SO_MARKET_IDENTIFIER not in market_name:
-                    continue
-            else:
-                # PA: nome deve ser exatamente "1x2" (sem "Odds Aumentadas")
-                if self.SO_MARKET_IDENTIFIER in market_name:
-                    continue
-                if market_name != self.PA_MARKET_NAME:
-                    continue
             
             # Extrair odds
             found_odds = {"home": None, "draw": None, "away": None}
