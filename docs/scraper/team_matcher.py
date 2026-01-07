@@ -3,11 +3,20 @@ Team Matcher - Fuzzy matching for team names across bookmakers.
 Uses RapidFuzz for fast string similarity matching.
 """
 
-from typing import Optional, Dict, List, Tuple
+import unicodedata
+from typing import Optional, Dict, List, Tuple, Set
 from rapidfuzz import fuzz, process
 from loguru import logger
 
 from supabase_client import SupabaseClient
+
+
+# Blocked matches - known incorrect fuzzy matches to prevent
+BLOCKED_MATCHES = {
+    "inter milan": "ac milan",
+    "internazionale": "ac milan",
+    "brest": "nottingham forest",
+}
 
 
 class TeamMatcher:
@@ -31,11 +40,32 @@ class TeamMatcher:
         self.aliases_cache: Dict[Tuple[str, str], str] = {}  # (alias, bookmaker) -> team_id
         self.reverse_cache: Dict[str, str] = {}  # standard_name.lower() -> team_id
         
+        # Log deduplication - tracks already-logged unmatched names this cycle
+        self._unmatched_logged: Set[str] = set()
+        
         # Configuration
         self.min_score = 85  # Minimum similarity score for fuzzy match
+        self.min_score_partial = 92  # Higher threshold for partial matches (avoid false positives)
         self.auto_create_alias = True  # Auto-create aliases for fuzzy matches
         self.auto_create_team = True  # Auto-create teams from primary bookmaker
         self.primary_bookmaker = "betano"  # Bookmaker that defines standard names
+    
+    def _normalize_name(self, name: str) -> str:
+        """
+        Normalize team name for matching.
+        - Removes tabs, extra spaces
+        - Normalizes accents (Bétis -> Betis)
+        """
+        # Remove tabs and extra whitespace
+        name = " ".join(name.split())
+        # Normalize unicode accents
+        name = unicodedata.normalize('NFD', name)
+        name = ''.join(c for c in name if unicodedata.category(c) != 'Mn')
+        return name.strip()
+    
+    def clear_log_cache(self):
+        """Clear the unmatched log cache. Call at the start of each cycle."""
+        self._unmatched_logged.clear()
     
     async def load_cache(self):
         """
@@ -51,12 +81,22 @@ class TeamMatcher:
             t["standard_name"].lower(): t["id"] for t in teams
         }
         
+        # Also add normalized versions to reverse cache
+        for t in teams:
+            normalized = self._normalize_name(t["standard_name"]).lower()
+            if normalized not in self.reverse_cache:
+                self.reverse_cache[normalized] = t["id"]
+        
         # Load aliases
         aliases = await self.supabase.fetch_team_aliases()
         self.aliases_cache = {}
         for alias in aliases:
             key = (alias["alias_name"].lower(), alias["bookmaker_source"].lower())
             self.aliases_cache[key] = alias["team_id"]
+            # Also add normalized version
+            normalized_key = (self._normalize_name(alias["alias_name"]).lower(), alias["bookmaker_source"].lower())
+            if normalized_key not in self.aliases_cache:
+                self.aliases_cache[normalized_key] = alias["team_id"]
         
         self.logger.info(
             f"Loaded {len(self.teams_cache)} teams and "
@@ -71,13 +111,14 @@ class TeamMatcher:
         if not raw_name:
             return None
         
-        normalized_name = raw_name.strip().lower()
+        normalized_name = self._normalize_name(raw_name).lower()
         normalized_bookmaker = bookmaker.strip().lower()
         
-        # Step 1: Exact match in aliases
-        alias_key = (normalized_name, normalized_bookmaker)
-        if alias_key in self.aliases_cache:
-            return self.aliases_cache[alias_key]
+        # Step 1: Exact match in aliases (try both raw and normalized)
+        for name_variant in [raw_name.strip().lower(), normalized_name]:
+            alias_key = (name_variant, normalized_bookmaker)
+            if alias_key in self.aliases_cache:
+                return self.aliases_cache[alias_key]
         
         # Step 2: Exact match in standard names
         if normalized_name in self.reverse_cache:
@@ -106,14 +147,15 @@ class TeamMatcher:
         if not raw_name:
             return None
         
-        normalized_name = raw_name.strip().lower()
+        normalized_name = self._normalize_name(raw_name).lower()
         normalized_bookmaker = bookmaker.strip().lower()
         
-        # Step 1: Exact match in aliases
-        alias_key = (normalized_name, normalized_bookmaker)
-        if alias_key in self.aliases_cache:
-            self.logger.debug(f"Exact alias match: {raw_name} -> {self.aliases_cache[alias_key]}")
-            return self.aliases_cache[alias_key]
+        # Step 1: Exact match in aliases (try both raw and normalized)
+        for name_variant in [raw_name.strip().lower(), normalized_name]:
+            alias_key = (name_variant, normalized_bookmaker)
+            if alias_key in self.aliases_cache:
+                self.logger.debug(f"Exact alias match: {raw_name} -> {self.aliases_cache[alias_key]}")
+                return self.aliases_cache[alias_key]
         
         # Step 2: Exact match in standard names
         if normalized_name in self.reverse_cache:
@@ -157,31 +199,34 @@ class TeamMatcher:
         Uses multiple scoring algorithms and takes the best match:
         - Token Sort Ratio: Good for word order differences
         - Token Set Ratio: Good for partial matches
-        - Partial Ratio: Good for substring matches
+        - Partial Ratio: Good for substring matches (higher threshold)
         """
         if not self.teams_cache:
             self.logger.warning("Teams cache is empty!")
             return None
         
+        # Normalize the input name
+        normalized_input = self._normalize_name(raw_name)
+        
         all_names = list(self.teams_cache.values())
         
-        # Try different matching strategies
+        # Try different matching strategies with variable thresholds
         strategies = [
-            (fuzz.token_sort_ratio, "token_sort"),
-            (fuzz.token_set_ratio, "token_set"),
-            (fuzz.partial_ratio, "partial"),
+            (fuzz.token_sort_ratio, "token_sort", self.min_score),
+            (fuzz.token_set_ratio, "token_set", self.min_score),
+            (fuzz.partial_ratio, "partial", self.min_score_partial),  # Higher threshold
         ]
         
         best_match = None
         best_score = 0
         best_strategy = None
         
-        for scorer, strategy_name in strategies:
+        for scorer, strategy_name, min_threshold in strategies:
             result = process.extractOne(
-                raw_name,
+                normalized_input,
                 all_names,
                 scorer=scorer,
-                score_cutoff=self.min_score
+                score_cutoff=min_threshold
             )
             
             if result and result[1] > best_score:
@@ -190,19 +235,49 @@ class TeamMatcher:
                 best_strategy = strategy_name
         
         if best_match:
+            # Check if this match is blocked
+            input_lower = normalized_input.lower()
+            match_lower = best_match.lower()
+            
+            if input_lower in BLOCKED_MATCHES:
+                blocked_target = BLOCKED_MATCHES[input_lower]
+                if blocked_target in match_lower or match_lower in blocked_target:
+                    # This is a known bad match, reject it
+                    self._log_unmatched(raw_name, f"blocked match to '{best_match}'")
+                    return None
+            
             team_id = next(
                 (tid for tid, name in self.teams_cache.items() 
                  if name == best_match),
                 None
             )
-            self.logger.info(
-                f"Fuzzy match ({best_strategy}): '{raw_name}' -> "
-                f"'{best_match}' (score: {best_score})"
-            )
+            
+            # Only log uncertain matches (score < 95) as INFO
+            if best_score < 95:
+                self.logger.info(
+                    f"Fuzzy match ({best_strategy}): '{raw_name}' -> "
+                    f"'{best_match}' (score: {best_score:.1f})"
+                )
+            else:
+                self.logger.debug(
+                    f"Fuzzy match: '{raw_name}' -> '{best_match}' ({best_score:.0f})"
+                )
+            
             return team_id
         
-        self.logger.warning(f"No match found for: '{raw_name}'")
+        self._log_unmatched(raw_name)
         return None
+    
+    def _log_unmatched(self, raw_name: str, reason: str = None):
+        """Log unmatched team name, but only once per cycle."""
+        normalized = self._normalize_name(raw_name).lower()
+        
+        if normalized not in self._unmatched_logged:
+            self._unmatched_logged.add(normalized)
+            if reason:
+                self.logger.warning(f"No match for '{raw_name}': {reason}")
+            else:
+                self.logger.warning(f"No match found for: '{raw_name}'")
     
     def _create_alias_async(self, team_id: str, alias_name: str, bookmaker: str):
         """
