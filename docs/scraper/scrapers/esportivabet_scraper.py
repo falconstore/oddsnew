@@ -220,8 +220,8 @@ class EsportivabetScraper(BaseScraper):
                         self.logger.debug(f"📡 Esportivabet {league.name}: Nenhum evento em {endpoint.split('/')[-1]}, tentando próximo...")
                         continue
                 
-                if response.status_code in [401, 403]:
-                    self.logger.warning(f"⚠️ Esportivabet: Token expirado (HTTP {response.status_code})")
+                if response.status_code in [400, 401, 403]:
+                    self.logger.warning(f"⚠️ Esportivabet: Token inválido ou expirado (HTTP {response.status_code})")
                     
                     # Auto-retry: limpa token, recaptura e tenta novamente (1x)
                     if retry_on_auth_fail:
