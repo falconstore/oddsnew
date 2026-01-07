@@ -30,6 +30,10 @@ class Aposta1Scraper(BaseScraper):
     
     API_URL = "https://sb2frontend-altenar2.biahosted.com/api/widget/GetEvents"
     
+    # Identificacao de mercados SO vs PA
+    SO_MARKET_IDENTIFIER = "Odds Aumentadas"
+    PA_MARKET_NAME = "1x2"
+    
     def __init__(self):
         super().__init__(name="aposta1", base_url="https://www.aposta1.bet.br")
         self.session: Optional[AsyncSession] = None
@@ -38,7 +42,7 @@ class Aposta1Scraper(BaseScraper):
         self.logger = logger.bind(component="aposta1")
     
     async def setup(self) -> None:
-        self.logger.info("🔑 Aposta1: Iniciando captura de token...")
+        self.logger.info("Iniciando captura de token")
         
         async with async_playwright() as p:
             browser = await p.chromium.launch(
@@ -64,19 +68,19 @@ class Aposta1Scraper(BaseScraper):
             
             try:
                 target_url = "https://www.aposta1.bet.br/esportes"
-                self.logger.info(f"🌍 Aposta1: Navegando para {target_url}...")
+                self.logger.info("Navegando para pagina de esportes")
                 await page.goto(target_url, wait_until="domcontentloaded", timeout=30000)
                 
                 # Aguarda token
                 self.auth_token = await asyncio.wait_for(token_future, timeout=20.0)
                 self.user_agent = await page.evaluate("navigator.userAgent")
                 
-                self.logger.info(f"✅ Aposta1: Token capturado! UA: {self.user_agent[:20]}...")
+                self.logger.info("Token capturado com sucesso")
                 
             except asyncio.TimeoutError:
-                self.logger.error("❌ Aposta1: Timeout capturando token.")
+                self.logger.error("Timeout ao capturar token")
             except Exception as e:
-                self.logger.error(f"❌ Aposta1: Erro no Playwright: {e}")
+                self.logger.error(f"Erro Playwright: {e}")
             finally:
                 await browser.close()
         
@@ -140,11 +144,11 @@ class Aposta1Scraper(BaseScraper):
             if response.status_code in [401, 403]:
                 self.auth_token = None
             
-            self.logger.error(f"❌ Aposta1 {league.name}: HTTP {response.status_code}")
+            self.logger.error(f"{league.name}: HTTP {response.status_code}")
             return []
             
         except Exception as e:
-            self.logger.error(f"❌ Aposta1 {league.name}: Erro - {e}")
+            self.logger.error(f"{league.name}: Erro - {e}")
             return []
     
     def _get_country_for_league(self, league_name: str) -> str:
@@ -168,10 +172,72 @@ class Aposta1Scraper(BaseScraper):
                 return val.category_id
         return ""
     
+    def _extract_1x2_odds(
+        self, 
+        market_ids: List[int], 
+        markets_map: Dict[int, Dict], 
+        odds_map: Dict[int, Dict],
+        is_super_odds: bool
+    ) -> Optional[Dict[str, float]]:
+        """
+        Extrai odds 1x2 de um tipo especifico de mercado.
+        
+        Args:
+            is_super_odds: True para "Odds Aumentadas" (SO), False para "1x2" regular (PA)
+        """
+        for mid in market_ids:
+            market = markets_map.get(mid)
+            if not market:
+                continue
+            
+            market_name = market.get("name", "")
+            type_id = market.get("typeId")
+            
+            # So considera mercados 1x2 (typeId == 1)
+            if type_id != 1:
+                continue
+            
+            # Filtra por tipo de mercado
+            if is_super_odds:
+                # SO: nome deve conter "Odds Aumentadas"
+                if self.SO_MARKET_IDENTIFIER not in market_name:
+                    continue
+            else:
+                # PA: nome deve ser exatamente "1x2" (sem "Odds Aumentadas")
+                if self.SO_MARKET_IDENTIFIER in market_name:
+                    continue
+                if market_name != self.PA_MARKET_NAME:
+                    continue
+            
+            # Extrair odds
+            found_odds = {"home": None, "draw": None, "away": None}
+            odd_ids = market.get("oddIds", [])
+            
+            for oid in odd_ids:
+                odd = odds_map.get(oid)
+                if not odd:
+                    continue
+                
+                t_id = odd.get("typeId")
+                price = odd.get("price")
+                
+                if t_id == 1:
+                    found_odds["home"] = float(price)
+                elif t_id == 2:
+                    found_odds["draw"] = float(price)
+                elif t_id == 3:
+                    found_odds["away"] = float(price)
+            
+            # Retorna se encontrou todas as odds
+            if all(found_odds.values()):
+                return found_odds
+        
+        return None
+    
     def _parse_response(self, data: Dict[str, Any], league: LeagueConfig) -> List[ScrapedOdds]:
         results = []
         
-        # 1. CRIAR MAPAS (Lookup Dictionaries)
+        # Criar mapas de lookup
         odds_map = {o['id']: o for o in data.get('odds', [])}
         markets_map = {m['id']: m for m in data.get('markets', [])}
         events_list = data.get("events", [])
@@ -196,63 +262,46 @@ class Aposta1Scraper(BaseScraper):
                 else:
                     continue
 
-                # Buscar Odds 1x2
-                found_odds = {"home": None, "draw": None, "away": None}
-                market_ids = event.get("marketIds", [])
-                
-                for mid in market_ids:
-                    market = markets_map.get(mid)
-                    if not market:
-                        continue
-                        
-                    # Verifica se é o mercado 1x2 (TypeId 1)
-                    if market.get("typeId") == 1 or market.get("name") == "1x2":
-                        odd_ids = market.get("oddIds", [])
-                        
-                        for oid in odd_ids:
-                            odd = odds_map.get(oid)
-                            if not odd:
-                                continue
-                            
-                            t_id = odd.get("typeId")
-                            price = odd.get("price")
-                            
-                            if t_id == 1:
-                                found_odds["home"] = float(price)
-                            elif t_id == 2:
-                                found_odds["draw"] = float(price)
-                            elif t_id == 3:
-                                found_odds["away"] = float(price)
-                        
-                        break
-
-                if not all(found_odds.values()):
-                    continue
-
                 # Parse date
                 parsed_date = date_parser.parse(match_date)
+                
+                # Buscar ambos os mercados (SO e PA)
+                market_ids = event.get("marketIds", [])
+                
+                for odds_type, is_super in [("SO", True), ("PA", False)]:
+                    found_odds = self._extract_1x2_odds(
+                        market_ids, markets_map, odds_map, 
+                        is_super_odds=is_super
+                    )
+                    
+                    if not found_odds:
+                        continue
+                    
+                    scraped = ScrapedOdds(
+                        bookmaker_name="aposta1",
+                        home_team_raw=home_team,
+                        away_team_raw=away_team,
+                        league_raw=league.name,
+                        match_date=parsed_date,
+                        home_odd=found_odds["home"],
+                        draw_odd=found_odds["draw"],
+                        away_odd=found_odds["away"],
+                        market_type="1x2",
+                        odds_type=odds_type,
+                        extra_data={
+                            "aposta1_event_id": str(event_id),
+                            "aposta1_champ_id": self._get_champ_id_for_league(league.name),
+                            "aposta1_category_id": self._get_category_id_for_league(league.name)
+                        }
+                    )
+                    results.append(scraped)
 
-                # ✅ CORRIGIDO: Usar parâmetros corretos do ScrapedOdds
-                scraped = ScrapedOdds(
-                    bookmaker_name="aposta1",
-                    home_team_raw=home_team,
-                    away_team_raw=away_team,
-                    league_raw=league.name,
-                    match_date=parsed_date,
-                    home_odd=found_odds["home"],
-                    draw_odd=found_odds["draw"],
-                    away_odd=found_odds["away"],
-                    market_type="1x2",
-                    extra_data={
-                        "aposta1_event_id": str(event_id),
-                        "aposta1_champ_id": self._get_champ_id_for_league(league.name),
-                        "aposta1_category_id": self._get_category_id_for_league(league.name)
-                    }
-                )
-                results.append(scraped)
-
-            except Exception as e:
+            except Exception:
                 continue
         
-        self.logger.info(f"✅ Aposta1 {league.name}: {len(results)} odds coletadas")
+        # Log com contagem separada
+        so_count = len([r for r in results if r.odds_type == "SO"])
+        pa_count = len([r for r in results if r.odds_type == "PA"])
+        self.logger.info(f"{league.name}: {so_count} SO + {pa_count} PA = {len(results)} total")
+        
         return results
