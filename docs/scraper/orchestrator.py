@@ -230,7 +230,7 @@ class Orchestrator:
         
         for i, result in enumerate(results):
             scraper_name = self.scrapers[i].name
-            if isinstance(result, Exception):
+            if isinstance(result, BaseException):
                 self.logger.error(f"Scraper {scraper_name} failed: {result}")
                 errors.append({"scraper": scraper_name, "error": str(result)})
             else:
