@@ -195,10 +195,13 @@ class TeamMatcher:
             team = await self.supabase.create_team(name, league_id)
             if team:
                 team_id = team["id"]
-                # Update local caches
+                # Update local caches with both original and normalized names
                 self.teams_cache[team_id] = name
                 self.reverse_cache[name.lower()] = team_id
-                self.logger.info(f"Auto-created team: '{name}' in league {league_id}")
+                # Also add normalized version for accented names (e.g., München -> Munchen)
+                normalized = self._normalize_name(name).lower()
+                if normalized != name.lower():
+                    self.reverse_cache[normalized] = team_id
                 return team_id
         except Exception as e:
             self.logger.error(f"Failed to create team '{name}': {e}")
@@ -277,7 +280,7 @@ class TeamMatcher:
             
             return team_id
         
-        self._log_unmatched(raw_name)
+        # Don't log here - logging is done in find_team_id with full context
         return None
     
     def _log_unmatched(
