@@ -28,6 +28,8 @@ class McgamesScraper(BaseScraper):
         "serie_a": McgamesLeague(champ_id="2942", name="Serie A", country="italia"),
         "premier_league": McgamesLeague(champ_id="2936", name="Premier League", country="inglaterra"),
         "la_liga": McgamesLeague(champ_id="2941", name="La Liga", country="espanha"),
+ 	"bundesliga": McgamesLeague(champ_id="2950", name="Bundesliga", country="alemanha"),
+ 	"ligue_1": McgamesLeague(champ_id="2943", name="Ligue 1", country="franca"),
     }
     
     API_BASE = "https://sb2frontend-altenar2.biahosted.com/api/widget/GetEvents"
@@ -67,7 +69,7 @@ class McgamesScraper(BaseScraper):
                         token = headers["authorization"]
                         if not token_future.done():
                             token_future.set_result(token)
-                            self.logger.info("🔑 Mcgames: Token capturado via request")
+                            self.logger.info(" Mcgames: Token capturado via request")
             
             page.on("request", handle_request)
             
@@ -87,22 +89,22 @@ class McgamesScraper(BaseScraper):
                 self.user_agent = await page.evaluate("navigator.userAgent")
                 
             except asyncio.TimeoutError:
-                self.logger.error("❌ Mcgames: Timeout capturando token")
+                self.logger.error(" Mcgames: Timeout capturando token")
             except Exception as e:
-                self.logger.error(f"❌ Mcgames Playwright: {e}")
+                self.logger.error(f" Mcgames Playwright: {e}")
             finally:
                 await browser.close()
         
         # Initialize curl_cffi session after getting token
         self.session = AsyncSession(impersonate="chrome")
-        self.logger.info("✅ Mcgames: Session initialized")
+        self.logger.info(" Mcgames: Session initialized")
     
     async def teardown(self) -> None:
         """Close the session."""
         if self.session:
             await self.session.close()
             self.session = None
-        self.logger.info("🔒 Mcgames: Session closed")
+        self.logger.info(" Mcgames: Session closed")
     
     async def get_available_leagues(self) -> List[LeagueConfig]:
         """Return list of supported leagues."""
@@ -123,11 +125,11 @@ class McgamesScraper(BaseScraper):
             await self.setup()
         
         if not self.auth_token:
-            self.logger.error(f"❌ Mcgames: No token available for {league.name}")
+            self.logger.error(f" Mcgames: No token available for {league.name}")
             return []
         
         if league.league_id not in self.LEAGUES:
-            self.logger.warning(f"⚠️ Mcgames: Unknown league {league.league_id}")
+            self.logger.warning(f" Mcgames: Unknown league {league.league_id}")
             return []
         
         mcgames_league = self.LEAGUES[league.league_id]
@@ -163,14 +165,14 @@ class McgamesScraper(BaseScraper):
             )
             
             if response.status_code != 200:
-                self.logger.error(f"❌ Mcgames {league.name}: HTTP {response.status_code}")
+                self.logger.error(f" Mcgames {league.name}: HTTP {response.status_code}")
                 return []
             
             data = response.json()
             return self._parse_response(data, mcgames_league)
             
         except Exception as e:
-            self.logger.error(f"❌ Mcgames {league.name}: {e}")
+            self.logger.error(f" Mcgames {league.name}: {e}")
             return []
     
     def _parse_response(self, data: Dict[str, Any], league: McgamesLeague) -> List[ScrapedOdds]:
@@ -183,10 +185,10 @@ class McgamesScraper(BaseScraper):
         odds_list = data.get("odds", [])
         competitors_list = data.get("competitors", [])
         
-        self.logger.info(f"📊 Mcgames {league.name}: Structure: {len(events_list)} events, {len(markets_list)} markets, {len(odds_list)} odds")
+        self.logger.info(f" Mcgames {league.name}: Structure: {len(events_list)} events, {len(markets_list)} markets, {len(odds_list)} odds")
         
         if not events_list:
-            self.logger.warning(f"⚠️ Mcgames {league.name}: No events found")
+            self.logger.warning(f" Mcgames {league.name}: No events found")
             return []
         
         # Build lookup maps
@@ -295,7 +297,7 @@ class McgamesScraper(BaseScraper):
                 self.logger.debug(f"⚠️ Mcgames: Error parsing market: {e}")
                 continue
         
-        self.logger.info(f"✅ Mcgames {league.name}: {len(results)} odds processed")
+        self.logger.info(f" Mcgames {league.name}: {len(results)} odds processed")
         return results
 
 
