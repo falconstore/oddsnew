@@ -284,17 +284,26 @@ class SupabaseClient:
         result_map = {}
         
         try:
-            # Get unique match keys
+            # Get unique match keys and calculate dynamic date window from batch data
             unique_keys = set()
+            all_dates = []
             for m in matches_data:
                 key = (m["league_id"], m["home_team_id"], m["away_team_id"])
                 unique_keys.add(key)
+                # Parse match_date for dynamic window
+                md = m["match_date"]
+                if isinstance(md, str):
+                    md = datetime.fromisoformat(md.replace("Z", "+00:00").replace("+00:00", ""))
+                all_dates.append(md)
             
-            # Fetch all potentially matching matches in one query
-            # Using a time window of the past day to future week
-            now = datetime.utcnow()
-            date_min = now - timedelta(days=1)
-            date_max = now + timedelta(days=7)
+            # Dynamic date window based on actual batch data (not fixed now+7 days)
+            if all_dates:
+                date_min = min(all_dates) - timedelta(days=1)
+                date_max = max(all_dates) + timedelta(days=1)
+            else:
+                now = datetime.utcnow()
+                date_min = now - timedelta(days=1)
+                date_max = now + timedelta(days=30)
             
             response = (
                 self.client.table("matches")
@@ -536,16 +545,26 @@ class SupabaseClient:
         result_map = {}
         
         try:
-            # Get unique match keys
+            # Get unique match keys and calculate dynamic date window from batch data
             unique_keys = set()
+            all_dates = []
             for m in matches_data:
                 key = (m["league_id"], m["home_team_id"], m["away_team_id"])
                 unique_keys.add(key)
+                # Parse match_date for dynamic window
+                md = m["match_date"]
+                if isinstance(md, str):
+                    md = datetime.fromisoformat(md.replace("Z", "+00:00").replace("+00:00", ""))
+                all_dates.append(md)
             
-            # Fetch all potentially matching matches in one query
-            now = datetime.utcnow()
-            date_min = now - timedelta(days=1)
-            date_max = now + timedelta(days=7)
+            # Dynamic date window based on actual batch data (not fixed now+7 days)
+            if all_dates:
+                date_min = min(all_dates) - timedelta(days=1)
+                date_max = max(all_dates) + timedelta(days=1)
+            else:
+                now = datetime.utcnow()
+                date_min = now - timedelta(days=1)
+                date_max = now + timedelta(days=30)
             
             response = (
                 self.client.table("nba_matches")
