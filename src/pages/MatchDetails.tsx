@@ -370,8 +370,16 @@ const MatchDetails = () => {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold">
-              {sportIcon} {match.home_team} vs {match.away_team}
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              {match.home_team_logo ? (
+                <img src={match.home_team_logo} alt={match.home_team} className="h-8 w-8 object-contain" />
+              ) : (
+                <span>{sportIcon}</span>
+              )}
+              {match.home_team} vs {match.away_team}
+              {match.away_team_logo && (
+                <img src={match.away_team_logo} alt={match.away_team} className="h-8 w-8 object-contain" />
+              )}
             </h1>
             <div className="flex items-center gap-2 text-muted-foreground">
               <Badge variant="outline">{match.league_name}</Badge>

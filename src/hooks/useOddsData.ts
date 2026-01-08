@@ -388,6 +388,8 @@ function groupOddsByMatch(data: OddsComparison[]): MatchOddsGroup[] {
         sport_type: row.sport_type,
         home_team: row.home_team,
         away_team: row.away_team,
+        home_team_logo: (row as any).home_team_logo || null,
+        away_team_logo: (row as any).away_team_logo || null,
         odds: [],
         best_home: 0,
         best_draw: isBasketball ? null : 0,

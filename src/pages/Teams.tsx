@@ -29,7 +29,7 @@ const Teams = () => {
   const [isAliasDialogOpen, setIsAliasDialogOpen] = useState(false);
   const [selectedTeamForAlias, setSelectedTeamForAlias] = useState<Team | null>(null);
   const [newAlias, setNewAlias] = useState({ alias_name: '', bookmaker_source: '' });
-  const [formData, setFormData] = useState({ standard_name: '', league_id: '', status: 'active' as EntityStatus });
+  const [formData, setFormData] = useState({ standard_name: '', league_id: '', status: 'active' as EntityStatus, logo_url: '' });
 
   const filteredTeams = selectedLeague === 'all' 
     ? teams 
@@ -37,19 +37,28 @@ const Teams = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const dataToSubmit = {
+      ...formData,
+      logo_url: formData.logo_url || null
+    };
     if (editingTeam) {
-      updateTeam.mutate({ id: editingTeam.id, ...formData });
+      updateTeam.mutate({ id: editingTeam.id, ...dataToSubmit });
     } else {
-      createTeam.mutate(formData);
+      createTeam.mutate(dataToSubmit);
     }
     setIsDialogOpen(false);
     setEditingTeam(null);
-    setFormData({ standard_name: '', league_id: '', status: 'active' });
+    setFormData({ standard_name: '', league_id: '', status: 'active', logo_url: '' });
   };
 
   const handleEdit = (team: Team) => {
     setEditingTeam(team);
-    setFormData({ standard_name: team.standard_name, league_id: team.league_id, status: team.status });
+    setFormData({ 
+      standard_name: team.standard_name, 
+      league_id: team.league_id, 
+      status: team.status,
+      logo_url: team.logo_url || ''
+    });
     setIsDialogOpen(true);
   };
 
@@ -81,7 +90,7 @@ const Teams = () => {
             setIsDialogOpen(open);
             if (!open) {
               setEditingTeam(null);
-              setFormData({ standard_name: '', league_id: '', status: 'active' });
+              setFormData({ standard_name: '', league_id: '', status: 'active', logo_url: '' });
             }
           }}>
             <DialogTrigger asChild>
@@ -133,6 +142,26 @@ const Teams = () => {
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="logo">URL do Logo</Label>
+                  <Input
+                    id="logo"
+                    value={formData.logo_url}
+                    onChange={(e) => setFormData({ ...formData, logo_url: e.target.value })}
+                    placeholder="https://exemplo.com/logo.png"
+                  />
+                  {formData.logo_url && (
+                    <div className="flex items-center gap-2 mt-2 p-2 border rounded">
+                      <img 
+                        src={formData.logo_url} 
+                        alt="Preview" 
+                        className="h-8 w-8 object-contain"
+                        onError={(e) => (e.currentTarget.style.display = 'none')}
+                      />
+                      <span className="text-sm text-muted-foreground">Preview do logo</span>
+                    </div>
+                  )}
+                </div>
                 <div className="flex justify-end gap-2">
                   <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
                   <Button type="submit">{editingTeam ? 'Salvar' : 'Criar'}</Button>
@@ -165,6 +194,13 @@ const Teams = () => {
                 <AccordionItem key={team.id} value={team.id}>
                   <AccordionTrigger className="hover:no-underline">
                     <div className="flex items-center gap-4">
+                      {team.logo_url && (
+                        <img 
+                          src={team.logo_url} 
+                          alt={team.standard_name}
+                          className="h-6 w-6 object-contain"
+                        />
+                      )}
                       <span className="font-medium">{team.standard_name}</span>
                       <Badge variant="outline">{(team.league as any)?.name || 'Sem liga'}</Badge>
                       <Badge variant={team.status === 'active' ? 'default' : 'secondary'}>

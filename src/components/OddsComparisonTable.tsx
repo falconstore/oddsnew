@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertTriangle } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { OddsFilters, OddsFiltersState, defaultFilters } from './OddsFilters';
@@ -20,6 +21,7 @@ interface OddsComparisonTableProps {
 export function OddsComparisonTable({ onStatsUpdate }: OddsComparisonTableProps) {
   const [filters, setFilters] = useState<OddsFiltersState>(defaultFilters);
   const [viewMode, setViewMode] = useState<ViewMode>('cards');
+  const [activeTab, setActiveTab] = useState<'football' | 'basketball'>('football');
   
   const { data: matches, isLoading, error } = useOddsComparison(
     filters.league !== 'all' ? { leagueName: filters.league } : undefined
@@ -31,10 +33,8 @@ export function OddsComparisonTable({ onStatsUpdate }: OddsComparisonTableProps)
     
     let result = [...matches];
     
-    // Sport filter
-    if (filters.sport !== 'all') {
-      result = result.filter(m => (m.sport_type || 'football') === filters.sport);
-    }
+    // Sport filter based on active tab
+    result = result.filter(m => (m.sport_type || 'football') === activeTab);
     
     // Date filter
     if (filters.dateFilter !== 'all') {
@@ -100,7 +100,16 @@ export function OddsComparisonTable({ onStatsUpdate }: OddsComparisonTableProps)
     });
     
     return result;
-  }, [matches, filters]);
+  }, [matches, filters, activeTab]);
+
+  // Calculate counts per sport
+  const sportCounts = useMemo(() => {
+    if (!matches) return { football: 0, basketball: 0 };
+    return {
+      football: matches.filter(m => (m.sport_type || 'football') === 'football').length,
+      basketball: matches.filter(m => (m.sport_type || 'football') === 'basketball').length
+    };
+  }, [matches]);
 
   // Calculate stats
   useMemo(() => {
@@ -145,46 +154,66 @@ export function OddsComparisonTable({ onStatsUpdate }: OddsComparisonTableProps)
 
   return (
     <div className="space-y-4">
-      {/* Filters */}
-      <OddsFilters filters={filters} onFiltersChange={setFilters} />
+      {/* Sport Tabs */}
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'football' | 'basketball')}>
+        <TabsList className="grid w-full grid-cols-2 max-w-md">
+          <TabsTrigger value="football" className="gap-2">
+            ⚽ Odds Futebol
+            {sportCounts.football > 0 && (
+              <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">{sportCounts.football}</Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="basketball" className="gap-2">
+            🏀 Odds Basquete
+            {sportCounts.basketball > 0 && (
+              <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">{sportCounts.basketball}</Badge>
+            )}
+          </TabsTrigger>
+        </TabsList>
 
-      {/* View Toggle */}
-      <div className="flex items-center justify-between">
-        <div className="text-sm text-muted-foreground">
-          {displayMatches.length} partida{displayMatches.length !== 1 ? 's' : ''} encontrada{displayMatches.length !== 1 ? 's' : ''}
-        </div>
-        <ViewToggle value={viewMode} onChange={setViewMode} />
-      </div>
+        <TabsContent value={activeTab} className="mt-4 space-y-4">
+          {/* Filters */}
+          <OddsFilters filters={filters} onFiltersChange={setFilters} />
 
-      {/* Loading state */}
-      {isLoading && (
-        <div className="space-y-4">
-          {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-32 w-full" />
+          {/* View Toggle */}
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-muted-foreground">
+              {displayMatches.length} partida{displayMatches.length !== 1 ? 's' : ''} encontrada{displayMatches.length !== 1 ? 's' : ''}
+            </div>
+            <ViewToggle value={viewMode} onChange={setViewMode} />
+          </div>
+
+          {/* Loading state */}
+          {isLoading && (
+            <div className="space-y-4">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-32 w-full" />
+              ))}
+            </div>
+          )}
+
+          {/* Empty state */}
+          {!isLoading && displayMatches.length === 0 && (
+            <Card>
+              <CardContent className="pt-6 text-center text-muted-foreground">
+                {viewMode === 'surebets' 
+                  ? 'Nenhuma surebet encontrada no momento.'
+                  : `Nenhuma partida de ${activeTab === 'football' ? 'futebol' : 'basquete'} encontrada com os filtros atuais.`}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Compact Table View */}
+          {viewMode === 'compact' && displayMatches.length > 0 && (
+            <CompactTableView matches={displayMatches} />
+          )}
+
+          {/* Card View */}
+          {(viewMode === 'cards' || viewMode === 'surebets') && displayMatches.map((match) => (
+            <MatchCard key={match.match_id} match={match} />
           ))}
-        </div>
-      )}
-
-      {/* Empty state */}
-      {!isLoading && displayMatches.length === 0 && (
-        <Card>
-          <CardContent className="pt-6 text-center text-muted-foreground">
-            {viewMode === 'surebets' 
-              ? 'Nenhuma surebet encontrada no momento.'
-              : 'Nenhuma partida encontrada com os filtros atuais.'}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Compact Table View */}
-      {viewMode === 'compact' && displayMatches.length > 0 && (
-        <CompactTableView matches={displayMatches} />
-      )}
-
-      {/* Card View */}
-      {(viewMode === 'cards' || viewMode === 'surebets') && displayMatches.map((match) => (
-        <MatchCard key={match.match_id} match={match} />
-      ))}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
@@ -230,8 +259,19 @@ function CompactTableView({ matches }: { matches: MatchOddsGroup[] }) {
                   onClick={() => navigate(`/match/${match.match_id}`)}
                 >
                   <TableCell className="font-medium">
-                    <span className="mr-1">{sportIcon}</span>
-                    {match.home_team} vs {match.away_team}
+                    <div className="flex items-center gap-2">
+                      {match.home_team_logo ? (
+                        <img src={match.home_team_logo} alt={match.home_team} className="h-5 w-5 object-contain" />
+                      ) : (
+                        <span className="mr-1">{sportIcon}</span>
+                      )}
+                      <span>{match.home_team}</span>
+                      <span className="text-muted-foreground">vs</span>
+                      <span>{match.away_team}</span>
+                      {match.away_team_logo && (
+                        <img src={match.away_team_logo} alt={match.away_team} className="h-5 w-5 object-contain" />
+                      )}
+                    </div>
                     {hasArbitrage && (
                       <Badge className="ml-2 bg-green-500 text-white text-xs">SUREBET</Badge>
                     )}
@@ -299,11 +339,21 @@ function MatchCard({ match }: { match: MatchOddsGroup }) {
     >
       <CardContent className="p-4">
         <div className="space-y-3">
-          {/* Title: Icon + Teams */}
+          {/* Title: Icon + Teams with Logos */}
           <div className="flex items-center justify-between gap-2">
-            <h3 className="font-semibold text-lg">
-              {sportIcon} {match.home_team} vs {match.away_team}
-            </h3>
+            <div className="flex items-center gap-2">
+              {match.home_team_logo ? (
+                <img src={match.home_team_logo} alt={match.home_team} className="h-6 w-6 object-contain" />
+              ) : (
+                <span>{sportIcon}</span>
+              )}
+              <span className="font-semibold text-lg">{match.home_team}</span>
+              <span className="text-muted-foreground">vs</span>
+              <span className="font-semibold text-lg">{match.away_team}</span>
+              {match.away_team_logo && (
+                <img src={match.away_team_logo} alt={match.away_team} className="h-6 w-6 object-contain" />
+              )}
+            </div>
             {hasArbitrage && (
               <Badge className="bg-green-500 text-white text-sm px-3 py-1 shrink-0">
                 🎯 SUREBET +{roiPercentage}%
