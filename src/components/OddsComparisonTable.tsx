@@ -15,6 +15,53 @@ import { OddsFilters, OddsFiltersState, defaultFilters } from './OddsFilters';
 import { ViewToggle, ViewMode } from './ViewToggle';
 import type { MatchOddsGroup, BookmakerOdds } from '@/types/database';
 
+// Sort bookmakers: Betbra first, then PA alphabetically, then SO alphabetically
+function sortBookmakerOdds(odds: BookmakerOdds[]): { sorted: BookmakerOdds[]; betbraEnd: number; paEnd: number } {
+  const betbra: BookmakerOdds[] = [];
+  const paOdds: BookmakerOdds[] = [];
+  const soOdds: BookmakerOdds[] = [];
+  
+  // Known SO bookmakers (use odds_type if available, otherwise infer)
+  const knownSOBookmakers = ['novibet', 'betbra', 'betnacional'];
+  
+  odds.forEach((odd) => {
+    const name = odd.bookmaker_name.toLowerCase();
+    const oddsType = odd.odds_type || (knownSOBookmakers.some(b => name.includes(b)) ? 'SO' : 'PA');
+    
+    if (name.includes('betbra')) {
+      betbra.push(odd);
+    } else if (oddsType === 'PA') {
+      paOdds.push(odd);
+    } else {
+      soOdds.push(odd);
+    }
+  });
+  
+  // Sort PA and SO alphabetically
+  paOdds.sort((a, b) => a.bookmaker_name.localeCompare(b.bookmaker_name));
+  soOdds.sort((a, b) => a.bookmaker_name.localeCompare(b.bookmaker_name));
+  
+  const sorted = [...betbra, ...paOdds, ...soOdds];
+  const betbraEnd = betbra.length - 1;
+  const paEnd = betbra.length + paOdds.length - 1;
+  
+  return { sorted, betbraEnd, paEnd };
+}
+
+// Discrete separator row component
+function OddsSeparatorRow({ label, colSpan }: { label: string; colSpan: number }) {
+  return (
+    <TableRow className="border-t border-border/30 hover:bg-transparent">
+      <TableCell 
+        colSpan={colSpan} 
+        className="py-1.5 text-[10px] text-muted-foreground/50 font-medium uppercase tracking-wider"
+      >
+        {label}
+      </TableCell>
+    </TableRow>
+  );
+}
+
 interface OddsComparisonTableProps {
   onStatsUpdate?: (stats: { surebetCount: number; totalMatches: number }) => void;
 }
@@ -350,21 +397,48 @@ function MatchCard({ match }: { match: MatchOddsGroup }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {match.odds.map((odds) => (
-              <OddsRow 
-                key={`${odds.bookmaker_id}-${odds.odds_type ?? 'PA'}`}
-                odds={odds} 
-                bestHome={match.best_home}
-                bestDraw={match.best_draw}
-                bestAway={match.best_away}
-                worstHome={match.worst_home}
-                worstDraw={match.worst_draw}
-                worstAway={match.worst_away}
-                homeTeam={match.home_team}
-                awayTeam={match.away_team}
-                isBasketball={isBasketball}
-              />
-            ))}
+            {(() => {
+              const { sorted, betbraEnd, paEnd } = sortBookmakerOdds(match.odds);
+              const colSpan = isBasketball ? 3 : 4;
+              const hasPAOdds = paEnd > betbraEnd;
+              const hasSOOdds = sorted.length > paEnd + 1;
+              
+              return sorted.map((odds, index) => {
+                const elements: React.ReactNode[] = [];
+                
+                // Separator after Betbra (before PA section)
+                if (index === betbraEnd + 1 && betbraEnd >= 0 && hasPAOdds) {
+                  elements.push(
+                    <OddsSeparatorRow key="sep-pa" label="Pagamento Antecipado" colSpan={colSpan} />
+                  );
+                }
+                
+                // Separator after PA (before SO section)
+                if (index === paEnd + 1 && hasSOOdds) {
+                  elements.push(
+                    <OddsSeparatorRow key="sep-so" label="Super Odds" colSpan={colSpan} />
+                  );
+                }
+                
+                elements.push(
+                  <OddsRow 
+                    key={`${odds.bookmaker_id}-${odds.odds_type ?? 'PA'}`}
+                    odds={odds} 
+                    bestHome={match.best_home}
+                    bestDraw={match.best_draw}
+                    bestAway={match.best_away}
+                    worstHome={match.worst_home}
+                    worstDraw={match.worst_draw}
+                    worstAway={match.worst_away}
+                    homeTeam={match.home_team}
+                    awayTeam={match.away_team}
+                    isBasketball={isBasketball}
+                  />
+                );
+                
+                return elements;
+              }).flat();
+            })()}
           </TableBody>
         </Table>
       </CardContent>
