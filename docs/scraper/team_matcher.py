@@ -39,6 +39,7 @@ class TeamMatcher:
         self.teams_cache: Dict[str, str] = {}  # team_id -> standard_name
         self.aliases_cache: Dict[Tuple[str, str], str] = {}  # (alias, bookmaker) -> team_id
         self.reverse_cache: Dict[str, str] = {}  # standard_name.lower() -> team_id
+        self.teams_by_league: Dict[str, Dict[str, str]] = {}  # league_id -> {name.lower(): team_id}
         
         # Log deduplication - tracks already-logged unmatched names this cycle
         self._unmatched_logged: Set[str] = set()
@@ -81,6 +82,19 @@ class TeamMatcher:
             t["standard_name"].lower(): t["id"] for t in teams
         }
         
+        # Build league-scoped cache for fuzzy matching within leagues
+        self.teams_by_league = {}
+        for t in teams:
+            league_id = t.get("league_id")
+            if league_id:
+                if league_id not in self.teams_by_league:
+                    self.teams_by_league[league_id] = {}
+                self.teams_by_league[league_id][t["standard_name"].lower()] = t["id"]
+                # Also add normalized version
+                normalized = self._normalize_name(t["standard_name"]).lower()
+                if normalized not in self.teams_by_league[league_id]:
+                    self.teams_by_league[league_id][normalized] = t["id"]
+        
         # Also add normalized versions to reverse cache
         for t in teams:
             normalized = self._normalize_name(t["standard_name"]).lower()
@@ -100,7 +114,7 @@ class TeamMatcher:
         
         self.logger.info(
             f"Loaded {len(self.teams_cache)} teams and "
-            f"{len(self.aliases_cache)} aliases"
+            f"{len(self.aliases_cache)} aliases across {len(self.teams_by_league)} leagues"
         )
     
     def find_team_id_cached(self, raw_name: str, bookmaker: str) -> Optional[str]:
@@ -160,12 +174,19 @@ class TeamMatcher:
                 self.logger.debug(f"Exact alias match: {raw_name} -> {self.aliases_cache[alias_key]}")
                 return self.aliases_cache[alias_key]
         
-        # Step 2: Exact match in standard names
+        # Step 2: Exact match in standard names (league-scoped first if available)
+        if league_id and league_id in self.teams_by_league:
+            if normalized_name in self.teams_by_league[league_id]:
+                return self.teams_by_league[league_id][normalized_name]
+        
+        # Fallback to global reverse cache for exact match
         if normalized_name in self.reverse_cache:
             return self.reverse_cache[normalized_name]
         
-        # Step 3: Fuzzy match
-        team_id = self._fuzzy_match(raw_name)
+        # Step 3: Fuzzy match - ONLY within the same league to prevent cross-league errors
+        team_id = None
+        if league_id and league_id in self.teams_by_league:
+            team_id = self._fuzzy_match_in_league(raw_name, league_id)
         
         if team_id and self.auto_create_alias:
             # Create alias for future exact matches
@@ -173,7 +194,8 @@ class TeamMatcher:
             return team_id
         
         # Step 4: Auto-create team if primary bookmaker (Betano) and has league_id
-        if self.auto_create_team and is_primary and league_id:
+        # This is triggered when NO match was found in the league
+        if self.auto_create_team and is_primary and league_id and not team_id:
             self.logger.info(
                 f"[Auto-create] Attempting to create team: '{raw_name}' "
                 f"league={league_name or league_id} bookmaker={bookmaker}"
@@ -190,46 +212,54 @@ class TeamMatcher:
         return None
     
     async def _create_team(self, name: str, league_id: str) -> Optional[str]:
-        """Create a new team in the database and update cache."""
+        """Create a new team in the database and update all caches."""
         try:
             team = await self.supabase.create_team(name, league_id)
             if team:
                 team_id = team["id"]
-                # Update local caches with both original and normalized names
+                # Update global caches
                 self.teams_cache[team_id] = name
                 self.reverse_cache[name.lower()] = team_id
+                
                 # Also add normalized version for accented names (e.g., München -> Munchen)
                 normalized = self._normalize_name(name).lower()
                 if normalized != name.lower():
                     self.reverse_cache[normalized] = team_id
+                
+                # Update league-scoped cache
+                if league_id not in self.teams_by_league:
+                    self.teams_by_league[league_id] = {}
+                self.teams_by_league[league_id][name.lower()] = team_id
+                if normalized != name.lower():
+                    self.teams_by_league[league_id][normalized] = team_id
+                
                 return team_id
         except Exception as e:
             self.logger.error(f"Failed to create team '{name}': {e}")
         return None
     
-    def _fuzzy_match(self, raw_name: str) -> Optional[str]:
+    def _fuzzy_match_in_league(self, raw_name: str, league_id: str) -> Optional[str]:
         """
-        Perform fuzzy matching against all standard team names.
-        
-        Uses multiple scoring algorithms and takes the best match:
-        - Token Sort Ratio: Good for word order differences
-        - Token Set Ratio: Good for partial matches
-        - Partial Ratio: Good for substring matches (higher threshold)
+        Perform fuzzy matching ONLY against teams in the specified league.
+        This prevents cross-league matches (e.g., matching a Bundesliga team to a Serie A team).
         """
-        if not self.teams_cache:
-            self.logger.warning("Teams cache is empty!")
+        league_teams = self.teams_by_league.get(league_id, {})
+        if not league_teams:
             return None
         
         # Normalize the input name
         normalized_input = self._normalize_name(raw_name)
         
-        all_names = list(self.teams_cache.values())
+        # Get team names for this league only
+        all_names = [self.teams_cache[tid] for tid in league_teams.values() if tid in self.teams_cache]
+        if not all_names:
+            return None
         
         # Try different matching strategies with variable thresholds
         strategies = [
             (fuzz.token_sort_ratio, "token_sort", self.min_score),
             (fuzz.token_set_ratio, "token_set", self.min_score),
-            (fuzz.partial_ratio, "partial", self.min_score_partial),  # Higher threshold
+            (fuzz.partial_ratio, "partial", self.min_score_partial),
         ]
         
         best_match = None
@@ -257,30 +287,27 @@ class TeamMatcher:
             if input_lower in BLOCKED_MATCHES:
                 blocked_target = BLOCKED_MATCHES[input_lower]
                 if blocked_target in match_lower or match_lower in blocked_target:
-                    # This is a known bad match, reject it
                     self.logger.debug(f"Blocked match: '{raw_name}' -> '{best_match}'")
                     return None
             
-            team_id = next(
-                (tid for tid, name in self.teams_cache.items() 
-                 if name == best_match),
-                None
-            )
+            # Find the team_id from the league-scoped cache
+            team_id = league_teams.get(best_match.lower())
+            if not team_id:
+                # Try normalized version
+                team_id = league_teams.get(self._normalize_name(best_match).lower())
             
-            # Only log uncertain matches (score < 95) as INFO
-            if best_score < 95:
-                self.logger.info(
-                    f"Fuzzy match ({best_strategy}): '{raw_name}' -> "
-                    f"'{best_match}' (score: {best_score:.1f})"
-                )
-            else:
-                self.logger.debug(
-                    f"Fuzzy match: '{raw_name}' -> '{best_match}' ({best_score:.0f})"
-                )
-            
-            return team_id
+            if team_id:
+                if best_score < 95:
+                    self.logger.info(
+                        f"Fuzzy match in-league ({best_strategy}): '{raw_name}' -> "
+                        f"'{best_match}' (score: {best_score:.1f})"
+                    )
+                else:
+                    self.logger.debug(
+                        f"Fuzzy match in-league: '{raw_name}' -> '{best_match}' ({best_score:.0f})"
+                    )
+                return team_id
         
-        # Don't log here - logging is done in find_team_id with full context
         return None
     
     def _log_unmatched(
