@@ -5,7 +5,7 @@ Handles all interactions with the Supabase database.
 
 import json
 from typing import List, Dict, Any, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from supabase import create_client, Client
 from loguru import logger
 
@@ -290,10 +290,15 @@ class SupabaseClient:
             for m in matches_data:
                 key = (m["league_id"], m["home_team_id"], m["away_team_id"])
                 unique_keys.add(key)
-                # Parse match_date for dynamic window
+                # Parse match_date for dynamic window - ensure UTC aware
                 md = m["match_date"]
                 if isinstance(md, str):
-                    md = datetime.fromisoformat(md.replace("Z", "+00:00").replace("+00:00", ""))
+                    md = datetime.fromisoformat(md.replace("Z", "+00:00"))
+                # Normalize to UTC aware
+                if md.tzinfo is None:
+                    md = md.replace(tzinfo=timezone.utc)
+                else:
+                    md = md.astimezone(timezone.utc)
                 all_dates.append(md)
             
             # Dynamic date window based on actual batch data (not fixed now+7 days)
@@ -301,7 +306,7 @@ class SupabaseClient:
                 date_min = min(all_dates) - timedelta(days=1)
                 date_max = max(all_dates) + timedelta(days=1)
             else:
-                now = datetime.utcnow()
+                now = datetime.now(timezone.utc)
                 date_min = now - timedelta(days=1)
                 date_max = now + timedelta(days=30)
             
@@ -551,10 +556,15 @@ class SupabaseClient:
             for m in matches_data:
                 key = (m["league_id"], m["home_team_id"], m["away_team_id"])
                 unique_keys.add(key)
-                # Parse match_date for dynamic window
+                # Parse match_date for dynamic window - ensure UTC aware
                 md = m["match_date"]
                 if isinstance(md, str):
-                    md = datetime.fromisoformat(md.replace("Z", "+00:00").replace("+00:00", ""))
+                    md = datetime.fromisoformat(md.replace("Z", "+00:00"))
+                # Normalize to UTC aware
+                if md.tzinfo is None:
+                    md = md.replace(tzinfo=timezone.utc)
+                else:
+                    md = md.astimezone(timezone.utc)
                 all_dates.append(md)
             
             # Dynamic date window based on actual batch data (not fixed now+7 days)
@@ -562,7 +572,7 @@ class SupabaseClient:
                 date_min = min(all_dates) - timedelta(days=1)
                 date_max = max(all_dates) + timedelta(days=1)
             else:
-                now = datetime.utcnow()
+                now = datetime.now(timezone.utc)
                 date_min = now - timedelta(days=1)
                 date_max = now + timedelta(days=30)
             
