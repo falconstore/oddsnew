@@ -269,34 +269,56 @@ class Aposta1Scraper(BaseScraper):
         """
         Parseia odds do GetEventDetails.
         
-        Regra:
-        - typeId: 1 = Home, 2 = Draw, 3 = Away
-        - SEM campo 'offers' = Super Odds (SO)
-        - COM campo 'offers' = Pagamento Antecipado (PA)
-        """
-        so_odds = {"home": None, "draw": None, "away": None}
-        pa_odds = {"home": None, "draw": None, "away": None}
+        Estrategia: Agrupar odds em conjuntos de 3 (home/draw/away).
+        - Primeiro conjunto completo sem nenhum 'offers' = SO (Odds Aumentadas)
+        - Segundo conjunto onde ALGUM item tem 'offers' = PA (Pagamento Antecipado)
         
-        for odd in data.get("odds", []):
+        Nota: No PA, o empate (typeId 2) nao tem o campo 'offers', apenas home e away.
+        """
+        odds_list = data.get("odds", [])
+        
+        # Filtrar apenas 1x2 (typeId 1, 2, 3) com price valido
+        filtered = [o for o in odds_list if o.get("typeId") in [1, 2, 3] and o.get("price")]
+        
+        # Agrupar em conjuntos de 3 consecutivos
+        sets = []
+        current_set = {}
+        current_has_offers = False
+        
+        for odd in filtered:
             type_id = odd.get("typeId")
-            price = odd.get("price")
+            pos = {1: "home", 2: "draw", 3: "away"}.get(type_id)
+            price = float(odd.get("price"))
             has_offers = "offers" in odd and odd.get("offers")
             
-            if type_id not in [1, 2, 3] or not price:
-                continue
+            # Se ja tem essa posicao, comeca novo conjunto
+            if pos in current_set:
+                if len(current_set) == 3:
+                    sets.append({"odds": current_set, "has_offers": current_has_offers})
+                current_set = {}
+                current_has_offers = False
             
-            pos = {1: "home", 2: "draw", 3: "away"}.get(type_id)
-            
+            current_set[pos] = price
             if has_offers:
-                pa_odds[pos] = float(price)
-            else:
-                so_odds[pos] = float(price)
+                current_has_offers = True
+            
+            # Se completou o conjunto, salva
+            if len(current_set) == 3:
+                sets.append({"odds": current_set, "has_offers": current_has_offers})
+                current_set = {}
+                current_has_offers = False
         
+        # Classificar: primeiro sem offers = SO, com offers = PA
         result = {}
-        if all(v is not None for v in so_odds.values()):
-            result["SO"] = so_odds
-        if all(v is not None for v in pa_odds.values()):
-            result["PA"] = pa_odds
+        for s in sets:
+            odds_type = "PA" if s["has_offers"] else "SO"
+            
+            if odds_type not in result:
+                result[odds_type] = {
+                    "home": s["odds"]["home"],
+                    "draw": s["odds"]["draw"],
+                    "away": s["odds"]["away"]
+                }
         
         return result
 
