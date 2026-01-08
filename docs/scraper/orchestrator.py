@@ -220,6 +220,9 @@ class Orchestrator:
         start_time = datetime.utcnow()
         self.logger.info("Starting scraping cycle...")
         
+        # Clear unmatched log cache at the start of each cycle
+        self.team_matcher.clear_log_cache()
+        
         # Run all scrapers in parallel
         tasks = [scraper.scrape_all() for scraper in self.scrapers]
         results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -366,12 +369,14 @@ class Orchestrator:
                 home_team_id = await self.team_matcher.find_team_id(
                     odds.home_team_raw, 
                     odds.bookmaker_name,
-                    league_id
+                    league_id,
+                    odds.league_raw  # Pass league name for better logging
                 )
                 away_team_id = await self.team_matcher.find_team_id(
                     odds.away_team_raw, 
                     odds.bookmaker_name,
-                    league_id
+                    league_id,
+                    odds.league_raw  # Pass league name for better logging
                 )
             else:
                 # Other bookmakers use cache-only (no DB calls)
