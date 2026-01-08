@@ -46,7 +46,7 @@ WHERE l.status = 'active' AND b.status = 'active'
 
 
 -- =====================================================
--- NBA odds_comparison view with logos (if exists)
+-- NBA odds_comparison view with logos
 -- =====================================================
 
 DROP VIEW IF EXISTS public.nba_odds_comparison;
@@ -75,8 +75,8 @@ SELECT
     EXTRACT(EPOCH FROM (NOW() - oh.scraped_at)) AS data_age_seconds
 FROM public.nba_matches m
 JOIN public.leagues l ON m.league_id = l.id
-JOIN public.nba_teams ht ON m.home_team_id = ht.id
-JOIN public.nba_teams at ON m.away_team_id = at.id
+JOIN public.teams ht ON m.home_team_id = ht.id
+JOIN public.teams at ON m.away_team_id = at.id
 JOIN public.nba_odds_history oh ON m.id = oh.match_id AND oh.is_latest = TRUE
 JOIN public.bookmakers b ON oh.bookmaker_id = b.id
 WHERE l.status = 'active' AND b.status = 'active'
