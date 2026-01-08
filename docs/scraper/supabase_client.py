@@ -60,7 +60,10 @@ class SupabaseClient:
         standard_name: str, 
         league_id: str
     ) -> Optional[Dict[str, Any]]:
-        """Create a new team."""
+        """
+        Create a new team. If INSERT returns empty data (PostgREST minimal mode),
+        falls back to SELECT to retrieve the created record.
+        """
         try:
             response = (
                 self.client.table("teams")
@@ -70,8 +73,35 @@ class SupabaseClient:
                 })
                 .execute()
             )
-            return response.data[0] if response.data else None
+            
+            if response.data:
+                return response.data[0]
+            
+            # Fallback: SELECT the team we just created
+            self.logger.debug(f"INSERT returned empty, fetching team '{standard_name}'")
+            select_response = (
+                self.client.table("teams")
+                .select("*")
+                .eq("standard_name", standard_name)
+                .eq("league_id", league_id)
+                .limit(1)
+                .execute()
+            )
+            return select_response.data[0] if select_response.data else None
+            
         except Exception as e:
+            # Handle duplicate key - team may already exist
+            if "duplicate key" in str(e).lower() or "23505" in str(e):
+                self.logger.debug(f"Team already exists: '{standard_name}'")
+                select_response = (
+                    self.client.table("teams")
+                    .select("*")
+                    .eq("standard_name", standard_name)
+                    .eq("league_id", league_id)
+                    .limit(1)
+                    .execute()
+                )
+                return select_response.data[0] if select_response.data else None
             self.logger.error(f"Error creating team: {e}")
             return None
     

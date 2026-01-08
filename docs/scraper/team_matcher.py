@@ -131,7 +131,8 @@ class TeamMatcher:
         self, 
         raw_name: str, 
         bookmaker: str,
-        league_id: str = None
+        league_id: str = None,
+        league_name: str = None
     ) -> Optional[str]:
         """
         Find the team ID for a raw team name from a specific bookmaker.
@@ -140,6 +141,7 @@ class TeamMatcher:
             raw_name: Team name as it appears on the bookmaker site
             bookmaker: Name of the bookmaker (e.g., "Betano")
             league_id: League ID (required for auto-creating teams)
+            league_name: League name for logging purposes
             
         Returns:
             Team ID if found, None otherwise
@@ -149,6 +151,7 @@ class TeamMatcher:
         
         normalized_name = self._normalize_name(raw_name).lower()
         normalized_bookmaker = bookmaker.strip().lower()
+        is_primary = normalized_bookmaker == self.primary_bookmaker
         
         # Step 1: Exact match in aliases (try both raw and normalized)
         for name_variant in [raw_name.strip().lower(), normalized_name]:
@@ -169,12 +172,21 @@ class TeamMatcher:
             self._create_alias_async(team_id, raw_name, bookmaker)
             return team_id
         
-        # Step 4: Auto-create team if primary bookmaker (Betano)
-        if self.auto_create_team and normalized_bookmaker == self.primary_bookmaker and league_id:
+        # Step 4: Auto-create team if primary bookmaker (Betano) and has league_id
+        if self.auto_create_team and is_primary and league_id:
+            self.logger.info(
+                f"[Auto-create] Attempting to create team: '{raw_name}' "
+                f"league={league_name or league_id} bookmaker={bookmaker}"
+            )
             team_id = await self._create_team(raw_name.strip(), league_id)
             if team_id:
+                self.logger.info(f"[Auto-create] Success: '{raw_name}' -> {team_id}")
                 return team_id
+            else:
+                self.logger.warning(f"[Auto-create] Failed to create team: '{raw_name}'")
         
+        # Log unmatched only if we couldn't find OR create the team
+        self._log_unmatched(raw_name, bookmaker, league_name, is_primary)
         return None
     
     async def _create_team(self, name: str, league_id: str) -> Optional[str]:
@@ -243,7 +255,7 @@ class TeamMatcher:
                 blocked_target = BLOCKED_MATCHES[input_lower]
                 if blocked_target in match_lower or match_lower in blocked_target:
                     # This is a known bad match, reject it
-                    self._log_unmatched(raw_name, f"blocked match to '{best_match}'")
+                    self.logger.debug(f"Blocked match: '{raw_name}' -> '{best_match}'")
                     return None
             
             team_id = next(
@@ -268,16 +280,29 @@ class TeamMatcher:
         self._log_unmatched(raw_name)
         return None
     
-    def _log_unmatched(self, raw_name: str, reason: str = None):
-        """Log unmatched team name, but only once per cycle."""
+    def _log_unmatched(
+        self, 
+        raw_name: str, 
+        bookmaker: str = None, 
+        league_name: str = None,
+        is_primary: bool = False
+    ):
+        """Log unmatched team name with context, but only once per cycle."""
         normalized = self._normalize_name(raw_name).lower()
         
         if normalized not in self._unmatched_logged:
             self._unmatched_logged.add(normalized)
-            if reason:
-                self.logger.warning(f"No match for '{raw_name}': {reason}")
-            else:
-                self.logger.warning(f"No match found for: '{raw_name}'")
+            
+            context_parts = []
+            if bookmaker:
+                context_parts.append(f"bookmaker={bookmaker}")
+            if league_name:
+                context_parts.append(f"league={league_name}")
+            if is_primary:
+                context_parts.append("primary=true")
+            
+            context = f" ({', '.join(context_parts)})" if context_parts else ""
+            self.logger.warning(f"No match found for: '{raw_name}'{context}")
     
     def _create_alias_async(self, team_id: str, alias_name: str, bookmaker: str):
         """
