@@ -365,7 +365,8 @@ class Orchestrator:
                 )
             
             # Match teams - use full method for primary bookmaker to auto-create
-            if odds.bookmaker_name.lower() == self.team_matcher.primary_bookmaker:
+            normalized_bookmaker = odds.bookmaker_name.strip().lower()
+            if normalized_bookmaker == self.team_matcher.primary_bookmaker:
                 home_team_id = await self.team_matcher.find_team_id(
                     odds.home_team_raw, 
                     odds.bookmaker_name,
