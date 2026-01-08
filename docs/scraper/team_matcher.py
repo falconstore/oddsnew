@@ -175,6 +175,15 @@ class TeamMatcher:
         normalized_bookmaker = bookmaker.strip().lower()
         is_primary = normalized_bookmaker == self.primary_bookmaker
         
+        # Diagnostic log for Bundesliga/Ligue 1
+        if is_primary and league_name in ('Bundesliga', 'Ligue 1'):
+            has_league_cache = league_id in self.teams_by_league if league_id else False
+            teams_in_cache = len(self.teams_by_league.get(league_id, {})) if league_id else 0
+            self.logger.info(
+                f"[DIAG] find_team_id: '{raw_name}' league={league_name} "
+                f"has_cache={has_league_cache} teams_in_cache={teams_in_cache}"
+            )
+        
         # Step 1: Exact match in aliases (try both raw and normalized)
         for name_variant in [raw_name.strip().lower(), normalized_name]:
             alias_key = (name_variant, normalized_bookmaker)
@@ -195,6 +204,13 @@ class TeamMatcher:
         team_id = None
         if league_id and league_id in self.teams_by_league:
             team_id = self._fuzzy_match_in_league(raw_name, league_id)
+        
+        # Diagnostic log after fuzzy match for Bundesliga/Ligue 1
+        if is_primary and league_name in ('Bundesliga', 'Ligue 1'):
+            self.logger.info(
+                f"[DIAG] fuzzy result for '{raw_name}': team_id={team_id} "
+                f"will_auto_create={self.auto_create_team and not team_id}"
+            )
         
         if team_id and self.auto_create_alias:
             # Create alias for future exact matches
