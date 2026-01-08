@@ -48,6 +48,18 @@ class BetanoScraper(BaseScraper):
             "country": "Itália",
             "url_path": "/sport/futebol/italia/serie-a/1635/"
         },
+        "ligue_1": {
+            "id": "215",
+            "name": "Ligue 1",
+            "country": "França",
+            "url_path": "/sport/futebol/franca/ligue-1/215/"
+        },
+        "bundesliga": {
+            "id": "216",
+            "name": "Bundesliga",
+            "country": "Alemanha",
+            "url_path": "/sport/futebol/alemanha/bundesliga/216/"
+        },
     }
     
     def __init__(self):
