@@ -626,7 +626,9 @@ class Orchestrator:
                     "league_country": row.get("league_country"),
                     "sport_type": row.get("sport_type", "football"),  # Include sport_type
                     "home_team": home_team,
+                    "home_team_logo": row.get("home_team_logo"),
                     "away_team": away_team,
+                    "away_team_logo": row.get("away_team_logo"),
                     "odds": [],
                     "best_home": 0,
                     "best_draw": 0,
