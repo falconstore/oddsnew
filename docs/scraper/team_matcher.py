@@ -134,18 +134,16 @@ class TeamMatcher:
             if alias_key in self.aliases_cache:
                 return self.aliases_cache[alias_key]
         
-        # Step 2: Exact match in standard names (league-scoped first)
+        # Step 2: Exact match in standard names (league-scoped ONLY when league_id is present)
         if league_id and league_id in self.teams_by_league:
             if normalized_name in self.teams_by_league[league_id]:
                 return self.teams_by_league[league_id][normalized_name]
+            # Fuzzy match within league only (no cross-league)
+            return self._fuzzy_match_in_league(raw_name, league_id)
         
-        # Step 3: Fallback to global reverse cache for exact match
+        # Fallback to global reverse cache ONLY when no league_id (rare case)
         if normalized_name in self.reverse_cache:
             return self.reverse_cache[normalized_name]
-        
-        # Step 4: Fuzzy match within league only (no cross-league matches)
-        if league_id:
-            return self._fuzzy_match_in_league(raw_name, league_id)
         
         return None
     
@@ -191,19 +189,18 @@ class TeamMatcher:
                 self.logger.debug(f"Exact alias match: {raw_name} -> {self.aliases_cache[alias_key]}")
                 return self.aliases_cache[alias_key]
         
-        # Step 2: Exact match in standard names (league-scoped first if available)
+        # Step 2: Exact match in standard names (league-scoped ONLY when league_id is present)
         if league_id and league_id in self.teams_by_league:
             if normalized_name in self.teams_by_league[league_id]:
                 return self.teams_by_league[league_id][normalized_name]
         
-        # Fallback to global reverse cache for exact match
-        if normalized_name in self.reverse_cache:
-            return self.reverse_cache[normalized_name]
-        
-        # Step 3: Fuzzy match - ONLY within the same league to prevent cross-league errors
+        # Step 3: Fuzzy match - ONLY within the same league (skip global reverse_cache when league_id exists)
         team_id = None
         if league_id and league_id in self.teams_by_league:
             team_id = self._fuzzy_match_in_league(raw_name, league_id)
+        elif not league_id and normalized_name in self.reverse_cache:
+            # Fallback to global reverse cache ONLY when no league_id (rare case)
+            return self.reverse_cache[normalized_name]
         
         # Diagnostic log after fuzzy match for Bundesliga/Ligue 1
         if is_primary and league_name in ('Bundesliga', 'Ligue 1'):
