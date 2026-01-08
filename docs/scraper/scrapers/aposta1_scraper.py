@@ -23,8 +23,8 @@ class Aposta1Scraper(BaseScraper):
         "serie_a": Aposta1League(champ_id="2942", category_id="502", name="Serie A", country="italia"),
         "premier_league": Aposta1League(champ_id="2936", category_id="497", name="Premier League", country="inglaterra"),
         "la_liga": Aposta1League(champ_id="2941", category_id="501", name="La Liga", country="espanha"),
-        "bundesliga": Aposta1League(champ_id="2943", category_id="503", name="Bundesliga", country="alemanha"),
-        "ligue_1": Aposta1League(champ_id="2944", category_id="504", name="Ligue 1", country="franca"),
+        "bundesliga": Aposta1League(champ_id="2950", category_id="506", name="Bundesliga", country="alemanha"),
+        "ligue_1": Aposta1League(champ_id="2943", category_id="503", name="Ligue 1", country="franca"),
     }
     
     EVENTS_API = "https://sb2frontend-altenar2.biahosted.com/api/widget/GetEvents"
