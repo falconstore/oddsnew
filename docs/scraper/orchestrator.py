@@ -380,14 +380,16 @@ class Orchestrator:
                     odds.league_raw  # Pass league name for better logging
                 )
             else:
-                # Other bookmakers use cache-only (no DB calls)
+                # Other bookmakers use cache-only (no DB calls) with league-scoping
                 home_team_id = self.team_matcher.find_team_id_cached(
                     odds.home_team_raw, 
-                    odds.bookmaker_name
+                    odds.bookmaker_name,
+                    league_id
                 )
                 away_team_id = self.team_matcher.find_team_id_cached(
                     odds.away_team_raw, 
-                    odds.bookmaker_name
+                    odds.bookmaker_name,
+                    league_id
                 )
             
             if not home_team_id:

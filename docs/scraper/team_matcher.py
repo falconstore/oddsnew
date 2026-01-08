@@ -117,10 +117,10 @@ class TeamMatcher:
             f"{len(self.aliases_cache)} aliases across {len(self.teams_by_league)} leagues"
         )
     
-    def find_team_id_cached(self, raw_name: str, bookmaker: str) -> Optional[str]:
+    def find_team_id_cached(self, raw_name: str, bookmaker: str, league_id: str = None) -> Optional[str]:
         """
         Find team ID using only in-memory cache (no DB calls).
-        Fast path for batch processing.
+        Fast path for batch processing. Now supports league-scoped matching.
         """
         if not raw_name:
             return None
@@ -134,12 +134,20 @@ class TeamMatcher:
             if alias_key in self.aliases_cache:
                 return self.aliases_cache[alias_key]
         
-        # Step 2: Exact match in standard names
+        # Step 2: Exact match in standard names (league-scoped first)
+        if league_id and league_id in self.teams_by_league:
+            if normalized_name in self.teams_by_league[league_id]:
+                return self.teams_by_league[league_id][normalized_name]
+        
+        # Step 3: Fallback to global reverse cache for exact match
         if normalized_name in self.reverse_cache:
             return self.reverse_cache[normalized_name]
         
-        # Step 3: Fuzzy match (uses only cache)
-        return self._fuzzy_match(raw_name)
+        # Step 4: Fuzzy match within league only (no cross-league matches)
+        if league_id:
+            return self._fuzzy_match_in_league(raw_name, league_id)
+        
+        return None
     
     async def find_team_id(
         self, 
