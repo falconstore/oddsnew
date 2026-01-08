@@ -361,15 +361,28 @@ class Orchestrator:
                     f"bookmaker={odds.bookmaker_name}, league_id={league_id}"
                 )
             
-            # Match teams using cache-only method (no DB calls)
-            home_team_id = self.team_matcher.find_team_id_cached(
-                odds.home_team_raw, 
-                odds.bookmaker_name
-            )
-            away_team_id = self.team_matcher.find_team_id_cached(
-                odds.away_team_raw, 
-                odds.bookmaker_name
-            )
+            # Match teams - use full method for primary bookmaker to auto-create
+            if odds.bookmaker_name.lower() == self.team_matcher.primary_bookmaker:
+                home_team_id = await self.team_matcher.find_team_id(
+                    odds.home_team_raw, 
+                    odds.bookmaker_name,
+                    league_id
+                )
+                away_team_id = await self.team_matcher.find_team_id(
+                    odds.away_team_raw, 
+                    odds.bookmaker_name,
+                    league_id
+                )
+            else:
+                # Other bookmakers use cache-only (no DB calls)
+                home_team_id = self.team_matcher.find_team_id_cached(
+                    odds.home_team_raw, 
+                    odds.bookmaker_name
+                )
+                away_team_id = self.team_matcher.find_team_id_cached(
+                    odds.away_team_raw, 
+                    odds.bookmaker_name
+                )
             
             if not home_team_id:
                 unmatched_teams.append((odds.home_team_raw, odds.bookmaker_name))
