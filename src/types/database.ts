@@ -126,6 +126,8 @@ export interface MatchOddsGroup {
   sport_type?: SportType;
   home_team: string;
   away_team: string;
+  home_team_logo?: string | null;
+  away_team_logo?: string | null;
   odds: BookmakerOdds[];
   best_home: number;
   best_draw: number | null;
