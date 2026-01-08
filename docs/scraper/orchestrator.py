@@ -366,6 +366,15 @@ class Orchestrator:
             
             # Match teams - use full method for primary bookmaker to auto-create
             normalized_bookmaker = odds.bookmaker_name.strip().lower()
+            
+            # Diagnostic log for Bundesliga/Ligue 1
+            if odds.league_raw in ('Bundesliga', 'Ligue 1'):
+                self.logger.info(
+                    f"[DIAG] {odds.league_raw}: home='{odds.home_team_raw}' "
+                    f"away='{odds.away_team_raw}' league_id={league_id} "
+                    f"is_primary={normalized_bookmaker == self.team_matcher.primary_bookmaker}"
+                )
+            
             if normalized_bookmaker == self.team_matcher.primary_bookmaker:
                 home_team_id = await self.team_matcher.find_team_id(
                     odds.home_team_raw, 
