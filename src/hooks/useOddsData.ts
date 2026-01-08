@@ -305,8 +305,8 @@ export const useOddsComparison = (filters?: {
         throw new Error('Supabase not configured');
       }
 
-      // Fetch from Supabase Storage instead of direct database query
-      const jsonUrl = `${supabaseUrl}/storage/v1/object/public/odds-data/odds.json`;
+      // Fetch from Supabase Storage with cache-busting to ensure fresh data
+      const jsonUrl = `${supabaseUrl}/storage/v1/object/public/odds-data/odds.json?v=${Date.now()}`;
       
       const response = await fetch(jsonUrl, {
         headers: {
