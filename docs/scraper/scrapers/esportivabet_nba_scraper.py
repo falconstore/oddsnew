@@ -307,8 +307,8 @@ class EsportivabetNBAScraper(BaseScraper):
                     if not market:
                         continue
                         
-                    # Verifica se é o mercado Moneyline (TypeId 1)
-                    if market.get("typeId") == 1:
+                    # Verifica se é o mercado Vencedor/Moneyline (TypeId 219 para NBA)
+                    if market.get("typeId") == 219:
                         odds_sets = self._group_odds_by_type(market, odds_map)
                         
                         parsed_date = date_parser.parse(match_date)
@@ -344,16 +344,17 @@ class EsportivabetNBAScraper(BaseScraper):
     
     def _group_odds_by_type(self, market: Dict[str, Any], odds_map: Dict[int, Dict[str, Any]]) -> Dict[str, Dict[str, float]]:
         """
-        Agrupa odds em SO e PA baseado no campo 'offers'.
+        Extrai odds Home/Away do mercado Moneyline.
+        Para NBA, todas as odds são tratadas como PA (Pagamento Antecipado).
         
-        - Sem 'offers' ou offers vazio = SO (Super Odds)
-        - Com 'offers' populado = PA (Pagamento Antecipado)
+        Price pode ser:
+        - float direto: 1.85
+        - objeto: {"source": "3.8000", "parsedValue": 3.8}
         
         Returns:
-            Dict com chaves "SO" e/ou "PA", cada uma contendo {"home": float, "away": float}
+            Dict com chave "PA" contendo {"home": float, "away": float}
         """
-        so_odds = {"home": None, "away": None}
-        pa_odds = {"home": None, "away": None}
+        odds_data = {"home": None, "away": None}
         
         odd_ids = market.get("oddIds", [])
         
@@ -363,36 +364,30 @@ class EsportivabetNBAScraper(BaseScraper):
                 continue
             
             type_id = odd.get("typeId")
-            price = odd.get("price")
+            price_raw = odd.get("price")
             
-            if price is None:
+            if price_raw is None:
                 continue
             
-            price = float(price)
+            # Price pode ser número ou objeto {"source": "3.8", "parsedValue": 3.8}
+            if isinstance(price_raw, dict):
+                price = float(price_raw.get("parsedValue", 0))
+            else:
+                price = float(price_raw)
             
-            # Verifica se tem offers (campo existe e não é vazio)
-            offers = odd.get("offers")
-            has_offers = offers is not None and len(offers) > 0
+            if price <= 0:
+                continue
             
             if type_id == 1:  # Home
-                if has_offers:
-                    pa_odds["home"] = price
-                else:
-                    so_odds["home"] = price
+                odds_data["home"] = price
             elif type_id == 3:  # Away
-                if has_offers:
-                    pa_odds["away"] = price
-                else:
-                    so_odds["away"] = price
+                odds_data["away"] = price
         
         result = {}
         
         # Só inclui se tiver ambas odds (home e away)
-        if so_odds["home"] is not None and so_odds["away"] is not None:
-            result["SO"] = so_odds
-        
-        if pa_odds["home"] is not None and pa_odds["away"] is not None:
-            result["PA"] = pa_odds
+        if odds_data["home"] is not None and odds_data["away"] is not None:
+            result["PA"] = odds_data  # NBA usa PA por padrão
         
         return result
 
