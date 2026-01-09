@@ -28,7 +28,7 @@ class EsportivabetScraper(BaseScraper):
         "la_liga": EsportivabetLeague(champ_id="2941", category_id="501", name="La Liga", country="espanha", league_slug="laliga"),
         "bundesliga": EsportivabetLeague(champ_id="2950", category_id="503", name="Bundesliga", country="alemanha", league_slug="bundesliga"),
         "ligue_1": EsportivabetLeague(champ_id="2943", category_id="504", name="Ligue 1", country="franca", league_slug="ligue-1"),
- 	"paulistao": EsportivabetLeague(champ_id="3436", category_id="504", name="Paulistao", country="brasil", league_slug="paulistao"),
+     	"paulistao": EsportivabetLeague(champ_id="3436", category_id="504", name="Paulistao", country="brasil", league_slug="paulistao"),
     }
     
     API_BASE = "https://sb2frontend-altenar2.biahosted.com/api/widget"
