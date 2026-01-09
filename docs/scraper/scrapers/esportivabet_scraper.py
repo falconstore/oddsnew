@@ -26,6 +26,9 @@ class EsportivabetScraper(BaseScraper):
         "serie_a": EsportivabetLeague(champ_id="2942", category_id="502", name="Serie A", country="italia", league_slug="serie-a"),
         "premier_league": EsportivabetLeague(champ_id="2936", category_id="497", name="Premier League", country="inglaterra", league_slug="premier-league"),
         "la_liga": EsportivabetLeague(champ_id="2941", category_id="501", name="La Liga", country="espanha", league_slug="laliga"),
+        "bundesliga": EsportivabetLeague(champ_id="2950", category_id="503", name="Bundesliga", country="alemanha", league_slug="bundesliga"),
+        "ligue_1": EsportivabetLeague(champ_id="2943", category_id="504", name="Ligue 1", country="franca", league_slug="ligue-1"),
+ 	"paulistao": EsportivabetLeague(champ_id="3436", category_id="504", name="Paulistao", country="brasil", league_slug="paulistao"),
     }
     
     API_BASE = "https://sb2frontend-altenar2.biahosted.com/api/widget"
@@ -44,14 +47,14 @@ class EsportivabetScraper(BaseScraper):
         # Se já temos token e user_agent, apenas reinicia a session se necessário
         if self.auth_token and self.user_agent:
             if not self.session:
-                self.logger.info("🔄 Esportivabet: Reusando token existente, reinicializando session")
+                self.logger.info(" Esportivabet: Reusando token existente, reinicializando session")
                 self._init_session()
             return
         
         # Check for manual token override via env var
         manual_token = os.environ.get("ESPORTIVABET_AUTH_TOKEN")
         if manual_token:
-            self.logger.info("🔑 Esportivabet: Usando token manual da env var")
+            self.logger.info(" Esportivabet: Usando token manual da env var")
             self.auth_token = manual_token
             self.user_agent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
             self._init_session()
@@ -62,7 +65,7 @@ class EsportivabetScraper(BaseScraper):
             return
         
         self._setup_attempted = True
-        self.logger.info("🔑 Esportivabet: Iniciando captura de token via Playwright...")
+        self.logger.info(" Esportivabet: Iniciando captura de token via Playwright...")
         
         async with async_playwright() as p:
             browser = await p.chromium.launch(
@@ -78,7 +81,7 @@ class EsportivabetScraper(BaseScraper):
             
             async def handle_request(request):
                 if "biahosted.com/api" in request.url:
-                    self.logger.debug(f"📡 Request detectada: {request.url[:80]}...")
+                    self.logger.debug(f" Request detectada: {request.url[:80]}...")
                     headers = request.headers
                     if "authorization" in headers:
                         token = headers["authorization"]
@@ -100,12 +103,12 @@ class EsportivabetScraper(BaseScraper):
                     if token_future.done():
                         break
                     
-                    self.logger.info(f"🌍 Esportivabet: Navegando para {target_url}...")
+                    self.logger.info(f" Esportivabet: Navegando para {target_url}...")
                     
                     try:
                         await page.goto(target_url, wait_until="domcontentloaded", timeout=60000)
                     except Exception as nav_error:
-                        self.logger.warning(f"⚠️ Navegação falhou: {nav_error}")
+                        self.logger.warning(f" Navegação falhou: {nav_error}")
                         continue
                     
                     # Aguarda um pouco para requests carregarem
@@ -113,7 +116,7 @@ class EsportivabetScraper(BaseScraper):
                     
                     if not token_future.done():
                         # Tenta scroll para forçar lazy-load
-                        self.logger.debug("📜 Fazendo scroll para forçar requests...")
+                        self.logger.debug(" Fazendo scroll para forçar requests...")
                         await page.evaluate("window.scrollTo(0, 500)")
                         await page.wait_for_timeout(2000)
                         await page.evaluate("window.scrollTo(0, 1000)")
@@ -126,12 +129,12 @@ class EsportivabetScraper(BaseScraper):
                     self.auth_token = token_future.result()
                 
                 self.user_agent = await page.evaluate("navigator.userAgent")
-                self.logger.info(f"✅ Esportivabet: Token capturado! UA: {self.user_agent[:30]}...")
+                self.logger.info(f" Esportivabet: Token capturado! UA: {self.user_agent[:30]}...")
                 
             except asyncio.TimeoutError:
-                self.logger.error("❌ Esportivabet: Timeout capturando token após todas as tentativas.")
+                self.logger.error(" Esportivabet: Timeout capturando token após todas as tentativas.")
             except Exception as e:
-                self.logger.error(f"❌ Esportivabet: Erro no Playwright: {e}")
+                self.logger.error(f" Esportivabet: Erro no Playwright: {e}")
             finally:
                 await browser.close()
         
@@ -214,10 +217,10 @@ class EsportivabetScraper(BaseScraper):
                     events = data.get("events", [])
                     
                     if events:
-                        self.logger.debug(f"📡 Esportivabet {league.name}: {len(events)} eventos em {endpoint.split('/')[-1]}")
+                        self.logger.debug(f" Esportivabet {league.name}: {len(events)} eventos em {endpoint.split('/')[-1]}")
                         return self._parse_response(data, league)
                     else:
-                        self.logger.debug(f"📡 Esportivabet {league.name}: Nenhum evento em {endpoint.split('/')[-1]}, tentando próximo...")
+                        self.logger.debug(f" Esportivabet {league.name}: Nenhum evento em {endpoint.split('/')[-1]}, tentando próximo...")
                         continue
                 
                 if response.status_code in [400, 401, 403]:
@@ -225,7 +228,7 @@ class EsportivabetScraper(BaseScraper):
                     
                     # Auto-retry: limpa token, recaptura e tenta novamente (1x)
                     if retry_on_auth_fail:
-                        self.logger.info("🔄 Esportivabet: Tentando recapturar token...")
+                        self.logger.info(" Esportivabet: Tentando recapturar token...")
                         self.auth_token = None
                         self.user_agent = None
                         if self.session:
@@ -237,13 +240,13 @@ class EsportivabetScraper(BaseScraper):
                     
                     return []
                 
-                self.logger.warning(f"⚠️ Esportivabet {league.name}: HTTP {response.status_code} em {endpoint.split('/')[-1]}")
+                self.logger.warning(f" Esportivabet {league.name}: HTTP {response.status_code} em {endpoint.split('/')[-1]}")
                 
             except Exception as e:
-                self.logger.error(f"❌ Esportivabet {league.name}: Erro em {endpoint.split('/')[-1]} - {e}")
+                self.logger.error(f" Esportivabet {league.name}: Erro em {endpoint.split('/')[-1]} - {e}")
                 continue
 
-        self.logger.warning(f"⚠️ Esportivabet {league.name}: Nenhum evento encontrado em ambos endpoints")
+        self.logger.warning(f" Esportivabet {league.name}: Nenhum evento encontrado em ambos endpoints")
         return []
     
     def _get_country_for_league(self, league_name: str) -> str:
@@ -341,7 +344,7 @@ class EsportivabetScraper(BaseScraper):
             except Exception as e:
                 continue
         
-        self.logger.info(f"✅ Esportivabet {league.name}: {len(results)} odds coletadas")
+        self.logger.info(f" Esportivabet {league.name}: {len(results)} odds coletadas")
         return results
 
 
