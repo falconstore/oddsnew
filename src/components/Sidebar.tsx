@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
 import { 
   LayoutDashboard, 
   Trophy, 
@@ -9,12 +10,14 @@ import {
   Menu,
   X,
   BarChart3,
+  LogOut,
+  Shield,
   type LucideIcon
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useState } from 'react';
 
-// Sport icon components as valid React components
 const FootballIcon = () => <span className="text-base">⚽</span>;
 const BasketballIcon = () => <span className="text-base">🏀</span>;
 
@@ -22,21 +25,29 @@ type NavigationItem = {
   name: string;
   href: string;
   icon: LucideIcon | (() => JSX.Element);
+  adminOnly?: boolean;
 };
 
 const navigation: NavigationItem[] = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Monitor Futebol', href: '/monitor-futebol', icon: FootballIcon },
   { name: 'Monitor Basquete', href: '/monitor-basquete', icon: BasketballIcon },
-  { name: 'Ligas', href: '/leagues', icon: Trophy },
-  { name: 'Times', href: '/teams', icon: Users },
-  { name: 'Casas de Apostas', href: '/bookmakers', icon: Building2 },
+  { name: 'Ligas', href: '/leagues', icon: Trophy, adminOnly: true },
+  { name: 'Times', href: '/teams', icon: Users, adminOnly: true },
+  { name: 'Casas de Apostas', href: '/bookmakers', icon: Building2, adminOnly: true },
   { name: 'Configurações', href: '/settings', icon: Settings },
 ];
 
 export function Sidebar() {
   const location = useLocation();
+  const { user, isAdmin, signOut } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  const filteredNavigation = navigation.filter(item => !item.adminOnly || isAdmin);
+
+  const handleSignOut = async () => {
+    await signOut();
+  };
 
   return (
     <>
@@ -60,16 +71,18 @@ export function Sidebar() {
 
       {/* Sidebar */}
       <aside className={cn(
-        "fixed left-0 top-0 z-40 h-screen w-64 bg-sidebar border-r border-sidebar-border transition-transform md:translate-x-0",
+        "fixed left-0 top-0 z-40 h-screen w-64 bg-sidebar border-r border-sidebar-border transition-transform md:translate-x-0 flex flex-col",
         mobileOpen ? "translate-x-0" : "-translate-x-full"
       )}>
+        {/* Header */}
         <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-6">
           <BarChart3 className="h-6 w-6 text-sidebar-primary" />
           <span className="text-lg font-semibold text-sidebar-foreground">OddsCompare</span>
         </div>
         
-        <nav className="flex flex-col gap-1 p-4">
-          {navigation.map((item) => {
+        {/* Navigation */}
+        <nav className="flex flex-col gap-1 p-4 flex-1">
+          {filteredNavigation.map((item) => {
             const isActive = location.pathname === item.href;
             return (
               <Link
@@ -89,6 +102,36 @@ export function Sidebar() {
             );
           })}
         </nav>
+
+        {/* User Footer */}
+        {user && (
+          <div className="p-4 border-t border-sidebar-border">
+            <div className="flex items-center gap-3">
+              <Avatar className="h-8 w-8">
+                <AvatarFallback className="text-xs">
+                  {user.email?.[0].toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate text-sidebar-foreground">
+                  {user.email}
+                </p>
+                <p className="text-xs text-sidebar-foreground/60 flex items-center gap-1">
+                  {isAdmin && <Shield className="h-3 w-3" />}
+                  {isAdmin ? 'Admin' : 'Usuário'}
+                </p>
+              </div>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={handleSignOut}
+                className="h-8 w-8 text-sidebar-foreground/60 hover:text-sidebar-foreground"
+              >
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
       </aside>
     </>
   );

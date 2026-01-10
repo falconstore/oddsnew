@@ -1,7 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { isSupabaseConfigured } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -23,36 +22,11 @@ const Login = () => {
 
   const from = (location.state as any)?.from?.pathname || '/';
 
-  // Redirect if already logged in
-  if (user) {
-    navigate(from, { replace: true });
-    return null;
-  }
-
-  if (!isSupabaseConfigured()) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <div className="flex justify-center mb-4">
-              <div className="bg-primary/10 p-3 rounded-full">
-                <TrendingUp className="h-8 w-8 text-primary" />
-              </div>
-            </div>
-            <CardTitle>Supabase não configurado</CardTitle>
-            <CardDescription>
-              Configure o Supabase em Configurações antes de fazer login.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button className="w-full" onClick={() => navigate('/settings')}>
-              Ir para Configurações
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  useEffect(() => {
+    if (user) {
+      navigate(from, { replace: true });
+    }
+  }, [user, navigate, from]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,6 +76,10 @@ const Login = () => {
     
     setLoading(false);
   };
+
+  if (user) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
