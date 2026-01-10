@@ -12,7 +12,7 @@ import { TrendingUp, AlertCircle, Clock } from 'lucide-react';
 const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { signIn, signUp, user, isApproved, userStatus, loading: authLoading } = useAuth();
+  const { signIn, signUp, signOut, user, isApproved, userStatus, loading: authLoading } = useAuth();
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -118,9 +118,8 @@ const Login = () => {
             <Button 
               variant="outline" 
               className="w-full" 
-              onClick={() => {
-                signIn('', ''); // Reset session
-                window.location.reload();
+              onClick={async () => {
+                await signOut();
               }}
             >
               Sair
