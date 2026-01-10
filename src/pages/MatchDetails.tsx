@@ -215,6 +215,14 @@ function generateBookmakerLink(
     }
   }
   
+  // Jogo de Ouro - query params format
+  if (name.includes('jogodeouro')) {
+    const eventId = extraData.jogodeouro_event_id;
+    if (eventId) {
+      return `https://jogodeouro.bet.br/pt/sports?page=event&eventId=${eventId}&sportId=66`;
+    }
+  }
+  
   return null;
 }
 
