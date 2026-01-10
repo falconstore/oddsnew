@@ -1,9 +1,10 @@
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { MultiSelectPopover } from '@/components/ui/multi-select-popover';
-import { X, Filter, ArrowUpDown, CalendarIcon } from 'lucide-react';
+import { X, Filter, ArrowUpDown, CalendarIcon, Search } from 'lucide-react';
 import { useLeagues, useBookmakers } from '@/hooks/useOddsData';
 import { format, parse } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -83,6 +84,17 @@ export function OddsFilters({ filters, onFiltersChange, hasActiveFilters, hideSp
     <div className="space-y-4">
       {/* Main Filters Row */}
       <div className="flex flex-wrap items-center gap-3">
+        {/* Search Input */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar time..."
+            value={filters.searchTerm}
+            onChange={(e) => updateFilter('searchTerm', e.target.value)}
+            className="pl-9 w-[180px] h-9"
+          />
+        </div>
+        
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Filter className="h-4 w-4" />
           <span>Filtros:</span>
