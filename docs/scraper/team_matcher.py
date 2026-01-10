@@ -50,6 +50,39 @@ class TeamMatcher:
         self.auto_create_alias = True  # Auto-create aliases for fuzzy matches
         self.auto_create_team = True  # Auto-create teams from primary bookmaker
         self.primary_bookmaker = "betano"  # Bookmaker that defines standard names
+        
+        # Competições que permitem busca cross-league (copas e europeias)
+        # Times de ligas domésticas serão encontrados nessas competições
+        self.cross_league_competitions = {
+            "fa cup",
+            "efl cup",
+            "carabao cup",
+            "community shield",
+            "champions league",
+            "europa league",
+            "conference league",
+            "copa do brasil",
+            "copa america",
+            "libertadores",
+            "sul-americana",
+            "supercopa",
+            "recopa",
+            "coppa italia",
+            "supercoppa",
+            "dfb pokal",
+            "supercup",
+            "coupe de france",
+            "trophee des champions",
+            "copa del rey",
+            "supercopa de espana",
+            "taca de portugal",
+            "supertaca",
+            "knvb beker",
+            "johan cruijff schaal",
+            "world cup",
+            "euro",
+            "nations league",
+        }
     
     def _normalize_name(self, name: str) -> str:
         """
@@ -214,8 +247,21 @@ class TeamMatcher:
             self._create_alias_async(team_id, raw_name, bookmaker)
             return team_id
         
+        # Step 3.5: Cross-league search para copas/europeias
+        # Se não encontrou na liga específica, tenta em outras ligas
+        if not team_id and league_name:
+            team_id = self._find_team_cross_league(raw_name, league_id, league_name)
+            
+            if team_id and self.auto_create_alias:
+                # Criar alias para matches futuros
+                self._create_alias_async(team_id, raw_name, bookmaker)
+                self.logger.info(
+                    f"[Cross-league] Found '{raw_name}' from another league -> {team_id}"
+                )
+                return team_id
+        
         # Step 4: Auto-create team if primary bookmaker (Betano) and has league_id
-        # This is triggered when NO match was found in the league
+        # This is triggered when NO match was found in the league OR cross-league
         if self.auto_create_team and is_primary and league_id and not team_id:
             self.logger.info(
                 f"[Auto-create] Attempting to create team: '{raw_name}' "
@@ -327,6 +373,98 @@ class TeamMatcher:
                     self.logger.debug(
                         f"Fuzzy match in-league: '{raw_name}' -> '{best_match}' ({best_score:.0f})"
                     )
+                return team_id
+        
+        return None
+    
+    def _find_team_cross_league(
+        self, 
+        raw_name: str, 
+        current_league_id: str,
+        league_name: str
+    ) -> Optional[str]:
+        """
+        Busca um time em TODAS as ligas quando não encontrado na liga atual.
+        Útil para copas e competições europeias (FA Cup, Champions League, etc).
+        
+        Só é ativado para competições configuradas em self.cross_league_competitions.
+        
+        Args:
+            raw_name: Nome do time
+            current_league_id: ID da liga atual (para excluir da busca)
+            league_name: Nome da liga (para verificar se é cross-league)
+            
+        Returns:
+            team_id se encontrado em outra liga, None caso contrário
+        """
+        # Verifica se é uma competição que permite cross-league
+        league_lower = league_name.lower()
+        is_cross_league_comp = any(
+            comp in league_lower for comp in self.cross_league_competitions
+        )
+        
+        if not is_cross_league_comp:
+            return None
+        
+        normalized_name = self._normalize_name(raw_name).lower()
+        
+        # Step 1: Match exato no reverse_cache global
+        if normalized_name in self.reverse_cache:
+            team_id = self.reverse_cache[normalized_name]
+            self.logger.debug(
+                f"[Cross-league] Exact global match: '{raw_name}' -> {team_id}"
+            )
+            return team_id
+        
+        # Step 2: Fuzzy match em TODAS as ligas (exceto a atual)
+        all_names = list(self.teams_cache.values())
+        if not all_names:
+            return None
+        
+        # Usar estratégias de matching similares ao in-league
+        strategies = [
+            (fuzz.token_sort_ratio, self.min_score),
+            (fuzz.token_set_ratio, self.min_score),
+        ]
+        
+        best_match = None
+        best_score = 0
+        
+        for scorer, min_threshold in strategies:
+            result = process.extractOne(
+                self._normalize_name(raw_name),
+                all_names,
+                scorer=scorer,
+                score_cutoff=min_threshold
+            )
+            
+            if result and result[1] > best_score:
+                best_match = result[0]
+                best_score = result[1]
+        
+        if best_match:
+            # Verificar blocked matches
+            input_lower = self._normalize_name(raw_name).lower()
+            match_lower = best_match.lower()
+            
+            if input_lower in BLOCKED_MATCHES:
+                blocked_target = BLOCKED_MATCHES[input_lower]
+                if blocked_target in match_lower or match_lower in blocked_target:
+                    self.logger.debug(
+                        f"[Cross-league] Blocked match: '{raw_name}' -> '{best_match}'"
+                    )
+                    return None
+            
+            # Encontrar o team_id no reverse_cache
+            team_id = self.reverse_cache.get(best_match.lower())
+            if not team_id:
+                team_id = self.reverse_cache.get(self._normalize_name(best_match).lower())
+            
+            if team_id:
+                self.logger.info(
+                    f"[Cross-league] Fuzzy match: '{raw_name}' -> '{best_match}' "
+                    f"(score: {best_score:.1f}) in competition '{league_name}'"
+                )
                 return team_id
         
         return None
