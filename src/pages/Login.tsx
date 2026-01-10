@@ -94,8 +94,17 @@ const Login = () => {
     setLoading(false);
   };
 
-  // Se usuário está logado mas pendente/rejeitado
-  if (user && !authLoading && !isApproved) {
+  // Mostrar loading enquanto carrega dados do usuário
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  // Se usuário está logado mas pendente/rejeitado (só mostra depois do loading)
+  if (user && !isApproved) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="w-full max-w-md">
