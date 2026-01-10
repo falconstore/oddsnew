@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
-import { getSupabase, isSupabaseConfigured } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 
 interface AuthContextType {
   user: User | null;
@@ -21,12 +21,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
-    const supabase = getSupabase();
-    if (!supabase) {
-      setLoading(false);
-      return;
-    }
-
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
@@ -34,7 +28,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(session?.user ?? null);
         setLoading(false);
 
-        // Defer role check with setTimeout to avoid deadlock
         if (session?.user) {
           setTimeout(() => {
             checkAdminRole(session.user.id);
@@ -60,9 +53,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const checkAdminRole = async (userId: string) => {
-    const supabase = getSupabase();
-    if (!supabase) return;
-
     try {
       const { data, error } = await supabase
         .from('user_roles')
@@ -71,46 +61,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .eq('role', 'admin')
         .maybeSingle();
 
-      if (!error && data) {
-        setIsAdmin(true);
-      } else {
-        setIsAdmin(false);
-      }
+      setIsAdmin(!error && !!data);
     } catch {
       setIsAdmin(false);
     }
   };
 
   const signIn = async (email: string, password: string) => {
-    const supabase = getSupabase();
-    if (!supabase) {
-      return { error: new Error('Supabase não configurado') };
-    }
-
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     return { error: error as Error | null };
   };
 
   const signUp = async (email: string, password: string) => {
-    const supabase = getSupabase();
-    if (!supabase) {
-      return { error: new Error('Supabase não configurado') };
-    }
-
-    const redirectUrl = `${window.location.origin}/`;
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: { emailRedirectTo: redirectUrl }
+      options: { emailRedirectTo: `${window.location.origin}/` }
     });
     return { error: error as Error | null };
   };
 
   const signOut = async () => {
-    const supabase = getSupabase();
-    if (supabase) {
-      await supabase.auth.signOut();
-    }
+    await supabase.auth.signOut();
     setUser(null);
     setSession(null);
     setIsAdmin(false);

@@ -27,14 +27,19 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<Login />} />
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/monitor-futebol" element={<MonitorFutebol />} />
-            <Route path="/monitor-basquete" element={<MonitorBasquete />} />
-            <Route path="/match/:matchId" element={<MatchDetails />} />
+            
+            {/* Rotas protegidas - qualquer usuário logado */}
+            <Route path="/" element={<RequireAuth><Dashboard /></RequireAuth>} />
+            <Route path="/monitor-futebol" element={<RequireAuth><MonitorFutebol /></RequireAuth>} />
+            <Route path="/monitor-basquete" element={<RequireAuth><MonitorBasquete /></RequireAuth>} />
+            <Route path="/match/:matchId" element={<RequireAuth><MatchDetails /></RequireAuth>} />
+            <Route path="/settings" element={<RequireAuth><Settings /></RequireAuth>} />
+            
+            {/* Rotas protegidas - apenas admin */}
             <Route path="/leagues" element={<RequireAuth requireAdmin><Leagues /></RequireAuth>} />
             <Route path="/teams" element={<RequireAuth requireAdmin><Teams /></RequireAuth>} />
             <Route path="/bookmakers" element={<RequireAuth requireAdmin><Bookmakers /></RequireAuth>} />
-            <Route path="/settings" element={<Settings />} />
+            
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

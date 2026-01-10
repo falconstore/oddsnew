@@ -1,54 +1,21 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
 
-// These will be configured via environment or localStorage
-const getSupabaseConfig = () => {
-  const storedUrl = localStorage.getItem('supabase_url');
-  const storedKey = localStorage.getItem('supabase_anon_key');
-  
-  return {
-    url: storedUrl || import.meta.env.VITE_SUPABASE_URL || '',
-    anonKey: storedKey || import.meta.env.VITE_SUPABASE_ANON_KEY || ''
-  };
-};
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-let supabaseInstance: SupabaseClient | null = null;
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error('Supabase environment variables are not configured');
+}
 
-export const getSupabase = () => {
-  const config = getSupabaseConfig();
-  if (!config.url || !config.anonKey) {
-    return null;
-  }
-  if (!supabaseInstance) {
-    supabaseInstance = createClient(config.url, config.anonKey);
-  }
-  return supabaseInstance;
-};
+export const supabase = createClient(
+  supabaseUrl || '',
+  supabaseAnonKey || ''
+);
 
-// For backward compatibility - but will throw if not configured
-export const supabase = new Proxy({} as SupabaseClient, {
-  get(_, prop) {
-    const instance = getSupabase();
-    if (!instance) {
-      throw new Error('Supabase not configured. Please configure your Supabase connection first.');
-    }
-    return (instance as any)[prop];
-  }
-});
+// Helper para compatibilidade
+export const getSupabase = () => supabase;
 
+// Verifica se as variáveis estão configuradas
 export const isSupabaseConfigured = () => {
-  const config = getSupabaseConfig();
-  return config.url !== '' && config.anonKey !== '';
-};
-
-export const updateSupabaseConfig = (url: string, anonKey: string) => {
-  localStorage.setItem('supabase_url', url);
-  localStorage.setItem('supabase_anon_key', anonKey);
-  // Reload to apply new config
-  window.location.reload();
-};
-
-export const clearSupabaseConfig = () => {
-  localStorage.removeItem('supabase_url');
-  localStorage.removeItem('supabase_anon_key');
-  window.location.reload();
+  return Boolean(supabaseUrl && supabaseAnonKey);
 };
