@@ -2,7 +2,6 @@ import { useSearchParams } from 'react-router-dom';
 import { useMemo, useCallback } from 'react';
 
 export interface OddsFiltersState {
-  sport: string;
   leagues: string[];
   dates: string[];
   bookmakers: string[];
@@ -12,7 +11,6 @@ export interface OddsFiltersState {
 }
 
 export const defaultFilters: OddsFiltersState = {
-  sport: 'all',
   leagues: [],
   dates: [],
   bookmakers: [],
@@ -26,7 +24,6 @@ export function useFiltersFromUrl() {
 
   const filters = useMemo((): OddsFiltersState => {
     return {
-      sport: searchParams.get('sport') || 'all',
       leagues: searchParams.get('leagues')?.split(',').filter(Boolean) || [],
       dates: searchParams.get('dates')?.split(',').filter(Boolean) || [],
       bookmakers: searchParams.get('bookmakers')?.split(',').filter(Boolean) || [],
@@ -39,7 +36,6 @@ export function useFiltersFromUrl() {
   const setFilters = useCallback((newFilters: OddsFiltersState) => {
     const params = new URLSearchParams();
     
-    if (newFilters.sport !== 'all') params.set('sport', newFilters.sport);
     if (newFilters.leagues.length) params.set('leagues', newFilters.leagues.join(','));
     if (newFilters.dates.length) params.set('dates', newFilters.dates.join(','));
     if (newFilters.bookmakers.length) params.set('bookmakers', newFilters.bookmakers.join(','));
@@ -52,7 +48,6 @@ export function useFiltersFromUrl() {
 
   const hasActiveFilters = useMemo(() => {
     return (
-      filters.sport !== 'all' ||
       filters.leagues.length > 0 ||
       filters.dates.length > 0 ||
       filters.bookmakers.length > 0 ||

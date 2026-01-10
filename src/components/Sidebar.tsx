@@ -8,13 +8,26 @@ import {
   Settings,
   Menu,
   X,
-  BarChart3
+  BarChart3,
+  type LucideIcon
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 
-const navigation = [
+// Sport icon components as valid React components
+const FootballIcon = () => <span className="text-base">⚽</span>;
+const BasketballIcon = () => <span className="text-base">🏀</span>;
+
+type NavigationItem = {
+  name: string;
+  href: string;
+  icon: LucideIcon | (() => JSX.Element);
+};
+
+const navigation: NavigationItem[] = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+  { name: 'Monitor Futebol', href: '/monitor-futebol', icon: FootballIcon },
+  { name: 'Monitor Basquete', href: '/monitor-basquete', icon: BasketballIcon },
   { name: 'Ligas', href: '/leagues', icon: Trophy },
   { name: 'Times', href: '/teams', icon: Users },
   { name: 'Casas de Apostas', href: '/bookmakers', icon: Building2 },

@@ -6,6 +6,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { RequireAuth } from "@/components/RequireAuth";
 import Dashboard from "./pages/Dashboard";
+import MonitorFutebol from "./pages/MonitorFutebol";
+import MonitorBasquete from "./pages/MonitorBasquete";
 import MatchDetails from "./pages/MatchDetails";
 import Leagues from "./pages/Leagues";
 import Teams from "./pages/Teams";
@@ -26,6 +28,8 @@ const App = () => (
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/" element={<Dashboard />} />
+            <Route path="/monitor-futebol" element={<MonitorFutebol />} />
+            <Route path="/monitor-basquete" element={<MonitorBasquete />} />
             <Route path="/match/:matchId" element={<MatchDetails />} />
             <Route path="/leagues" element={<RequireAuth requireAdmin><Leagues /></RequireAuth>} />
             <Route path="/teams" element={<RequireAuth requireAdmin><Teams /></RequireAuth>} />
