@@ -1,4 +1,4 @@
-import { format, isToday, isTomorrow, addDays, isWithinInterval } from 'date-fns';
+import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -10,8 +10,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertTriangle } from 'lucide-react';
 import { useState, useMemo } from 'react';
-import { OddsFilters, OddsFiltersState, defaultFilters } from './OddsFilters';
+import { OddsFilters } from './OddsFilters';
 import { ViewToggle, ViewMode } from './ViewToggle';
+import { useFiltersFromUrl, defaultFilters } from '@/hooks/useFiltersFromUrl';
 import type { MatchOddsGroup } from '@/types/database';
 
 interface OddsComparisonTableProps {
@@ -19,12 +20,15 @@ interface OddsComparisonTableProps {
 }
 
 export function OddsComparisonTable({ onStatsUpdate }: OddsComparisonTableProps) {
-  const [filters, setFilters] = useState<OddsFiltersState>(defaultFilters);
+  const { filters, setFilters, hasActiveFilters } = useFiltersFromUrl();
   const [viewMode, setViewMode] = useState<ViewMode>('cards');
   const [activeTab, setActiveTab] = useState<'football' | 'basketball'>('football');
   
+  // Get first league for API query (or undefined for all)
+  const leagueForQuery = filters.leagues.length === 1 ? filters.leagues[0] : undefined;
+  
   const { data: matches, isLoading, error } = useOddsComparison(
-    filters.league !== 'all' ? { leagueName: filters.league } : undefined
+    leagueForQuery ? { leagueName: leagueForQuery } : undefined
   );
 
   // Filter and sort matches
@@ -36,24 +40,23 @@ export function OddsComparisonTable({ onStatsUpdate }: OddsComparisonTableProps)
     // Sport filter based on active tab
     result = result.filter(m => (m.sport_type || 'football') === activeTab);
     
-    // Date filter
-    if (filters.dateFilter !== 'all') {
-      const now = new Date();
+    // League filter (multiple)
+    if (filters.leagues.length > 0) {
+      result = result.filter(m => filters.leagues.includes(m.league_name));
+    }
+    
+    // Date filter (multiple specific dates)
+    if (filters.dates.length > 0) {
       result = result.filter(m => {
-        const matchDate = new Date(m.match_date);
-        if (filters.dateFilter === 'today') return isToday(matchDate);
-        if (filters.dateFilter === 'tomorrow') return isTomorrow(matchDate);
-        if (filters.dateFilter === 'week') {
-          return isWithinInterval(matchDate, { start: now, end: addDays(now, 7) });
-        }
-        return true;
+        const matchDateStr = format(new Date(m.match_date), 'yyyy-MM-dd');
+        return filters.dates.includes(matchDateStr);
       });
     }
     
-    // Bookmaker filter
-    if (filters.bookmaker !== 'all') {
+    // Bookmaker filter (multiple)
+    if (filters.bookmakers.length > 0) {
       result = result.filter(m => 
-        m.odds.some(o => o.bookmaker_name.toLowerCase() === filters.bookmaker.toLowerCase())
+        m.odds.some(o => filters.bookmakers.includes(o.bookmaker_name))
       );
     }
     
@@ -173,7 +176,11 @@ export function OddsComparisonTable({ onStatsUpdate }: OddsComparisonTableProps)
 
         <TabsContent value={activeTab} className="mt-4 space-y-4">
           {/* Filters */}
-          <OddsFilters filters={filters} onFiltersChange={setFilters} />
+          <OddsFilters 
+            filters={filters} 
+            onFiltersChange={setFilters} 
+            hasActiveFilters={hasActiveFilters}
+          />
 
           {/* View Toggle */}
           <div className="flex items-center justify-between">
