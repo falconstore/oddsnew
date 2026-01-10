@@ -123,34 +123,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signUp = async (email: string, password: string, fullName: string, phone: string) => {
-    // Criar conta no Supabase Auth
-    const { data, error } = await supabase.auth.signUp({
+    // Criar conta no Supabase Auth com metadata
+    // O perfil será criado automaticamente pelo trigger do banco
+    const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: { emailRedirectTo: `${window.location.origin}/` }
+      options: { 
+        emailRedirectTo: `${window.location.origin}/`,
+        data: {
+          full_name: fullName,
+          phone: phone
+        }
+      }
     });
 
     if (error) {
       return { error: error as Error | null };
     }
 
-    // Se a conta foi criada, criar o perfil
-    if (data.user) {
-      const { error: profileError } = await supabase
-        .from('user_profiles')
-        .insert({
-          user_id: data.user.id,
-          full_name: fullName,
-          phone: phone,
-          status: 'pending'
-        });
-
-      if (profileError) {
-        console.error('Error creating profile:', profileError);
-        return { error: new Error('Conta criada, mas houve um erro ao salvar o perfil.') };
-      }
-    }
-
+    // Perfil será criado automaticamente pelo trigger handle_new_user()
     return { error: null };
   };
 

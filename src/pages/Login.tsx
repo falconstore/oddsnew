@@ -174,6 +174,7 @@ const Login = () => {
                   <Input
                     id="login-email"
                     type="email"
+                    autoComplete="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="seu@email.com"
@@ -186,6 +187,7 @@ const Login = () => {
                   <Input
                     id="login-password"
                     type="password"
+                    autoComplete="current-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
@@ -206,6 +208,7 @@ const Login = () => {
                   <Input
                     id="signup-fullname"
                     type="text"
+                    autoComplete="name"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder="Seu nome completo"
@@ -218,6 +221,7 @@ const Login = () => {
                   <Input
                     id="signup-phone"
                     type="tel"
+                    autoComplete="tel"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="(00) 00000-0000"
@@ -230,6 +234,7 @@ const Login = () => {
                   <Input
                     id="signup-email"
                     type="email"
+                    autoComplete="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="seu@email.com"
@@ -242,6 +247,7 @@ const Login = () => {
                   <Input
                     id="signup-password"
                     type="password"
+                    autoComplete="new-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
