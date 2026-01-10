@@ -25,6 +25,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [userDataLoading, setUserDataLoading] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isApproved, setIsApproved] = useState(false);
   const [userStatus, setUserStatus] = useState<UserStatus | null>(null);
@@ -32,6 +33,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [userPermissions, setUserPermissions] = useState<UserPermission[]>([]);
 
   const loadUserData = async (userId: string) => {
+    setUserDataLoading(true);
     try {
       // Verificar role admin
       const { data: roleData } = await supabase
@@ -63,6 +65,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUserPermissions(permissionsData || []);
     } catch (error) {
       console.error('Error loading user data:', error);
+    } finally {
+      setUserDataLoading(false);
     }
   };
 
@@ -156,11 +160,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUserPermissions([]);
   };
 
+  // Combinar loading states - considerar carregando enquanto auth OU dados do usuário estão carregando
+  const isLoading = loading || (!!user && userDataLoading);
+
   return (
     <AuthContext.Provider value={{ 
       user, 
       session, 
-      loading, 
+      loading: isLoading, 
       signIn, 
       signUp, 
       signOut, 
