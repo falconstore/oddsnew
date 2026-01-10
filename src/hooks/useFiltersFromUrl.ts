@@ -8,6 +8,7 @@ export interface OddsFiltersState {
   opportunityType: string;
   sortBy: string;
   sortOrder: 'asc' | 'desc';
+  searchTerm: string;
 }
 
 export const defaultFilters: OddsFiltersState = {
@@ -17,6 +18,7 @@ export const defaultFilters: OddsFiltersState = {
   opportunityType: 'all',
   sortBy: 'date',
   sortOrder: 'asc',
+  searchTerm: '',
 };
 
 export function useFiltersFromUrl() {
@@ -30,6 +32,7 @@ export function useFiltersFromUrl() {
       opportunityType: searchParams.get('type') || 'all',
       sortBy: searchParams.get('sortBy') || 'date',
       sortOrder: (searchParams.get('sortOrder') as 'asc' | 'desc') || 'asc',
+      searchTerm: searchParams.get('search') || '',
     };
   }, [searchParams]);
 
@@ -42,6 +45,7 @@ export function useFiltersFromUrl() {
     if (newFilters.opportunityType !== 'all') params.set('type', newFilters.opportunityType);
     if (newFilters.sortBy !== 'date') params.set('sortBy', newFilters.sortBy);
     if (newFilters.sortOrder !== 'asc') params.set('sortOrder', newFilters.sortOrder);
+    if (newFilters.searchTerm) params.set('search', newFilters.searchTerm);
     
     setSearchParams(params, { replace: true });
   }, [setSearchParams]);
@@ -51,7 +55,8 @@ export function useFiltersFromUrl() {
       filters.leagues.length > 0 ||
       filters.dates.length > 0 ||
       filters.bookmakers.length > 0 ||
-      filters.opportunityType !== 'all'
+      filters.opportunityType !== 'all' ||
+      filters.searchTerm.length > 0
     );
   }, [filters]);
 

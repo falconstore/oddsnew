@@ -61,6 +61,15 @@ export function OddsMonitor({ sportType, onStatsUpdate }: OddsMonitorProps) {
       );
     }
     
+    // Search filter - busca no nome do time (home ou away)
+    if (filters.searchTerm.trim()) {
+      const searchLower = filters.searchTerm.toLowerCase().trim();
+      result = result.filter(m => 
+        m.home_team.toLowerCase().includes(searchLower) ||
+        m.away_team.toLowerCase().includes(searchLower)
+      );
+    }
+    
     // Opportunity type filter (surebet)
     if (filters.opportunityType === 'surebet') {
       result = result.filter(m => {
