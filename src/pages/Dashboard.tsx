@@ -1,25 +1,12 @@
-import { useState, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
-import { OddsComparisonTable } from '@/components/OddsComparisonTable';
 import { StatsCards } from '@/components/StatsCards';
 import { SupabaseConfig } from '@/components/SupabaseConfig';
 import { isSupabaseConfigured } from '@/lib/supabase';
-
-interface DashboardStats {
-  surebetCount: number;
-  totalMatches: number;
-}
+import { Card, CardContent } from '@/components/ui/card';
 
 const Dashboard = () => {
   const configured = isSupabaseConfigured();
-  const [stats, setStats] = useState<DashboardStats>({
-    surebetCount: 0,
-    totalMatches: 0,
-  });
-
-  const handleStatsUpdate = useCallback((newStats: DashboardStats) => {
-    setStats(newStats);
-  }, []);
 
   if (!configured) {
     return (
@@ -37,18 +24,44 @@ const Dashboard = () => {
 
   return (
     <Layout>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">Dashboard</h1>
-          <p className="text-muted-foreground">Comparação de odds em tempo real</p>
+      <div className="space-y-8">
+        <div className="text-center py-8">
+          <h1 className="text-3xl font-bold mb-2">OddsCompare</h1>
+          <p className="text-muted-foreground">
+            Escolha o esporte para monitorar odds em tempo real
+          </p>
         </div>
 
-        <StatsCards
-          surebetCount={stats.surebetCount}
-          totalMatches={stats.totalMatches}
-        />
+        <div className="grid gap-6 md:grid-cols-2 max-w-2xl mx-auto">
+          {/* Card Futebol */}
+          <Link to="/monitor-futebol">
+            <Card className="cursor-pointer hover:border-primary transition-all hover:shadow-lg">
+              <CardContent className="p-8 text-center">
+                <span className="text-6xl mb-4 block">⚽</span>
+                <h2 className="text-xl font-semibold">Monitor Futebol</h2>
+                <p className="text-muted-foreground text-sm mt-2">
+                  Odds de partidas de futebol
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
 
-        <OddsComparisonTable onStatsUpdate={handleStatsUpdate} />
+          {/* Card Basquete */}
+          <Link to="/monitor-basquete">
+            <Card className="cursor-pointer hover:border-primary transition-all hover:shadow-lg">
+              <CardContent className="p-8 text-center">
+                <span className="text-6xl mb-4 block">🏀</span>
+                <h2 className="text-xl font-semibold">Monitor Basquete</h2>
+                <p className="text-muted-foreground text-sm mt-2">
+                  Odds de partidas de basquete
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
+        </div>
+
+        {/* Stats gerais */}
+        <StatsCards />
       </div>
     </Layout>
   );

@@ -17,17 +17,12 @@ interface OddsFiltersProps {
   filters: OddsFiltersState;
   onFiltersChange: (filters: OddsFiltersState) => void;
   hasActiveFilters?: boolean;
+  hideSportFilter?: boolean;
 }
 
 const OPPORTUNITY_OPTIONS = [
   { value: 'all', label: 'Todas' },
   { value: 'surebet', label: 'Apenas Surebets' },
-];
-
-const SPORT_OPTIONS = [
-  { value: 'all', label: 'Todos' },
-  { value: 'football', label: '⚽ Futebol' },
-  { value: 'basketball', label: '🏀 Basquete' },
 ];
 
 const SORT_OPTIONS = [
@@ -37,7 +32,7 @@ const SORT_OPTIONS = [
   { value: 'bookmakers', label: 'Nº de Casas' },
 ];
 
-export function OddsFilters({ filters, onFiltersChange, hasActiveFilters }: OddsFiltersProps) {
+export function OddsFilters({ filters, onFiltersChange, hasActiveFilters, hideSportFilter }: OddsFiltersProps) {
   const { data: leagues } = useLeagues();
   const { data: bookmakers } = useBookmakers();
 
@@ -92,20 +87,6 @@ export function OddsFilters({ filters, onFiltersChange, hasActiveFilters }: Odds
           <Filter className="h-4 w-4" />
           <span>Filtros:</span>
         </div>
-
-        {/* Sport Filter */}
-        <Select value={filters.sport} onValueChange={(v) => updateFilter('sport', v)}>
-          <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder="Esporte" />
-          </SelectTrigger>
-          <SelectContent>
-            {SPORT_OPTIONS.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
 
         {/* League Filter - Multi Select */}
         <MultiSelectPopover
