@@ -1,30 +1,23 @@
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { X, Filter, ArrowUpDown } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { MultiSelectPopover } from '@/components/ui/multi-select-popover';
+import { X, Filter, ArrowUpDown, CalendarIcon } from 'lucide-react';
 import { useLeagues, useBookmakers } from '@/hooks/useOddsData';
+import { format, parse } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { OddsFiltersState, defaultFilters } from '@/hooks/useFiltersFromUrl';
+import { cn } from '@/lib/utils';
 
-export interface OddsFiltersState {
-  sport: string;
-  league: string;
-  dateFilter: string;
-  bookmaker: string;
-  opportunityType: string;
-  sortBy: string;
-  sortOrder: 'asc' | 'desc';
-}
+export { defaultFilters };
+export type { OddsFiltersState };
 
 interface OddsFiltersProps {
   filters: OddsFiltersState;
   onFiltersChange: (filters: OddsFiltersState) => void;
+  hasActiveFilters?: boolean;
 }
-
-const DATE_OPTIONS = [
-  { value: 'all', label: 'Todas as datas' },
-  { value: 'today', label: 'Hoje' },
-  { value: 'tomorrow', label: 'Amanhã' },
-  { value: 'week', label: 'Próximos 7 dias' },
-];
 
 const OPPORTUNITY_OPTIONS = [
   { value: 'all', label: 'Todas' },
@@ -44,17 +37,7 @@ const SORT_OPTIONS = [
   { value: 'bookmakers', label: 'Nº de Casas' },
 ];
 
-export const defaultFilters: OddsFiltersState = {
-  sport: 'all',
-  league: 'all',
-  dateFilter: 'all',
-  bookmaker: 'all',
-  opportunityType: 'all',
-  sortBy: 'date',
-  sortOrder: 'asc',
-};
-
-export function OddsFilters({ filters, onFiltersChange }: OddsFiltersProps) {
+export function OddsFilters({ filters, onFiltersChange, hasActiveFilters }: OddsFiltersProps) {
   const { data: leagues } = useLeagues();
   const { data: bookmakers } = useBookmakers();
 
@@ -66,16 +49,40 @@ export function OddsFilters({ filters, onFiltersChange }: OddsFiltersProps) {
     onFiltersChange(defaultFilters);
   };
 
-  const hasActiveFilters = 
-    filters.sport !== 'all' ||
-    filters.league !== 'all' ||
-    filters.dateFilter !== 'all' ||
-    filters.bookmaker !== 'all' ||
-    filters.opportunityType !== 'all';
-
   const toggleSortOrder = () => {
     updateFilter('sortOrder', filters.sortOrder === 'asc' ? 'desc' : 'asc');
   };
+
+  // Convert date strings to Date objects for Calendar
+  const selectedDates = filters.dates
+    .map(d => {
+      try {
+        return parse(d, 'yyyy-MM-dd', new Date());
+      } catch {
+        return null;
+      }
+    })
+    .filter((d): d is Date => d !== null);
+
+  const handleDatesChange = (dates: Date[] | undefined) => {
+    if (!dates) {
+      updateFilter('dates', []);
+      return;
+    }
+    const formatted = dates.map(d => format(d, 'yyyy-MM-dd'));
+    updateFilter('dates', formatted);
+  };
+
+  const formatDateDisplay = () => {
+    if (selectedDates.length === 0) return 'Todas as datas';
+    if (selectedDates.length === 1) return format(selectedDates[0], 'dd/MM/yyyy', { locale: ptBR });
+    return `${selectedDates.length} datas`;
+  };
+
+  const leagueOptions = leagues?.map(l => ({ value: l.name, label: l.name })) || [];
+  const bookmakerOptions = bookmakers
+    ?.filter(b => b.status === 'active')
+    .map(b => ({ value: b.name, label: b.name })) || [];
 
   return (
     <div className="space-y-4">
@@ -100,49 +107,62 @@ export function OddsFilters({ filters, onFiltersChange }: OddsFiltersProps) {
           </SelectContent>
         </Select>
 
-        {/* League Filter */}
-        <Select value={filters.league} onValueChange={(v) => updateFilter('league', v)}>
-          <SelectTrigger className="w-[160px]">
-            <SelectValue placeholder="Liga" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas as ligas</SelectItem>
-            {leagues?.map((league) => (
-              <SelectItem key={league.id} value={league.name}>
-                {league.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {/* League Filter - Multi Select */}
+        <MultiSelectPopover
+          options={leagueOptions}
+          selected={filters.leagues}
+          onChange={(selected) => updateFilter('leagues', selected)}
+          placeholder="Todas as ligas"
+          className="w-[160px]"
+        />
 
-        {/* Date Filter */}
-        <Select value={filters.dateFilter} onValueChange={(v) => updateFilter('dateFilter', v)}>
-          <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder="Data" />
-          </SelectTrigger>
-          <SelectContent>
-            {DATE_OPTIONS.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {/* Date Filter - Calendar Multi Select */}
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              className={cn(
+                "w-[160px] justify-start text-left font-normal",
+                selectedDates.length === 0 && "text-muted-foreground"
+              )}
+            >
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              <span className="truncate">{formatDateDisplay()}</span>
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar
+              mode="multiple"
+              selected={selectedDates}
+              onSelect={handleDatesChange}
+              locale={ptBR}
+              className={cn("p-3 pointer-events-auto")}
+              initialFocus
+            />
+            {selectedDates.length > 0 && (
+              <div className="p-2 border-t">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="w-full"
+                  onClick={() => updateFilter('dates', [])}
+                >
+                  <X className="h-4 w-4 mr-1" />
+                  Limpar datas
+                </Button>
+              </div>
+            )}
+          </PopoverContent>
+        </Popover>
 
-        {/* Bookmaker Filter */}
-        <Select value={filters.bookmaker} onValueChange={(v) => updateFilter('bookmaker', v)}>
-          <SelectTrigger className="w-[150px]">
-            <SelectValue placeholder="Casa" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas as casas</SelectItem>
-            {bookmakers?.filter(b => b.status === 'active').map((bookmaker) => (
-              <SelectItem key={bookmaker.id} value={bookmaker.name}>
-                {bookmaker.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {/* Bookmaker Filter - Multi Select */}
+        <MultiSelectPopover
+          options={bookmakerOptions}
+          selected={filters.bookmakers}
+          onChange={(selected) => updateFilter('bookmakers', selected)}
+          placeholder="Todas as casas"
+          className="w-[150px]"
+        />
 
         {/* Opportunity Type */}
         <Select value={filters.opportunityType} onValueChange={(v) => updateFilter('opportunityType', v)}>
