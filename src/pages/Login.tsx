@@ -7,15 +7,17 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { TrendingUp, AlertCircle } from 'lucide-react';
+import { TrendingUp, AlertCircle, Clock } from 'lucide-react';
 
 const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { signIn, signUp, user } = useAuth();
+  const { signIn, signUp, user, isApproved, userStatus, loading: authLoading } = useAuth();
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -23,10 +25,10 @@ const Login = () => {
   const from = (location.state as any)?.from?.pathname || '/';
 
   useEffect(() => {
-    if (user) {
+    if (user && isApproved) {
       navigate(from, { replace: true });
     }
-  }, [user, navigate, from]);
+  }, [user, isApproved, navigate, from]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,8 +45,6 @@ const Login = () => {
       } else {
         setError(error.message);
       }
-    } else {
-      navigate(from, { replace: true });
     }
     
     setLoading(false);
@@ -56,13 +56,26 @@ const Login = () => {
     setSuccess(null);
     setLoading(true);
 
+    // Validações
+    if (!fullName.trim()) {
+      setError('Por favor, informe seu nome completo.');
+      setLoading(false);
+      return;
+    }
+
+    if (!phone.trim()) {
+      setError('Por favor, informe seu telefone.');
+      setLoading(false);
+      return;
+    }
+
     if (password.length < 6) {
       setError('A senha deve ter pelo menos 6 caracteres.');
       setLoading(false);
       return;
     }
 
-    const { error } = await signUp(email, password);
+    const { error } = await signUp(email, password, fullName.trim(), phone.trim());
     
     if (error) {
       if (error.message.includes('User already registered')) {
@@ -71,13 +84,54 @@ const Login = () => {
         setError(error.message);
       }
     } else {
-      setSuccess('Cadastro realizado! Verifique seu email para confirmar a conta.');
+      setSuccess('Cadastro realizado! Verifique seu email e aguarde a aprovação do administrador.');
+      setEmail('');
+      setPassword('');
+      setFullName('');
+      setPhone('');
     }
     
     setLoading(false);
   };
 
-  if (user) {
+  // Se usuário está logado mas pendente/rejeitado
+  if (user && !authLoading && !isApproved) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <div className="flex justify-center mb-4">
+              <div className="bg-primary/10 p-3 rounded-full">
+                <Clock className="h-8 w-8 text-primary" />
+              </div>
+            </div>
+            <CardTitle>
+              {userStatus === 'pending' ? 'Aguardando Aprovação' : 'Acesso Negado'}
+            </CardTitle>
+            <CardDescription>
+              {userStatus === 'pending' 
+                ? 'Seu cadastro está em análise. Você receberá acesso assim que um administrador aprovar sua conta.'
+                : 'Seu cadastro foi rejeitado. Entre em contato com o administrador para mais informações.'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button 
+              variant="outline" 
+              className="w-full" 
+              onClick={() => {
+                signIn('', ''); // Reset session
+                window.location.reload();
+              }}
+            >
+              Sair
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (user && isApproved) {
     return null;
   }
 
@@ -148,6 +202,30 @@ const Login = () => {
             
             <TabsContent value="signup">
               <form onSubmit={handleSignUp} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="signup-fullname">Nome Completo</Label>
+                  <Input
+                    id="signup-fullname"
+                    type="text"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    placeholder="Seu nome completo"
+                    required
+                    disabled={loading}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-phone">Telefone</Label>
+                  <Input
+                    id="signup-phone"
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="(00) 00000-0000"
+                    required
+                    disabled={loading}
+                  />
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor="signup-email">Email</Label>
                   <Input

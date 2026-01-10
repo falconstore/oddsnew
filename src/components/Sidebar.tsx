@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
+import { PAGE_KEYS, PageKey } from '@/types/auth';
 import { 
   LayoutDashboard, 
   Trophy, 
@@ -12,6 +13,7 @@ import {
   BarChart3,
   LogOut,
   Shield,
+  UserCog,
   type LucideIcon
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -26,28 +28,39 @@ type NavigationItem = {
   href: string;
   icon: LucideIcon | (() => JSX.Element);
   adminOnly?: boolean;
+  pageKey: PageKey;
 };
 
 const navigation: NavigationItem[] = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { name: 'Monitor Futebol', href: '/monitor-futebol', icon: FootballIcon },
-  { name: 'Monitor Basquete', href: '/monitor-basquete', icon: BasketballIcon },
-  { name: 'Ligas', href: '/leagues', icon: Trophy, adminOnly: true },
-  { name: 'Times', href: '/teams', icon: Users, adminOnly: true },
-  { name: 'Casas de Apostas', href: '/bookmakers', icon: Building2, adminOnly: true },
-  { name: 'Configurações', href: '/settings', icon: Settings },
+  { name: 'Dashboard', href: '/', icon: LayoutDashboard, pageKey: PAGE_KEYS.DASHBOARD },
+  { name: 'Monitor Futebol', href: '/monitor-futebol', icon: FootballIcon, pageKey: PAGE_KEYS.MONITOR_FUTEBOL },
+  { name: 'Monitor Basquete', href: '/monitor-basquete', icon: BasketballIcon, pageKey: PAGE_KEYS.MONITOR_BASQUETE },
+  { name: 'Ligas', href: '/leagues', icon: Trophy, adminOnly: true, pageKey: PAGE_KEYS.LEAGUES },
+  { name: 'Times', href: '/teams', icon: Users, adminOnly: true, pageKey: PAGE_KEYS.TEAMS },
+  { name: 'Casas de Apostas', href: '/bookmakers', icon: Building2, adminOnly: true, pageKey: PAGE_KEYS.BOOKMAKERS },
+  { name: 'Configurações', href: '/settings', icon: Settings, pageKey: PAGE_KEYS.SETTINGS },
+  { name: 'Gerenciar Usuários', href: '/admin/users', icon: UserCog, adminOnly: true, pageKey: PAGE_KEYS.ADMIN_USERS },
 ];
 
 export function Sidebar() {
   const location = useLocation();
-  const { user, isAdmin, signOut } = useAuth();
+  const { user, isAdmin, signOut, canAccessPage, userProfile } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const filteredNavigation = navigation.filter(item => !item.adminOnly || isAdmin);
+  // Filtrar navegação baseado em permissões granulares e adminOnly
+  const filteredNavigation = navigation.filter(item => {
+    // Se for adminOnly e não é admin, esconder
+    if (item.adminOnly && !isAdmin) return false;
+    // Se não for admin, verificar permissão granular
+    if (!isAdmin && !canAccessPage(item.pageKey)) return false;
+    return true;
+  });
 
   const handleSignOut = async () => {
     await signOut();
   };
+
+  const displayName = userProfile?.full_name || user?.email || 'Usuário';
 
   return (
     <>
@@ -109,12 +122,12 @@ export function Sidebar() {
             <div className="flex items-center gap-3">
               <Avatar className="h-8 w-8">
                 <AvatarFallback className="text-xs">
-                  {user.email?.[0].toUpperCase()}
+                  {displayName[0].toUpperCase()}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate text-sidebar-foreground">
-                  {user.email}
+                  {displayName}
                 </p>
                 <p className="text-xs text-sidebar-foreground/60 flex items-center gap-1">
                   {isAdmin && <Shield className="h-3 w-3" />}
