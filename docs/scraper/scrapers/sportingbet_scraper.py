@@ -57,6 +57,12 @@ class SportingbetScraper(BaseScraper):
             "name": "Paulistao",
             "country": "Brasil"
         },
+	 "fa_cup": {
+            "region_id": "14",
+            "competition_id": "102802",
+            "name": "FA Cup",
+            "country": "Inglaterra"
+        },
     }
     
     def __init__(self):
