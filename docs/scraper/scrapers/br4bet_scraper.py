@@ -102,9 +102,9 @@ class Br4betScraper(BaseScraper):
                 self.user_agent = await page.evaluate("navigator.userAgent")
                 
             except asyncio.TimeoutError:
-                self.logger.error("❌ Timeout: Site não carregou API.")
+                self.logger.error(" Timeout: Site não carregou API.")
             except Exception as e:
-                self.logger.error(f"❌ Erro Playwright: {e}")
+                self.logger.error(f" Erro Playwright: {e}")
             finally:
                 await browser.close()
 
@@ -180,7 +180,7 @@ class Br4betScraper(BaseScraper):
         self.logger.info(f" Br4bet {league.name}: {len(events_list)} events, {len(markets_list)} markets, {len(odds_list)} odds")
         
         if not events_list:
-            self.logger.warning(f"⚠️ Br4bet {league.name}: No events found")
+            self.logger.warning(f" Br4bet {league.name}: No events found")
             return []
         
         # Build lookup maps
@@ -271,8 +271,8 @@ class Br4betScraper(BaseScraper):
                 results.append(scraped)
                 
             except Exception as e:
-                self.logger.debug(f"⚠️ Br4bet: Error parsing market: {e}")
+                self.logger.debug(f" Br4bet: Error parsing market: {e}")
                 continue
         
-        self.logger.info(f"✅ Br4bet {league.name}: {len(results)} odds processed")
+        self.logger.info(f" Br4bet {league.name}: {len(results)} odds processed")
         return results
