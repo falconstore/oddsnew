@@ -1,10 +1,11 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { ArrowLeft, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
-import { useState } from 'react';
+import { ArrowLeft, ExternalLink, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
+import { useState, useMemo } from 'react';
 import { Layout } from '@/components/Layout';
-import { useOddsComparison } from '@/hooks/useOddsData';
+import { useOddsComparison, useBookmakers } from '@/hooks/useOddsData';
+import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -322,9 +323,27 @@ const MatchDetails = () => {
   const navigate = useNavigate();
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
   
+  const { isAdmin } = useAuth();
   const { data: matches, isLoading } = useOddsComparison();
+  const { data: allBookmakers } = useBookmakers();
   
   const match = matches?.find(m => m.match_id === matchId);
+  
+  // Calcular casas faltantes (apenas se admin)
+  const missingBookmakers = useMemo(() => {
+    if (!isAdmin || !allBookmakers || !match) return [];
+    
+    // Pegar nomes das casas que têm odds nesta partida
+    const presentBookmakers = new Set(
+      match.odds.map(o => o.bookmaker_name.toLowerCase())
+    );
+    
+    // Filtrar casas ativas que não estão presentes
+    return allBookmakers
+      .filter(b => b.status === 'active')
+      .filter(b => !presentBookmakers.has(b.name.toLowerCase()))
+      .sort((a, b) => a.priority - b.priority);
+  }, [isAdmin, allBookmakers, match]);
   
   if (isLoading) {
     return (
@@ -443,6 +462,39 @@ const MatchDetails = () => {
             </div>
           </CardContent>
         </Card>
+        
+        {/* Admin Diagnostic - Missing Bookmakers */}
+        {isAdmin && missingBookmakers.length > 0 && (
+          <Card className="border-amber-500/50 bg-amber-500/5">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2 text-amber-600">
+                <AlertTriangle className="h-4 w-4" />
+                Casas Faltando ({missingBookmakers.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-muted-foreground mb-3">
+                Estas casas ativas não possuem odds para esta partida. 
+                Verificar se a liga está configurada no scraper ou se faltam aliases de times.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {missingBookmakers.map((b) => (
+                  <Badge 
+                    key={b.id} 
+                    variant="outline" 
+                    className="text-amber-600 border-amber-500/50"
+                  >
+                    {b.name}
+                  </Badge>
+                ))}
+              </div>
+              <div className="mt-3 text-xs text-muted-foreground">
+                <strong>Liga:</strong> {match.league_name} | 
+                <strong> Times:</strong> {match.home_team} vs {match.away_team}
+              </div>
+            </CardContent>
+          </Card>
+        )}
         
         {/* Surebet Calculator */}
         {hasArbitrage && (
