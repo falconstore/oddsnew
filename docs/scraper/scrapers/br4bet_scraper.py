@@ -28,6 +28,26 @@ class Br4betScraper(BaseScraper):
             "name": "La Liga",
             "country": "espanha"
         },
+	"bundesliga": {
+            "champ_id": "2950",
+            "name": "Bundesliga",
+            "country": "alemanha"
+        },
+	"ligue_1": {
+            "champ_id": "2943",
+            "name": "Ligue 1",
+            "country": "franca"
+        },
+	"paulistao": {
+            "champ_id": "3436",
+            "name": "Paulistao",
+            "country": "brasil"
+        },
+	"fa_cup": {
+            "champ_id": "2935",
+            "name": "FA Cup",
+            "country": "Inglaterra"
+        },
     }
     
     API_URL = "https://sb2frontend-altenar2.biahosted.com/api/widget/GetEvents"
@@ -61,7 +81,7 @@ class Br4betScraper(BaseScraper):
                         token = headers["authorization"]
                         if not token_future.done():
                             token_future.set_result(token)
-                            self.logger.info(f"🔑 Token capturado via request")
+                            self.logger.info(f" Token capturado via request")
 
             page.on("request", handle_request)
 
@@ -157,7 +177,7 @@ class Br4betScraper(BaseScraper):
         odds_list = data.get("odds", [])
         competitors_list = data.get("competitors", [])
         
-        self.logger.info(f"📊 Br4bet {league.name}: {len(events_list)} events, {len(markets_list)} markets, {len(odds_list)} odds")
+        self.logger.info(f" Br4bet {league.name}: {len(events_list)} events, {len(markets_list)} markets, {len(odds_list)} odds")
         
         if not events_list:
             self.logger.warning(f"⚠️ Br4bet {league.name}: No events found")
