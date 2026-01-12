@@ -219,6 +219,55 @@ export const useCreateTeamAlias = () => {
   });
 };
 
+// Create multiple aliases at once (for multi-bookmaker selection)
+export const useCreateTeamAliases = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ team_id, alias_name, bookmaker_sources }: {
+      team_id: string;
+      alias_name: string;
+      bookmaker_sources: string[];
+    }) => {
+      if (!bookmaker_sources.length) {
+        throw new Error('Selecione pelo menos uma casa de apostas');
+      }
+      
+      const normalizedAliasName = alias_name.trim().toLowerCase();
+      
+      // Create one record for each selected bookmaker
+      const aliasesToInsert = bookmaker_sources.map(bookmaker => ({
+        team_id,
+        alias_name: normalizedAliasName,
+        bookmaker_source: bookmaker.trim().toLowerCase(),
+      }));
+      
+      const { data, error } = await supabase
+        .from('team_aliases')
+        .insert(aliasesToInsert)
+        .select();
+      
+      if (error) {
+        if (error.code === '23505') {
+          throw new Error('Um ou mais aliases já existem para as casas selecionadas');
+        }
+        throw error;
+      }
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['team_aliases'] });
+      queryClient.invalidateQueries({ queryKey: ['teams'] });
+      toast({ 
+        title: `${data.length} alias(es) criado(s)!`, 
+        description: 'Normalizados para minúsculas automaticamente.' 
+      });
+    },
+    onError: (error) => {
+      toast({ title: 'Erro ao criar aliases', description: error.message, variant: 'destructive' });
+    }
+  });
+};
+
 export const useDeleteTeamAlias = () => {
   const queryClient = useQueryClient();
   return useMutation({
