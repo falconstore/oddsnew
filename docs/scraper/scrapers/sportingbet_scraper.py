@@ -39,6 +39,24 @@ class SportingbetScraper(BaseScraper):
             "name": "Serie A",
             "country": "Itália"
         },
+ 	  "bundesliga": {
+            "region_id": "17",
+            "competition_id": "102842",
+            "name": "Bundesliga",
+            "country": "Alemanha"
+        },
+	  "ligue_1": {
+            "region_id": "16",
+            "competition_id": "102843",
+            "name": "Ligue 1",
+            "country": "Franca"
+        },
+ 	 "paulistao": {
+            "region_id": "33",
+            "competition_id": "102148",
+            "name": "Paulistao",
+            "country": "Brasil"
+        },
     }
     
     def __init__(self):
