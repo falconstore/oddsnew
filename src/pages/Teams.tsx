@@ -1,22 +1,25 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
-import { useTeams, useLeagues, useCreateTeam, useUpdateTeam, useDeleteTeam, useTeamAliases, useCreateTeamAlias, useDeleteTeamAlias } from '@/hooks/useOddsData';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useTeams, useLeagues, useCreateTeam, useUpdateTeam, useDeleteTeam, useTeamAliases, useCreateTeamAlias, useDeleteTeamAlias, useBookmakers } from '@/hooks/useOddsData';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Plus, Pencil, Trash2, Tag, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, Tag, X, Search, AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import type { Team, EntityStatus } from '@/types/database';
 
 const Teams = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const { data: teams, isLoading } = useTeams();
   const { data: leagues } = useLeagues();
   const { data: aliases } = useTeamAliases();
+  const { data: bookmakers } = useBookmakers();
   const createTeam = useCreateTeam();
   const updateTeam = useUpdateTeam();
   const deleteTeam = useDeleteTeam();
@@ -24,6 +27,7 @@ const Teams = () => {
   const deleteAlias = useDeleteTeamAlias();
   
   const [selectedLeague, setSelectedLeague] = useState<string>('all');
+  const [searchTerm, setSearchTerm] = useState<string>(searchParams.get('search') || '');
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isAliasDialogOpen, setIsAliasDialogOpen] = useState(false);
@@ -31,9 +35,41 @@ const Teams = () => {
   const [newAlias, setNewAlias] = useState({ alias_name: '', bookmaker_source: '' });
   const [formData, setFormData] = useState({ standard_name: '', league_id: '', status: 'active' as EntityStatus, logo_url: '' });
 
-  const filteredTeams = selectedLeague === 'all' 
-    ? teams 
-    : teams?.filter(t => t.league_id === selectedLeague);
+  // Casas de apostas ativas para o select
+  const activeBookmakers = useMemo(() => 
+    bookmakers?.filter(b => b.status === 'active').sort((a, b) => a.name.localeCompare(b.name)) || [],
+    [bookmakers]
+  );
+
+  // Filtrar times por liga E por termo de busca (nome ou alias)
+  const filteredTeams = useMemo(() => {
+    let result = selectedLeague === 'all' 
+      ? teams 
+      : teams?.filter(t => t.league_id === selectedLeague);
+    
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      result = result?.filter(team => {
+        // Busca no nome padrão
+        if (team.standard_name.toLowerCase().includes(term)) return true;
+        // Busca nos aliases
+        const teamAliases = aliases?.filter(a => a.team_id === team.id);
+        return teamAliases?.some(a => a.alias_name.toLowerCase().includes(term));
+      });
+    }
+    
+    return result;
+  }, [teams, selectedLeague, searchTerm, aliases]);
+
+  // Atualizar URL quando busca muda
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value);
+    if (value) {
+      setSearchParams({ search: value });
+    } else {
+      setSearchParams({});
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,13 +106,18 @@ const Teams = () => {
 
   const handleAddAlias = (e: React.FormEvent) => {
     e.preventDefault();
-    if (selectedTeamForAlias) {
+    if (selectedTeamForAlias && newAlias.bookmaker_source) {
       createAlias.mutate({ team_id: selectedTeamForAlias.id, ...newAlias });
       setNewAlias({ alias_name: '', bookmaker_source: '' });
     }
   };
 
   const getTeamAliases = (teamId: string) => aliases?.filter(a => a.team_id === teamId) || [];
+
+  // Preview do alias normalizado
+  const normalizedAliasPreview = newAlias.alias_name && newAlias.bookmaker_source 
+    ? `"${newAlias.alias_name.toLowerCase()}" (${newAlias.bookmaker_source.toLowerCase()})`
+    : null;
 
   return (
     <Layout>
@@ -171,8 +212,17 @@ const Teams = () => {
           </Dialog>
         </div>
 
-        {/* Filter */}
+        {/* Filters with Search */}
         <div className="flex gap-4">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar time ou alias..."
+              value={searchTerm}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              className="pl-8"
+            />
+          </div>
           <Select value={selectedLeague} onValueChange={setSelectedLeague}>
             <SelectTrigger className="w-[200px]">
               <SelectValue placeholder="Filtrar por liga" />
@@ -185,6 +235,16 @@ const Teams = () => {
             </SelectContent>
           </Select>
         </div>
+
+        {/* Search results info */}
+        {searchTerm && (
+          <div className="text-sm text-muted-foreground">
+            {filteredTeams?.length || 0} resultado(s) para "{searchTerm}"
+            <Button variant="link" className="px-2 h-auto text-sm" onClick={() => handleSearchChange('')}>
+              Limpar
+            </Button>
+          </div>
+        )}
 
         <Card>
           <CardContent className="pt-6">
@@ -235,7 +295,11 @@ const Teams = () => {
                           {getTeamAliases(team.id).map((alias) => (
                             <Badge key={alias.id} variant="secondary" className="gap-1">
                               {alias.alias_name}
-                              {alias.bookmaker_source && <span className="text-xs opacity-60">({alias.bookmaker_source})</span>}
+                              {alias.bookmaker_source && (
+                                <span className="text-xs opacity-60 bg-background/50 px-1 rounded">
+                                  {alias.bookmaker_source}
+                                </span>
+                              )}
                               <button onClick={() => deleteAlias.mutate(alias.id)} className="ml-1 hover:text-destructive">
                                 <X className="h-3 w-3" />
                               </button>
@@ -257,8 +321,13 @@ const Teams = () => {
           </CardContent>
         </Card>
 
-        {/* Alias Dialog */}
-        <Dialog open={isAliasDialogOpen} onOpenChange={setIsAliasDialogOpen}>
+        {/* Alias Dialog - IMPROVED */}
+        <Dialog open={isAliasDialogOpen} onOpenChange={(open) => {
+          setIsAliasDialogOpen(open);
+          if (!open) {
+            setNewAlias({ alias_name: '', bookmaker_source: '' });
+          }
+        }}>
           <DialogContent aria-describedby="alias-dialog-description">
             <DialogHeader>
               <DialogTitle>Adicionar Alias para {selectedTeamForAlias?.standard_name}</DialogTitle>
@@ -266,29 +335,65 @@ const Teams = () => {
                 Adicione um nome alternativo usado por casas de apostas.
               </p>
             </DialogHeader>
+            
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription className="text-xs">
+                O alias e a casa serão <strong>normalizados automaticamente</strong> para minúsculas.
+                A casa de apostas é <strong>obrigatória</strong> para o scraper encontrar o alias.
+              </AlertDescription>
+            </Alert>
+
             <form onSubmit={handleAddAlias} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="alias">Nome do Alias</Label>
+                <Label htmlFor="alias">Nome do Alias *</Label>
                 <Input
                   id="alias"
                   value={newAlias.alias_name}
                   onChange={(e) => setNewAlias({ ...newAlias, alias_name: e.target.value })}
-                  placeholder="Ex: Man Utd"
+                  placeholder="Ex: Man Utd, Manchester Utd"
                   required
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="source">Casa de Apostas (opcional)</Label>
-                <Input
-                  id="source"
-                  value={newAlias.bookmaker_source}
-                  onChange={(e) => setNewAlias({ ...newAlias, bookmaker_source: e.target.value })}
-                  placeholder="Ex: Bet365"
-                />
+                <Label htmlFor="source">Casa de Apostas *</Label>
+                <Select 
+                  value={newAlias.bookmaker_source} 
+                  onValueChange={(v) => setNewAlias({ ...newAlias, bookmaker_source: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a casa de apostas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {activeBookmakers.map((b) => (
+                      <SelectItem key={b.id} value={b.name.toLowerCase()}>
+                        {b.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Selecione a casa que usa este nome alternativo para o time.
+                </p>
               </div>
+
+              {/* Preview do alias normalizado */}
+              {normalizedAliasPreview && (
+                <div className="p-3 bg-muted rounded-md">
+                  <span className="text-xs text-muted-foreground">Será salvo como:</span>
+                  <code className="block mt-1 text-sm font-mono">
+                    {normalizedAliasPreview}
+                  </code>
+                </div>
+              )}
+
               <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => setIsAliasDialogOpen(false)}>Cancelar</Button>
-                <Button type="submit">Adicionar</Button>
+                <Button type="button" variant="outline" onClick={() => setIsAliasDialogOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={!newAlias.alias_name || !newAlias.bookmaker_source}>
+                  Adicionar
+                </Button>
               </div>
             </form>
           </DialogContent>

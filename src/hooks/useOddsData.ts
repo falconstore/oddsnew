@@ -180,13 +180,31 @@ export const useCreateTeamAlias = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (alias: Partial<TeamAlias>) => {
-      const { data, error } = await supabase.from('team_aliases').insert(alias).select().single();
-      if (error) throw error;
+      // Validação: bookmaker_source é obrigatório
+      if (!alias.bookmaker_source?.trim()) {
+        throw new Error('Casa de apostas é obrigatória para criar alias');
+      }
+      
+      // Normalização automática para lowercase
+      const normalizedAlias = {
+        team_id: alias.team_id,
+        alias_name: alias.alias_name?.trim().toLowerCase(),
+        bookmaker_source: alias.bookmaker_source.trim().toLowerCase(),
+      };
+      
+      const { data, error } = await supabase.from('team_aliases').insert(normalizedAlias).select().single();
+      if (error) {
+        // Erro de duplicata mais amigável
+        if (error.code === '23505') {
+          throw new Error(`Alias "${normalizedAlias.alias_name}" já existe para ${normalizedAlias.bookmaker_source}`);
+        }
+        throw error;
+      }
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['team_aliases'] });
-      toast({ title: 'Alias criado!' });
+      toast({ title: 'Alias criado!', description: 'O alias foi normalizado para minúsculas automaticamente.' });
     },
     onError: (error) => {
       toast({ title: 'Erro ao criar alias', description: error.message, variant: 'destructive' });
