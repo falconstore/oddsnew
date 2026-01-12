@@ -111,9 +111,20 @@ class TeamMatcher:
         # Load teams
         teams = await self.supabase.fetch_teams()
         self.teams_cache = {t["id"]: t["standard_name"] for t in teams}
-        self.reverse_cache = {
-            t["standard_name"].lower(): t["id"] for t in teams
-        }
+        
+        # Build reverse_cache - keep FIRST encountered team_id for each name
+        # Log warning if duplicates exist (same name in different leagues)
+        self.reverse_cache = {}
+        for t in teams:
+            name_lower = t["standard_name"].lower()
+            if name_lower in self.reverse_cache:
+                # Duplicata detectada - logar warning
+                self.logger.warning(
+                    f"[DUPLICATE] Team '{t['standard_name']}' exists in multiple leagues. "
+                    f"Consider merging them. IDs: {self.reverse_cache[name_lower]}, {t['id']}"
+                )
+            else:
+                self.reverse_cache[name_lower] = t["id"]
         
         # Build league-scoped cache for fuzzy matching within leagues
         self.teams_by_league = {}
@@ -263,6 +274,24 @@ class TeamMatcher:
         # Step 4: Auto-create team if primary bookmaker (Betano) and has league_id
         # This is triggered when NO match was found in the league OR cross-league
         if self.auto_create_team and is_primary and league_id and not team_id:
+            # NOVO: Para competições cross-league, NÃO criar time novo
+            # Primeiro buscar em TODAS as ligas para evitar duplicatas
+            is_cross_league = any(
+                comp in (league_name or '').lower() for comp in self.cross_league_competitions
+            )
+            
+            if is_cross_league:
+                # Buscar em TODAS as ligas primeiro antes de criar
+                existing = self._find_team_global(raw_name)
+                if existing:
+                    self.logger.info(
+                        f"[Cross-league] Reusing existing team: '{raw_name}' -> {existing}"
+                    )
+                    # Criar alias para matches futuros
+                    if self.auto_create_alias:
+                        self._create_alias_async(existing, raw_name, bookmaker)
+                    return existing
+            
             self.logger.info(
                 f"[Auto-create] Attempting to create team: '{raw_name}' "
                 f"league={league_name or league_id} bookmaker={bookmaker}"
@@ -278,6 +307,48 @@ class TeamMatcher:
         self._log_unmatched(raw_name, bookmaker, league_name, is_primary)
         return None
     
+    def _find_team_global(self, raw_name: str) -> Optional[str]:
+        """
+        Busca um time em TODAS as ligas pelo nome exato ou fuzzy.
+        Usado para evitar duplicatas em competições cross-league.
+        
+        Diferente de _find_team_cross_league, este método:
+        - Não requer league_name
+        - Usa threshold mais alto (95) para evitar falsos positivos
+        - É usado ANTES de criar um novo time
+        """
+        normalized = self._normalize_name(raw_name).lower()
+        
+        # Match exato global
+        if normalized in self.reverse_cache:
+            return self.reverse_cache[normalized]
+        
+        # Fuzzy match global com threshold alto
+        all_names = list(self.teams_cache.values())
+        if not all_names:
+            return None
+        
+        result = process.extractOne(
+            self._normalize_name(raw_name),
+            all_names,
+            scorer=fuzz.token_sort_ratio,
+            score_cutoff=95  # Threshold alto para evitar falsos positivos
+        )
+        
+        if result:
+            match_name = result[0]
+            team_id = self.reverse_cache.get(match_name.lower())
+            if not team_id:
+                team_id = self.reverse_cache.get(self._normalize_name(match_name).lower())
+            
+            if team_id:
+                self.logger.debug(
+                    f"[Global] Found existing team: '{raw_name}' -> '{match_name}' ({result[1]:.0f}%)"
+                )
+                return team_id
+        
+        return None
+
     async def _create_team(self, name: str, league_id: str) -> Optional[str]:
         """Create a new team in the database and update all caches."""
         try:
