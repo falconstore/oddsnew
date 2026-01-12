@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { FileWarning, ChevronRight, ExternalLink, AlertTriangle, BarChart3, Filter, Tag } from 'lucide-react';
+import { FileWarning, ChevronRight, ExternalLink, AlertTriangle, BarChart3, Filter, Tag, RefreshCw } from 'lucide-react';
 import { Layout } from '@/components/Layout';
 import { useOddsComparison, useBookmakers } from '@/hooks/useOddsData';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,7 +27,7 @@ interface MatchWithMissing {
 }
 
 export default function AdminLogs() {
-  const { data: matches, isLoading: matchesLoading } = useOddsComparison();
+  const { data: matches, isLoading: matchesLoading, dataUpdatedAt, refetch, isFetching } = useOddsComparison();
   const { data: allBookmakers, isLoading: bookmakersLoading } = useBookmakers();
   
   const [selectedLeagues, setSelectedLeagues] = useState<string[]>([]);
@@ -142,14 +142,36 @@ export default function AdminLogs() {
     <Layout>
       <div className="space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <FileWarning className="h-6 w-6 text-amber-500" />
-            Logs / Diagnóstico
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Identifique partidas com casas de apostas faltando para diagnosticar problemas de scraping
-          </p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              <FileWarning className="h-6 w-6 text-amber-500" />
+              Logs / Diagnóstico
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              Identifique partidas com casas de apostas faltando para diagnosticar problemas de scraping
+            </p>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            <div className="text-sm text-muted-foreground flex items-center gap-1">
+              <RefreshCw className={`h-3 w-3 ${isFetching ? 'animate-spin' : ''}`} />
+              {dataUpdatedAt && (
+                <span>
+                  Atualizado: {format(new Date(dataUpdatedAt), "HH:mm:ss", { locale: ptBR })}
+                </span>
+              )}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => refetch()}
+              disabled={isFetching}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
+              Atualizar
+            </Button>
+          </div>
         </div>
 
         {/* Filters */}

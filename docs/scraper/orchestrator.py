@@ -223,6 +223,9 @@ class Orchestrator:
         # Clear unmatched log cache at the start of each cycle
         self.team_matcher.clear_log_cache()
         
+        # Reload caches to pick up new teams/aliases/leagues added via UI
+        await self._reload_caches()
+        
         # Run all scrapers in parallel
         tasks = [scraper.scrape_all() for scraper in self.scrapers]
         results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -299,6 +302,51 @@ class Orchestrator:
         )
         
         return summary
+    
+    async def _reload_caches(self):
+        """
+        Reload team/league/bookmaker caches to pick up new entries.
+        Called at the start of each scraping cycle.
+        """
+        try:
+            # Track previous counts for logging
+            prev_team_count = len(self.team_matcher.teams_cache)
+            prev_alias_count = len(self.team_matcher.aliases_cache)
+            prev_league_count = len(self.league_matcher.leagues_cache)
+            prev_bookmaker_count = len(self.bookmaker_ids)
+            
+            # Reload all caches
+            await self.team_matcher.load_cache()
+            await self.league_matcher.load_cache()
+            
+            # Reload bookmaker IDs
+            bookmakers = await self.supabase.fetch_bookmakers()
+            self.bookmaker_ids = {b["name"].lower(): b["id"] for b in bookmakers}
+            
+            # Log changes
+            new_team_count = len(self.team_matcher.teams_cache)
+            new_alias_count = len(self.team_matcher.aliases_cache)
+            new_league_count = len(self.league_matcher.leagues_cache)
+            new_bookmaker_count = len(self.bookmaker_ids)
+            
+            changes = []
+            if new_team_count != prev_team_count:
+                changes.append(f"teams: {prev_team_count}→{new_team_count}")
+            if new_alias_count != prev_alias_count:
+                changes.append(f"aliases: {prev_alias_count}→{new_alias_count}")
+            if new_league_count != prev_league_count:
+                changes.append(f"leagues: {prev_league_count}→{new_league_count}")
+            if new_bookmaker_count != prev_bookmaker_count:
+                changes.append(f"bookmakers: {prev_bookmaker_count}→{new_bookmaker_count}")
+            
+            if changes:
+                self.logger.info(f"Cache reloaded with changes: {', '.join(changes)}")
+            else:
+                self.logger.debug("Cache reloaded (no changes)")
+                
+        except Exception as e:
+            self.logger.error(f"Failed to reload caches: {e}")
+            # Continue with existing cache - don't break the cycle
     
     async def run_forever(self, interval_seconds: Optional[int] = None):
         """

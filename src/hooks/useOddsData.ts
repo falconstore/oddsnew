@@ -102,7 +102,10 @@ export const useTeams = (leagueId?: string) => {
       const { data, error } = await query;
       if (error) throw error;
       return data as Team[];
-    }
+    },
+    staleTime: 30000, // 30 seconds before considered stale
+    refetchInterval: 60000, // Refresh every 60 seconds
+    refetchIntervalInBackground: false, // Only when tab is active
   });
 };
 
@@ -172,7 +175,10 @@ export const useTeamAliases = (teamId?: string) => {
       const { data, error } = await query;
       if (error) throw error;
       return data as TeamAlias[];
-    }
+    },
+    staleTime: 30000,
+    refetchInterval: 60000,
+    refetchIntervalInBackground: false,
   });
 };
 
@@ -204,6 +210,7 @@ export const useCreateTeamAlias = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['team_aliases'] });
+      queryClient.invalidateQueries({ queryKey: ['teams'] });
       toast({ title: 'Alias criado!', description: 'O alias foi normalizado para minúsculas automaticamente.' });
     },
     onError: (error) => {
@@ -243,7 +250,10 @@ export const useBookmakers = () => {
         .order('priority');
       if (error) throw error;
       return data as Bookmaker[];
-    }
+    },
+    staleTime: 30000,
+    refetchInterval: 60000,
+    refetchIntervalInBackground: false,
   });
 };
 
