@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
-import { useTeams, useLeagues, useCreateTeam, useUpdateTeam, useDeleteTeam, useTeamAliases, useCreateTeamAlias, useDeleteTeamAlias, useBookmakers } from '@/hooks/useOddsData';
+import { useTeams, useLeagues, useCreateTeam, useUpdateTeam, useDeleteTeam, useTeamAliases, useCreateTeamAliases, useDeleteTeamAlias, useBookmakers } from '@/hooks/useOddsData';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { MultiSelectPopover } from '@/components/ui/multi-select-popover';
 import { Plus, Pencil, Trash2, Tag, X, Search, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import type { Team, EntityStatus } from '@/types/database';
@@ -23,7 +24,7 @@ const Teams = () => {
   const createTeam = useCreateTeam();
   const updateTeam = useUpdateTeam();
   const deleteTeam = useDeleteTeam();
-  const createAlias = useCreateTeamAlias();
+  const createAliases = useCreateTeamAliases();
   const deleteAlias = useDeleteTeamAlias();
   
   const [selectedLeague, setSelectedLeague] = useState<string>('all');
@@ -32,7 +33,7 @@ const Teams = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isAliasDialogOpen, setIsAliasDialogOpen] = useState(false);
   const [selectedTeamForAlias, setSelectedTeamForAlias] = useState<Team | null>(null);
-  const [newAlias, setNewAlias] = useState({ alias_name: '', bookmaker_source: '' });
+  const [newAlias, setNewAlias] = useState({ alias_name: '', bookmaker_sources: [] as string[] });
   const [formData, setFormData] = useState({ standard_name: '', league_id: '', status: 'active' as EntityStatus, logo_url: '' });
 
   // Casas de apostas ativas para o select
@@ -106,18 +107,27 @@ const Teams = () => {
 
   const handleAddAlias = (e: React.FormEvent) => {
     e.preventDefault();
-    if (selectedTeamForAlias && newAlias.bookmaker_source) {
-      createAlias.mutate({ team_id: selectedTeamForAlias.id, ...newAlias });
-      setNewAlias({ alias_name: '', bookmaker_source: '' });
+    if (selectedTeamForAlias && newAlias.bookmaker_sources.length > 0) {
+      createAliases.mutate({ 
+        team_id: selectedTeamForAlias.id, 
+        alias_name: newAlias.alias_name,
+        bookmaker_sources: newAlias.bookmaker_sources
+      });
+      setNewAlias({ alias_name: '', bookmaker_sources: [] });
+      setIsAliasDialogOpen(false);
     }
   };
 
   const getTeamAliases = (teamId: string) => aliases?.filter(a => a.team_id === teamId) || [];
 
-  // Preview do alias normalizado
-  const normalizedAliasPreview = newAlias.alias_name && newAlias.bookmaker_source 
-    ? `"${newAlias.alias_name.toLowerCase()}" (${newAlias.bookmaker_source.toLowerCase()})`
-    : null;
+  // Bookmakers options for multi-select
+  const bookmakerOptions = useMemo(() => 
+    activeBookmakers.map(b => ({ 
+      value: b.name.toLowerCase(), 
+      label: b.name 
+    })),
+    [activeBookmakers]
+  );
 
   return (
     <Layout>
@@ -321,11 +331,11 @@ const Teams = () => {
           </CardContent>
         </Card>
 
-        {/* Alias Dialog - IMPROVED */}
+        {/* Alias Dialog - Multi-bookmaker selection */}
         <Dialog open={isAliasDialogOpen} onOpenChange={(open) => {
           setIsAliasDialogOpen(open);
           if (!open) {
-            setNewAlias({ alias_name: '', bookmaker_source: '' });
+            setNewAlias({ alias_name: '', bookmaker_sources: [] });
           }
         }}>
           <DialogContent aria-describedby="alias-dialog-description">
@@ -339,8 +349,8 @@ const Teams = () => {
             <Alert>
               <AlertCircle className="h-4 w-4" />
               <AlertDescription className="text-xs">
-                O alias e a casa serão <strong>normalizados automaticamente</strong> para minúsculas.
-                A casa de apostas é <strong>obrigatória</strong> para o scraper encontrar o alias.
+                O alias e as casas serão <strong>normalizados automaticamente</strong> para minúsculas.
+                Você pode selecionar <strong>múltiplas casas</strong> se usarem o mesmo nome.
               </AlertDescription>
             </Alert>
 
@@ -356,34 +366,32 @@ const Teams = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="source">Casa de Apostas *</Label>
-                <Select 
-                  value={newAlias.bookmaker_source} 
-                  onValueChange={(v) => setNewAlias({ ...newAlias, bookmaker_source: v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione a casa de apostas" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {activeBookmakers.map((b) => (
-                      <SelectItem key={b.id} value={b.name.toLowerCase()}>
-                        {b.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>Casas de Apostas *</Label>
+                <MultiSelectPopover
+                  options={bookmakerOptions}
+                  selected={newAlias.bookmaker_sources}
+                  onChange={(selected) => setNewAlias({ ...newAlias, bookmaker_sources: selected })}
+                  placeholder="Selecione as casas"
+                  className="w-full"
+                />
                 <p className="text-xs text-muted-foreground">
-                  Selecione a casa que usa este nome alternativo para o time.
+                  Selecione uma ou mais casas que usam este nome alternativo.
                 </p>
               </div>
 
-              {/* Preview do alias normalizado */}
-              {normalizedAliasPreview && (
-                <div className="p-3 bg-muted rounded-md">
-                  <span className="text-xs text-muted-foreground">Será salvo como:</span>
-                  <code className="block mt-1 text-sm font-mono">
-                    {normalizedAliasPreview}
-                  </code>
+              {/* Preview of all aliases to be created */}
+              {newAlias.alias_name && newAlias.bookmaker_sources.length > 0 && (
+                <div className="p-3 bg-muted rounded-md space-y-2">
+                  <span className="text-xs text-muted-foreground">
+                    Serão criados {newAlias.bookmaker_sources.length} alias(es):
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {newAlias.bookmaker_sources.map(bookmaker => (
+                      <Badge key={bookmaker} variant="secondary" className="text-xs font-mono">
+                        "{newAlias.alias_name.toLowerCase()}" ({bookmaker})
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
               )}
 
@@ -391,8 +399,8 @@ const Teams = () => {
                 <Button type="button" variant="outline" onClick={() => setIsAliasDialogOpen(false)}>
                   Cancelar
                 </Button>
-                <Button type="submit" disabled={!newAlias.alias_name || !newAlias.bookmaker_source}>
-                  Adicionar
+                <Button type="submit" disabled={!newAlias.alias_name || newAlias.bookmaker_sources.length === 0}>
+                  Adicionar {newAlias.bookmaker_sources.length > 1 ? `(${newAlias.bookmaker_sources.length})` : ''}
                 </Button>
               </div>
             </form>
