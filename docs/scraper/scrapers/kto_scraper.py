@@ -45,6 +45,27 @@ class KtoScraper(BaseScraper):
             "name": "La Liga",
             "country": "Espanha"
         },
+	 "bundesliga": {
+            "path": "football/germany/bundesliga", 
+            "name": "Bundesliga",
+            "country": "Alemanha"
+        },
+	 "ligue_1": {
+            "path": "football/france/ligue_1", 
+            "name": "Ligue 1",
+            "country": "Franca"
+        },
+	 "paulista": {
+            "path": "football/brazil/paulista_a1", 
+            "name": "Paulistao A1",
+            "country": "Brasil"
+ 	},
+ 	 "fa_cup": {
+            "path": "football/england/fa_cup", 
+            "name": "FA Cup",
+            "country": "Inglaterra"
+        },
+
     }
     
     def __init__(self):
@@ -246,12 +267,12 @@ if __name__ == "__main__":
         so_odds = [o for o in odds if o.odds_type == "SO"]
         pa_odds = [o for o in odds if o.odds_type == "PA"]
         
-        print(f"\n📊 SO (Super Odds): {len(so_odds)} jogos")
+        print(f"\n SO (Super Odds): {len(so_odds)} jogos")
         for o in so_odds[:3]:
             print(f"  {o.home_team_raw} x {o.away_team_raw}")
             print(f"    Odds: {o.home_odd:.2f} - {o.draw_odd:.2f} - {o.away_odd:.2f}")
         
-        print(f"\n💰 PA (Pagamento Antecipado): {len(pa_odds)} jogos")
+        print(f"\n PA (Pagamento Antecipado): {len(pa_odds)} jogos")
         for o in pa_odds[:3]:
             print(f"  {o.home_team_raw} x {o.away_team_raw}")
             print(f"    Odds: {o.home_odd:.2f} - {o.draw_odd:.2f} - {o.away_odd:.2f}")
