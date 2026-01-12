@@ -492,6 +492,31 @@ const MatchDetails = () => {
                 <strong>Liga:</strong> {match.league_name} | 
                 <strong> Times:</strong> {match.home_team} vs {match.away_team}
               </div>
+              
+              {/* Ação rápida para criar aliases */}
+              <div className="mt-4 pt-4 border-t border-amber-500/20">
+                <p className="text-xs text-muted-foreground mb-2">
+                  Ação rápida: Buscar times para criar aliases
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="text-xs"
+                    onClick={() => navigate(`/teams?search=${encodeURIComponent(match.home_team)}`)}
+                  >
+                    Buscar "{match.home_team}"
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="text-xs"
+                    onClick={() => navigate(`/teams?search=${encodeURIComponent(match.away_team)}`)}
+                  >
+                    Buscar "{match.away_team}"
+                  </Button>
+                </div>
+              </div>
             </CardContent>
           </Card>
         )}

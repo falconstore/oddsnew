@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { FileWarning, ChevronRight, ExternalLink, AlertTriangle, BarChart3, Filter } from 'lucide-react';
+import { FileWarning, ChevronRight, ExternalLink, AlertTriangle, BarChart3, Filter, Tag } from 'lucide-react';
 import { Layout } from '@/components/Layout';
 import { useOddsComparison, useBookmakers } from '@/hooks/useOddsData';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -107,15 +107,20 @@ export default function AdminLogs() {
       });
     });
     
+    // Ordenar casas por quantidade de falhas
+    const bookmakerStats = Object.entries(bookmakerCounts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, count]) => ({ name, count }));
+    
     // Casa mais problemática
-    const mostProblematic = Object.entries(bookmakerCounts)
-      .sort((a, b) => b[1] - a[1])[0];
+    const mostProblematic = bookmakerStats[0] || null;
     
     return {
       totalMatches,
       matchesWithErrors,
       errorPercentage: totalMatches > 0 ? Math.round((matchesWithErrors / totalMatches) * 100) : 0,
-      mostProblematic: mostProblematic ? { name: mostProblematic[0], count: mostProblematic[1] } : null
+      mostProblematic,
+      bookmakerStats
     };
   }, [matchesWithMissing]);
 
@@ -242,6 +247,39 @@ export default function AdminLogs() {
               )}
             </CardContent>
           </Card>
+
+          {/* Card de Diagnóstico de Aliases */}
+          {stats.bookmakerStats.length > 0 && (
+            <Card className="border-blue-500/30 bg-blue-500/5">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1">
+                  <Tag className="h-4 w-4 text-blue-500" />
+                  Casas que Precisam de Aliases
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Casas com mais partidas faltando podem precisar de aliases de times.
+                </p>
+                <div className="space-y-1">
+                  {stats.bookmakerStats.slice(0, 5).map(({ name, count }) => (
+                    <div key={name} className="flex items-center justify-between text-sm">
+                      <span>{name}</span>
+                      <Badge variant="outline" className="text-xs">{count} partidas</Badge>
+                    </div>
+                  ))}
+                </div>
+                <Button 
+                  variant="link" 
+                  size="sm" 
+                  className="mt-2 h-auto p-0 text-xs"
+                  asChild
+                >
+                  <Link to="/teams">Gerenciar Times e Aliases →</Link>
+                </Button>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Grouped Tables */}
