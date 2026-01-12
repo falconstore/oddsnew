@@ -14,6 +14,7 @@ import {
   LogOut,
   Shield,
   UserCog,
+  FileWarning,
   type LucideIcon
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -40,6 +41,7 @@ const navigation: NavigationItem[] = [
   { name: 'Casas de Apostas', href: '/bookmakers', icon: Building2, adminOnly: true, pageKey: PAGE_KEYS.BOOKMAKERS },
   { name: 'Configurações', href: '/settings', icon: Settings, pageKey: PAGE_KEYS.SETTINGS },
   { name: 'Gerenciar Usuários', href: '/admin/users', icon: UserCog, adminOnly: true, pageKey: PAGE_KEYS.ADMIN_USERS },
+  { name: 'Logs / Diagnóstico', href: '/admin/logs', icon: FileWarning, adminOnly: true, pageKey: PAGE_KEYS.ADMIN_LOGS },
 ];
 
 export function Sidebar() {
