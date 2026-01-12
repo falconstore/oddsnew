@@ -30,6 +30,8 @@ class McgamesScraper(BaseScraper):
         "la_liga": McgamesLeague(champ_id="2941", name="La Liga", country="espanha"),
  	"bundesliga": McgamesLeague(champ_id="2950", name="Bundesliga", country="alemanha"),
  	"ligue_1": McgamesLeague(champ_id="2943", name="Ligue 1", country="franca"),
+	"paulistao": McgamesLeague(champ_id="3436", name="Paulistao A1", country="brasil"),
+	"fa_cup": McgamesLeague(champ_id="2935", name="FA Cup", country="inglaterra"),
     }
     
     API_BASE = "https://sb2frontend-altenar2.biahosted.com/api/widget/GetEvents"
@@ -294,7 +296,7 @@ class McgamesScraper(BaseScraper):
                 results.append(scraped)
                 
             except Exception as e:
-                self.logger.debug(f"⚠️ Mcgames: Error parsing market: {e}")
+                self.logger.debug(f" Mcgames: Error parsing market: {e}")
                 continue
         
         self.logger.info(f" Mcgames {league.name}: {len(results)} odds processed")
