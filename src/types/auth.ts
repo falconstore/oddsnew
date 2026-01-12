@@ -37,6 +37,7 @@ export const PAGE_KEYS = {
   BOOKMAKERS: 'bookmakers',
   SETTINGS: 'settings',
   ADMIN_USERS: 'admin_users',
+  ADMIN_LOGS: 'admin_logs',
 } as const;
 
 export type PageKey = typeof PAGE_KEYS[keyof typeof PAGE_KEYS];
@@ -51,4 +52,5 @@ export const PAGE_CONFIG: Record<PageKey, { label: string; adminOnly: boolean }>
   [PAGE_KEYS.BOOKMAKERS]: { label: 'Casas de Apostas', adminOnly: true },
   [PAGE_KEYS.SETTINGS]: { label: 'Configurações', adminOnly: false },
   [PAGE_KEYS.ADMIN_USERS]: { label: 'Gerenciar Usuários', adminOnly: true },
+  [PAGE_KEYS.ADMIN_LOGS]: { label: 'Logs / Diagnóstico', adminOnly: true },
 };

@@ -16,6 +16,7 @@ import Bookmakers from "./pages/Bookmakers";
 import Settings from "./pages/Settings";
 import Login from "./pages/Login";
 import AdminUsers from "./pages/admin/Users";
+import AdminLogs from "./pages/admin/Logs";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -76,6 +77,11 @@ const App = () => (
             <Route path="/admin/users" element={
               <RequireAuth requireAdmin pageKey={PAGE_KEYS.ADMIN_USERS}>
                 <AdminUsers />
+              </RequireAuth>
+            } />
+            <Route path="/admin/logs" element={
+              <RequireAuth requireAdmin pageKey={PAGE_KEYS.ADMIN_LOGS}>
+                <AdminLogs />
               </RequireAuth>
             } />
             
