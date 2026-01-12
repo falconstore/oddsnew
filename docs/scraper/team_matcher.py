@@ -115,16 +115,30 @@ class TeamMatcher:
         # Build reverse_cache - keep FIRST encountered team_id for each name
         # Log warning if duplicates exist (same name in different leagues)
         self.reverse_cache = {}
+        duplicates_found = []
         for t in teams:
             name_lower = t["standard_name"].lower()
             if name_lower in self.reverse_cache:
-                # Duplicata detectada - logar warning
-                self.logger.warning(
-                    f"[DUPLICATE] Team '{t['standard_name']}' exists in multiple leagues. "
-                    f"Consider merging them. IDs: {self.reverse_cache[name_lower]}, {t['id']}"
-                )
+                # Duplicata detectada - coletar para relatório
+                duplicates_found.append({
+                    "name": t["standard_name"],
+                    "canonical_id": self.reverse_cache[name_lower],
+                    "duplicate_id": t["id"],
+                    "league_id": t.get("league_id")
+                })
             else:
                 self.reverse_cache[name_lower] = t["id"]
+        
+        # Log all duplicates found with consolidation SQL hint
+        if duplicates_found:
+            self.logger.warning(
+                f"[DUPLICATE] Found {len(duplicates_found)} duplicate team(s). "
+                "Run cleanup_duplicates.py to generate merge SQL."
+            )
+            for dup in duplicates_found:
+                self.logger.warning(
+                    f"  - '{dup['name']}': keep {dup['canonical_id']}, merge {dup['duplicate_id']}"
+                )
         
         # Build league-scoped cache for fuzzy matching within leagues
         self.teams_by_league = {}
