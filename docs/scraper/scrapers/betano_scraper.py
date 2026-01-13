@@ -60,6 +60,24 @@ class BetanoScraper(BaseScraper):
             "country": "Alemanha",
             "url_path": "/sport/futebol/alemanha/bundesliga/216/"
         },
+	"paulistao": {
+            "id": "16901",
+            "name": "Paulistao",
+            "country": "Brasil",
+            "url_path": "/sport/futebol/brasil/campeonato-paulista-serie-a1/16901/"
+        },
+	"fa_cup": {
+            "id": "218",
+            "name": "FA Cup",
+            "country": "Inglaterra",
+            "url_path": "/sport/futebol/inglaterra/facup/218/"
+        },
+	"efl_cup": {
+            "id": "10215",
+            "name": "EFL Cup",
+            "country": "Inglaterra",
+            "url_path": "/sport/futebol/inglaterra/efl-cup/10215/"
+        },
     }
     
     def __init__(self):
