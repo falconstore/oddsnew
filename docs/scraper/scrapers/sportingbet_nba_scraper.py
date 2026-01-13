@@ -43,8 +43,10 @@ class SportingbetNBAScraper(BaseScraper):
             headers={
                 "accept": "application/json, text/plain, */*",
                 "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
-                "referer": "https://www.sportingbet.bet.br/",
-                "x-bwin-browser-url": "https://www.sportingbet.bet.br/",
+                "referer": "https://www.sportingbet.bet.br/pt-br/sports/basquete-7/aposta/am%C3%A9rica-do-norte-9/nba-6004",
+                "x-bwin-browser-url": "https://www.sportingbet.bet.br/pt-br/sports/basquete-7/aposta/am%C3%A9rica-do-norte-9/nba-6004",
+                "X-From-Product": "host-app",
+                "X-Device-Type": "desktop",
             }
         )
     
@@ -71,13 +73,7 @@ class SportingbetNBAScraper(BaseScraper):
         if not self.client:
             await self.setup()
         
-        league_config = self.LEAGUES.get(league.league_id, {})
-        region_id = league_config.get("region_id")
-        competition_id = league_config.get("competition_id")
-        if not region_id or not competition_id:
-            self.logger.warning(f"[Sportingbet NBA] Liga nao configurada: {league.league_id}")
-            return []
-        
+        # Simplified params - no regionIds or competitionIds to avoid HTTP 400
         params = {
             "x-bwin-accessid": self.ACCESS_ID,
             "lang": "pt-br",
@@ -88,9 +84,7 @@ class SportingbetNBAScraper(BaseScraper):
             "offerMapping": "Filtered",
             "offerCategories": "Gridable",
             "fixtureCategories": "Gridable,NonGridable,Other",
-            "sportIds": "7",  # Basketball
-            "regionIds": region_id,
-            "competitionIds": competition_id,
+            "sportIds": "7",  # Basketball only
             "isPriceBoost": "false",
             "statisticsModes": "None",
             "skip": "0",
@@ -104,7 +98,7 @@ class SportingbetNBAScraper(BaseScraper):
             response = await self.client.get(self.API_BASE, params=params)
             response.raise_for_status()
             data = response.json()
-            return self._parse_response(data, league.name, region_id)
+            return self._parse_response(data, league.name)
         except httpx.HTTPStatusError as e:
             self.logger.error(f"[Sportingbet NBA] Erro HTTP: {e.response.status_code}")
             return []
@@ -112,13 +106,19 @@ class SportingbetNBAScraper(BaseScraper):
             self.logger.error(f"[Sportingbet NBA] Erro: {e}")
             return []
 
-    def _parse_response(self, data: Dict[str, Any], league_name: str, region_id: str) -> List[ScrapedOdds]:
+    def _parse_response(self, data: Dict[str, Any], league_name: str) -> List[ScrapedOdds]:
         """Parse API response and extract NBA moneyline odds."""
         results = []
         fixtures = data.get("fixtures", [])
         
         for fixture in fixtures:
             try:
+                # Filter only NBA games
+                competition = fixture.get("competition", {})
+                comp_name = competition.get("name", {}).get("value", "").upper()
+                if "NBA" not in comp_name:
+                    continue
+                
                 # Extract teams from participants
                 participants = fixture.get("participants", [])
                 home_team = ""
@@ -186,7 +186,6 @@ class SportingbetNBAScraper(BaseScraper):
                         market_type="moneyline",
                         extra_data={
                             "fixture_id": fixture_id,
-                            "region_id": region_id,
                             "home_team_raw": home_team.strip(),
                             "away_team_raw": away_team.strip()
                         }
