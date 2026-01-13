@@ -111,28 +111,39 @@ class SportingbetNBAScraper(BaseScraper):
         results = []
         fixtures = data.get("fixtures", [])
         
+        self.logger.debug(f"[Sportingbet NBA] Processando {len(fixtures)} fixtures...")
+        
         for fixture in fixtures:
             try:
-                # Filter only NBA games
+                # Filter by competition if present (accept if missing since API already filters basketball)
                 competition = fixture.get("competition", {})
-                comp_name = competition.get("name", {}).get("value", "").upper()
-                if "NBA" not in comp_name:
-                    continue
+                if competition:
+                    comp_name = competition.get("name", {}).get("value", "").upper()
+                    if comp_name and "NBA" not in comp_name:
+                        continue
                 
                 # Extract teams from participants
+                # Teams are participants WITHOUT properties.type (players have type="Player")
                 participants = fixture.get("participants", [])
-                home_team = ""
-                away_team = ""
+                teams = []
                 
                 for p in participants:
-                    ptype = p.get("properties", {}).get("type")
-                    if ptype == "HomeTeam":
-                        home_team = p.get("name", {}).get("value", "")
-                    elif ptype == "AwayTeam":
-                        away_team = p.get("name", {}).get("value", "")
+                    props = p.get("properties", {})
+                    # Teams don't have properties.type, players have type="Player"
+                    if not props.get("type"):
+                        team_name = p.get("name", {}).get("value", "")
+                        if team_name:
+                            teams.append(team_name)
+                    if len(teams) >= 2:
+                        break
                 
-                if not home_team or not away_team:
+                if len(teams) < 2:
+                    self.logger.debug(f"[Sportingbet NBA] Fixture sem 2 times encontrados")
                     continue
+                
+                # In Sportingbet NBA API: first team in participants list corresponds to sourceName="1"
+                # and second team to sourceName="2". We'll map them after finding odds.
+                team_by_source = {"1": teams[0], "2": teams[1]}
                 
                 # Parse match date
                 start_date = fixture.get("startDate", "")
@@ -146,29 +157,32 @@ class SportingbetNBAScraper(BaseScraper):
                 markets = fixture.get("optionMarkets", [])
                 home_odd = None
                 away_odd = None
+                home_team = ""
+                away_team = ""
                 
                 for market in markets:
                     market_name = market.get("name", {}).get("value", "")
                     
-                    # Moneyline market: "Vencedor"
-                    if "Vencedor" in market_name or "Winner" in market_name:
+                    # Only process main Moneyline market "Vencedor" (not "Vencedor - 1º Tempo" etc)
+                    if market_name == "Vencedor":
                         options = market.get("options", [])
                         for opt in options:
                             source_name = opt.get("sourceName", {}).get("value", "")
                             price = opt.get("price", {}).get("odds")
-                            opt_name = opt.get("name", {}).get("value", "")
                             
-                            if price:
-                                # sourceName "1" = first team (home), "2" = second team (away)
-                                if source_name == "1" or opt_name == home_team:
-                                    home_odd = price
-                                elif source_name == "2" or opt_name == away_team:
+                            if price and source_name:
+                                # sourceName "1" = Away team, "2" = Home team (NBA convention)
+                                if source_name == "1":
                                     away_odd = price
+                                    away_team = team_by_source.get("1", "")
+                                elif source_name == "2":
+                                    home_odd = price
+                                    home_team = team_by_source.get("2", "")
                         break
                 
                 # Only add if both odds are found
-                if home_odd and away_odd:
-                    # Extract fixture ID (remove "7:" prefix if present for basketball)
+                if home_odd and away_odd and home_team and away_team:
+                    # Extract fixture ID (remove prefix if present)
                     fixture_id = str(fixture.get("id", ""))
                     if ":" in fixture_id:
                         fixture_id = fixture_id.split(":")[-1]
@@ -191,6 +205,7 @@ class SportingbetNBAScraper(BaseScraper):
                         }
                     )
                     results.append(scraped)
+                    self.logger.debug(f"[Sportingbet NBA] {home_team} vs {away_team}: {home_odd} / {away_odd}")
                     
             except Exception as e:
                 self.logger.debug(f"[Sportingbet NBA] Erro ao processar fixture: {e}")
