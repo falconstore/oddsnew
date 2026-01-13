@@ -76,7 +76,7 @@ class TeamMatcher:
             "supercup",
             "coupe de france",
             "trophee des champions",
-            "copa del rey",
+            "copa do rei",
             "supercopa de espana",
             "taca de portugal",
             "supertaca",
