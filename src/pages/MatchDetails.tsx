@@ -138,29 +138,40 @@ function generateBookmakerLink(
   
   if (name.includes('kto')) {
     const eventId = extraData.event_id;
+    const sportType = extraData.sport_type as string;
     const leaguePath = extraData.league_path as string;
     const homeOriginal = extraData.home_team_slug as string;
     const awayOriginal = extraData.away_team_slug as string;
     const homeName = homeOriginal || homeTeam;
     const awayName = awayOriginal || awayTeam;
     
-    if (eventId && leaguePath && homeName && awayName) {
-      const pathParts = leaguePath.split('/');
-      const sport = pathParts[0] === 'football' ? 'futebol' : pathParts[0];
-      const countryMap: Record<string, string> = {
-        'italy': 'italia', 'england': 'inglaterra', 'spain': 'espanha',
-        'brazil': 'brasil', 'germany': 'alemanha', 'france': 'franca', 'portugal': 'portugal'
-      };
-      const country = countryMap[pathParts[1]] || pathParts[1];
-      const leagueSlug = pathParts[2]?.replace(/_/g, '-') || '';
+    if (eventId && homeName && awayName) {
       const homeSlug = homeName.toLowerCase().replace(/\s+/g, '-').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
       const awaySlug = awayName.toLowerCase().replace(/\s+/g, '-').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-      return `https://www.kto.bet.br/esportes/${sport}/${country}/${leagueSlug}/${homeSlug}---${awaySlug}/${eventId}`;
+      
+      // NBA uses fixed path: basquete/nba
+      if (sportType === 'basketball') {
+        return `https://www.kto.bet.br/esportes/basquete/nba/${homeSlug}---${awaySlug}/${eventId}`;
+      }
+      
+      // Football uses league_path
+      if (leaguePath) {
+        const pathParts = leaguePath.split('/');
+        const sport = pathParts[0] === 'football' ? 'futebol' : pathParts[0];
+        const countryMap: Record<string, string> = {
+          'italy': 'italia', 'england': 'inglaterra', 'spain': 'espanha',
+          'brazil': 'brasil', 'germany': 'alemanha', 'france': 'franca', 'portugal': 'portugal'
+        };
+        const country = countryMap[pathParts[1]] || pathParts[1];
+        const leagueSlug = pathParts[2]?.replace(/_/g, '-') || '';
+        return `https://www.kto.bet.br/esportes/${sport}/${country}/${leagueSlug}/${homeSlug}---${awaySlug}/${eventId}`;
+      }
     }
   }
   
   if (name.includes('sportingbet')) {
     const fixtureId = extraData.fixture_id;
+    const sportType = extraData.sport_type as string;
     const homeOriginal = extraData.home_team_raw as string;
     const awayOriginal = extraData.away_team_raw as string;
     const homeName = homeOriginal || homeTeam;
@@ -169,6 +180,13 @@ function generateBookmakerLink(
     if (fixtureId && homeName && awayName) {
       const homeSlug = homeName.toLowerCase().replace(/\s+/g, '-').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
       const awaySlug = awayName.toLowerCase().replace(/\s+/g, '-').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      
+      // NBA uses format: away-at-home-fixtureId
+      if (sportType === 'basketball') {
+        return `https://www.sportingbet.bet.br/pt-br/sports/eventos/${awaySlug}-at-${homeSlug}-${fixtureId}?tab=score`;
+      }
+      
+      // Football maintains original format
       return `https://www.sportingbet.bet.br/pt-br/sports/eventos/${homeSlug}-${awaySlug}-2:${fixtureId}?tab=score`;
     }
   }

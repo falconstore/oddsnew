@@ -201,7 +201,8 @@ class SportingbetNBAScraper(BaseScraper):
                         extra_data={
                             "fixture_id": fixture_id,
                             "home_team_raw": home_team.strip(),
-                            "away_team_raw": away_team.strip()
+                            "away_team_raw": away_team.strip(),
+                            "sport_type": "basketball"
                         }
                     )
                     results.append(scraped)
