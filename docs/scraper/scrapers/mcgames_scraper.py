@@ -1,9 +1,11 @@
 """
 Mcgames Scraper - Uses Altenar API (same as Br4bet).
 Hybrid approach: Playwright captures token, curl_cffi fetches data.
+Robust pattern: env var override, multiple warm-up URLs, progressive scroll.
 """
 
 import asyncio
+import os
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
 
@@ -28,13 +30,22 @@ class McgamesScraper(BaseScraper):
         "serie_a": McgamesLeague(champ_id="2942", name="Serie A", country="italia"),
         "premier_league": McgamesLeague(champ_id="2936", name="Premier League", country="inglaterra"),
         "la_liga": McgamesLeague(champ_id="2941", name="La Liga", country="espanha"),
-     	"bundesliga": McgamesLeague(champ_id="2950", name="Bundesliga", country="alemanha"),
-     	"ligue_1": McgamesLeague(champ_id="2943", name="Ligue 1", country="franca"),
-    	"paulistao": McgamesLeague(champ_id="3436", name="Paulistao A1", country="brasil"),
-    	"fa_cup": McgamesLeague(champ_id="2935", name="FA Cup", country="inglaterra"),
+        "bundesliga": McgamesLeague(champ_id="2950", name="Bundesliga", country="alemanha"),
+        "ligue_1": McgamesLeague(champ_id="2943", name="Ligue 1", country="franca"),
+        "paulistao": McgamesLeague(champ_id="3436", name="Paulistao A1", country="brasil"),
+        "fa_cup": McgamesLeague(champ_id="2935", name="FA Cup", country="inglaterra"),
+        "efl_cup": McgamesLeague(champ_id="2972", name="EFL Cup", country="inglaterra"),
     }
     
     API_BASE = "https://sb2frontend-altenar2.biahosted.com/api/widget/GetEvents"
+    
+    # Multiple warm-up URLs for token capture
+    WARMUP_URLS = [
+        "https://mcgames.bet.br/sports/futebol/italia/serie-a/c-2942",
+        "https://mcgames.bet.br/sports/futebol/inglaterra/premier-league/c-2936",
+        "https://mcgames.bet.br/sports/futebol",
+        "https://mcgames.bet.br/sports",
+    ]
     
     def __init__(self):
         super().__init__(
@@ -44,11 +55,41 @@ class McgamesScraper(BaseScraper):
         self.session: Optional[AsyncSession] = None
         self.auth_token: Optional[str] = None
         self.user_agent: Optional[str] = None
+        self._setup_attempted: bool = False
         self.logger = logger.bind(component="mcgames")
     
+    def _init_session(self) -> None:
+        """Initialize curl_cffi session."""
+        if not self.session:
+            self.session = AsyncSession(impersonate="chrome")
+            self.logger.info("[Mcgames] Session initialized")
+    
     async def setup(self) -> None:
-        """Capture authorization token via Playwright."""
-        self.logger.info("Iniciando Playwright para capturar credenciais Mcgames...")
+        """Capture authorization token via Playwright with robust fallbacks."""
+        
+        # Reuse existing token if available
+        if self.auth_token and self.user_agent:
+            if not self.session:
+                self._init_session()
+            self.logger.info("[Mcgames] Reusing existing token")
+            return
+        
+        # Check for manual token override via env var
+        manual_token = os.environ.get("MCGAMES_AUTH_TOKEN")
+        if manual_token:
+            self.logger.info("[Mcgames] Using manual token from MCGAMES_AUTH_TOKEN env var")
+            self.auth_token = manual_token
+            self.user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+            self._init_session()
+            return
+        
+        # Prevent infinite setup loops
+        if self._setup_attempted:
+            self.logger.warning("[Mcgames] Setup already attempted this cycle, skipping")
+            return
+        
+        self._setup_attempted = True
+        self.logger.info("[Mcgames] Starting Playwright to capture credentials...")
         
         async with async_playwright() as p:
             browser = await p.chromium.launch(
@@ -71,42 +112,71 @@ class McgamesScraper(BaseScraper):
                         token = headers["authorization"]
                         if not token_future.done():
                             token_future.set_result(token)
-                            self.logger.info(" Mcgames: Token capturado via request")
+                            self.logger.info("[Mcgames] Token captured via request interception")
             
             page.on("request", handle_request)
             
             try:
-                target_url = "https://mcgames.bet.br/sports/futebol/italia/serie-a/c-2942"
-                self.logger.info(f"Navegando para {target_url}...")
+                # Try multiple warm-up URLs
+                for i, target_url in enumerate(self.WARMUP_URLS):
+                    if token_future.done():
+                        self.logger.info(f"[Mcgames] Token captured on URL {i+1}/{len(self.WARMUP_URLS)}")
+                        break
+                    
+                    self.logger.info(f"[Mcgames] Trying URL {i+1}/{len(self.WARMUP_URLS)}: {target_url}")
+                    
+                    try:
+                        await page.goto(target_url, wait_until="domcontentloaded", timeout=30000)
+                        await page.wait_for_timeout(3000)
+                        
+                        # Progressive scroll to trigger API calls
+                        if not token_future.done():
+                            await page.evaluate("window.scrollTo(0, 500)")
+                            await page.wait_for_timeout(2000)
+                        
+                        if not token_future.done():
+                            await page.evaluate("window.scrollTo(0, 1000)")
+                            await page.wait_for_timeout(2000)
+                        
+                        if not token_future.done():
+                            await page.evaluate("window.scrollTo(0, 1500)")
+                            await page.wait_for_timeout(2000)
+                            
+                    except Exception as url_error:
+                        self.logger.warning(f"[Mcgames] URL {i+1} failed: {url_error}")
+                        continue
                 
-                await page.goto(target_url, wait_until="domcontentloaded", timeout=60000)
+                # Final wait for token if still not captured
+                if not token_future.done():
+                    self.logger.info("[Mcgames] Waiting final 10s for token...")
+                    try:
+                        self.auth_token = await asyncio.wait_for(token_future, timeout=10.0)
+                    except asyncio.TimeoutError:
+                        self.logger.error("[Mcgames] FAILED: Could not capture token after all attempts")
+                        self.auth_token = None
+                else:
+                    self.auth_token = token_future.result()
                 
-                try:
-                    self.auth_token = await asyncio.wait_for(token_future, timeout=15.0)
-                except asyncio.TimeoutError:
-                    self.logger.warning("Token demorou. Scrollando...")
-                    await page.evaluate("window.scrollTo(0, 500)")
-                    self.auth_token = await asyncio.wait_for(token_future, timeout=15.0)
+                if self.auth_token:
+                    self.user_agent = await page.evaluate("navigator.userAgent")
+                    self.logger.info("[Mcgames] Token capture successful!")
                 
-                self.user_agent = await page.evaluate("navigator.userAgent")
-                
-            except asyncio.TimeoutError:
-                self.logger.error(" Mcgames: Timeout capturando token")
             except Exception as e:
-                self.logger.error(f" Mcgames Playwright: {e}")
+                self.logger.error(f"[Mcgames] Playwright error: {type(e).__name__}: {e}")
             finally:
                 await browser.close()
         
-        # Initialize curl_cffi session after getting token
-        self.session = AsyncSession(impersonate="chrome")
-        self.logger.info(" Mcgames: Session initialized")
+        # Initialize session after getting token
+        if self.auth_token:
+            self._init_session()
     
     async def teardown(self) -> None:
         """Close the session."""
         if self.session:
             await self.session.close()
             self.session = None
-        self.logger.info(" Mcgames: Session closed")
+        self._setup_attempted = False  # Reset for next cycle
+        self.logger.info("[Mcgames] Session closed")
     
     async def get_available_leagues(self) -> List[LeagueConfig]:
         """Return list of supported leagues."""
@@ -127,11 +197,11 @@ class McgamesScraper(BaseScraper):
             await self.setup()
         
         if not self.auth_token:
-            self.logger.error(f" Mcgames: No token available for {league.name}")
+            self.logger.error(f"[Mcgames] No token available for {league.name}")
             return []
         
         if league.league_id not in self.LEAGUES:
-            self.logger.warning(f" Mcgames: Unknown league {league.league_id}")
+            self.logger.warning(f"[Mcgames] Unknown league {league.league_id}")
             return []
         
         mcgames_league = self.LEAGUES[league.league_id]
@@ -166,15 +236,22 @@ class McgamesScraper(BaseScraper):
                 timeout=30
             )
             
+            # Handle token expiration
+            if response.status_code in (401, 403):
+                self.logger.warning(f"[Mcgames] Token expired (HTTP {response.status_code}), will recapture next cycle")
+                self.auth_token = None
+                self._setup_attempted = False  # Allow recapture
+                return []
+            
             if response.status_code != 200:
-                self.logger.error(f" Mcgames {league.name}: HTTP {response.status_code}")
+                self.logger.error(f"[Mcgames] {league.name}: HTTP {response.status_code}")
                 return []
             
             data = response.json()
             return self._parse_response(data, mcgames_league)
             
         except Exception as e:
-            self.logger.error(f" Mcgames {league.name}: {e}")
+            self.logger.error(f"[Mcgames] {league.name}: {type(e).__name__}: {e}")
             return []
     
     def _parse_response(self, data: Dict[str, Any], league: McgamesLeague) -> List[ScrapedOdds]:
@@ -187,23 +264,18 @@ class McgamesScraper(BaseScraper):
         odds_list = data.get("odds", [])
         competitors_list = data.get("competitors", [])
         
-        self.logger.info(f" Mcgames {league.name}: Structure: {len(events_list)} events, {len(markets_list)} markets, {len(odds_list)} odds")
+        self.logger.info(f"[Mcgames] {league.name}: {len(events_list)} events, {len(markets_list)} markets, {len(odds_list)} odds")
         
         if not events_list:
-            self.logger.warning(f" Mcgames {league.name}: No events found")
+            self.logger.warning(f"[Mcgames] {league.name}: No events found")
             return []
         
         # Build lookup maps
-        # event_id -> event data
         events_map = {e["id"]: e for e in events_list}
-        
-        # competitor_id -> name
         competitors_map = {c["id"]: c["name"] for c in competitors_list}
-        
-        # odd_id -> odd data
         odds_map = {o["id"]: o for o in odds_list}
         
-        # market_id -> event_id (from event.marketIds)
+        # market_id -> event_id
         market_to_event = {}
         for event in events_list:
             for mid in event.get("marketIds", []):
@@ -226,7 +298,6 @@ class McgamesScraper(BaseScraper):
                 match_date = event.get("startDate")
                 competitor_ids = event.get("competitorIds", [])
                 
-                # Skip if not enough data
                 if not event_name or len(competitor_ids) < 2:
                     continue
                 
@@ -296,15 +367,16 @@ class McgamesScraper(BaseScraper):
                 results.append(scraped)
                 
             except Exception as e:
-                self.logger.debug(f"⚠️ Mcgames: Error parsing market: {e}")
+                self.logger.debug(f"[Mcgames] Error parsing market: {e}")
                 continue
         
-        self.logger.info(f" Mcgames {league.name}: {len(results)} odds processed")
+        self.logger.info(f"[Mcgames] {league.name}: {len(results)} odds processed")
         return results
 
 
 async def main():
     """Test the scraper."""
+    import logging
     logging.basicConfig(level=logging.INFO)
     
     scraper = McgamesScraper()
