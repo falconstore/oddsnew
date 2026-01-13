@@ -78,6 +78,12 @@ class BetanoScraper(BaseScraper):
             "country": "Inglaterra",
             "url_path": "/sport/futebol/inglaterra/efl-cup/10215/"
         },
+	"copa_do_rei": {
+            "id": "10067",
+            "name": "Copa do Rei",
+            "country": "Espanha",
+            "url_path": "/sport/futebol/espanha/copa-do-rei/10067/"
+        },
     }
     
     def __init__(self):
