@@ -177,6 +177,9 @@ class KtoNBAScraper(BaseScraper):
                         extra_data={
                             "event_id": str(event_id),
                             "kambi_offer_id": str(match_offer.get("id")),
+                            "sport_type": "basketball",
+                            "home_team_slug": home_team.strip(),
+                            "away_team_slug": away_team.strip()
                         }
                     )
                     results.append(scraped)
