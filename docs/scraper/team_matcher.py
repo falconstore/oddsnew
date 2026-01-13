@@ -18,6 +18,9 @@ BLOCKED_MATCHES = {
     "brest": "nottingham forest",
 }
 
+# Common words to remove for better fuzzy matching
+COMMON_WORDS = {'de', 'do', 'da', 'del', 'la', 'fc', 'sc', 'cf', 'ac', 'ss', 'club', 'sporting'}
+
 
 class TeamMatcher:
     """
@@ -96,6 +99,21 @@ class TeamMatcher:
         name = unicodedata.normalize('NFD', name)
         name = ''.join(c for c in name if unicodedata.category(c) != 'Mn')
         return name.strip()
+    
+    def _normalize_for_fuzzy(self, name: str) -> str:
+        """
+        Remove common words for better fuzzy matching.
+        E.g., "Atlético de Madrid" -> "Atlético Madrid"
+        This prevents mismatches when bookmakers use variations with/without prepositions.
+        """
+        normalized = self._normalize_name(name).lower()
+        words = normalized.split()
+        # Filter out common words, but keep at least 2 words to maintain meaning
+        filtered = [w for w in words if w not in COMMON_WORDS]
+        if len(filtered) < 2 and len(words) >= 2:
+            # If we removed too much, use original but without just articles
+            filtered = [w for w in words if w not in {'de', 'do', 'da', 'del', 'la'}]
+        return ' '.join(filtered) if filtered else normalized
     
     def clear_log_cache(self):
         """Clear the unmatched log cache. Call at the start of each cycle."""
@@ -418,7 +436,12 @@ class TeamMatcher:
         best_score = 0
         best_strategy = None
         
+        # Also try matching with normalized names (without common words like "de", "do")
+        fuzzy_input = self._normalize_for_fuzzy(raw_name)
+        fuzzy_names = {name: self._normalize_for_fuzzy(name) for name in all_names}
+        
         for scorer, strategy_name, min_threshold in strategies:
+            # Try standard matching first
             result = process.extractOne(
                 normalized_input,
                 all_names,
@@ -430,6 +453,15 @@ class TeamMatcher:
                 best_match = result[0]
                 best_score = result[1]
                 best_strategy = strategy_name
+            
+            # Also try matching with normalized names (without "de", "do", "da")
+            # This helps match "Atlético de Madrid" with "Atlético Madrid"
+            for original_name, fuzzy_name in fuzzy_names.items():
+                score = scorer(fuzzy_input, fuzzy_name)
+                if score >= min_threshold and score > best_score:
+                    best_match = original_name
+                    best_score = score
+                    best_strategy = f"{strategy_name}_fuzzy"
         
         if best_match:
             # Check if this match is blocked
@@ -515,7 +547,12 @@ class TeamMatcher:
         best_match = None
         best_score = 0
         
+        # Also prepare normalized versions for fuzzy matching
+        fuzzy_input = self._normalize_for_fuzzy(raw_name)
+        fuzzy_names = {name: self._normalize_for_fuzzy(name) for name in all_names}
+        
         for scorer, min_threshold in strategies:
+            # Standard matching
             result = process.extractOne(
                 self._normalize_name(raw_name),
                 all_names,
@@ -526,6 +563,13 @@ class TeamMatcher:
             if result and result[1] > best_score:
                 best_match = result[0]
                 best_score = result[1]
+            
+            # Also try matching with normalized names (without "de", "do", "da")
+            for original_name, fuzzy_name in fuzzy_names.items():
+                score = scorer(fuzzy_input, fuzzy_name)
+                if score >= min_threshold and score > best_score:
+                    best_match = original_name
+                    best_score = score
         
         if best_match:
             # Verificar blocked matches
