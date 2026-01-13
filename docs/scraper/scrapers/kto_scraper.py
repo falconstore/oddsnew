@@ -64,8 +64,17 @@ class KtoScraper(BaseScraper):
             "path": "football/england/fa_cup", 
             "name": "FA Cup",
             "country": "Inglaterra"
+	},
+ 	 "efl_cup": {
+            "path": "football/england/efl_cup", 
+            "name": "EFL Cup",
+            "country": "Inglaterra"
         },
-
+ 	"copa_do_rei": {
+            "path": "/football/spain/copa_del_rey", 
+            "name": "Copa do Rei",
+            "country": "Espanha"
+        },
     }
     
     def __init__(self):
