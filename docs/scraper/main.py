@@ -35,7 +35,9 @@ from scrapers.betbra_nba_scraper import BetbraNBAScraper
 from scrapers.br4bet_scraper import Br4betScraper
 from scrapers.estrelabet_scraper import EstrelabetScraper
 from scrapers.kto_scraper import KtoScraper
+from scrapers.kto_nba_scraper import KtoNBAScraper
 from scrapers.sportingbet_scraper import SportingbetScraper
+from scrapers.sportingbet_nba_scraper import SportingbetNBAScraper
 from scrapers.novibet_scraper import NovibetScraper
 from scrapers.betnacional_scraper import BetnacionalScraper
 from scrapers.stake_scraper import StakeScraper
@@ -44,6 +46,7 @@ from scrapers.aposta1_scraper import Aposta1Scraper
 from scrapers.esportivabet_scraper import EsportivabetScraper
 from scrapers.esportivabet_nba_scraper import EsportivabetNBAScraper
 from scrapers.jogodeouro_scraper import JogodeOuroScraper
+from scrapers.jogodeouro_nba_scraper import JogodeOuroNBAScraper
 # from scrapers.bet365 import Bet365Scraper
 # from scrapers.betfair import BetfairScraper
 # from scrapers.onexbet import OneXBetScraper
@@ -98,7 +101,9 @@ def create_orchestrator() -> Orchestrator:
     orchestrator.register_scraper(Br4betScraper())
     orchestrator.register_scraper(EstrelabetScraper())
     orchestrator.register_scraper(KtoScraper())
+    orchestrator.register_scraper(KtoNBAScraper())  # NBA Basketball - KTO Kambi
     orchestrator.register_scraper(SportingbetScraper())
+    orchestrator.register_scraper(SportingbetNBAScraper())  # NBA Basketball - Sportingbet CDS
     orchestrator.register_scraper(NovibetScraper())
     orchestrator.register_scraper(BetnacionalScraper())
     orchestrator.register_scraper(StakeScraper())
@@ -107,6 +112,7 @@ def create_orchestrator() -> Orchestrator:
     orchestrator.register_scraper(EsportivabetScraper())  # Altenar API - same pattern as Aposta1
     orchestrator.register_scraper(EsportivabetNBAScraper())  # NBA Basketball - Esportivabet Altenar
     orchestrator.register_scraper(JogodeOuroScraper())  # Altenar API - same pattern as Esportivabet
+    orchestrator.register_scraper(JogodeOuroNBAScraper())  # NBA Basketball - Jogo de Ouro Altenar
     # orchestrator.register_scraper(Bet365Scraper())
     # orchestrator.register_scraper(BetfairScraper())
     # orchestrator.register_scraper(OneXBetScraper())

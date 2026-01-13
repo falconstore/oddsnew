@@ -9,7 +9,9 @@ from .superbet_nba_scraper import SuperbetNBAScraper
 from .betbra_nba_scraper import BetbraNBAScraper
 # from .br4bet_scraper import Br4betScraper  # Pausado - problemas com Cloudflare
 from .kto_scraper import KtoScraper
+from .kto_nba_scraper import KtoNBAScraper
 from .sportingbet_scraper import SportingbetScraper
+from .sportingbet_nba_scraper import SportingbetNBAScraper
 from .novibet_scraper import NovibetScraper
 from .betnacional_scraper import BetnacionalScraper
 from .stake_scraper import StakeScraper
@@ -18,5 +20,16 @@ from .aposta1_scraper import Aposta1Scraper
 from .esportivabet_scraper import EsportivabetScraper
 from .esportivabet_nba_scraper import EsportivabetNBAScraper
 from .jogodeouro_scraper import JogodeOuroScraper
+from .jogodeouro_nba_scraper import JogodeOuroNBAScraper
 
-__all__ = ["BetanoScraper", "BetanoNBAScraper", "SuperbetScraper", "SuperbetNBAScraper", "BetbraNBAScraper", "KtoScraper", "SportingbetScraper", "NovibetScraper", "BetnacionalScraper", "StakeScraper", "McgamesScraper", "Aposta1Scraper", "EsportivabetScraper", "EsportivabetNBAScraper", "JogodeOuroScraper"]
+__all__ = [
+    "BetanoScraper", "BetanoNBAScraper", 
+    "SuperbetScraper", "SuperbetNBAScraper", 
+    "BetbraNBAScraper", 
+    "KtoScraper", "KtoNBAScraper",
+    "SportingbetScraper", "SportingbetNBAScraper",
+    "NovibetScraper", "BetnacionalScraper", "StakeScraper", 
+    "McgamesScraper", "Aposta1Scraper", 
+    "EsportivabetScraper", "EsportivabetNBAScraper", 
+    "JogodeOuroScraper", "JogodeOuroNBAScraper"
+]
