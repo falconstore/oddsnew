@@ -33,6 +33,9 @@ class JogodeOuroScraper(BaseScraper):
         "bundesliga": JogodeOuroLeague(champ_id="2950", category_id="503", name="Bundesliga", country="alemanha", league_slug="bundesliga"),
         "ligue_1": JogodeOuroLeague(champ_id="2943", category_id="504", name="Ligue 1", country="franca", league_slug="ligue-1"),
         "paulistao": JogodeOuroLeague(champ_id="3436", category_id="504", name="Paulistao", country="brasil", league_slug="paulistao"),
+	"fa_cup": JogodeOuroLeague(champ_id="2935", category_id="497", name="FA Cup", country="inglaterra", league_slug="fa-cup"),
+	"efl_cup": JogodeOuroLeague(champ_id="2972", category_id="498", name="EFL Cup", country="inglaterra", league_slug="efl-cup"),
+	"copa_do_rei": JogodeOuroLeague(champ_id="2973", category_id="499", name="Copa do Rei", country="espanha", league_slug="copa-do-rei"),
     }
     
     API_BASE = "https://sb2frontend-altenar2.biahosted.com/api/widget"
