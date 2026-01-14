@@ -60,21 +60,17 @@ class KtoScraper(BaseScraper):
             "name": "Paulistao A1",
             "country": "Brasil"
  	},
- 	 "fa_cup": {
-            "path": "football/england/fa_cup", 
-            "name": "FA Cup",
-            "country": "Inglaterra"
-	},
  	 "efl_cup": {
             "path": "football/england/efl_cup", 
             "name": "EFL Cup",
             "country": "Inglaterra"
         },
- 	"copa_do_rei": {
-            "path": "/football/spain/copa_del_rey", 
-            "name": "Copa do Rei",
+	 "copa_do_rei": {
+            "path": "football/spain/copa_del_rey", 
+            "name": "Copa do rei",
             "country": "Espanha"
         },
+
     }
     
     def __init__(self):
@@ -132,7 +128,7 @@ class KtoScraper(BaseScraper):
         
         so_count = len([r for r in all_results if r.odds_type == "SO"])
         pa_count = len([r for r in all_results if r.odds_type == "PA"])
-        self.logger.info(f"✅ KTO {league.name}: {so_count} SO + {pa_count} PA = {len(all_results)} total")
+        self.logger.info(f"KTO {league.name}: {so_count} SO + {pa_count} PA = {len(all_results)} total")
         
         return all_results
 
