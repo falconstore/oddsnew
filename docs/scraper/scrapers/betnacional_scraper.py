@@ -1,6 +1,6 @@
 """
 Betnacional Scraper - Playwright only (Cloudflare bypass).
-Otimizado para requisições paralelas via context.request.
+Otimizado com page.goto + wait_until="load" para maior velocidade.
 
 API: https://prod-global-bff-events.bet6.com.br/api/odds/1/events-by-seasons
 """
@@ -114,16 +114,22 @@ class BetnacionalScraper(BaseScraper):
         
         self._page = await self._context.new_page()
         
-        # Warm-up: resolver Cloudflare uma vez
+        # Warm-up: resolver Cloudflare + primeira requisição API
         try:
             self.logger.info("Warm-up: resolvendo Cloudflare...")
             await self._page.goto(self.WARMUP_URL, wait_until="domcontentloaded", timeout=15000)
-            await self._page.wait_for_timeout(2000)
+            await self._page.wait_for_timeout(1500)
+            
+            # Fazer primeira requisição API via page.goto para estabelecer sessão
+            first_api_url = f"{self.API_BASE_URL}?sport_id=1&category_id=0&tournament_id=17&markets=1&filter_time_event="
+            await self._page.goto(first_api_url, wait_until="load", timeout=10000)
+            await self._page.wait_for_timeout(500)
+            
             self._setup_done = True
-            self.logger.info("Warm-up concluido, pronto para requisicoes paralelas")
+            self.logger.info("Warm-up concluido")
         except Exception as e:
             self.logger.warning(f"Warm-up falhou: {e}")
-            self._setup_done = True  # Continua mesmo assim
+            self._setup_done = True
     
     async def teardown(self):
         """Fecha recursos do Playwright."""
@@ -143,29 +149,23 @@ class BetnacionalScraper(BaseScraper):
         ]
     
     async def scrape_all(self) -> List[ScrapedOdds]:
-        """Busca todas as ligas em PARALELO usando context.request."""
+        """Busca todas as ligas sequencialmente com page.goto otimizado."""
         if not self._context:
             await self.setup()
         
         leagues = await self.get_available_leagues()
-        self.logger.info(f"Buscando {len(leagues)} ligas em paralelo...")
-        
-        # Criar tasks para buscar todas as ligas simultaneamente
-        tasks = [self._fetch_league_api(league) for league in leagues]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        self.logger.info(f"Buscando {len(leagues)} ligas...")
         
         all_odds = []
-        for i, result in enumerate(results):
-            if isinstance(result, Exception):
-                self.logger.error(f"Erro em {leagues[i].name}: {result}")
-            elif isinstance(result, list):
-                all_odds.extend(result)
-                self.logger.info(f"Collected {len(result)} odds from {leagues[i].name}")
+        for league in leagues:
+            result = await self._fetch_league_fast(league)
+            all_odds.extend(result)
+            self.logger.info(f"Collected {len(result)} odds from {league.name}")
         
         return all_odds
     
-    async def _fetch_league_api(self, league: LeagueConfig) -> List[ScrapedOdds]:
-        """Busca odds via API usando context.request (não navega)."""
+    async def _fetch_league_fast(self, league: LeagueConfig) -> List[ScrapedOdds]:
+        """Busca odds via page.goto otimizado (load ao invés de networkidle)."""
         league_config = self.LEAGUES.get(league.league_id)
         if not league_config:
             for k, v in self.LEAGUES.items():
@@ -181,14 +181,16 @@ class BetnacionalScraper(BaseScraper):
         url = f"{self.API_BASE_URL}?sport_id=1&category_id=0&tournament_id={tournament_id}&markets=1&filter_time_event="
         
         try:
-            # Usar context.request para requisição direta (muito mais rápido que page.goto)
-            response = await self._context.request.get(url, timeout=10000)
+            # page.goto com wait_until="load" é mais rápido que "networkidle"
+            response = await self._page.goto(url, wait_until="load", timeout=8000)
             
-            if response.ok:
-                data = await response.json()
+            if response and response.ok:
+                body_text = await self._page.evaluate("() => document.body.innerText")
+                data = json.loads(body_text)
                 return self._parse_odds(data, league.name)
             else:
-                self.logger.warning(f"{league.name}: HTTP {response.status}")
+                status = response.status if response else "N/A"
+                self.logger.warning(f"{league.name}: HTTP {status}")
                 return []
                 
         except Exception as e:
