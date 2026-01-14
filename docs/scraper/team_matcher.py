@@ -193,10 +193,23 @@ class TeamMatcher:
             f"{len(self.aliases_cache)} aliases across {len(self.teams_by_league)} leagues"
         )
     
-    def find_team_id_cached(self, raw_name: str, bookmaker: str, league_id: str = None) -> Optional[str]:
+    def find_team_id_cached(
+        self, 
+        raw_name: str, 
+        bookmaker: str, 
+        league_id: str = None,
+        league_name: str = None
+    ) -> Optional[str]:
         """
         Find team ID using only in-memory cache (no DB calls).
-        Fast path for batch processing. Now supports league-scoped matching.
+        Fast path for batch processing. Now supports league-scoped matching
+        AND cross-league fallback for cups/european competitions.
+        
+        Args:
+            raw_name: Team name as it appears on the bookmaker site
+            bookmaker: Name of the bookmaker
+            league_id: League ID for scoped matching
+            league_name: League name to detect cross-league competitions
         """
         if not raw_name:
             return None
@@ -214,11 +227,52 @@ class TeamMatcher:
         if league_id and league_id in self.teams_by_league:
             if normalized_name in self.teams_by_league[league_id]:
                 return self.teams_by_league[league_id][normalized_name]
-            # Fuzzy match within league only (no cross-league)
-            return self._fuzzy_match_in_league(raw_name, league_id)
+            # Fuzzy match within league
+            result = self._fuzzy_match_in_league(raw_name, league_id)
+            if result:
+                return result
         
-        # Fallback to global reverse cache ONLY when no league_id (rare case)
-        if normalized_name in self.reverse_cache:
+        # Step 3: Cross-league fallback para copas/europeias
+        if league_name:
+            is_cross_league = any(
+                comp in league_name.lower() for comp in self.cross_league_competitions
+            )
+            if is_cross_league:
+                # Buscar no cache global (reverse_cache) - match exato
+                if normalized_name in self.reverse_cache:
+                    self.logger.debug(
+                        f"[Cross-league cached] Exact: '{raw_name}' -> {self.reverse_cache[normalized_name]}"
+                    )
+                    return self.reverse_cache[normalized_name]
+                
+                # Fuzzy match global com threshold do min_score (85)
+                all_names = list(self.teams_cache.values())
+                if all_names:
+                    # Usar _normalize_for_fuzzy para melhor matching
+                    fuzzy_name = self._normalize_for_fuzzy(raw_name)
+                    result = process.extractOne(
+                        fuzzy_name,
+                        [self._normalize_for_fuzzy(n) for n in all_names],
+                        scorer=fuzz.token_sort_ratio,
+                        score_cutoff=self.min_score  # 85
+                    )
+                    if result:
+                        # Encontrar o nome original correspondente
+                        matched_idx = [self._normalize_for_fuzzy(n) for n in all_names].index(result[0])
+                        matched_name = all_names[matched_idx]
+                        team_id = self.reverse_cache.get(matched_name.lower())
+                        if not team_id:
+                            team_id = self.reverse_cache.get(
+                                self._normalize_name(matched_name).lower()
+                            )
+                        if team_id:
+                            self.logger.debug(
+                                f"[Cross-league cached] Fuzzy: '{raw_name}' -> '{matched_name}' ({result[1]:.0f}%)"
+                            )
+                            return team_id
+        
+        # Step 4: Fallback global só se não tiver league_id
+        if not league_id and normalized_name in self.reverse_cache:
             return self.reverse_cache[normalized_name]
         
         return None
