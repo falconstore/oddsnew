@@ -49,9 +49,29 @@ class StakeScraper(BaseScraper):
             "country": "Alemanha"
         },
         "ligue_1": {
-            "tournament_id": "1000094993",
+            "tournament_id": "1000094991",
             "name": "Ligue 1",
             "country": "França"
+        },
+ 	"paulistao": {
+            "tournament_id": "1000094970",
+            "name": "Paulistao",
+            "country": "Brasil"
+        },
+	"fa_cup": {
+            "tournament_id": "1000094984",
+            "name": "FA Cup",
+            "country": "Inglaterra"
+        },
+	"efl_cup": {
+            "tournament_id": "1000094986",
+            "name": "EFL Cup",
+            "country": "Inglaterra"
+        },
+	"copa_do_rei": {
+            "tournament_id": "1000095050",
+            "name": "Copa do Rei",
+            "country": "Espanha"
         },
     }
     
