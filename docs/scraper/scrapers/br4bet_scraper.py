@@ -63,12 +63,10 @@ class Br4betScraper(BaseScraper):
     
     API_URL = "https://sb2frontend-altenar2.biahosted.com/api/widget/GetEvents"
     
-    # Multiple warm-up URLs for token capture
+    # Reduced warm-up URLs for faster token capture
     WARMUP_URLS = [
-        "https://br4.bet.br/sports/futebol/inglaterra/premier-league",
         "https://br4.bet.br/sports/futebol/italia/serie-a",
         "https://br4.bet.br/sports/futebol",
-        "https://br4.bet.br/sports",
     ]
     
     def __init__(self):
@@ -137,7 +135,7 @@ class Br4betScraper(BaseScraper):
             page.on("request", handle_request)
             
             try:
-                # Try multiple warm-up URLs
+                # Try warm-up URLs with reduced timeouts
                 for i, target_url in enumerate(self.WARMUP_URLS):
                     if token_future.done():
                         self.logger.info(f"[Br4bet] Token captured on URL {i+1}/{len(self.WARMUP_URLS)}")
@@ -146,21 +144,13 @@ class Br4betScraper(BaseScraper):
                     self.logger.info(f"[Br4bet] Trying URL {i+1}/{len(self.WARMUP_URLS)}: {target_url}")
                     
                     try:
-                        await page.goto(target_url, wait_until="domcontentloaded", timeout=30000)
-                        await page.wait_for_timeout(3000)
+                        await page.goto(target_url, wait_until="domcontentloaded", timeout=15000)
+                        await page.wait_for_timeout(2000)
                         
-                        # Progressive scroll to trigger API calls
-                        if not token_future.done():
-                            await page.evaluate("window.scrollTo(0, 500)")
-                            await page.wait_for_timeout(2000)
-                        
+                        # Single scroll to trigger API calls
                         if not token_future.done():
                             await page.evaluate("window.scrollTo(0, 1000)")
-                            await page.wait_for_timeout(2000)
-                        
-                        if not token_future.done():
-                            await page.evaluate("window.scrollTo(0, 1500)")
-                            await page.wait_for_timeout(2000)
+                            await page.wait_for_timeout(1500)
                             
                     except Exception as url_error:
                         self.logger.warning(f"[Br4bet] URL {i+1} failed: {url_error}")
@@ -168,9 +158,9 @@ class Br4betScraper(BaseScraper):
                 
                 # Final wait for token if still not captured
                 if not token_future.done():
-                    self.logger.info("[Br4bet] Waiting final 10s for token...")
+                    self.logger.info("[Br4bet] Waiting final 5s for token...")
                     try:
-                        self.api_token = await asyncio.wait_for(token_future, timeout=10.0)
+                        self.api_token = await asyncio.wait_for(token_future, timeout=5.0)
                     except asyncio.TimeoutError:
                         self.logger.error("[Br4bet] FAILED: Could not capture token after all attempts")
                         self.api_token = None
@@ -247,11 +237,11 @@ class Br4betScraper(BaseScraper):
                 timeout=30
             )
             
-            # Handle token expiration
-            if response.status_code in (401, 403):
-                self.logger.warning(f"[Br4bet] Token expired (HTTP {response.status_code}), will recapture next cycle")
+            # Handle token expiration or bad request (includes 400)
+            if response.status_code in (400, 401, 403):
+                self.logger.warning(f"[Br4bet] Token issue (HTTP {response.status_code}), will recapture next cycle")
                 self.api_token = None
-                self._setup_attempted = False  # Allow recapture
+                self._setup_attempted = False  # Allow recapture next cycle
                 return []
             
             if response.status_code != 200:
