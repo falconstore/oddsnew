@@ -368,10 +368,10 @@ class Br4betScraper(BaseScraper):
                     draw_odd=found_odds["draw"],
                     away_odd=found_odds["away"],
                     market_type="1x2",
-                    extra_data={
-                        "event_id": str(event_id),
-                        "country": country
-                    }
+                extra_data={
+                    "br4bet_event_id": str(event_id),
+                    "br4bet_country": country
+                }
                 )
                 results.append(scraped)
                 
