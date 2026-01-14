@@ -63,6 +63,18 @@ class SportingbetScraper(BaseScraper):
             "name": "FA Cup",
             "country": "Inglaterra"
         },
+	 "efl_cup": {
+            "region_id": "14",
+            "competition_id": "102782",
+            "name": "EFL Cup",
+            "country": "Inglaterra"
+        },
+	 "copa_do_rei": {
+            "region_id": "28",
+            "competition_id": "102728",
+            "name": "Copa do Rei",
+            "country": "Espanha"
+        },
     }
     
     def __init__(self):
