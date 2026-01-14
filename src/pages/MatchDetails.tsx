@@ -202,8 +202,11 @@ function generateBookmakerLink(
   
   if (name.includes('betnacional')) {
     const eventId = extraData.event_id;
+    const sportType = extraData.sport_type as string;
     if (eventId) {
-      return `https://betnacional.bet.br/event/1/0/${eventId}`;
+      // NBA usa sport=2, Futebol usa sport=1
+      const sportId = sportType === 'basketball' ? '2' : '1';
+      return `https://betnacional.bet.br/event/${sportId}/0/${eventId}`;
     }
   }
   
