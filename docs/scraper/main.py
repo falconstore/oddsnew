@@ -34,7 +34,9 @@ from scrapers.superbet_nba_scraper import SuperbetNBAScraper
 from scrapers.betbra_scraper import BetbraScraper
 from scrapers.betbra_nba_scraper import BetbraNBAScraper
 from scrapers.br4bet_scraper import Br4betScraper
+from scrapers.br4bet_nba_scraper import Br4betNBAScraper
 from scrapers.estrelabet_scraper import EstrelabetScraper
+from scrapers.estrelabet_nba_scraper import EstrelabetNBAScraper
 from scrapers.kto_scraper import KtoScraper
 from scrapers.kto_nba_scraper import KtoNBAScraper
 from scrapers.sportingbet_scraper import SportingbetScraper
@@ -45,14 +47,13 @@ from scrapers.betnacional_scraper import BetnacionalScraper
 from scrapers.betnacional_nba_scraper import BetnacionalNBAScraper
 from scrapers.stake_scraper import StakeScraper
 from scrapers.mcgames_scraper import McgamesScraper
+from scrapers.mcgames_nba_scraper import McgamesNBAScraper
 from scrapers.aposta1_scraper import Aposta1Scraper
+from scrapers.aposta1_nba_scraper import Aposta1NBAScraper
 from scrapers.esportivabet_scraper import EsportivabetScraper
 from scrapers.esportivabet_nba_scraper import EsportivabetNBAScraper
 from scrapers.jogodeouro_scraper import JogodeOuroScraper
 from scrapers.jogodeouro_nba_scraper import JogodeOuroNBAScraper
-# from scrapers.bet365 import Bet365Scraper
-# from scrapers.betfair import BetfairScraper
-# from scrapers.onexbet import OneXBetScraper
 
 
 def setup_logging():
@@ -95,33 +96,36 @@ def create_orchestrator() -> Orchestrator:
     """Create and configure the orchestrator with all scrapers."""
     orchestrator = Orchestrator()
     
-    # Register scrapers
+    # Register scrapers - Football
     orchestrator.register_scraper(BetanoScraper())
-    orchestrator.register_scraper(BetanoNBAScraper())
     orchestrator.register_scraper(SuperbetScraper())
-    orchestrator.register_scraper(SuperbetNBAScraper())  # NBA Basketball - Superbet
-    orchestrator.register_scraper(BetbraScraper())  # Exchange - only BACK odds
-    orchestrator.register_scraper(BetbraNBAScraper())  # NBA Basketball - Betbra Exchange
+    orchestrator.register_scraper(BetbraScraper())
     orchestrator.register_scraper(Br4betScraper())
     orchestrator.register_scraper(EstrelabetScraper())
     orchestrator.register_scraper(KtoScraper())
-    orchestrator.register_scraper(KtoNBAScraper())  # NBA Basketball - KTO Kambi
     orchestrator.register_scraper(SportingbetScraper())
-    orchestrator.register_scraper(SportingbetNBAScraper())  # NBA Basketball - Sportingbet CDS
     orchestrator.register_scraper(NovibetScraper())
-    orchestrator.register_scraper(NovibetNBAScraper())  # NBA Basketball - Novibet SO/PA
     orchestrator.register_scraper(BetnacionalScraper())
-    orchestrator.register_scraper(BetnacionalNBAScraper())  # NBA Basketball - Betnacional SO
     orchestrator.register_scraper(StakeScraper())
-    orchestrator.register_scraper(McgamesScraper())  # Altenar API - same pattern as Br4bet
-    orchestrator.register_scraper(Aposta1Scraper())  # Altenar API - same pattern as Mcgames
-    orchestrator.register_scraper(EsportivabetScraper())  # Altenar API - same pattern as Aposta1
-    orchestrator.register_scraper(EsportivabetNBAScraper())  # NBA Basketball - Esportivabet Altenar
-    orchestrator.register_scraper(JogodeOuroScraper())  # Altenar API - same pattern as Esportivabet
-    orchestrator.register_scraper(JogodeOuroNBAScraper())  # NBA Basketball - Jogo de Ouro Altenar
-    # orchestrator.register_scraper(Bet365Scraper())
-    # orchestrator.register_scraper(BetfairScraper())
-    # orchestrator.register_scraper(OneXBetScraper())
+    orchestrator.register_scraper(McgamesScraper())
+    orchestrator.register_scraper(Aposta1Scraper())
+    orchestrator.register_scraper(EsportivabetScraper())
+    orchestrator.register_scraper(JogodeOuroScraper())
+    
+    # Register scrapers - NBA Basketball
+    orchestrator.register_scraper(BetanoNBAScraper())
+    orchestrator.register_scraper(SuperbetNBAScraper())
+    orchestrator.register_scraper(BetbraNBAScraper())
+    orchestrator.register_scraper(Br4betNBAScraper())        # NEW
+    orchestrator.register_scraper(EstrelabetNBAScraper())    # NEW
+    orchestrator.register_scraper(KtoNBAScraper())
+    orchestrator.register_scraper(SportingbetNBAScraper())
+    orchestrator.register_scraper(NovibetNBAScraper())
+    orchestrator.register_scraper(BetnacionalNBAScraper())
+    orchestrator.register_scraper(McgamesNBAScraper())       # NEW
+    orchestrator.register_scraper(Aposta1NBAScraper())       # NEW
+    orchestrator.register_scraper(EsportivabetNBAScraper())
+    orchestrator.register_scraper(JogodeOuroNBAScraper())
     
     return orchestrator
 
