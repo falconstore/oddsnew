@@ -52,15 +52,15 @@ class BetbraScraper(BaseScraper):
 
     LEAGUES = {
 
-        "premier_league": {
+   	    "premier_league": {
 
-            "name": "Premier League",
+  	    "name": "Premier League",
 
-            "country": "England",
+    	    "country": "England",
 
-            "tag_url_name": "england",  # API uses "england" for Premier League
+    	    "tag_url_name": "english-premier-league",  # Tag específica para Premier League principal
+    },
 
-        },
 
         "serie_a": {
 
@@ -101,6 +101,47 @@ class BetbraScraper(BaseScraper):
             "tag_url_name": "france-ligue-1",  # Specific Ligue 1 tag
 
         },
+
+
+        "paulistao": {
+
+            "name": "paulistao",
+
+            "country": "Brazil",
+
+            "tag_url_name": "brazil-paulista-a1",  # Specific Paulista A1 tag
+
+        },
+
+
+        "fa_cup": {
+
+            "name": "facup",
+
+            "country": "England",
+
+            "tag_url_name": "england-fa-cup",  # Specific FA Cup tag
+
+        },
+
+ 	"efl_cup": {
+
+            "name": "EFL Cup",
+
+            "country": "England",
+
+            "tag_url_name": "england-league-cup",  # Specific EFL Cup tag
+ 	},
+
+ 	"copa_do_rei": {
+
+            "name": "Copa do Rei",
+
+            "country": "Spain",
+
+            "tag_url_name": "spain-copa-del-rey",  # Specific Copa do Rei tag
+        },
+
     }
 
     
