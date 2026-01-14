@@ -203,7 +203,8 @@ class StakeScraper(BaseScraper):
                     continue
                 
                 column_id = odd.get("columnId")  # 0=Home, 1=Draw, 2=Away
-                odd_value = odd.get("oddValues", {}).get("decimal")
+                odd_values = odd.get("oddValues") or {}
+                odd_value = odd_values.get("decimal") if isinstance(odd_values, dict) else None
                 
                 if column_id is not None and odd_value:
                     odds_map[column_id] = float(odd_value)
@@ -257,9 +258,9 @@ class StakeScraper(BaseScraper):
         
         # Process each event
         for event_id, event in event_lookup.items():
-            teams = event.get("teams", {})
-            home_team = teams.get("home", "Unknown")
-            away_team = teams.get("away", "Unknown")
+            teams = event.get("teams") or {}
+            home_team = teams.get("home", "Unknown") if isinstance(teams, dict) else "Unknown"
+            away_team = teams.get("away", "Unknown") if isinstance(teams, dict) else "Unknown"
             
             # Parse match date
             date_str = event.get("dateStart", "")
@@ -327,7 +328,8 @@ class StakeScraper(BaseScraper):
                 continue
             
             column_id = odd.get("columnId")  # 0=Home, 1=Draw, 2=Away
-            odd_value = odd.get("oddValues", {}).get("decimal")
+            odd_values = odd.get("oddValues") or {}
+            odd_value = odd_values.get("decimal") if isinstance(odd_values, dict) else None
             
             if event_id and column_id is not None and odd_value:
                 if event_id not in odds_by_event:
