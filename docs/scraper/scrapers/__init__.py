@@ -15,6 +15,7 @@ from .sportingbet_nba_scraper import SportingbetNBAScraper
 from .novibet_scraper import NovibetScraper
 from .novibet_nba_scraper import NovibetNBAScraper
 from .betnacional_scraper import BetnacionalScraper
+from .betnacional_nba_scraper import BetnacionalNBAScraper
 from .stake_scraper import StakeScraper
 from .mcgames_scraper import McgamesScraper
 from .aposta1_scraper import Aposta1Scraper
@@ -29,7 +30,9 @@ __all__ = [
     "BetbraNBAScraper", 
     "KtoScraper", "KtoNBAScraper",
     "SportingbetScraper", "SportingbetNBAScraper",
-    "NovibetScraper", "NovibetNBAScraper", "BetnacionalScraper", "StakeScraper", 
+    "NovibetScraper", "NovibetNBAScraper", 
+    "BetnacionalScraper", "BetnacionalNBAScraper",
+    "StakeScraper", 
     "McgamesScraper", "Aposta1Scraper", 
     "EsportivabetScraper", "EsportivabetNBAScraper", 
     "JogodeOuroScraper", "JogodeOuroNBAScraper"
