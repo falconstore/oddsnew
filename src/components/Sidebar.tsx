@@ -2,6 +2,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { PAGE_KEYS, PageKey } from '@/types/auth';
+import { useSwipeGesture } from '@/hooks/useSwipeGesture';
 import { 
   LayoutDashboard, 
   Trophy, 
@@ -49,11 +50,15 @@ export function Sidebar() {
   const { user, isAdmin, signOut, canAccessPage, userProfile } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  // Filtrar navegação baseado em permissões granulares e adminOnly
+  // Swipe gesture to close sidebar on mobile
+  const { onTouchStart, onTouchMove, onTouchEnd, swipeDistance } = useSwipeGesture({
+    threshold: 50,
+    onSwipeLeft: () => setMobileOpen(false),
+  });
+
+  // Filter navigation based on granular permissions and adminOnly
   const filteredNavigation = navigation.filter(item => {
-    // Se for adminOnly e não é admin, esconder
     if (item.adminOnly && !isAdmin) return false;
-    // Se não for admin, verificar permissão granular
     if (!isAdmin && !canAccessPage(item.pageKey)) return false;
     return true;
   });
@@ -64,13 +69,18 @@ export function Sidebar() {
 
   const displayName = userProfile?.full_name || user?.email || 'Usuário';
 
+  // Calculate sidebar transform based on swipe distance
+  const sidebarTransform = mobileOpen && swipeDistance > 0 
+    ? `translateX(-${Math.min(swipeDistance, 256)}px)` 
+    : undefined;
+
   return (
     <>
       {/* Mobile menu button */}
       <Button
         variant="ghost"
         size="icon"
-        className="fixed top-3 left-3 z-50 md:hidden h-10 w-10"
+        className="fixed top-3 left-3 z-50 md:hidden h-12 w-12 rounded-full bg-card/80 backdrop-blur-sm border border-border/50 shadow-lg hover:shadow-xl transition-all duration-200"
         onClick={() => setMobileOpen(!mobileOpen)}
       >
         {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -79,24 +89,33 @@ export function Sidebar() {
       {/* Mobile overlay */}
       {mobileOpen && (
         <div 
-          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 md:hidden"
+          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 md:hidden transition-opacity duration-300"
           onClick={() => setMobileOpen(false)}
         />
       )}
 
       {/* Sidebar */}
-      <aside className={cn(
-        "fixed left-0 top-0 z-40 h-screen w-64 bg-sidebar border-r border-sidebar-border transition-transform md:translate-x-0 flex flex-col",
-        mobileOpen ? "translate-x-0" : "-translate-x-full"
-      )}>
-        {/* Header */}
-        <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-6">
-          <BarChart3 className="h-6 w-6 text-sidebar-primary" />
-          <span className="text-lg font-semibold text-sidebar-foreground">OddsCompare</span>
+      <aside 
+        className={cn(
+          "fixed left-0 top-0 z-40 h-screen w-64 bg-sidebar border-r border-sidebar-border flex flex-col",
+          "transition-transform duration-300 ease-out md:translate-x-0",
+          mobileOpen ? "translate-x-0" : "-translate-x-full"
+        )}
+        style={{ transform: sidebarTransform }}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+      >
+        {/* Header with animated logo */}
+        <div className="flex h-16 items-center gap-3 border-b border-sidebar-border px-6">
+          <div className="p-2 rounded-lg bg-primary/10 animate-float">
+            <BarChart3 className="h-5 w-5 text-sidebar-primary" />
+          </div>
+          <span className="text-lg font-semibold text-sidebar-foreground tracking-tight">OddsCompare</span>
         </div>
         
-        {/* Navigation */}
-        <nav className="flex flex-col gap-1 p-4 flex-1">
+        {/* Navigation with animated indicators */}
+        <nav className="flex flex-col gap-1 p-4 flex-1 overflow-y-auto">
           {filteredNavigation.map((item) => {
             const isActive = location.pathname === item.href;
             return (
@@ -105,25 +124,35 @@ export function Sidebar() {
                 to={item.href}
                 onClick={() => setMobileOpen(false)}
                 className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-colors",
+                  "group relative flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium",
+                  "transition-all duration-200 ease-out",
                   isActive 
                     ? "bg-sidebar-accent text-sidebar-accent-foreground" 
-                    : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                    : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground hover:translate-x-1"
                 )}
               >
-                <item.icon className="h-4 w-4" />
-                {item.name}
+                {/* Active indicator bar */}
+                {isActive && (
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-sidebar-primary rounded-r-full transition-all duration-200" />
+                )}
+                <span className={cn(
+                  "transition-transform duration-200",
+                  isActive && "scale-110"
+                )}>
+                  <item.icon className="h-4 w-4" />
+                </span>
+                <span>{item.name}</span>
               </Link>
             );
           })}
         </nav>
 
-        {/* User Footer */}
+        {/* User Footer with enhanced styling */}
         {user && (
-          <div className="p-4 border-t border-sidebar-border">
+          <div className="p-4 border-t border-sidebar-border bg-sidebar-accent/10">
             <div className="flex items-center gap-3">
-              <Avatar className="h-8 w-8">
-                <AvatarFallback className="text-xs">
+              <Avatar className="h-9 w-9 ring-2 ring-sidebar-primary/20">
+                <AvatarFallback className="text-xs bg-sidebar-primary/10 text-sidebar-primary font-semibold">
                   {displayName[0].toUpperCase()}
                 </AvatarFallback>
               </Avatar>
@@ -140,7 +169,7 @@ export function Sidebar() {
                 variant="ghost" 
                 size="icon" 
                 onClick={handleSignOut}
-                className="h-8 w-8 text-sidebar-foreground/60 hover:text-sidebar-foreground"
+                className="h-9 w-9 text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-destructive/10 transition-colors"
               >
                 <LogOut className="h-4 w-4" />
               </Button>
