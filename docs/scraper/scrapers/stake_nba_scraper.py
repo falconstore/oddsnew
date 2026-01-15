@@ -5,7 +5,7 @@ Uses httpx for direct API calls. Only Moneyline (2-way, no draw).
 
 import httpx
 from datetime import datetime, timezone
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 from loguru import logger
 
 from base_scraper import BaseScraper, ScrapedOdds, LeagueConfig
@@ -14,7 +14,7 @@ from base_scraper import BaseScraper, ScrapedOdds, LeagueConfig
 class StakeNBAScraper(BaseScraper):
     """
     Scraper for Stake.bet.br NBA basketball odds.
-    Uses REST API endpoints for event listing and odds fetching.
+    Uses REST API endpoints for event listing and individual odds fetching.
     NBA only has Moneyline (2-way, no draw).
     """
     
@@ -88,14 +88,15 @@ class StakeNBAScraper(BaseScraper):
             
             self.logger.info(f"[Stake NBA] {league.name}: Found {len(events)} events")
             
-            # Step 2: Extract event IDs
-            event_ids = [str(event["id"]) for event in events]
+            # Step 2: Fetch odds for each event individually
+            all_event_odds: List[Tuple[str, List[Dict[str, Any]]]] = []
+            for event in events:
+                event_id = str(event["id"])
+                event_odds = await self._fetch_event_odds(event_id)
+                all_event_odds.append((event_id, event_odds))
             
-            # Step 3: Fetch Moneyline odds (batch request)
-            odds_data = await self._fetch_moneyline_odds(event_ids)
-            
-            # Step 4: Parse odds and create ScrapedOdds objects
-            scraped_odds = self._parse_all_odds(events, odds_data, league)
+            # Step 3: Parse odds and create ScrapedOdds objects
+            scraped_odds = self._parse_all_odds(events, all_event_odds, league)
             
             self.logger.info(f"[Stake NBA] {league.name}: Scraped {len(scraped_odds)} games")
             
@@ -120,27 +121,23 @@ class StakeNBAScraper(BaseScraper):
             self.logger.error(f"[Stake NBA] Error fetching events: {e}")
             return []
     
-    async def _fetch_moneyline_odds(self, event_ids: List[str]) -> Dict[str, Any]:
-        """Fetch Moneyline odds for a list of event IDs (batch request)."""
-        if not event_ids:
-            return {}
-        
+    async def _fetch_event_odds(self, event_id: str) -> List[Dict[str, Any]]:
+        """Fetch odds for a single event."""
         try:
-            ids_param = ",".join(event_ids)
-            url = f"{self.API_BASE}/events/odds?events={ids_param}"
-            
+            url = f"{self.API_BASE}/events/{event_id}/odds"
             response = await self.client.get(url)
             response.raise_for_status()
-            return response.json()
+            data = response.json()
+            return data.get("odds", [])
             
         except Exception as e:
-            self.logger.error(f"[Stake NBA] Error fetching Moneyline odds: {e}")
-            return {}
+            self.logger.error(f"[Stake NBA] Error fetching odds for event {event_id}: {e}")
+            return []
     
     def _parse_all_odds(
         self,
         events: List[Dict[str, Any]],
-        odds_data: Dict[str, Any],
+        all_event_odds: List[Tuple[str, List[Dict[str, Any]]]],
         league: LeagueConfig
     ) -> List[ScrapedOdds]:
         """Parse Moneyline odds and create ScrapedOdds objects."""
@@ -149,13 +146,14 @@ class StakeNBAScraper(BaseScraper):
         # Create event lookup by ID
         event_lookup = {str(e["id"]): e for e in events}
         
-        # Parse Moneyline odds from batch response
-        moneyline_odds = self._parse_moneyline_odds(odds_data)
-        
         tournament_id = self.LEAGUES.get(league.league_id, {}).get("tournament_id")
         
-        # Process each event
-        for event_id, event in event_lookup.items():
+        # Process each event with its odds
+        for event_id, event_odds in all_event_odds:
+            event = event_lookup.get(event_id)
+            if not event:
+                continue
+            
             teams = event.get("teams") or {}
             home_team = teams.get("home", "Unknown") if isinstance(teams, dict) else "Unknown"
             away_team = teams.get("away", "Unknown") if isinstance(teams, dict) else "Unknown"
@@ -171,11 +169,11 @@ class StakeNBAScraper(BaseScraper):
             except Exception:
                 match_date = datetime.now(timezone.utc)
             
-            # Get Moneyline odds for this event
-            odds = moneyline_odds.get(event_id, {})
+            # Parse Moneyline odds for this event
+            odds = self._parse_moneyline_odds(event_odds)
             
-            # NBA uses columnId 0 (Home) and 2 (Away), no Draw
-            if 0 in odds and 2 in odds:
+            # NBA uses columnId 0 (Home) and 1 (Away), no Draw
+            if 0 in odds and 1 in odds:
                 scraped.append(ScrapedOdds(
                     bookmaker_name="stake",
                     home_team_raw=home_team,
@@ -184,7 +182,7 @@ class StakeNBAScraper(BaseScraper):
                     match_date=match_date,
                     home_odd=odds[0],
                     draw_odd=None,  # No draw in basketball
-                    away_odd=odds[2],
+                    away_odd=odds[1],
                     sport="basketball",
                     market_type="moneyline",
                     odds_type="PA",  # Default for NBA
@@ -197,30 +195,25 @@ class StakeNBAScraper(BaseScraper):
         
         return scraped
     
-    def _parse_moneyline_odds(self, odds_data: Dict[str, Any]) -> Dict[str, Dict[int, float]]:
-        """Parse Moneyline odds from batch response."""
-        odds_by_event: Dict[str, Dict[int, float]] = {}
+    def _parse_moneyline_odds(self, event_odds: List[Dict[str, Any]]) -> Dict[int, float]:
+        """Parse Moneyline odds from single event response."""
+        odds_map: Dict[int, float] = {}
         
-        odds_list = odds_data.get("odds", [])
-        
-        for odd in odds_list:
-            event_id = str(odd.get("eventId", ""))
+        for odd in event_odds:
             market_id = odd.get("marketId", "")
             
             # Only process Moneyline market
             if market_id != self.MARKET_MONEYLINE:
                 continue
             
-            column_id = odd.get("columnId")  # 0=Home, 2=Away (no Draw in basketball)
+            column_id = odd.get("columnId")  # 0=Home, 1=Away (no Draw in basketball)
             odd_values = odd.get("oddValues") or {}
             odd_value = odd_values.get("decimal") if isinstance(odd_values, dict) else None
             
-            if event_id and column_id is not None and odd_value:
-                if event_id not in odds_by_event:
-                    odds_by_event[event_id] = {}
-                odds_by_event[event_id][column_id] = float(odd_value)
+            if column_id is not None and odd_value:
+                odds_map[column_id] = float(odd_value)
         
-        return odds_by_event
+        return odds_map
 
 
 # For testing
