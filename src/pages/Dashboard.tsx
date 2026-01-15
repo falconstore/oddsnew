@@ -14,14 +14,14 @@ const Dashboard = () => {
           </p>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2 max-w-2xl mx-auto">
+        <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 max-w-2xl mx-auto">
           {/* Card Futebol */}
           <Link to="/monitor-futebol">
             <Card className="cursor-pointer hover:border-primary transition-all hover:shadow-lg">
-              <CardContent className="p-8 text-center">
-                <span className="text-6xl mb-4 block">⚽</span>
-                <h2 className="text-xl font-semibold">Monitor Futebol</h2>
-                <p className="text-muted-foreground text-sm mt-2">
+              <CardContent className="p-6 sm:p-8 text-center">
+                <span className="text-4xl sm:text-6xl mb-2 sm:mb-4 block">⚽</span>
+                <h2 className="text-lg sm:text-xl font-semibold">Monitor Futebol</h2>
+                <p className="text-muted-foreground text-xs sm:text-sm mt-2">
                   Odds de partidas de futebol
                 </p>
               </CardContent>
@@ -31,10 +31,10 @@ const Dashboard = () => {
           {/* Card Basquete */}
           <Link to="/monitor-basquete">
             <Card className="cursor-pointer hover:border-primary transition-all hover:shadow-lg">
-              <CardContent className="p-8 text-center">
-                <span className="text-6xl mb-4 block">🏀</span>
-                <h2 className="text-xl font-semibold">Monitor Basquete</h2>
-                <p className="text-muted-foreground text-sm mt-2">
+              <CardContent className="p-6 sm:p-8 text-center">
+                <span className="text-4xl sm:text-6xl mb-2 sm:mb-4 block">🏀</span>
+                <h2 className="text-lg sm:text-xl font-semibold">Monitor Basquete</h2>
+                <p className="text-muted-foreground text-xs sm:text-sm mt-2">
                   Odds de partidas de basquete
                 </p>
               </CardContent>

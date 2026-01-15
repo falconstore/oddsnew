@@ -81,21 +81,21 @@ export function OddsFilters({ filters, onFiltersChange, hasActiveFilters, hideSp
     .map(b => ({ value: b.name, label: b.name })) || [];
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4">
+      {/* Search Input - Full width on mobile */}
+      <div className="relative w-full sm:w-auto">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Buscar time..."
+          value={filters.searchTerm}
+          onChange={(e) => updateFilter('searchTerm', e.target.value)}
+          className="pl-9 w-full sm:w-[180px] h-10 sm:h-9"
+        />
+      </div>
+
       {/* Main Filters Row */}
-      <div className="flex flex-wrap items-center gap-3">
-        {/* Search Input */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar time..."
-            value={filters.searchTerm}
-            onChange={(e) => updateFilter('searchTerm', e.target.value)}
-            className="pl-9 w-[180px] h-9"
-          />
-        </div>
-        
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+      <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 sm:gap-3">
+        <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground">
           <Filter className="h-4 w-4" />
           <span>Filtros:</span>
         </div>
@@ -106,7 +106,7 @@ export function OddsFilters({ filters, onFiltersChange, hasActiveFilters, hideSp
           selected={filters.leagues}
           onChange={(selected) => updateFilter('leagues', selected)}
           placeholder="Todas as ligas"
-          className="w-[160px]"
+          className="w-full sm:w-[160px]"
         />
 
         {/* Date Filter - Calendar Multi Select */}
@@ -115,7 +115,7 @@ export function OddsFilters({ filters, onFiltersChange, hasActiveFilters, hideSp
             <Button
               variant="outline"
               className={cn(
-                "w-[160px] justify-start text-left font-normal",
+                "w-full sm:w-[160px] justify-start text-left font-normal h-10 sm:h-9",
                 selectedDates.length === 0 && "text-muted-foreground"
               )}
             >
@@ -154,12 +154,12 @@ export function OddsFilters({ filters, onFiltersChange, hasActiveFilters, hideSp
           selected={filters.bookmakers}
           onChange={(selected) => updateFilter('bookmakers', selected)}
           placeholder="Todas as casas"
-          className="w-[150px]"
+          className="w-full sm:w-[150px]"
         />
 
         {/* Opportunity Type */}
         <Select value={filters.opportunityType} onValueChange={(v) => updateFilter('opportunityType', v)}>
-          <SelectTrigger className="w-[160px]">
+          <SelectTrigger className="w-full sm:w-[160px] h-10 sm:h-9">
             <SelectValue placeholder="Tipo" />
           </SelectTrigger>
           <SelectContent>
@@ -173,19 +173,19 @@ export function OddsFilters({ filters, onFiltersChange, hasActiveFilters, hideSp
 
         {/* Clear Filters */}
         {hasActiveFilters && (
-          <Button variant="ghost" size="sm" onClick={resetFilters} className="h-9">
+          <Button variant="ghost" size="sm" onClick={resetFilters} className="h-10 sm:h-9 w-full sm:w-auto">
             <X className="h-4 w-4 mr-1" />
-            Limpar
+            Limpar filtros
           </Button>
         )}
       </div>
 
       {/* Sort Row */}
-      <div className="flex flex-wrap items-center gap-4">
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Ordenar:</span>
+      <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <span className="text-xs sm:text-sm text-muted-foreground">Ordenar:</span>
           <Select value={filters.sortBy} onValueChange={(v) => updateFilter('sortBy', v)}>
-            <SelectTrigger className="w-[130px]">
+            <SelectTrigger className="w-full sm:w-[130px] h-9">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -196,7 +196,7 @@ export function OddsFilters({ filters, onFiltersChange, hasActiveFilters, hideSp
               ))}
             </SelectContent>
           </Select>
-          <Button variant="ghost" size="icon" className="h-9 w-9" onClick={toggleSortOrder}>
+          <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={toggleSortOrder}>
             <ArrowUpDown className={`h-4 w-4 transition-transform ${filters.sortOrder === 'desc' ? 'rotate-180' : ''}`} />
           </Button>
         </div>

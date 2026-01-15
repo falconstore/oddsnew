@@ -413,29 +413,31 @@ const MatchDetails = () => {
     <Layout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="self-start shrink-0">
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-lg sm:text-2xl font-bold flex flex-wrap items-center gap-2">
               {match.home_team_logo ? (
-                <img src={match.home_team_logo} alt={match.home_team} className="h-8 w-8 object-contain" />
+                <img src={match.home_team_logo} alt={match.home_team} className="h-6 w-6 sm:h-8 sm:w-8 object-contain" />
               ) : (
                 <span>{sportIcon}</span>
               )}
-              {match.home_team} vs {match.away_team}
+              <span className="break-words">{match.home_team}</span>
+              <span className="text-muted-foreground">vs</span>
+              <span className="break-words">{match.away_team}</span>
               {match.away_team_logo && (
-                <img src={match.away_team_logo} alt={match.away_team} className="h-8 w-8 object-contain" />
+                <img src={match.away_team_logo} alt={match.away_team} className="h-6 w-6 sm:h-8 sm:w-8 object-contain" />
               )}
             </h1>
-            <div className="flex items-center gap-2 text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-2 text-muted-foreground text-sm mt-1">
               <Badge variant="outline">{match.league_name}</Badge>
               <span>{format(matchDate, "dd/MM/yyyy HH:mm", { locale: ptBR })}</span>
             </div>
           </div>
           {hasArbitrage && (
-            <Badge className="bg-green-500 text-white text-sm px-3 py-1 ml-auto">
+            <Badge className="bg-green-500 text-white text-xs sm:text-sm px-2 sm:px-3 py-1 self-start sm:self-auto shrink-0">
               🎯 SUREBET +{roiPercentage}%
             </Badge>
           )}
@@ -443,17 +445,17 @@ const MatchDetails = () => {
         
         {/* Best Odds Summary */}
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Melhores Odds</CardTitle>
+          <CardHeader className="pb-2 px-3 sm:px-6">
+            <CardTitle className="text-sm sm:text-base">Melhores Odds</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-4 gap-4">
+          <CardContent className="px-3 sm:px-6">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
               <div className="text-center">
-                <div className="text-xs text-muted-foreground mb-1">{bestHomeBookmaker}</div>
-                <div className={cn("font-bold text-2xl", hasArbitrage ? "text-green-500" : "text-primary")}>
+                <div className="text-[10px] sm:text-xs text-muted-foreground mb-1 truncate">{bestHomeBookmaker}</div>
+                <div className={cn("font-bold text-xl sm:text-2xl", hasArbitrage ? "text-green-500" : "text-primary")}>
                   {match.best_home.toFixed(2)}
                 </div>
-                <div className="text-xs text-muted-foreground">{isBasketball ? 'Time 1' : 'Casa'}</div>
+                <div className="text-[10px] sm:text-xs text-muted-foreground">{isBasketball ? 'Time 1' : 'Casa'}</div>
               </div>
               {!isBasketball && match.best_draw !== null && match.best_draw > 0 && (
                 <div className="text-center">
@@ -571,14 +573,15 @@ const MatchDetails = () => {
         
         {/* Full Odds Table */}
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Todas as Casas de Apostas ({match.odds.length})</CardTitle>
+          <CardHeader className="pb-2 px-3 sm:px-6">
+            <CardTitle className="text-sm sm:text-base">Todas as Casas de Apostas ({match.odds.length})</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="overflow-x-auto -mx-3 sm:mx-0 px-3 sm:px-6">
+            <div className="min-w-[400px]">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[200px]">Casa</TableHead>
+                  <TableHead className="w-[140px] sm:w-[200px]">Casa</TableHead>
                   <TableHead className="text-center">{isBasketball ? 'Time 1' : 'Casa (1)'}</TableHead>
                   {!isBasketball && <TableHead className="text-center">Empate (X)</TableHead>}
                   <TableHead className="text-center">{isBasketball ? 'Time 2' : 'Fora (2)'}</TableHead>
@@ -627,6 +630,7 @@ const MatchDetails = () => {
                 })()}
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
       </div>

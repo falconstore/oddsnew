@@ -216,7 +216,8 @@ function CompactTableView({ matches, isBasketball }: { matches: MatchOddsGroup[]
   
   return (
     <Card>
-      <CardContent className="pt-4 overflow-x-auto">
+      <CardContent className="pt-4 overflow-x-auto -mx-3 sm:mx-0 px-3 sm:px-6">
+        <div className="min-w-[600px]">
         <Table>
           <TableHeader>
             <TableRow>
@@ -294,6 +295,7 @@ function CompactTableView({ matches, isBasketball }: { matches: MatchOddsGroup[]
             })}
           </TableBody>
         </Table>
+        </div>
       </CardContent>
     </Card>
   );
@@ -327,76 +329,76 @@ function MatchCard({ match }: { match: MatchOddsGroup }) {
       )}
       onClick={() => navigate(`/match/${match.match_id}`)}
     >
-      <CardContent className="p-4">
-        <div className="space-y-3">
+      <CardContent className="p-3 sm:p-4">
+        <div className="space-y-2 sm:space-y-3">
           {/* Title: Icon + Teams with Logos */}
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-1 sm:gap-2">
               {match.home_team_logo ? (
-                <img src={match.home_team_logo} alt={match.home_team} className="h-6 w-6 object-contain" />
+                <img src={match.home_team_logo} alt={match.home_team} className="h-5 w-5 sm:h-6 sm:w-6 object-contain" />
               ) : (
-                <span>{sportIcon}</span>
+                <span className="text-sm sm:text-base">{sportIcon}</span>
               )}
-              <span className="font-semibold text-lg">{match.home_team}</span>
-              <span className="text-muted-foreground">vs</span>
-              <span className="font-semibold text-lg">{match.away_team}</span>
+              <span className="font-semibold text-base sm:text-lg">{match.home_team}</span>
+              <span className="text-muted-foreground text-sm">vs</span>
+              <span className="font-semibold text-base sm:text-lg">{match.away_team}</span>
               {match.away_team_logo && (
-                <img src={match.away_team_logo} alt={match.away_team} className="h-6 w-6 object-contain" />
+                <img src={match.away_team_logo} alt={match.away_team} className="h-5 w-5 sm:h-6 sm:w-6 object-contain" />
               )}
             </div>
             {hasArbitrage && (
-              <Badge className="bg-green-500 text-white text-sm px-3 py-1 shrink-0">
+              <Badge className="bg-green-500 text-white text-xs sm:text-sm px-2 sm:px-3 py-0.5 sm:py-1 shrink-0 self-start sm:self-auto">
                 🎯 SUREBET +{roiPercentage}%
               </Badge>
             )}
           </div>
           
           {/* League */}
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Badge variant="outline">{match.league_name}</Badge>
-            {isLive && <Badge className="bg-destructive">AO VIVO</Badge>}
+          <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
+            <Badge variant="outline" className="text-xs">{match.league_name}</Badge>
+            {isLive && <Badge className="bg-destructive text-xs">AO VIVO</Badge>}
           </div>
           
           {/* Date/Time */}
-          <div className="text-sm text-muted-foreground">
+          <div className="text-xs sm:text-sm text-muted-foreground">
             {format(matchDate, "dd/MM/yyyy HH:mm", { locale: ptBR })}
           </div>
           
           {/* Best Odds Grid */}
           <div className={cn(
-            "grid gap-4 pt-2 border-t",
+            "grid gap-2 sm:gap-4 pt-2 border-t",
             isBasketball ? "grid-cols-3" : "grid-cols-4"
           )}>
             <div className="text-center">
-              <div className="text-xs text-muted-foreground truncate">{bestHomeBookmaker}</div>
-              <div className={cn("font-bold text-xl font-mono", hasArbitrage ? "text-green-500" : "text-primary")}>
+              <div className="text-[10px] sm:text-xs text-muted-foreground truncate">{bestHomeBookmaker}</div>
+              <div className={cn("font-bold text-lg sm:text-xl font-mono", hasArbitrage ? "text-green-500" : "text-primary")}>
                 {match.best_home.toFixed(2)}
               </div>
-              <div className="text-xs text-muted-foreground">{isBasketball ? 'Time 1' : 'Casa'}</div>
+              <div className="text-[10px] sm:text-xs text-muted-foreground">{isBasketball ? 'Time 1' : 'Casa'}</div>
             </div>
             
             {!isBasketball && match.best_draw !== null && match.best_draw > 0 && (
               <div className="text-center">
-                <div className="text-xs text-muted-foreground truncate">{bestDrawBookmaker}</div>
-                <div className={cn("font-bold text-xl font-mono", hasArbitrage ? "text-green-500" : "text-primary")}>
+                <div className="text-[10px] sm:text-xs text-muted-foreground truncate">{bestDrawBookmaker}</div>
+                <div className={cn("font-bold text-lg sm:text-xl font-mono", hasArbitrage ? "text-green-500" : "text-primary")}>
                   {match.best_draw.toFixed(2)}
                 </div>
-                <div className="text-xs text-muted-foreground">Empate</div>
+                <div className="text-[10px] sm:text-xs text-muted-foreground">Empate</div>
               </div>
             )}
             
             <div className="text-center">
-              <div className="text-xs text-muted-foreground truncate">{bestAwayBookmaker}</div>
-              <div className={cn("font-bold text-xl font-mono", hasArbitrage ? "text-green-500" : "text-primary")}>
+              <div className="text-[10px] sm:text-xs text-muted-foreground truncate">{bestAwayBookmaker}</div>
+              <div className={cn("font-bold text-lg sm:text-xl font-mono", hasArbitrage ? "text-green-500" : "text-primary")}>
                 {match.best_away.toFixed(2)}
               </div>
-              <div className="text-xs text-muted-foreground">{isBasketball ? 'Time 2' : 'Fora'}</div>
+              <div className="text-[10px] sm:text-xs text-muted-foreground">{isBasketball ? 'Time 2' : 'Fora'}</div>
             </div>
             
             <div className="text-center">
-              <div className="text-xs text-muted-foreground">ROI</div>
+              <div className="text-[10px] sm:text-xs text-muted-foreground">ROI</div>
               <div className={cn(
-                "font-bold text-xl font-mono",
+                "font-bold text-lg sm:text-xl font-mono",
                 hasArbitrage ? "text-green-500" : "text-muted-foreground"
               )}>
                 {Number(roiPercentage) > 0 ? `+${roiPercentage}%` : `${roiPercentage}%`}

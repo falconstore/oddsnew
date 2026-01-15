@@ -86,37 +86,37 @@ const AdminUsers = () => {
           <p className="text-muted-foreground">Aprove, rejeite e configure permissões de usuários.</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
           <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Total</CardTitle>
+            <CardHeader className="pb-1 sm:pb-2 px-3 sm:px-6 pt-3 sm:pt-6">
+              <CardTitle className="text-xs sm:text-sm font-medium">Total</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{users.length}</div>
+            <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
+              <div className="text-xl sm:text-2xl font-bold">{users.length}</div>
             </CardContent>
           </Card>
           <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-yellow-600">Pendentes</CardTitle>
+            <CardHeader className="pb-1 sm:pb-2 px-3 sm:px-6 pt-3 sm:pt-6">
+              <CardTitle className="text-xs sm:text-sm font-medium text-yellow-600">Pendentes</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{filterUsersByStatus('pending').length}</div>
+            <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
+              <div className="text-xl sm:text-2xl font-bold">{filterUsersByStatus('pending').length}</div>
             </CardContent>
           </Card>
           <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-green-600">Aprovados</CardTitle>
+            <CardHeader className="pb-1 sm:pb-2 px-3 sm:px-6 pt-3 sm:pt-6">
+              <CardTitle className="text-xs sm:text-sm font-medium text-green-600">Aprovados</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{filterUsersByStatus('approved').length}</div>
+            <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
+              <div className="text-xl sm:text-2xl font-bold">{filterUsersByStatus('approved').length}</div>
             </CardContent>
           </Card>
           <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-red-600">Rejeitados</CardTitle>
+            <CardHeader className="pb-1 sm:pb-2 px-3 sm:px-6 pt-3 sm:pt-6">
+              <CardTitle className="text-xs sm:text-sm font-medium text-red-600">Rejeitados</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{filterUsersByStatus('rejected').length}</div>
+            <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
+              <div className="text-xl sm:text-2xl font-bold">{filterUsersByStatus('rejected').length}</div>
             </CardContent>
           </Card>
         </div>
@@ -126,25 +126,26 @@ const AdminUsers = () => {
             <CardTitle>Usuários Cadastrados</CardTitle>
             <CardDescription>Lista de todos os usuários do sistema.</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-3 sm:px-6">
             <Tabs defaultValue="pending">
-              <TabsList>
-                <TabsTrigger value="pending">
+              <TabsList className="w-full flex flex-wrap h-auto gap-1 sm:gap-0">
+                <TabsTrigger value="pending" className="flex-1 sm:flex-none text-xs sm:text-sm py-1.5 sm:py-2">
                   Pendentes ({filterUsersByStatus('pending').length})
                 </TabsTrigger>
-                <TabsTrigger value="approved">
+                <TabsTrigger value="approved" className="flex-1 sm:flex-none text-xs sm:text-sm py-1.5 sm:py-2">
                   Aprovados ({filterUsersByStatus('approved').length})
                 </TabsTrigger>
-                <TabsTrigger value="rejected">
+                <TabsTrigger value="rejected" className="flex-1 sm:flex-none text-xs sm:text-sm py-1.5 sm:py-2">
                   Rejeitados ({filterUsersByStatus('rejected').length})
                 </TabsTrigger>
-                <TabsTrigger value="all">
+                <TabsTrigger value="all" className="flex-1 sm:flex-none text-xs sm:text-sm py-1.5 sm:py-2">
                   Todos ({users.length})
                 </TabsTrigger>
               </TabsList>
 
               {['pending', 'approved', 'rejected', 'all'].map((tab) => (
-                <TabsContent key={tab} value={tab}>
+                <TabsContent key={tab} value={tab} className="overflow-x-auto -mx-3 sm:mx-0 px-3 sm:px-0">
+                  <div className="min-w-[700px]">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -179,7 +180,7 @@ const AdminUsers = () => {
                               : 'N/A'}
                           </TableCell>
                           <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
+                            <div className="flex flex-wrap justify-end gap-1 sm:gap-2">
                               {user.profile?.status === 'pending' && (
                                 <>
                                   <Button
@@ -251,6 +252,7 @@ const AdminUsers = () => {
                       )}
                     </TableBody>
                   </Table>
+                  </div>
                 </TabsContent>
               ))}
             </Tabs>

@@ -144,16 +144,16 @@ const Login = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+    <div className="min-h-screen flex items-center justify-center bg-background p-3 sm:p-4">
       <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="flex justify-center mb-4">
-            <div className="bg-primary/10 p-3 rounded-full">
-              <TrendingUp className="h-8 w-8 text-primary" />
+        <CardHeader className="text-center px-4 sm:px-6">
+          <div className="flex justify-center mb-2 sm:mb-4">
+            <div className="bg-primary/10 p-2 sm:p-3 rounded-full">
+              <TrendingUp className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
             </div>
           </div>
-          <CardTitle>Odds Tracker</CardTitle>
-          <CardDescription>
+          <CardTitle className="text-xl sm:text-2xl">Odds Tracker</CardTitle>
+          <CardDescription className="text-sm">
             Faça login para acessar o sistema
           </CardDescription>
         </CardHeader>
