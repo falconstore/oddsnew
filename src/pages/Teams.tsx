@@ -131,11 +131,11 @@ const Teams = () => {
 
   return (
     <Layout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
+      <div className="space-y-6 animate-fade-in-up">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold">Times</h1>
-            <p className="text-muted-foreground">Gerencie times e seus aliases para normalização</p>
+            <h1 className="text-xl sm:text-2xl font-bold">Times</h1>
+            <p className="text-muted-foreground text-sm">Gerencie times e seus aliases para normalização</p>
           </div>
           <Dialog open={isDialogOpen} onOpenChange={(open) => {
             setIsDialogOpen(open);
@@ -223,18 +223,18 @@ const Teams = () => {
         </div>
 
         {/* Filters with Search */}
-        <div className="flex gap-4">
-          <div className="relative flex-1 max-w-sm">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+          <div className="relative flex-1 sm:max-w-sm">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Buscar time ou alias..."
               value={searchTerm}
               onChange={(e) => handleSearchChange(e.target.value)}
-              className="pl-8"
+              className="pl-8 h-10"
             />
           </div>
           <Select value={selectedLeague} onValueChange={setSelectedLeague}>
-            <SelectTrigger className="w-[200px]">
+            <SelectTrigger className="w-full sm:w-[200px] h-10">
               <SelectValue placeholder="Filtrar por liga" />
             </SelectTrigger>
             <SelectContent>
@@ -257,45 +257,50 @@ const Teams = () => {
         )}
 
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="pt-4 sm:pt-6">
             <Accordion type="single" collapsible className="w-full">
               {isLoading && <div className="text-center py-4">Carregando...</div>}
               {filteredTeams?.map((team) => (
                 <AccordionItem key={team.id} value={team.id}>
-                  <AccordionTrigger className="hover:no-underline">
-                    <div className="flex items-center gap-4">
+                  <AccordionTrigger className="hover:no-underline py-3">
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-left">
                       {team.logo_url && (
                         <img 
                           src={team.logo_url} 
                           alt={team.standard_name}
-                          className="h-6 w-6 object-contain"
+                          className="h-5 w-5 sm:h-6 sm:w-6 object-contain"
                         />
                       )}
-                      <span className="font-medium">{team.standard_name}</span>
-                      <Badge variant="outline">{(team.league as any)?.name || 'Sem liga'}</Badge>
-                      <Badge variant={team.status === 'active' ? 'default' : 'secondary'}>
-                        {team.status === 'active' ? 'Ativo' : 'Inativo'}
-                      </Badge>
-                      <Badge variant="outline">
-                        <Tag className="h-3 w-3 mr-1" />
-                        {getTeamAliases(team.id).length} aliases
-                      </Badge>
+                      <span className="font-medium text-sm sm:text-base">{team.standard_name}</span>
+                      <div className="flex flex-wrap gap-1 sm:gap-2">
+                        <Badge variant="outline" className="text-xs">{(team.league as any)?.name || 'Sem liga'}</Badge>
+                        <Badge variant={team.status === 'active' ? 'default' : 'secondary'} className="text-xs">
+                          {team.status === 'active' ? 'Ativo' : 'Inativo'}
+                        </Badge>
+                        <Badge variant="outline" className="text-xs">
+                          <Tag className="h-3 w-3 mr-1" />
+                          {getTeamAliases(team.id).length}
+                        </Badge>
+                      </div>
                     </div>
                   </AccordionTrigger>
                   <AccordionContent>
                     <div className="space-y-4 pt-4">
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
                         <Button variant="outline" size="sm" onClick={() => handleEdit(team)}>
-                          <Pencil className="h-4 w-4 mr-1" /> Editar
+                          <Pencil className="h-4 w-4 sm:mr-1" /> 
+                          <span className="hidden sm:inline">Editar</span>
                         </Button>
                         <Button variant="outline" size="sm" onClick={() => {
                           setSelectedTeamForAlias(team);
                           setIsAliasDialogOpen(true);
                         }}>
-                          <Tag className="h-4 w-4 mr-1" /> Adicionar Alias
+                          <Tag className="h-4 w-4 sm:mr-1" /> 
+                          <span className="hidden sm:inline">Add Alias</span>
                         </Button>
                         <Button variant="outline" size="sm" onClick={() => handleDelete(team.id)}>
-                          <Trash2 className="h-4 w-4 mr-1" /> Excluir
+                          <Trash2 className="h-4 w-4 sm:mr-1" /> 
+                          <span className="hidden sm:inline">Excluir</span>
                         </Button>
                       </div>
                       

@@ -177,11 +177,32 @@ export function OddsMonitor({ sportType, onStatsUpdate }: OddsMonitorProps) {
         <ViewToggle value={viewMode} onChange={setViewMode} />
       </div>
 
-      {/* Loading state */}
+      {/* Loading state with animated skeletons */}
       {isLoading && (
         <div className="space-y-4">
           {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-32 w-full" />
+            <Card key={i} className="overflow-hidden">
+              <CardContent className="p-4">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <Skeleton className="h-6 w-6 rounded-full" />
+                    <Skeleton className="h-5 w-32" />
+                    <Skeleton className="h-4 w-8" />
+                    <Skeleton className="h-5 w-32" />
+                  </div>
+                  <Skeleton className="h-4 w-24" />
+                  <div className="grid grid-cols-4 gap-4 pt-2">
+                    {[1, 2, 3, 4].map((j) => (
+                      <div key={j} className="text-center space-y-2">
+                        <Skeleton className="h-3 w-16 mx-auto" />
+                        <Skeleton className="h-7 w-14 mx-auto" />
+                        <Skeleton className="h-3 w-10 mx-auto" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           ))}
         </div>
       )}
@@ -244,8 +265,8 @@ function CompactTableView({ matches, isBasketball }: { matches: MatchOddsGroup[]
                 <TableRow 
                   key={match.match_id} 
                   className={cn(
-                    "cursor-pointer hover:bg-muted/50",
-                    hasArbitrage && 'bg-green-500/10'
+                    "cursor-pointer transition-colors duration-200 hover:bg-muted/50",
+                    hasArbitrage && 'bg-success/10'
                   )}
                   onClick={() => navigate(`/match/${match.match_id}`)}
                 >
@@ -259,13 +280,13 @@ function CompactTableView({ matches, isBasketball }: { matches: MatchOddsGroup[]
                       <span>{match.home_team}</span>
                       <span className="text-muted-foreground">vs</span>
                       <span>{match.away_team}</span>
-                      {match.away_team_logo && (
-                        <img src={match.away_team_logo} alt={match.away_team} className="h-5 w-5 object-contain" />
-                      )}
-                    </div>
-                    {hasArbitrage && (
-                      <Badge className="ml-2 bg-green-500 text-white text-xs">SUREBET</Badge>
-                    )}
+                          {match.away_team_logo && (
+                            <img src={match.away_team_logo} alt={match.away_team} className="h-5 w-5 object-contain" />
+                          )}
+                        </div>
+                        {hasArbitrage && (
+                          <Badge variant="success" className="ml-2 text-xs">SUREBET</Badge>
+                        )}
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline" className="text-xs">{match.league_name}</Badge>
@@ -283,7 +304,7 @@ function CompactTableView({ matches, isBasketball }: { matches: MatchOddsGroup[]
                   </TableCell>
                   <TableCell className={cn(
                     "text-center font-mono",
-                    hasArbitrage ? "text-green-500 font-bold" : "text-muted-foreground"
+                    hasArbitrage ? "text-success font-bold" : "text-muted-foreground"
                   )}>
                     {Number(roi) > 0 ? `+${roi}%` : `${roi}%`}
                   </TableCell>
@@ -322,10 +343,11 @@ function MatchCard({ match }: { match: MatchOddsGroup }) {
   
   return (
     <Card 
+      variant="interactive"
       className={cn(
-        "cursor-pointer transition-all hover:bg-muted/50",
-        isLive && "border-primary",
-        hasArbitrage && "border-2 border-green-500 shadow-lg shadow-green-500/20"
+        "overflow-hidden animate-fade-in-up",
+        isLive && "border-destructive",
+        hasArbitrage && "border-2 border-success shadow-lg shadow-success/20"
       )}
       onClick={() => navigate(`/match/${match.match_id}`)}
     >
@@ -347,7 +369,7 @@ function MatchCard({ match }: { match: MatchOddsGroup }) {
               )}
             </div>
             {hasArbitrage && (
-              <Badge className="bg-green-500 text-white text-xs sm:text-sm px-2 sm:px-3 py-0.5 sm:py-1 shrink-0 self-start sm:self-auto">
+              <Badge variant="success" className="text-xs sm:text-sm px-2 sm:px-3 py-0.5 sm:py-1 shrink-0 self-start sm:self-auto animate-pulse-subtle">
                 🎯 SUREBET +{roiPercentage}%
               </Badge>
             )}
@@ -356,7 +378,7 @@ function MatchCard({ match }: { match: MatchOddsGroup }) {
           {/* League */}
           <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
             <Badge variant="outline" className="text-xs">{match.league_name}</Badge>
-            {isLive && <Badge className="bg-destructive text-xs">AO VIVO</Badge>}
+            {isLive && <Badge variant="destructive" className="text-xs animate-pulse">AO VIVO</Badge>}
           </div>
           
           {/* Date/Time */}
@@ -369,27 +391,36 @@ function MatchCard({ match }: { match: MatchOddsGroup }) {
             "grid gap-2 sm:gap-4 pt-2 border-t",
             isBasketball ? "grid-cols-3" : "grid-cols-4"
           )}>
-            <div className="text-center">
+            <div className="text-center group">
               <div className="text-[10px] sm:text-xs text-muted-foreground truncate">{bestHomeBookmaker}</div>
-              <div className={cn("font-bold text-lg sm:text-xl font-mono", hasArbitrage ? "text-green-500" : "text-primary")}>
+              <div className={cn(
+                "font-bold text-lg sm:text-xl font-mono transition-transform duration-200 group-hover:scale-110",
+                hasArbitrage ? "text-success" : "text-primary"
+              )}>
                 {match.best_home.toFixed(2)}
               </div>
               <div className="text-[10px] sm:text-xs text-muted-foreground">{isBasketball ? 'Time 1' : 'Casa'}</div>
             </div>
             
             {!isBasketball && match.best_draw !== null && match.best_draw > 0 && (
-              <div className="text-center">
+              <div className="text-center group">
                 <div className="text-[10px] sm:text-xs text-muted-foreground truncate">{bestDrawBookmaker}</div>
-                <div className={cn("font-bold text-lg sm:text-xl font-mono", hasArbitrage ? "text-green-500" : "text-primary")}>
+                <div className={cn(
+                  "font-bold text-lg sm:text-xl font-mono transition-transform duration-200 group-hover:scale-110",
+                  hasArbitrage ? "text-success" : "text-primary"
+                )}>
                   {match.best_draw.toFixed(2)}
                 </div>
                 <div className="text-[10px] sm:text-xs text-muted-foreground">Empate</div>
               </div>
             )}
             
-            <div className="text-center">
+            <div className="text-center group">
               <div className="text-[10px] sm:text-xs text-muted-foreground truncate">{bestAwayBookmaker}</div>
-              <div className={cn("font-bold text-lg sm:text-xl font-mono", hasArbitrage ? "text-green-500" : "text-primary")}>
+              <div className={cn(
+                "font-bold text-lg sm:text-xl font-mono transition-transform duration-200 group-hover:scale-110",
+                hasArbitrage ? "text-success" : "text-primary"
+              )}>
                 {match.best_away.toFixed(2)}
               </div>
               <div className="text-[10px] sm:text-xs text-muted-foreground">{isBasketball ? 'Time 2' : 'Fora'}</div>
@@ -399,7 +430,7 @@ function MatchCard({ match }: { match: MatchOddsGroup }) {
               <div className="text-[10px] sm:text-xs text-muted-foreground">ROI</div>
               <div className={cn(
                 "font-bold text-lg sm:text-xl font-mono",
-                hasArbitrage ? "text-green-500" : "text-muted-foreground"
+                hasArbitrage ? "text-success" : "text-muted-foreground"
               )}>
                 {Number(roiPercentage) > 0 ? `+${roiPercentage}%` : `${roiPercentage}%`}
               </div>
