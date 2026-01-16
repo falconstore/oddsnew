@@ -133,3 +133,65 @@ export const float: Variants = {
     },
   },
 };
+
+// Card hover animation (Planquo style)
+export const cardHover: Variants = {
+  initial: { scale: 1, y: 0 },
+  hover: { 
+    scale: 1.02, 
+    y: -4,
+    transition: {
+      duration: 0.3,
+      ease: [0.25, 0.46, 0.45, 0.94] as [number, number, number, number]
+    }
+  },
+  tap: { 
+    scale: 0.98,
+    transition: { duration: 0.1 }
+  }
+};
+
+// Glow pulse for surebets
+export const glowPulse: Variants = {
+  initial: { 
+    boxShadow: "0 0 0 hsl(142 70% 45% / 0)" 
+  },
+  animate: {
+    boxShadow: [
+      "0 0 10px hsl(142 70% 45% / 0.2)",
+      "0 0 30px hsl(142 70% 45% / 0.4)",
+      "0 0 10px hsl(142 70% 45% / 0.2)"
+    ],
+    transition: {
+      duration: 2,
+      repeat: Infinity,
+      ease: "easeInOut"
+    }
+  }
+};
+
+// Container with staggered entrance (enhanced)
+export const listContainer: Variants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.08,
+      delayChildren: 0.1
+    }
+  }
+};
+
+// List item (fade, slide, scale)
+export const listItem: Variants = {
+  hidden: { opacity: 0, y: 20, scale: 0.95 },
+  show: { 
+    opacity: 1, 
+    y: 0, 
+    scale: 1,
+    transition: {
+      duration: 0.4,
+      ease: [0.25, 0.46, 0.45, 0.94] as [number, number, number, number]
+    }
+  }
+};
