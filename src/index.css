@@ -197,6 +197,8 @@ All colors MUST be HSL.
     
     /* === GLOW EFFECTS (Enhanced in dark mode) === */
     --glow-primary: 0 0 30px hsl(142 70% 45% / 0.35);
+    --glow-primary-intense: 0 0 50px hsl(142 70% 45% / 0.5);
+    --glow-subtle: 0 0 15px hsl(142 70% 45% / 0.15);
   }
 }
 
@@ -220,5 +222,17 @@ All colors MUST be HSL.
       hsl(240 10% 6%) 100%
     );
     background-attachment: fixed;
+  }
+  
+  /* Grain/noise texture overlay for dark mode */
+  .dark body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    opacity: 0.025;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    background-repeat: repeat;
   }
 }

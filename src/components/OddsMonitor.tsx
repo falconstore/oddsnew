@@ -1,6 +1,7 @@
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useOddsComparison } from '@/hooks/useOddsData';
 import { Card, CardContent } from '@/components/ui/card';
@@ -13,6 +14,7 @@ import { OddsFilters } from './OddsFilters';
 import { ViewToggle, ViewMode } from './ViewToggle';
 import { useFiltersFromUrl } from '@/hooks/useFiltersFromUrl';
 import { useSurebetDetection } from '@/hooks/useSurebetDetection';
+import { listContainer, listItem } from '@/lib/animations';
 import type { MatchOddsGroup } from '@/types/database';
 
 interface OddsMonitorProps {
@@ -227,10 +229,21 @@ export function OddsMonitor({ sportType, onStatsUpdate }: OddsMonitorProps) {
         <CompactTableView matches={displayMatches} isBasketball={isBasketball} />
       )}
 
-      {/* Card View */}
-      {(viewMode === 'cards' || viewMode === 'surebets') && displayMatches.map((match) => (
-        <MatchCard key={match.match_id} match={match} />
-      ))}
+      {/* Card View with stagger animation */}
+      {(viewMode === 'cards' || viewMode === 'surebets') && (
+        <motion.div
+          variants={listContainer}
+          initial="hidden"
+          animate="show"
+          className="space-y-4"
+        >
+          {displayMatches.map((match) => (
+            <motion.div key={match.match_id} variants={listItem}>
+              <MatchCard match={match} />
+            </motion.div>
+          ))}
+        </motion.div>
+      )}
     </div>
   );
 }
