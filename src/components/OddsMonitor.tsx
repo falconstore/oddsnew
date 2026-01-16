@@ -12,6 +12,7 @@ import { useState, useMemo } from 'react';
 import { OddsFilters } from './OddsFilters';
 import { ViewToggle, ViewMode } from './ViewToggle';
 import { useFiltersFromUrl } from '@/hooks/useFiltersFromUrl';
+import { useSurebetDetection } from '@/hooks/useSurebetDetection';
 import type { MatchOddsGroup } from '@/types/database';
 
 interface OddsMonitorProps {
@@ -29,6 +30,9 @@ export function OddsMonitor({ sportType, onStatsUpdate }: OddsMonitorProps) {
   const { data: matches, isLoading, error } = useOddsComparison(
     leagueForQuery ? { leagueName: leagueForQuery } : undefined
   );
+
+  // Detect and notify new surebets
+  useSurebetDetection(matches);
 
   const isBasketball = sportType === 'basketball';
 
