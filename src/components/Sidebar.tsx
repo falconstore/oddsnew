@@ -21,6 +21,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useState } from 'react';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 const FootballIcon = () => <span className="text-base">⚽</span>;
 const BasketballIcon = () => <span className="text-base">🏀</span>;
@@ -146,6 +147,14 @@ export function Sidebar() {
             );
           })}
         </nav>
+
+        {/* Theme Toggle */}
+        <div className="px-4 py-3 border-t border-sidebar-border">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">Tema</span>
+            <ThemeToggle />
+          </div>
+        </div>
 
         {/* User Footer with enhanced styling */}
         {user && (
