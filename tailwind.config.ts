@@ -73,7 +73,11 @@ export default {
   		borderRadius: {
   			lg: 'var(--radius)',
   			md: 'calc(var(--radius) - 2px)',
-  			sm: 'calc(var(--radius) - 4px)'
+  			sm: 'calc(var(--radius) - 4px)',
+  			'xl': '1rem',
+  			'2xl': '1.25rem',
+  			'3xl': '1.5rem',
+  			'4xl': '2rem'
   		},
   		keyframes: {
   			'accordion-down': {
@@ -131,7 +135,13 @@ export default {
   			md: 'var(--shadow-md)',
   			lg: 'var(--shadow-lg)',
   			xl: 'var(--shadow-xl)',
-  			'2xl': 'var(--shadow-2xl)'
+  			'2xl': 'var(--shadow-2xl)',
+  			'card': 'var(--shadow-card)',
+  			'card-hover': 'var(--shadow-card-hover)',
+  			'glow-primary': 'var(--glow-primary)',
+  			'glow-sm': '0 0 10px hsl(var(--primary) / 0.2)',
+  			'glow-md': '0 0 20px hsl(var(--primary) / 0.3)',
+  			'glow-lg': '0 0 30px hsl(var(--primary) / 0.4)'
   		},
   		fontFamily: {
   			sans: [

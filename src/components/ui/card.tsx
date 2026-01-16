@@ -4,15 +4,38 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const cardVariants = cva(
-  "rounded-lg border text-card-foreground transition-all duration-300",
+  "rounded-2xl text-card-foreground transition-all duration-300",
   {
     variants: {
       variant: {
-        default: "bg-card shadow-sm hover:shadow-md",
-        glass: "bg-card/70 backdrop-blur-[12px] border-border/30",
-        gradient: "bg-gradient-to-br from-card to-background border-0 shadow-md",
-        elevated: "bg-card shadow-lg hover:shadow-xl hover:-translate-y-1",
-        interactive: "bg-card shadow-sm hover:shadow-lg hover:border-primary/50 cursor-pointer",
+        // Light mode: deep shadows | Dark mode: subtle borders with glow on hover
+        default: [
+          "bg-card",
+          "shadow-card hover:shadow-card-hover",
+          "dark:shadow-none dark:border dark:border-border/50",
+          "dark:hover:border-primary/30 dark:hover:shadow-glow-primary",
+        ].join(" "),
+        glass: [
+          "bg-card/60 backdrop-blur-xl border border-border/20",
+          "dark:bg-card/40 dark:border-border/30",
+        ].join(" "),
+        gradient: [
+          "bg-gradient-to-br from-card to-background border-0",
+          "shadow-lg hover:shadow-xl",
+          "dark:shadow-none dark:border dark:border-border/30",
+        ].join(" "),
+        elevated: [
+          "bg-card border-0",
+          "shadow-xl hover:shadow-2xl hover:-translate-y-1",
+          "dark:shadow-none dark:border dark:border-border/60",
+          "dark:hover:border-primary/40 dark:hover:shadow-glow-md",
+        ].join(" "),
+        interactive: [
+          "bg-card cursor-pointer",
+          "shadow-lg hover:shadow-xl hover:-translate-y-0.5",
+          "dark:shadow-none dark:border dark:border-border/50",
+          "dark:hover:border-primary/50 dark:hover:bg-card/80 dark:hover:shadow-glow-sm",
+        ].join(" "),
       },
     },
     defaultVariants: {
