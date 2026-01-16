@@ -7,7 +7,6 @@ import { useOddsComparison } from '@/hooks/useOddsData';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Skeleton } from '@/components/ui/skeleton';
 import { AlertTriangle } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { OddsFilters } from './OddsFilters';
@@ -15,6 +14,7 @@ import { ViewToggle, ViewMode } from './ViewToggle';
 import { useFiltersFromUrl } from '@/hooks/useFiltersFromUrl';
 import { useSurebetDetection } from '@/hooks/useSurebetDetection';
 import { listContainer, listItem } from '@/lib/animations';
+import { MatchCardSkeleton } from './MatchCardSkeleton';
 import type { MatchOddsGroup } from '@/types/database';
 
 interface OddsMonitorProps {
@@ -183,32 +183,11 @@ export function OddsMonitor({ sportType, onStatsUpdate }: OddsMonitorProps) {
         <ViewToggle value={viewMode} onChange={setViewMode} />
       </div>
 
-      {/* Loading state with animated skeletons */}
+      {/* Loading state with shimmer skeletons */}
       {isLoading && (
         <div className="space-y-4">
           {[1, 2, 3].map((i) => (
-            <Card key={i} className="overflow-hidden">
-              <CardContent className="p-4">
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3">
-                    <Skeleton className="h-6 w-6 rounded-full" />
-                    <Skeleton className="h-5 w-32" />
-                    <Skeleton className="h-4 w-8" />
-                    <Skeleton className="h-5 w-32" />
-                  </div>
-                  <Skeleton className="h-4 w-24" />
-                  <div className="grid grid-cols-4 gap-4 pt-2">
-                    {[1, 2, 3, 4].map((j) => (
-                      <div key={j} className="text-center space-y-2">
-                        <Skeleton className="h-3 w-16 mx-auto" />
-                        <Skeleton className="h-7 w-14 mx-auto" />
-                        <Skeleton className="h-3 w-10 mx-auto" />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <MatchCardSkeleton key={i} isBasketball={isBasketball} />
           ))}
         </div>
       )}
