@@ -369,9 +369,60 @@ const MatchDetails = () => {
   if (isLoading) {
     return (
       <Layout>
-        <div className="space-y-4">
-          <Skeleton className="h-10 w-48" />
-          <Skeleton className="h-64 w-full" />
+        <div className="space-y-6">
+          {/* Header skeleton */}
+          <div className="flex items-center gap-4">
+            <Skeleton className="h-10 w-10 rounded-lg" />
+            <div className="flex-1 space-y-2">
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-6 w-6 rounded-full" />
+                <Skeleton className="h-6 w-32" />
+                <Skeleton className="h-5 w-8" />
+                <Skeleton className="h-6 w-32" />
+                <Skeleton className="h-6 w-6 rounded-full" />
+              </div>
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-5 w-24 rounded-full" />
+                <Skeleton className="h-4 w-32" />
+              </div>
+            </div>
+          </div>
+          
+          {/* Best odds card skeleton */}
+          <Card>
+            <CardContent className="p-4 sm:p-6">
+              <Skeleton className="h-5 w-28 mb-4" />
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="text-center space-y-2">
+                    <Skeleton className="h-3 w-16 mx-auto" />
+                    <Skeleton className="h-10 w-16 mx-auto rounded-lg" />
+                    <Skeleton className="h-3 w-12 mx-auto" />
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+          
+          {/* Calculator skeleton */}
+          <Skeleton className="h-12 w-full rounded-xl" />
+          
+          {/* Odds table skeleton */}
+          <Card>
+            <CardContent className="p-4 sm:p-6">
+              <Skeleton className="h-5 w-40 mb-4" />
+              <div className="space-y-3">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} className="flex items-center gap-4">
+                    <Skeleton className="h-5 w-28" />
+                    <Skeleton className="h-8 w-16 flex-1 max-w-[80px]" />
+                    <Skeleton className="h-8 w-16 flex-1 max-w-[80px]" />
+                    <Skeleton className="h-8 w-16 flex-1 max-w-[80px]" />
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </Layout>
     );
