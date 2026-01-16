@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { User, Shield, LogOut } from 'lucide-react';
+import { NotificationSettings } from '@/components/NotificationSettings';
 
 const Settings = () => {
   const { user, signOut, isAdmin } = useAuth();
@@ -21,6 +22,9 @@ const Settings = () => {
         </div>
 
         <div className="max-w-xl space-y-6">
+          {/* Card de Notificações */}
+          <NotificationSettings />
+
           {/* Card de Perfil */}
           <Card>
             <CardHeader>
