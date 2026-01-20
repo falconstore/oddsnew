@@ -75,6 +75,18 @@ class SportingbetScraper(BaseScraper):
             "name": "Copa do Rei",
             "country": "Espanha"
         },
+     "champions_league": {
+            "region_id": "7",
+            "competition_id": "102855",
+            "name": "Champions League",
+            "country": "Europa"
+        },
+     "liga_europa": {
+            "region_id": "7",
+            "competition_id": "102856",
+            "name": "Liga Europa",
+            "country": "Europa"
+        },
     }
     
     def __init__(self):
