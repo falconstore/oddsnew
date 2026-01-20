@@ -211,38 +211,38 @@ class SportingbetScraper(BaseScraper):
                     market_name = market.get("name", {}).get("value", "")
                     is_main = market.get("isMain", False)
                     
-                # Main market: "Resultado da Partida" (exclude handicap markets like "VP (+2)")
-                if is_main and "Resultado" in market_name and "VP" not in market_name and "(+" not in market_name and "(-" not in market_name:
-                    options = market.get("options", [])
-                    
-                    # Log para debug
-                    self.logger.debug(
-                        f"Market '{market_name}' for {home_team} vs {away_team}: "
-                        f"{[(o.get('name', {}).get('value'), o.get('sourceName', {}).get('value')) for o in options]}"
-                    )
-                    
-                    for opt in options:
-                        opt_name = opt.get("name", {}).get("value", "")
-                        price = opt.get("price", {}).get("odds")
-                        # sourceName é um objeto: {"value": "1"}
-                        source_name_obj = opt.get("sourceName", {})
-                        source_name = source_name_obj.get("value", "") if isinstance(source_name_obj, dict) else str(source_name_obj)
+                    # Main market: "Resultado da Partida" (exclude handicap markets like "VP (+2)")
+                    if is_main and "Resultado" in market_name and "VP" not in market_name and "(+" not in market_name and "(-" not in market_name:
+                        options = market.get("options", [])
                         
-                        if price:
-                            # Método 1: Usar sourceName se disponível (ex: "1", "X", "2")
-                            if source_name == "1":
-                                home_odd = price
-                            elif source_name == "X" or source_name == "x":
-                                draw_odd = price
-                            elif source_name == "2":
-                                away_odd = price
-                            # Método 2: Checar o nome da opção
-                            elif opt_name == "X":
-                                draw_odd = price
-                            elif opt_name == home_team:
-                                home_odd = price
-                            elif opt_name == away_team:
-                                away_odd = price
+                        # Log para debug
+                        self.logger.debug(
+                            f"Market '{market_name}' for {home_team} vs {away_team}: "
+                            f"{[(o.get('name', {}).get('value'), o.get('sourceName', {}).get('value')) for o in options]}"
+                        )
+                        
+                        for opt in options:
+                            opt_name = opt.get("name", {}).get("value", "")
+                            price = opt.get("price", {}).get("odds")
+                            # sourceName é um objeto: {"value": "1"}
+                            source_name_obj = opt.get("sourceName", {})
+                            source_name = source_name_obj.get("value", "") if isinstance(source_name_obj, dict) else str(source_name_obj)
+                            
+                            if price:
+                                # Método 1: Usar sourceName se disponível (ex: "1", "X", "2")
+                                if source_name == "1":
+                                    home_odd = price
+                                elif source_name == "X" or source_name == "x":
+                                    draw_odd = price
+                                elif source_name == "2":
+                                    away_odd = price
+                                # Método 2: Checar o nome da opção
+                                elif opt_name == "X":
+                                    draw_odd = price
+                                elif opt_name == home_team:
+                                    home_odd = price
+                                elif opt_name == away_team:
+                                    away_odd = price
                         
                         # Fallback: Se ainda não encontrou todas, tentar por índice
                         if not (home_odd and draw_odd and away_odd) and len(options) == 3:
