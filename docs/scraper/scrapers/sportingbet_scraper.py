@@ -236,13 +236,13 @@ class SportingbetScraper(BaseScraper):
                                 draw_odd = price
                             elif source_name == "2":
                                 away_odd = price
-                                # Método 2: Checar o nome da opção
-                                elif opt_name == "X":
-                                    draw_odd = price
-                                elif opt_name == home_team:
-                                    home_odd = price
-                                elif opt_name == away_team:
-                                    away_odd = price
+                            # Método 2: Checar o nome da opção
+                            elif opt_name == "X":
+                                draw_odd = price
+                            elif opt_name == home_team:
+                                home_odd = price
+                            elif opt_name == away_team:
+                                away_odd = price
                         
                         # Fallback: Se ainda não encontrou todas, tentar por índice
                         if not (home_odd and draw_odd and away_odd) and len(options) == 3:
