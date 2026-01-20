@@ -211,8 +211,8 @@ class SportingbetScraper(BaseScraper):
                     market_name = market.get("name", {}).get("value", "")
                     is_main = market.get("isMain", False)
                     
-                    # Main market: "Resultado da Partida" (exclude handicap markets like "VP (+2)")
-                    if is_main and "Resultado" in market_name and "VP" not in market_name and "(+" not in market_name and "(-" not in market_name:
+                    # Main market: "Resultado da Partida" (API agora usa "VP (+2)" como mercado principal)
+                    if is_main and "Resultado" in market_name:
                         options = market.get("options", [])
                         
                         # Log para debug
