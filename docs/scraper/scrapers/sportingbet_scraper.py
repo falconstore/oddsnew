@@ -179,6 +179,7 @@ class SportingbetScraper(BaseScraper):
                         away_team = p.get("name", {}).get("value", "")
                 
                 if not home_team or not away_team:
+                    self.logger.debug(f"Skipping fixture - missing teams: {fixture.get('id')}")
                     continue
                 
                 # Parse match date
@@ -198,48 +199,87 @@ class SportingbetScraper(BaseScraper):
                     market_name = market.get("name", {}).get("value", "")
                     is_main = market.get("isMain", False)
                     
-                    # Main market: "Resultado da Partida - VP" or similar
+                    # Main market: "Resultado da Partida" or similar
                     if is_main and "Resultado" in market_name:
                         options = market.get("options", [])
+                        
+                        # Log para debug
+                        self.logger.debug(
+                            f"Market options for {home_team} vs {away_team}: "
+                            f"{[(o.get('name', {}).get('value'), o.get('sourceName')) for o in options]}"
+                        )
+                        
                         for opt in options:
                             opt_name = opt.get("name", {}).get("value", "")
                             price = opt.get("price", {}).get("odds")
+                            # sourceName pode ter "1", "X", "2"
+                            source_name = opt.get("sourceName", "")
                             
                             if price:
-                                if opt_name == "X":
+                                # Método 1: Usar sourceName se disponível (ex: "1", "X", "2")
+                                if source_name == "1" or source_name.lower() == "home":
+                                    home_odd = price
+                                elif source_name == "X" or source_name.lower() in ("x", "draw"):
+                                    draw_odd = price
+                                elif source_name == "2" or source_name.lower() == "away":
+                                    away_odd = price
+                                # Método 2: Checar o nome da opção
+                                elif opt_name == "X":
                                     draw_odd = price
                                 elif opt_name == home_team:
                                     home_odd = price
                                 elif opt_name == away_team:
                                     away_odd = price
+                        
+                        # Fallback: Se ainda não encontrou todas, tentar por índice
+                        if not (home_odd and draw_odd and away_odd) and len(options) == 3:
+                            self.logger.debug(f"Using positional fallback for {home_team} vs {away_team}")
+                            for i, opt in enumerate(options):
+                                opt_name = opt.get("name", {}).get("value", "")
+                                price = opt.get("price", {}).get("odds")
+                                if price:
+                                    if opt_name == "X" or i == 1:
+                                        if not draw_odd:
+                                            draw_odd = price
+                                    elif i == 0 and not home_odd:
+                                        home_odd = price
+                                    elif i == 2 and not away_odd:
+                                        away_odd = price
                         break
                 
-                # Only add if all odds are found
-                if home_odd and draw_odd and away_odd:
-                    # Extract fixture ID (remove "2:" prefix if present)
-                    fixture_id = str(fixture.get("id", ""))
-                    if fixture_id.startswith("2:"):
-                        fixture_id = fixture_id[2:]
-                    
-                    scraped = ScrapedOdds(
-                        bookmaker_name="sportingbet",
-                        home_team_raw=home_team.strip(),
-                        away_team_raw=away_team.strip(),
-                        league_raw=league_name,
-                        match_date=dt,
-                        home_odd=home_odd,
-                        draw_odd=draw_odd,
-                        away_odd=away_odd,
-                        market_type="1x2",
-                        extra_data={
-                            "fixture_id": fixture_id,
-                            "region_id": region_id,
-                            "home_team_raw": home_team.strip(),
-                            "away_team_raw": away_team.strip()
-                        }
+                # Log detalhado se falhar
+                if not (home_odd and draw_odd and away_odd):
+                    self.logger.debug(
+                        f"Incomplete odds for {home_team} vs {away_team}: "
+                        f"H={home_odd}, D={draw_odd}, A={away_odd}"
                     )
-                    results.append(scraped)
-                    
+                    continue
+                
+                # Extract fixture ID
+                fixture_id = str(fixture.get("id", ""))
+                if fixture_id.startswith("2:"):
+                    fixture_id = fixture_id[2:]
+                
+                scraped = ScrapedOdds(
+                    bookmaker_name="sportingbet",
+                    home_team_raw=home_team.strip(),
+                    away_team_raw=away_team.strip(),
+                    league_raw=league_name,
+                    match_date=dt,
+                    home_odd=home_odd,
+                    draw_odd=draw_odd,
+                    away_odd=away_odd,
+                    market_type="1x2",
+                    extra_data={
+                        "fixture_id": fixture_id,
+                        "region_id": region_id,
+                        "home_team_raw": home_team.strip(),
+                        "away_team_raw": away_team.strip()
+                    }
+                )
+                results.append(scraped)
+                self.logger.debug(f"Parsed: {home_team} vs {away_team} | {home_odd} / {draw_odd} / {away_odd}")
+                
             except Exception as e:
                 self.logger.debug(f"Erro ao processar fixture: {e}")
                 continue
