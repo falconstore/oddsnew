@@ -211,30 +211,31 @@ class SportingbetScraper(BaseScraper):
                     market_name = market.get("name", {}).get("value", "")
                     is_main = market.get("isMain", False)
                     
-                    # Main market: "Resultado da Partida" or similar
-                    if is_main and "Resultado" in market_name:
-                        options = market.get("options", [])
+                # Main market: "Resultado da Partida" (exclude handicap markets like "VP (+2)")
+                if is_main and "Resultado" in market_name and "VP" not in market_name and "(+" not in market_name and "(-" not in market_name:
+                    options = market.get("options", [])
+                    
+                    # Log para debug
+                    self.logger.debug(
+                        f"Market '{market_name}' for {home_team} vs {away_team}: "
+                        f"{[(o.get('name', {}).get('value'), o.get('sourceName', {}).get('value')) for o in options]}"
+                    )
+                    
+                    for opt in options:
+                        opt_name = opt.get("name", {}).get("value", "")
+                        price = opt.get("price", {}).get("odds")
+                        # sourceName é um objeto: {"value": "1"}
+                        source_name_obj = opt.get("sourceName", {})
+                        source_name = source_name_obj.get("value", "") if isinstance(source_name_obj, dict) else str(source_name_obj)
                         
-                        # Log para debug
-                        self.logger.debug(
-                            f"Market options for {home_team} vs {away_team}: "
-                            f"{[(o.get('name', {}).get('value'), o.get('sourceName')) for o in options]}"
-                        )
-                        
-                        for opt in options:
-                            opt_name = opt.get("name", {}).get("value", "")
-                            price = opt.get("price", {}).get("odds")
-                            # sourceName pode ter "1", "X", "2"
-                            source_name = opt.get("sourceName", "")
-                            
-                            if price:
-                                # Método 1: Usar sourceName se disponível (ex: "1", "X", "2")
-                                if source_name == "1" or source_name.lower() == "home":
-                                    home_odd = price
-                                elif source_name == "X" or source_name.lower() in ("x", "draw"):
-                                    draw_odd = price
-                                elif source_name == "2" or source_name.lower() == "away":
-                                    away_odd = price
+                        if price:
+                            # Método 1: Usar sourceName se disponível (ex: "1", "X", "2")
+                            if source_name == "1":
+                                home_odd = price
+                            elif source_name == "X" or source_name == "x":
+                                draw_odd = price
+                            elif source_name == "2":
+                                away_odd = price
                                 # Método 2: Checar o nome da opção
                                 elif opt_name == "X":
                                     draw_odd = price
