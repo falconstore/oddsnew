@@ -632,30 +632,43 @@ class Aposta1Scraper(BaseScraper):
 
         
 
-        # Classificar por ORDEM: 
-        # - Se tem 2 conjuntos: primeiro = SO, segundo = PA
-        # - Se tem 1 conjunto: sempre PA
+        # Classificar baseado em has_offers:
+        # - Conjunto COM offers = PA (promoção)
+        # - Conjunto SEM offers = SO (só se existir PA)
+        # - Se só tem 1 conjunto = sempre PA
         result = {}
 
+        if len(sets) == 0:
+            return result
+
         if len(sets) == 1:
-            # Apenas 1 conjunto = sempre PA
+            # Apenas 1 conjunto = sempre PA (independente de has_offers)
             result["PA"] = {
                 "home": sets[0]["odds"]["home"],
                 "draw": sets[0]["odds"]["draw"],
                 "away": sets[0]["odds"]["away"]
             }
-        elif len(sets) >= 2:
-            # 2 conjuntos: primeiro = SO, segundo = PA
-            result["SO"] = {
-                "home": sets[0]["odds"]["home"],
-                "draw": sets[0]["odds"]["draw"],
-                "away": sets[0]["odds"]["away"]
-            }
-            result["PA"] = {
-                "home": sets[1]["odds"]["home"],
-                "draw": sets[1]["odds"]["draw"],
-                "away": sets[1]["odds"]["away"]
-            }
+        else:
+            # 2+ conjuntos: separar por has_offers
+            for s in sets:
+                if s["has_offers"]:
+                    if "PA" not in result:
+                        result["PA"] = {
+                            "home": s["odds"]["home"],
+                            "draw": s["odds"]["draw"],
+                            "away": s["odds"]["away"]
+                        }
+                else:
+                    if "SO" not in result:
+                        result["SO"] = {
+                            "home": s["odds"]["home"],
+                            "draw": s["odds"]["draw"],
+                            "away": s["odds"]["away"]
+                        }
+            
+            # Se não encontrou PA mas tem SO, converte SO para PA
+            if "SO" in result and "PA" not in result:
+                result["PA"] = result.pop("SO")
 
         return result
 
