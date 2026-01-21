@@ -632,29 +632,30 @@ class Aposta1Scraper(BaseScraper):
 
         
 
-        # Classificar: primeiro sem offers = SO, com offers = PA
-
+        # Classificar por ORDEM: 
+        # - Se tem 2 conjuntos: primeiro = SO, segundo = PA
+        # - Se tem 1 conjunto: sempre PA
         result = {}
 
-        for s in sets:
-
-            odds_type = "PA" if s["has_offers"] else "SO"
-
-            
-
-            if odds_type not in result:
-
-                result[odds_type] = {
-
-                    "home": s["odds"]["home"],
-
-                    "draw": s["odds"]["draw"],
-
-                    "away": s["odds"]["away"]
-
-                }
-
-        
+        if len(sets) == 1:
+            # Apenas 1 conjunto = sempre PA
+            result["PA"] = {
+                "home": sets[0]["odds"]["home"],
+                "draw": sets[0]["odds"]["draw"],
+                "away": sets[0]["odds"]["away"]
+            }
+        elif len(sets) >= 2:
+            # 2 conjuntos: primeiro = SO, segundo = PA
+            result["SO"] = {
+                "home": sets[0]["odds"]["home"],
+                "draw": sets[0]["odds"]["draw"],
+                "away": sets[0]["odds"]["away"]
+            }
+            result["PA"] = {
+                "home": sets[1]["odds"]["home"],
+                "draw": sets[1]["odds"]["draw"],
+                "away": sets[1]["odds"]["away"]
+            }
 
         return result
 
