@@ -266,23 +266,25 @@ function CompactTableView({ matches, isBasketball }: { matches: MatchOddsGroup[]
                   )}
                   onClick={() => navigate(`/match/${match.match_id}`)}
                 >
-                  <TableCell className="font-medium">
+          <TableCell className="font-medium">
                     <div className="flex items-center gap-2">
+                      <span>{match.home_team}</span>
                       {match.home_team_logo ? (
                         <img src={match.home_team_logo} alt={match.home_team} className="h-5 w-5 object-contain" />
                       ) : (
-                        <span className="mr-1">{sportIcon}</span>
+                        <span>{sportIcon}</span>
                       )}
-                      <span>{match.home_team}</span>
-                      <span className="text-muted-foreground">vs</span>
+                      <span className="text-muted-foreground">x</span>
+                      {match.away_team_logo ? (
+                        <img src={match.away_team_logo} alt={match.away_team} className="h-5 w-5 object-contain" />
+                      ) : (
+                        <span>{sportIcon}</span>
+                      )}
                       <span>{match.away_team}</span>
-                          {match.away_team_logo && (
-                            <img src={match.away_team_logo} alt={match.away_team} className="h-5 w-5 object-contain" />
-                          )}
-                        </div>
-                        {hasArbitrage && (
-                          <Badge variant="success" className="ml-2 text-xs">SUREBET</Badge>
-                        )}
+                    </div>
+                    {hasArbitrage && (
+                      <Badge variant="success" className="ml-2 text-xs">SUREBET</Badge>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline" className="text-xs">{match.league_name}</Badge>
@@ -349,20 +351,22 @@ function MatchCard({ match }: { match: MatchOddsGroup }) {
     >
       <CardContent className="p-3 sm:p-4">
         <div className="space-y-2 sm:space-y-3">
-          {/* Title: Icon + Teams with Logos */}
+          {/* Title: Teams with Logos - Nome [Logo] x [Logo] Nome */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div className="flex flex-wrap items-center gap-1 sm:gap-2">
+              <span className="font-semibold text-base sm:text-lg">{match.home_team}</span>
               {match.home_team_logo ? (
                 <img src={match.home_team_logo} alt={match.home_team} className="h-5 w-5 sm:h-6 sm:w-6 object-contain" />
               ) : (
                 <span className="text-sm sm:text-base">{sportIcon}</span>
               )}
-              <span className="font-semibold text-base sm:text-lg">{match.home_team}</span>
-              <span className="text-muted-foreground text-sm">vs</span>
-              <span className="font-semibold text-base sm:text-lg">{match.away_team}</span>
-              {match.away_team_logo && (
+              <span className="text-muted-foreground text-sm">x</span>
+              {match.away_team_logo ? (
                 <img src={match.away_team_logo} alt={match.away_team} className="h-5 w-5 sm:h-6 sm:w-6 object-contain" />
+              ) : (
+                <span className="text-sm sm:text-base">{sportIcon}</span>
               )}
+              <span className="font-semibold text-base sm:text-lg">{match.away_team}</span>
             </div>
             {hasArbitrage && (
               <Badge variant="success" className="text-xs sm:text-sm px-2 sm:px-3 py-0.5 sm:py-1 shrink-0 self-start sm:self-auto animate-pulse-subtle">
