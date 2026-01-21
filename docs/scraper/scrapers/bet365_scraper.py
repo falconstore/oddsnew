@@ -29,7 +29,7 @@ class Bet365Scraper(BaseScraper):
     4. Se token expirar, refaz login automaticamente
     """
     
-    LOGIN_URL = "https://app.radarodds.com.br/api/auth/login"
+    LOGIN_URL = "https://app.radarodds.com.br/api/login"
     SNAPSHOT_URL = "https://app.radarodds.com.br/api/snapshot"
     
     # Mapeamento RadarOdds -> Sistema interno
@@ -74,6 +74,7 @@ class Bet365Scraper(BaseScraper):
         super().__init__(name="bet365", base_url="https://www.bet365.bet.br")
         self.client: Optional[httpx.AsyncClient] = None
         self.filter_token: Optional[str] = None
+        self.session_cookie: Optional[str] = None
         self.logger = logger.bind(component="bet365")
     
     async def setup(self):
@@ -105,15 +106,16 @@ class Bet365Scraper(BaseScraper):
     
     async def _login(self, settings) -> bool:
         """
-        Faz login no RadarOdds e obtém filter_token.
+        Faz login no RadarOdds e obtém filter_token dos cookies.
         
         Returns:
             True se login bem sucedido, False caso contrário
         """
-        email = getattr(settings, 'radarodds_email', None)
+        # Usar email como username (campo esperado pela API)
+        username = getattr(settings, 'radarodds_email', None)
         password = getattr(settings, 'radarodds_password', None)
         
-        if not email or not password:
+        if not username or not password:
             self.logger.error(
                 "Credenciais RadarOdds não configuradas! "
                 "Adicione RADARODDS_EMAIL e RADARODDS_PASSWORD no .env"
@@ -121,11 +123,11 @@ class Bet365Scraper(BaseScraper):
             return False
         
         try:
-            self.logger.debug(f"Fazendo login no RadarOdds com {email}...")
+            self.logger.debug(f"Fazendo login no RadarOdds com {username}...")
             
             response = await self.client.post(
                 self.LOGIN_URL,
-                json={"email": email, "password": password}
+                json={"username": username, "password": password}
             )
             
             if response.status_code == 401:
@@ -134,14 +136,24 @@ class Bet365Scraper(BaseScraper):
             
             response.raise_for_status()
             
-            data = response.json()
-            self.filter_token = data.get("filter_token")
+            # Extrair tokens dos cookies Set-Cookie
+            self.filter_token = response.cookies.get("ra_filter_token")
+            self.session_cookie = response.cookies.get("ra_sess")
+            
+            # Fallback: tentar do JSON se não veio nos cookies
+            if not self.filter_token:
+                try:
+                    data = response.json()
+                    self.filter_token = data.get("filter_token")
+                except:
+                    pass
             
             if self.filter_token:
                 self.logger.info("Login RadarOdds realizado com sucesso")
+                self.logger.debug(f"Token: {self.filter_token[:20]}...")
                 return True
             else:
-                self.logger.error("Token não retornado no login")
+                self.logger.error("Token não encontrado nos cookies nem no JSON")
                 return False
                 
         except httpx.HTTPStatusError as e:
@@ -186,8 +198,11 @@ class Bet365Scraper(BaseScraper):
             return []
         
         try:
-            # Adiciona token no header
+            # Adiciona token no header E cookies
             self.client.headers["x-filter-token"] = self.filter_token
+            if self.session_cookie:
+                self.client.cookies.set("ra_sess", self.session_cookie)
+                self.client.cookies.set("ra_filter_token", self.filter_token)
             
             self.logger.debug("Buscando snapshot do RadarOdds...")
             
