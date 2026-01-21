@@ -315,10 +315,23 @@ class Aposta1Scraper(BaseScraper):
                 
 
                 # Parse SO e PA do GetEventDetails
-
                 odds_by_type = self._parse_event_details_odds(details)
-
                 
+                # Debug log para verificação de SO/PA
+                if odds_by_type:
+                    types_found = list(odds_by_type.keys())
+                    if "SO" in odds_by_type and "PA" in odds_by_type:
+                        self.logger.debug(
+                            f"[Aposta1] {home_team} vs {away_team}: SO+PA | "
+                            f"SO: {odds_by_type['SO']['home']}/{odds_by_type['SO']['draw']}/{odds_by_type['SO']['away']} | "
+                            f"PA: {odds_by_type['PA']['home']}/{odds_by_type['PA']['draw']}/{odds_by_type['PA']['away']}"
+                        )
+                    elif types_found:
+                        odds = odds_by_type.get(types_found[0], {})
+                        self.logger.debug(
+                            f"[Aposta1] {home_team} vs {away_team}: {types_found[0]} only | "
+                            f"{odds.get('home', 0)}/{odds.get('draw', 0)}/{odds.get('away', 0)}"
+                        )
 
                 for odds_type, odds in odds_by_type.items():
 

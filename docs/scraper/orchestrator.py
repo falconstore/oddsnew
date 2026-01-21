@@ -405,12 +405,7 @@ class Orchestrator:
             # Determine if this is basketball
             is_basketball = odds.sport == "basketball" or odds.league_raw.upper() == "NBA"
             
-            # Debug NBA odds flow
-            if is_basketball:
-                self.logger.debug(
-                    f"NBA normalization: {odds.home_team_raw} vs {odds.away_team_raw} | "
-                    f"bookmaker={odds.bookmaker_name}, league_id={league_id}"
-                )
+            # NBA normalization logging removed (too verbose)
             
             # Match teams - use full method for primary bookmaker to auto-create
             normalized_bookmaker = odds.bookmaker_name.strip().lower()

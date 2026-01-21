@@ -240,9 +240,6 @@ class TeamMatcher:
             if is_cross_league:
                 # Buscar no cache global (reverse_cache) - match exato
                 if normalized_name in self.reverse_cache:
-                    self.logger.debug(
-                        f"[Cross-league cached] Exact: '{raw_name}' -> {self.reverse_cache[normalized_name]}"
-                    )
                     return self.reverse_cache[normalized_name]
                 
                 # Fuzzy match global com threshold do min_score (85)
@@ -266,9 +263,6 @@ class TeamMatcher:
                                 self._normalize_name(matched_name).lower()
                             )
                         if team_id:
-                            self.logger.debug(
-                                f"[Cross-league cached] Fuzzy: '{raw_name}' -> '{matched_name}' ({result[1]:.0f}%)"
-                            )
                             return team_id
         
         # Step 4: Fallback global só se não tiver league_id
@@ -535,14 +529,11 @@ class TeamMatcher:
                 team_id = league_teams.get(self._normalize_name(best_match).lower())
             
             if team_id:
+                # Log only low-confidence matches (< 95)
                 if best_score < 95:
                     self.logger.info(
                         f"Fuzzy match in-league ({best_strategy}): '{raw_name}' -> "
                         f"'{best_match}' (score: {best_score:.1f})"
-                    )
-                else:
-                    self.logger.debug(
-                        f"Fuzzy match in-league: '{raw_name}' -> '{best_match}' ({best_score:.0f})"
                     )
                 return team_id
         
@@ -581,11 +572,7 @@ class TeamMatcher:
         
         # Step 1: Match exato no reverse_cache global
         if normalized_name in self.reverse_cache:
-            team_id = self.reverse_cache[normalized_name]
-            self.logger.debug(
-                f"[Cross-league] Exact global match: '{raw_name}' -> {team_id}"
-            )
-            return team_id
+            return self.reverse_cache[normalized_name]
         
         # Step 2: Fuzzy match em TODAS as ligas (exceto a atual)
         all_names = list(self.teams_cache.values())
