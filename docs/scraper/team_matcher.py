@@ -297,14 +297,7 @@ class TeamMatcher:
         normalized_bookmaker = bookmaker.strip().lower()
         is_primary = normalized_bookmaker == self.primary_bookmaker
         
-        # Diagnostic log for Bundesliga/Ligue 1
-        if is_primary and league_name in ('Bundesliga', 'Ligue 1'):
-            has_league_cache = league_id in self.teams_by_league if league_id else False
-            teams_in_cache = len(self.teams_by_league.get(league_id, {})) if league_id else 0
-            self.logger.info(
-                f"[DIAG] find_team_id: '{raw_name}' league={league_name} "
-                f"has_cache={has_league_cache} teams_in_cache={teams_in_cache}"
-            )
+        # [DIAG] logs removed - only log on failure (handled in orchestrator)
         
         # Step 1: Exact match in aliases (try both raw and normalized)
         for name_variant in [raw_name.strip().lower(), normalized_name]:
@@ -326,12 +319,7 @@ class TeamMatcher:
             # Fallback to global reverse cache ONLY when no league_id (rare case)
             return self.reverse_cache[normalized_name]
         
-        # Diagnostic log after fuzzy match for Bundesliga/Ligue 1
-        if is_primary and league_name in ('Bundesliga', 'Ligue 1'):
-            self.logger.info(
-                f"[DIAG] fuzzy result for '{raw_name}': team_id={team_id} "
-                f"will_auto_create={self.auto_create_team and not team_id}"
-            )
+        # [DIAG] log removed - failure logging handled in orchestrator
         
         if team_id and self.auto_create_alias:
             # Create alias for future exact matches
@@ -529,8 +517,8 @@ class TeamMatcher:
                 team_id = league_teams.get(self._normalize_name(best_match).lower())
             
             if team_id:
-                # Log only low-confidence matches (< 95)
-                if best_score < 95:
+                # Log only low-confidence matches (< 90)
+                if best_score < 90:
                     self.logger.info(
                         f"Fuzzy match in-league ({best_strategy}): '{raw_name}' -> "
                         f"'{best_match}' (score: {best_score:.1f})"
