@@ -410,13 +410,7 @@ class Orchestrator:
             # Match teams - use full method for primary bookmaker to auto-create
             normalized_bookmaker = odds.bookmaker_name.strip().lower()
             
-            # Diagnostic log for Bundesliga/Ligue 1
-            if odds.league_raw in ('Bundesliga', 'Ligue 1'):
-                self.logger.info(
-                    f"[DIAG] {odds.league_raw}: home='{odds.home_team_raw}' "
-                    f"away='{odds.away_team_raw}' league_id={league_id} "
-                    f"is_primary={normalized_bookmaker == self.team_matcher.primary_bookmaker}"
-                )
+            # [DIAG] logs moved to after team matching (only when failing)
             
             if normalized_bookmaker == self.team_matcher.primary_bookmaker:
                 home_team_id = await self.team_matcher.find_team_id(
@@ -448,13 +442,19 @@ class Orchestrator:
             
             if not home_team_id:
                 unmatched_teams.append((odds.home_team_raw, odds.bookmaker_name))
-                if is_basketball:
-                    self.logger.debug(f"NBA team not found: {odds.home_team_raw}")
+                # [DIAG] log only when failing
+                if odds.league_raw in ('Bundesliga', 'Ligue 1'):
+                    self.logger.warning(
+                        f"[DIAG] UNMATCHED home='{odds.home_team_raw}' in {odds.league_raw}"
+                    )
                 continue
             if not away_team_id:
                 unmatched_teams.append((odds.away_team_raw, odds.bookmaker_name))
-                if is_basketball:
-                    self.logger.debug(f"NBA team not found: {odds.away_team_raw}")
+                # [DIAG] log only when failing
+                if odds.league_raw in ('Bundesliga', 'Ligue 1'):
+                    self.logger.warning(
+                        f"[DIAG] UNMATCHED away='{odds.away_team_raw}' in {odds.league_raw}"
+                    )
                 continue
             
             item = {
