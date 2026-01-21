@@ -52,13 +52,19 @@ class Aposta1Scraper(BaseScraper):
 
         "ligue_1": Aposta1League(champ_id="2943", category_id="503", name="Ligue 1", country="franca"),
 
-	"paulistao": Aposta1League(champ_id="3436", category_id="593", name="Paulistao A1", country="brasil"),
+	    "paulistao": Aposta1League(champ_id="3436", category_id="593", name="Paulistao A1", country="brasil"),
 
-	"fa_cup": Aposta1League(champ_id="2935", category_id="497", name="FA Cup", country="inglaterra"),
+	    "fa_cup": Aposta1League(champ_id="2935", category_id="497", name="FA Cup", country="inglaterra"),
 
-	"efl_cup": Aposta1League(champ_id="2972", category_id="497", name="EFL Cup", country="inglaterra"),
+	    "efl_cup": Aposta1League(champ_id="2972", category_id="497", name="EFL Cup", country="inglaterra"),
 
-	"copa_do_rei": Aposta1League(champ_id="2973", category_id="501", name="Copa do Rei", country="espanha"),
+	    "copa_do_rei": Aposta1League(champ_id="2973", category_id="501", name="Copa do Rei", country="espanha"),
+
+        "champions_league": Aposta1League(champ_id="16808", category_id="1133", name="Champions League", country="europa"),
+
+        "liga_europa": Aposta1League(champ_id="16809", category_id="1133", name="Liga Europa", country="europa"),
+
+        "liga_da_conferencia": Aposta1League(champ_id="31608", category_id="1133", name="Liga da Conferência", country="europa"),
 
     }
 
