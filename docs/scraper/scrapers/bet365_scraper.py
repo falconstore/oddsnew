@@ -32,13 +32,11 @@ class Bet365Scraper(BaseScraper):
     LOGIN_URL = "https://app.radarodds.com.br/api/login"
     SNAPSHOT_URL = "https://app.radarodds.com.br/api/snapshot"
     
-    # Mapeamento RadarOdds -> Sistema interno
+    # Mapeamento RadarOdds -> Sistema interno (sincronizado com banco de dados)
     LEAGUE_MAPPING = {
         # Brasil
         "Brasil - Série A": "Brasileirão Série A",
-        "Brasil - Paulista": "Paulistão A1",
-        "Brasil - Carioca": "Carioca",
-        "Brasil - Mineiro": "Campeonato Mineiro",
+        "Brasil - Paulista": "Paulistao",
         
         # Europa - Top Leagues
         "Inglaterra - Premier League": "Premier League",
@@ -47,27 +45,20 @@ class Bet365Scraper(BaseScraper):
         "França - Ligue 1": "Ligue 1",
         "Itália - Série A": "Serie A",
         "Holanda - Eredivisie": "Eredivisie",
-        "Inglaterra - Championship": "Championship",
         
         # Copas Nacionais
         "Inglaterra - FA Cup": "FA Cup",
         "Inglaterra - EFL cup": "EFL Cup",
         "Espanha - Copa del Rey": "Copa do Rei",
-        "Alemanha - DFB Pokal": "DFB Pokal",
         
         # Competições Continentais
         "Europa - UEFA Champions League": "Champions League",
-        "Europa - UEFA Europa League": "Europa League",
-        "Internacional - Conference League": "Conference League",
-        "América do Sul - CONMEBOL Libertadores": "Libertadores",
-        "América do Sul - CONMEBOL Sudamericana": "Sul-Americana",
-        "CONMEBOL Libertadores": "Libertadores",
-        "CONMEBOL Sudamericana": "Sul-Americana",
+        "Europa - UEFA Europa League": "Liga Europa",
+        "Internacional - Conference League": "Liga da Conferencia",
         
-        # Outros
-        "EUA - Major League Soccer": "MLS",
-        "Internacional - Amistoso Internacional": "Amistosos",
-        "Internacional - Eliminatórias da Copa do Mundo": "Eliminatórias",
+        # Basketball
+        "EUA - NBA": "NBA",
+        "Estados Unidos - NBA": "NBA",
     }
     
     def __init__(self):
