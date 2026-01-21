@@ -1,7 +1,8 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { ArrowLeft, ExternalLink, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, ExternalLink, ChevronDown, ChevronUp, AlertTriangle, Copy } from 'lucide-react';
+import { toast } from 'sonner';
 import { useState, useMemo } from 'react';
 import { Layout } from '@/components/Layout';
 import { useOddsComparison, useBookmakers } from '@/hooks/useOddsData';
@@ -297,16 +298,6 @@ function OddsRow({
           >
             {oddsType}
           </Badge>
-          {bookmakerLink && (
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="h-6 w-6"
-              onClick={() => window.open(bookmakerLink, '_blank')}
-            >
-              <ExternalLink className="h-4 w-4 text-muted-foreground hover:text-primary" />
-            </Button>
-          )}
         </div>
       </TableCell>
       <TableCell className="text-center">
@@ -319,6 +310,39 @@ function OddsRow({
       )}
       <TableCell className="text-center">
         <OddCell value={odds.away_odd} isBest={odds.away_odd === bestAway} isWorst={odds.away_odd === worstAway} />
+      </TableCell>
+      <TableCell className="text-center">
+        <div className="flex items-center justify-center gap-1">
+          {bookmakerLink && (
+            <>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-7 w-7"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  window.open(bookmakerLink, '_blank');
+                }}
+                title="Abrir no site"
+              >
+                <ExternalLink className="h-4 w-4 text-muted-foreground hover:text-primary" />
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-7 w-7"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigator.clipboard.writeText(bookmakerLink);
+                  toast.success('Link copiado!');
+                }}
+                title="Copiar link"
+              >
+                <Copy className="h-4 w-4 text-muted-foreground hover:text-primary" />
+              </Button>
+            </>
+          )}
+        </div>
       </TableCell>
     </TableRow>
   );
@@ -464,34 +488,44 @@ const MatchDetails = () => {
     <Layout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="self-start shrink-0">
+        <div className="flex flex-col gap-4">
+          {/* Botão Voltar */}
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="self-start">
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-lg sm:text-2xl font-bold flex flex-wrap items-center gap-2">
-              {match.home_team_logo ? (
-                <img src={match.home_team_logo} alt={match.home_team} className="h-6 w-6 sm:h-8 sm:w-8 object-contain" />
-              ) : (
-                <span>{sportIcon}</span>
-              )}
+
+          {/* Header Centralizado */}
+          <div className="flex flex-col items-center text-center gap-3 w-full">
+            {/* Times com logos maiores - Ordem: Nome A [Logo A] x [Logo B] Nome B */}
+            <h1 className="text-xl sm:text-3xl font-bold flex flex-wrap items-center justify-center gap-3">
               <span className="break-words">{match.home_team}</span>
-              <span className="text-muted-foreground">vs</span>
-              <span className="break-words">{match.away_team}</span>
-              {match.away_team_logo && (
-                <img src={match.away_team_logo} alt={match.away_team} className="h-6 w-6 sm:h-8 sm:w-8 object-contain" />
+              {match.home_team_logo ? (
+                <img src={match.home_team_logo} alt={match.home_team} className="h-10 w-10 sm:h-12 sm:w-12 object-contain" />
+              ) : (
+                <span className="text-2xl">{sportIcon}</span>
               )}
+              <span className="text-muted-foreground font-normal">x</span>
+              {match.away_team_logo ? (
+                <img src={match.away_team_logo} alt={match.away_team} className="h-10 w-10 sm:h-12 sm:w-12 object-contain" />
+              ) : (
+                <span className="text-2xl">{sportIcon}</span>
+              )}
+              <span className="break-words">{match.away_team}</span>
             </h1>
-            <div className="flex flex-wrap items-center gap-2 text-muted-foreground text-sm mt-1">
+            
+            {/* Liga e Data centralizados */}
+            <div className="flex flex-wrap items-center justify-center gap-2 text-muted-foreground text-sm">
               <Badge variant="outline">{match.league_name}</Badge>
               <span>{format(matchDate, "dd/MM/yyyy HH:mm", { locale: ptBR })}</span>
             </div>
+            
+            {/* Badge Surebet */}
+            {hasArbitrage && (
+              <Badge className="bg-green-500 text-white text-sm px-3 py-1">
+                🎯 SUREBET +{roiPercentage}%
+              </Badge>
+            )}
           </div>
-          {hasArbitrage && (
-            <Badge className="bg-green-500 text-white text-xs sm:text-sm px-2 sm:px-3 py-1 self-start sm:self-auto shrink-0">
-              🎯 SUREBET +{roiPercentage}%
-            </Badge>
-          )}
         </div>
         
         {/* Best Odds Summary */}
@@ -632,16 +666,17 @@ const MatchDetails = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[140px] sm:w-[200px]">Casa</TableHead>
+                  <TableHead className="w-[140px] sm:w-[180px]">Casa</TableHead>
                   <TableHead className="text-center">{isBasketball ? 'Time 1' : 'Casa (1)'}</TableHead>
                   {!isBasketball && <TableHead className="text-center">Empate (X)</TableHead>}
                   <TableHead className="text-center">{isBasketball ? 'Time 2' : 'Fora (2)'}</TableHead>
+                  <TableHead className="text-center w-[80px]">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {(() => {
                   const { sorted, betbraEnd, paEnd } = sortBookmakerOdds(match.odds);
-                  const colSpan = isBasketball ? 3 : 4;
+                  const colSpan = isBasketball ? 4 : 5;
                   const hasPAOdds = paEnd > betbraEnd;
                   const hasSOOdds = sorted.length > paEnd + 1;
                   
