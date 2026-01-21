@@ -218,7 +218,12 @@ class Bet365Scraper(BaseScraper):
                 
                 from config import settings
                 if await self._login(settings):
+                    # Reaplicar header E cookies após relogin
                     self.client.headers["x-filter-token"] = self.filter_token
+                    if self.session_cookie:
+                        self.client.cookies.set("ra_sess", self.session_cookie)
+                        self.client.cookies.set("ra_filter_token", self.filter_token)
+                    
                     response = await self.client.get(
                         self.SNAPSHOT_URL,
                         params={"window_days": 3}
@@ -229,7 +234,18 @@ class Bet365Scraper(BaseScraper):
             response.raise_for_status()
             data = response.json()
             
-            results = self._parse_response(data)
+            # Debug: mostrar estrutura da resposta
+            if isinstance(data, dict):
+                self.logger.debug(f"Resposta é dict com keys: {list(data.keys())}")
+                items = data.get("items", data.get("data", []))
+            elif isinstance(data, list):
+                self.logger.debug(f"Resposta é lista com {len(data)} elementos")
+                items = data
+            else:
+                self.logger.error(f"Resposta inesperada: {type(data)}")
+                return []
+            
+            results = self._parse_response(items)
             self.logger.info(f"Bet365: {len(results)} partidas coletadas via RadarOdds")
             return results
             
@@ -262,6 +278,11 @@ class Bet365Scraper(BaseScraper):
         
         for item in data:
             try:
+                # Pular se não for dict
+                if not isinstance(item, dict):
+                    self.logger.debug(f"Item não é dict: {type(item)} - {str(item)[:100]}")
+                    continue
+                
                 # Apenas itens do tipo odds.best
                 if item.get("type") != "odds.best":
                     continue
