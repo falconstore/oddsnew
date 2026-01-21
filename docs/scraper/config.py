@@ -41,6 +41,11 @@ class Settings(BaseSettings):
     br4bet_authorization: Optional[str] = None
     estrelabet_authorization: Optional[str] = None
     
+    # RadarOdds API (para Bet365)
+    radarodds_email: Optional[str] = None
+    radarodds_password: Optional[str] = None
+    radarodds_filter_token: Optional[str] = None  # Cache do token (opcional)
+    
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
