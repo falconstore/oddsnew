@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { ArrowLeft, ExternalLink, ChevronDown, ChevronUp, AlertTriangle, Copy } from 'lucide-react';
+import { ArrowLeft, ExternalLink, ChevronDown, ChevronUp, AlertTriangle, Copy, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { useState, useMemo } from 'react';
 import { Layout } from '@/components/Layout';
@@ -272,6 +272,7 @@ function OddsRow({
   awayTeam: string;
   isBasketball?: boolean;
 }) {
+  const [copied, setCopied] = useState(false);
   const bookmakerLink = generateBookmakerLink(odds.bookmaker_name, odds.extra_data, homeTeam, awayTeam);
 
   const getOddsType = (bookmakerName: string): 'SO' | 'PA' => {
@@ -330,15 +331,24 @@ function OddsRow({
               <Button 
                 variant="ghost" 
                 size="icon" 
-                className="h-7 w-7"
+                className={cn(
+                  "h-7 w-7 transition-colors duration-300",
+                  copied && "bg-success/20"
+                )}
                 onClick={(e) => {
                   e.stopPropagation();
                   navigator.clipboard.writeText(bookmakerLink);
                   toast.success('Link copiado!');
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 1500);
                 }}
                 title="Copiar link"
               >
-                <Copy className="h-4 w-4 text-muted-foreground hover:text-primary" />
+                {copied ? (
+                  <Check className="h-4 w-4 text-success" />
+                ) : (
+                  <Copy className="h-4 w-4 text-muted-foreground hover:text-primary" />
+                )}
               </Button>
             </>
           )}

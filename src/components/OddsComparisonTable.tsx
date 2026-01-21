@@ -267,17 +267,19 @@ function CompactTableView({ matches }: { matches: MatchOddsGroup[] }) {
                 >
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-2">
+                      <span>{match.home_team}</span>
                       {match.home_team_logo ? (
                         <img src={match.home_team_logo} alt={match.home_team} className="h-5 w-5 object-contain" />
                       ) : (
-                        <span className="mr-1">{sportIcon}</span>
+                        <span>{sportIcon}</span>
                       )}
-                      <span>{match.home_team}</span>
-                      <span className="text-muted-foreground">vs</span>
-                      <span>{match.away_team}</span>
-                      {match.away_team_logo && (
+                      <span className="text-muted-foreground">x</span>
+                      {match.away_team_logo ? (
                         <img src={match.away_team_logo} alt={match.away_team} className="h-5 w-5 object-contain" />
+                      ) : (
+                        <span>{sportIcon}</span>
                       )}
+                      <span>{match.away_team}</span>
                     </div>
                     {hasArbitrage && (
                       <Badge className="ml-2 bg-green-500 text-white text-xs">SUREBET</Badge>
@@ -346,20 +348,22 @@ function MatchCard({ match }: { match: MatchOddsGroup }) {
     >
       <CardContent className="p-4">
         <div className="space-y-3">
-          {/* Title: Icon + Teams with Logos */}
+          {/* Title: Teams with Logos - Nome [Logo] x [Logo] Nome */}
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
+              <span className="font-semibold text-lg">{match.home_team}</span>
               {match.home_team_logo ? (
                 <img src={match.home_team_logo} alt={match.home_team} className="h-6 w-6 object-contain" />
               ) : (
                 <span>{sportIcon}</span>
               )}
-              <span className="font-semibold text-lg">{match.home_team}</span>
-              <span className="text-muted-foreground">vs</span>
-              <span className="font-semibold text-lg">{match.away_team}</span>
-              {match.away_team_logo && (
+              <span className="text-muted-foreground">x</span>
+              {match.away_team_logo ? (
                 <img src={match.away_team_logo} alt={match.away_team} className="h-6 w-6 object-contain" />
+              ) : (
+                <span>{sportIcon}</span>
               )}
+              <span className="font-semibold text-lg">{match.away_team}</span>
             </div>
             {hasArbitrage && (
               <Badge className="bg-green-500 text-white text-sm px-3 py-1 shrink-0">
