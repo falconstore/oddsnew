@@ -150,15 +150,22 @@ class TradeballScraper(BaseScraper):
                 "marketId": 2
             }
         
+        # Encode filter with compact separators
         filter_json = json.dumps(filter_obj, separators=(',', ':'))
         filter_encoded = urllib.parse.quote(filter_json, safe='')
+        
+        # Encode sort the same way (this was the bug - : and , weren't encoded)
+        sort_obj = [{"property": "created_at", "direction": "desc"}]
+        sort_json = json.dumps(sort_obj, separators=(',', ':'))
+        sort_encoded = urllib.parse.quote(sort_json, safe='')
+        
         app_id = str(uuid.uuid4())
         
         return (
             f"{self.API_BASE}?page=1"
             f"&filter={filter_encoded}"
             f"&start=0&limit=50"
-            f"&sort=%5B%7B%22property%22:%22created_at%22,%22direction%22:%22desc%22%7D%5D"
+            f"&sort={sort_encoded}"
             f"&requiredDictionaries%5B%5D=LeagueGroup"
             f"&requiredDictionaries%5B%5D=TimeZone"
             f"&init=true"
