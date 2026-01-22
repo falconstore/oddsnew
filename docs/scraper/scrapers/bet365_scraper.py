@@ -35,32 +35,35 @@ class Bet365Scraper(BaseScraper):
     # Mapeamento slug da API -> nome do sistema
     LEAGUE_MAPPING = {
         # Brasil
-        "brazil-serie-a": "Brasileirão Série A",
-        "brazil-paulista": "Paulistao",
+        "brazil-brasileiro-serie-a": "Brasileirão Série A",
+        "brazil-paulista-serie-a1": "Paulistao",
         "brazil-mineiro": "Campeonato Mineiro",
         
-        # Europa - Top Leagues
-        "premier-league": "Premier League",
-        "la-liga": "La Liga",
-        "bundesliga": "Bundesliga",
-        "ligue-1": "Ligue 1",
-        "serie-a": "Serie A",
-        "eredivisie": "Eredivisie",
+        # Inglaterra
+        "england-premier-league": "Premier League",
+        "england-fa-cup": "FA Cup",
+        "england-efl-cup": "EFL Cup",
         
-        # Copas Nacionais
-        "fa-cup": "FA Cup",
-        "efl-cup": "EFL Cup",
-        "copa-del-rey": "Copa do Rei",
+        # Espanha
+        "spain-laliga": "La Liga",
+        "spain-copa-del-rey": "Copa do Rei",
         
-        # Competições Continentais
-        "champions-league": "Champions League",
-        "europa-league": "Liga Europa",
-        "conference-league": "Liga da Conferencia",
-    }
-    
-    # Mapeamento para NBA
-    NBA_LEAGUE_MAPPING = {
-        "nba": "NBA",
+        # Alemanha
+        "germany-bundesliga": "Bundesliga",
+        
+        # França
+        "france-ligue-1": "Ligue 1",
+        
+        # Itália
+        "italy-serie-a": "Serie A",
+        
+        # Holanda
+        "netherlands-eredivisie": "Eredivisie",
+        
+        # Competições Europeias
+        "international-clubs-uefa-champions-league": "Champions League",
+        "international-clubs-uefa-europa-league": "Liga Europa",
+        "international-clubs-uefa-conference-league": "Liga da Conferencia",
     }
     
     def __init__(self):
@@ -121,10 +124,10 @@ class Bet365Scraper(BaseScraper):
             results.extend(football_results)
             self.logger.info(f"Football: {len(football_results)} partidas coletadas")
             
-            # Buscar Basketball/NBA (slug em minúsculo conforme API)
-            basketball_results = await self._scrape_sport("basketball", self.NBA_LEAGUE_MAPPING, "basketball")
-            results.extend(basketball_results)
-            self.logger.info(f"Basketball: {len(basketball_results)} partidas coletadas")
+            # NBA desativado por enquanto
+            # basketball_results = await self._scrape_sport("basketball", self.NBA_LEAGUE_MAPPING, "basketball")
+            # results.extend(basketball_results)
+            # self.logger.info(f"Basketball: {len(basketball_results)} partidas coletadas")
             
         except Exception as e:
             self.logger.error(f"Erro no scrape_all: {e}")
