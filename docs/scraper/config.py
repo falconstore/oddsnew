@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     br4bet_authorization: Optional[str] = None
     estrelabet_authorization: Optional[str] = None
     
+    # Tradeball (Betbra Dball Exchange)
+    tradeball_auth_token: Optional[str] = None
+    tradeball_cookies: Optional[str] = None
+    
     # odds-api.io (para Bet365)
     odds_api_key: Optional[str] = None
     
