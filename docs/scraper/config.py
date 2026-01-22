@@ -44,6 +44,8 @@ class Settings(BaseSettings):
     # Tradeball (Betbra Dball Exchange)
     tradeball_auth_token: Optional[str] = None
     tradeball_cookies: Optional[str] = None
+    tradeball_username: Optional[str] = None
+    tradeball_password: Optional[str] = None
     
     # odds-api.io (para Bet365)
     odds_api_key: Optional[str] = None

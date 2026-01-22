@@ -1,25 +1,23 @@
 """
 Tradeball Scraper - Scrapes odds from Tradeball (Betbra Dball Exchange).
-Uses auth token from env var (TRADEBALL_AUTH_TOKEN) for direct API calls.
-Fallback to Playwright browser-based session if no token provided.
 
 API: https://tradeball.betbra.bet.br/api/feedDball/list
 Fetches today + next 3 days of matches.
 
-## How to get the token:
-1. Open https://tradeball.betbra.bet.br in Chrome and login
-2. Open DevTools (F12) → Network tab
-3. Filter by "feedDball" or "list"
-4. Click any request with status 200
-5. Copy:
-   - Header `Authorization`: the value after "Bearer "
-   - Header `Cookie`: the full value
-6. Set env vars:
-   export TRADEBALL_AUTH_TOKEN="27459028|lAf4ZXPMWTye..."
-   export TRADEBALL_COOKIES="BIAB_TZ=180; _fbp=fb.2...; BIAB_CUSTOMER=eyJ..."
-7. Restart the scraper
+## Authentication Modes (in priority order):
 
-Note: The token expires after a few hours. Monitor logs for 401 errors.
+### 1. Manual Token (TRADEBALL_AUTH_TOKEN) - Fastest, no browser
+   export TRADEBALL_AUTH_TOKEN="27459028|lAf4ZXPMWTye..."
+   export TRADEBALL_COOKIES="BIAB_TZ=180; BIAB_CUSTOMER=eyJ..."
+
+### 2. Auto-Login (TRADEBALL_USERNAME + PASSWORD) - Recommended
+   export TRADEBALL_USERNAME="seu_email@example.com"
+   export TRADEBALL_PASSWORD="sua_senha"
+   Uses Playwright to login automatically and capture the session token.
+
+### 3. Anonymous Browser - Fallback (will fail without login)
+
+Note: VPS must have Brazilian IP or use a Brazilian proxy (site is geo-blocked).
 """
 
 import json
@@ -71,6 +69,7 @@ class TradeballScraper(BaseScraper):
         self._auth_token: Optional[str] = None
         self._cookies: Optional[str] = None
         self._use_token_mode = False
+        self._last_fetch_status = 0  # Track last HTTP status for retry logic
         
         # Browser vars (only used if no token)
         self._playwright = None
@@ -81,10 +80,10 @@ class TradeballScraper(BaseScraper):
         self.logger = logger.bind(component="tradeball")
     
     async def setup(self):
-        """Initialize scraper - check for token first, fallback to browser."""
+        """Initialize scraper with authentication (token > auto-login > anonymous)."""
         self.logger.debug("Initializing Tradeball scraper...")
         
-        # Check for manual token override via env var (PRIORITY)
+        # Priority 1: Manual token from env var (fastest, no browser needed)
         manual_token = os.environ.get("TRADEBALL_AUTH_TOKEN")
         manual_cookies = os.environ.get("TRADEBALL_COOKIES")
         
@@ -95,8 +94,25 @@ class TradeballScraper(BaseScraper):
             self._use_token_mode = True
             return  # Skip browser setup - use direct API calls
         
-        # Fallback: try browser-based session (may not work without login)
-        self.logger.warning("No TRADEBALL_AUTH_TOKEN found, attempting browser mode (may fail)")
+        # Priority 2: Auto-login with credentials
+        username = os.environ.get("TRADEBALL_USERNAME")
+        password = os.environ.get("TRADEBALL_PASSWORD")
+        
+        if username and password:
+            self.logger.info("Credentials found, attempting auto-login...")
+            await self._setup_browser()
+            
+            login_success = await self._perform_login(username, password)
+            if login_success:
+                self.logger.info("Auto-login successful, session active")
+                self._use_token_mode = False  # Use browser fetch with session
+                return
+            else:
+                self.logger.error("Auto-login failed, scraper may not work")
+                return
+        
+        # Priority 3: Anonymous browser session (will likely fail)
+        self.logger.warning("No auth configured (set TRADEBALL_USERNAME/PASSWORD or TRADEBALL_AUTH_TOKEN)")
         await self._setup_browser()
     
     async def _setup_browser(self):
@@ -142,6 +158,181 @@ class TradeballScraper(BaseScraper):
         if self._playwright:
             await self._playwright.stop()
         self.logger.info("Session closed")
+    
+    async def _perform_login(self, username: str, password: str) -> bool:
+        """
+        Perform login via Playwright browser.
+        Returns True if successful, False otherwise.
+        """
+        try:
+            self.logger.info("Navigating to login page...")
+            
+            # Navigate to main site first to initialize cookies
+            await self._page.goto(
+                "https://tradeball.betbra.bet.br",
+                wait_until="networkidle",
+                timeout=30000
+            )
+            await self._page.wait_for_timeout(2000)
+            
+            # Click login button to open modal (if exists)
+            try:
+                login_btn = await self._page.wait_for_selector(
+                    'button:has-text("Entrar"), a:has-text("Entrar"), [data-test="login"]',
+                    timeout=5000
+                )
+                if login_btn:
+                    await login_btn.click()
+                    await self._page.wait_for_timeout(1500)
+            except Exception:
+                # Try navigating directly to login page
+                await self._page.goto(
+                    "https://tradeball.betbra.bet.br/login",
+                    wait_until="networkidle",
+                    timeout=30000
+                )
+                await self._page.wait_for_timeout(2000)
+            
+            self.logger.info("Filling login form...")
+            
+            # Try multiple possible selectors for email/username field
+            email_selectors = [
+                'input[name="email"]',
+                'input[name="username"]',
+                'input[type="email"]',
+                'input[placeholder*="email" i]',
+                'input[placeholder*="usuário" i]',
+                '#email',
+                '#username'
+            ]
+            
+            email_filled = False
+            for selector in email_selectors:
+                try:
+                    email_input = await self._page.wait_for_selector(selector, timeout=2000)
+                    if email_input:
+                        await email_input.fill(username)
+                        email_filled = True
+                        self.logger.debug(f"Email filled using selector: {selector}")
+                        break
+                except Exception:
+                    continue
+            
+            if not email_filled:
+                self.logger.error("Could not find email/username input field")
+                return False
+            
+            # Try multiple possible selectors for password field
+            password_selectors = [
+                'input[name="password"]',
+                'input[type="password"]',
+                'input[placeholder*="senha" i]',
+                '#password'
+            ]
+            
+            password_filled = False
+            for selector in password_selectors:
+                try:
+                    password_input = await self._page.wait_for_selector(selector, timeout=2000)
+                    if password_input:
+                        await password_input.fill(password)
+                        password_filled = True
+                        self.logger.debug(f"Password filled using selector: {selector}")
+                        break
+                except Exception:
+                    continue
+            
+            if not password_filled:
+                self.logger.error("Could not find password input field")
+                return False
+            
+            # Click submit button
+            submit_selectors = [
+                'button[type="submit"]',
+                'button:has-text("Entrar")',
+                'button:has-text("Login")',
+                'input[type="submit"]'
+            ]
+            
+            submit_clicked = False
+            for selector in submit_selectors:
+                try:
+                    submit_btn = await self._page.wait_for_selector(selector, timeout=2000)
+                    if submit_btn:
+                        await submit_btn.click()
+                        submit_clicked = True
+                        self.logger.debug(f"Submit clicked using selector: {selector}")
+                        break
+                except Exception:
+                    continue
+            
+            if not submit_clicked:
+                self.logger.error("Could not find submit button")
+                return False
+            
+            # Wait for navigation/response
+            self.logger.info("Waiting for login response...")
+            await self._page.wait_for_load_state("networkidle", timeout=15000)
+            await self._page.wait_for_timeout(3000)
+            
+            # Verify login success by checking URL or page content
+            current_url = self._page.url
+            self.logger.debug(f"Post-login URL: {current_url}")
+            
+            # Check for login error messages
+            try:
+                error_element = await self._page.query_selector(
+                    '.error, .alert-danger, [class*="error"], [class*="invalid"]'
+                )
+                if error_element:
+                    error_text = await error_element.text_content()
+                    if error_text and len(error_text.strip()) > 0:
+                        self.logger.error(f"Login error: {error_text.strip()}")
+                        return False
+            except Exception:
+                pass
+            
+            # If we're no longer on login page, assume success
+            if "login" not in current_url.lower():
+                self.logger.info("Login appears successful, navigating to trading feed...")
+                
+                # Navigate to trading feed to fully initialize session
+                await self._page.goto(
+                    "https://tradeball.betbra.bet.br/dballTradingFeed",
+                    wait_until="networkidle",
+                    timeout=30000
+                )
+                await self._page.wait_for_timeout(2000)
+                return True
+            else:
+                self.logger.warning("Still on login page after submit, checking page state...")
+                # Take screenshot for debugging (if headless=False would show it)
+                page_content = await self._page.content()
+                if "dashboard" in page_content.lower() or "tradingfeed" in page_content.lower():
+                    return True
+                return False
+            
+        except Exception as e:
+            self.logger.error(f"Login error: {e}")
+            return False
+    
+    async def _retry_with_relogin(self, url: str, date_str: Optional[str]) -> List[ScrapedOdds]:
+        """Attempt to re-login and retry fetch after 401 error."""
+        username = os.environ.get("TRADEBALL_USERNAME")
+        password = os.environ.get("TRADEBALL_PASSWORD")
+        
+        if not username or not password:
+            self.logger.error("Cannot re-login: no credentials configured")
+            return []
+        
+        self.logger.info("Attempting re-login after 401...")
+        if await self._perform_login(username, password):
+            self.logger.info("Re-login successful, retrying fetch...")
+            # Retry the fetch (without recursion to avoid infinite loop)
+            return await self._fetch_with_browser_no_retry(url, date_str)
+        else:
+            self.logger.error("Re-login failed")
+            return []
     
     async def get_available_leagues(self) -> List[LeagueConfig]:
         """Return all configured leagues."""
@@ -296,7 +487,19 @@ class TradeballScraper(BaseScraper):
                 return []
     
     async def _fetch_with_browser(self, url: str, date_str: Optional[str]) -> List[ScrapedOdds]:
-        """Fetch using browser context (slower, requires session)."""
+        """Fetch using browser context (slower, requires session). Retries on 401."""
+        result = await self._fetch_with_browser_no_retry(url, date_str)
+        
+        # If empty and we got a 401, try re-login
+        if not result and self._last_fetch_status == 401:
+            return await self._retry_with_relogin(url, date_str)
+        
+        return result
+    
+    async def _fetch_with_browser_no_retry(self, url: str, date_str: Optional[str]) -> List[ScrapedOdds]:
+        """Fetch using browser context without retry logic."""
+        self._last_fetch_status = 0
+        
         try:
             fetch_result = await self._page.evaluate("""
                 async (url) => {
@@ -321,15 +524,17 @@ class TradeballScraper(BaseScraper):
                 return []
             
             status = fetch_result.get("status", 0)
+            self._last_fetch_status = status
             fetch_text = fetch_result.get("text", "").strip()
             
             self.logger.debug(f"Browser fetch: status={status}, size={len(fetch_text)} bytes")
             
             if status == 401:
-                self.logger.error(
-                    "Unauthenticated (401). Browser session not valid. "
-                    "Set TRADEBALL_AUTH_TOKEN env var instead."
-                )
+                self.logger.warning("Got 401 Unauthenticated - session expired or invalid")
+                return []
+            
+            if status == 403:
+                self.logger.error("Got 403 Forbidden - possible geo-block (VPS needs Brazilian IP)")
                 return []
             
             if fetch_text.startswith('[') or fetch_text.startswith('{'):
