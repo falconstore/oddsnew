@@ -8,6 +8,7 @@ Fetches today + next 3 days of matches.
 
 import json
 import re
+import uuid
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 from playwright.async_api import async_playwright, Browser, BrowserContext, Page
@@ -156,16 +157,24 @@ class TradeballScraper(BaseScraper):
                 }
             
             import urllib.parse
-            filter_encoded = urllib.parse.quote(json.dumps(filter_obj))
+            # JSON compacto sem espaços (como a URL original)
+            filter_json = json.dumps(filter_obj, separators=(',', ':'))
+            filter_encoded = urllib.parse.quote(filter_json, safe='')
+            
+            # UUID único como o site usa
+            app_id = str(uuid.uuid4())
             
             url = (
                 f"{self.API_BASE}?page=1"
                 f"&filter={filter_encoded}"
-                f"&start=0&limit=100"
+                f"&start=0&limit=50"
                 f"&sort=%5B%7B%22property%22:%22created_at%22,%22direction%22:%22desc%22%7D%5D"
                 f"&requiredDictionaries%5B%5D=LeagueGroup"
                 f"&requiredDictionaries%5B%5D=TimeZone"
-                f"&version=0&locale=pt"
+                f"&init=true"
+                f"&version=0"
+                f"&uniqAppId={app_id}"
+                f"&locale=pt"
             )
             
             # Use page.goto() like betbra_scraper - browser handles authentication
