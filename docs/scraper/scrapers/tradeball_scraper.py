@@ -168,30 +168,52 @@ class TradeballScraper(BaseScraper):
                 f"&version=0&locale=pt"
             )
             
-            response = await self._page.goto(url, wait_until="domcontentloaded", timeout=30000)
+            # Use response interception to get raw JSON before HTML rendering
+            json_data = None
             
-            if not response or response.status != 200:
-                self.logger.error(f"API error for {date_str or 'today'}: status={response.status if response else 'None'}")
-                return []
+            async def handle_response(response):
+                nonlocal json_data
+                if "feedDball/list" in response.url:
+                    try:
+                        json_data = await response.json()
+                    except Exception:
+                        pass
             
-            # Extract JSON from response
+            self._page.on("response", handle_response)
+            
+            try:
+                await self._page.goto(url, wait_until="networkidle", timeout=30000)
+                await self._page.wait_for_timeout(1000)
+            finally:
+                self._page.remove_listener("response", handle_response)
+            
+            if json_data is not None:
+                return self._parse_response(json_data)
+            
+            # Fallback: extract from body text
             body_text = await self._page.content()
             
-            # Parse JSON from page content (may be wrapped in HTML)
-            json_match = re.search(r'<pre[^>]*>(.*?)</pre>', body_text, re.DOTALL)
-            if json_match:
-                json_text = json_match.group(1)
-            else:
-                # Try to find raw JSON
-                json_match = re.search(r'(\[.*\]|\{.*\})', body_text, re.DOTALL)
-                if json_match:
-                    json_text = json_match.group(1)
-                else:
-                    self.logger.warning(f"No JSON found in response for {date_str or 'today'}")
-                    return []
+            # Try to extract from <pre> first (Chrome renders JSON in <pre>)
+            pre_match = re.search(r'<pre[^>]*>(.*?)</pre>', body_text, re.DOTALL)
+            if pre_match:
+                json_text = pre_match.group(1).strip()
+                # Clean HTML entities
+                json_text = json_text.replace('&quot;', '"').replace('&amp;', '&')
+                data = json.loads(json_text)
+                return self._parse_response(data)
             
-            data = json.loads(json_text)
-            return self._parse_response(data)
+            # Try to extract from body directly
+            body_match = re.search(r'<body[^>]*>(.*?)</body>', body_text, re.DOTALL | re.IGNORECASE)
+            if body_match:
+                body_content = body_match.group(1).strip()
+                # Remove all HTML tags
+                body_clean = re.sub(r'<[^>]+>', '', body_content).strip()
+                if body_clean.startswith('[') or body_clean.startswith('{'):
+                    data = json.loads(body_clean)
+                    return self._parse_response(data)
+            
+            self.logger.warning(f"No JSON found for {date_str or 'today'}")
+            return []
             
         except Exception as e:
             self.logger.error(f"Fetch failed for {date_str or 'today'}: {e}")
