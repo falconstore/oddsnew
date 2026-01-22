@@ -3,6 +3,7 @@ Scraper para Bet365 via odds-api.io.
 API simples, sem necessidade de login complexo.
 """
 
+import asyncio
 import time
 import httpx
 from datetime import datetime
@@ -28,7 +29,8 @@ class Bet365Scraper(BaseScraper):
     Rate Limit: 100 requisições por ~10 minutos
     """
     
-    BASE_URL = "https://api.odds-api.io/v3/odds/updated"
+    BASE_URL_EVENTS = "https://api.odds-api.io/v3/events"
+    BASE_URL_ODDS_MULTI = "https://api.odds-api.io/v3/odds/multi"
     
     # Mapeamento slug da API -> nome do sistema
     LEAGUE_MAPPING = {
@@ -115,16 +117,14 @@ class Bet365Scraper(BaseScraper):
         
         try:
             # Buscar Football
-            football_data = await self._fetch_sport("Football")
-            football_odds = self._parse_football(football_data)
-            results.extend(football_odds)
-            self.logger.info(f"Football: {len(football_odds)} partidas coletadas")
+            football_results = await self._scrape_sport("Football", self.LEAGUE_MAPPING, "football")
+            results.extend(football_results)
+            self.logger.info(f"Football: {len(football_results)} partidas coletadas")
             
             # Buscar Basketball (NBA)
-            basketball_data = await self._fetch_sport("Basketball")
-            basketball_odds = self._parse_basketball(basketball_data)
-            results.extend(basketball_odds)
-            self.logger.info(f"Basketball: {len(basketball_odds)} partidas coletadas")
+            basketball_results = await self._scrape_sport("Basketball", self.NBA_LEAGUE_MAPPING, "basketball")
+            results.extend(basketball_results)
+            self.logger.info(f"Basketball: {len(basketball_results)} partidas coletadas")
             
         except Exception as e:
             self.logger.error(f"Erro no scrape_all: {e}")
@@ -132,27 +132,97 @@ class Bet365Scraper(BaseScraper):
         self.logger.info(f"Bet365 Total: {len(results)} partidas via odds-api.io")
         return results
     
-    async def _fetch_sport(self, sport: str) -> List[Dict]:
-        """Busca odds para um esporte específico."""
-        try:
-            # Timestamp atual (requisito da API - max 1 min)
-            since = int(time.time())
+    async def _scrape_sport(self, sport: str, league_mapping: Dict[str, str], sport_type: str) -> List[ScrapedOdds]:
+        """Busca eventos e odds para um esporte específico."""
+        results = []
+        
+        # Passo 1: Buscar lista de eventos
+        events = await self._fetch_events(sport)
+        self.logger.debug(f"{sport}: {len(events)} eventos totais encontrados")
+        
+        if not events:
+            return results
+        
+        # Passo 2: Filtrar apenas eventos de ligas mapeadas
+        filtered_events = []
+        for event in events:
+            if not isinstance(event, dict):
+                continue
+            league = event.get("league", {})
+            league_slug = league.get("slug", "")
+            if league_slug in league_mapping:
+                filtered_events.append(event)
+        
+        self.logger.debug(f"{sport}: {len(filtered_events)} eventos após filtro de ligas")
+        
+        if not filtered_events:
+            return results
+        
+        # Passo 3: Extrair IDs dos eventos
+        event_ids = [e.get("id") for e in filtered_events if e.get("id")]
+        
+        # Passo 4: Buscar odds em lotes de 10
+        for i in range(0, len(event_ids), 10):
+            batch = event_ids[i:i+10]
+            odds_data = await self._fetch_odds_batch(batch)
             
+            # Delay para rate limit
+            await asyncio.sleep(0.5)
+            
+            # Parsear resposta
+            parsed = self._parse_odds_response(odds_data, league_mapping, sport_type)
+            results.extend(parsed)
+        
+        return results
+    
+    async def _fetch_events(self, sport: str) -> List[Dict]:
+        """Busca lista de eventos de um esporte."""
+        try:
             params = {
                 "apiKey": self.api_key,
                 "sport": sport,
-                "bookmaker": "Bet365",
-                "since": since,
             }
             
-            self.logger.debug(f"Buscando {sport} com since={since}")
-            response = await self.client.get(self.BASE_URL, params=params)
+            self.logger.debug(f"Buscando eventos de {sport}")
+            response = await self.client.get(self.BASE_URL_EVENTS, params=params)
             
             # Log rate limit
             remaining = response.headers.get("x-ratelimit-remaining", "?")
-            reset = response.headers.get("x-ratelimit-reset", "?")
-            self.logger.debug(f"Rate limit: {remaining} restantes, reset: {reset}")
+            self.logger.debug(f"Rate limit: {remaining} restantes")
             
+            response.raise_for_status()
+            data = response.json()
+            
+            if isinstance(data, list):
+                return data
+            elif isinstance(data, dict) and "data" in data:
+                return data.get("data", [])
+            elif isinstance(data, dict) and "items" in data:
+                return data.get("items", [])
+            
+            return []
+            
+        except httpx.HTTPStatusError as e:
+            self.logger.error(f"HTTP Error buscando eventos {sport}: {e.response.status_code}")
+            return []
+        except Exception as e:
+            self.logger.error(f"Erro buscando eventos {sport}: {e}")
+            return []
+    
+    async def _fetch_odds_batch(self, event_ids: List[int]) -> List[Dict]:
+        """Busca odds para múltiplos eventos (max 10)."""
+        try:
+            params = {
+                "apiKey": self.api_key,
+                "eventIds": ",".join(str(id) for id in event_ids[:10]),
+                "bookmakers": "Bet365",
+            }
+            
+            self.logger.debug(f"Buscando odds para {len(event_ids)} eventos")
+            response = await self.client.get(self.BASE_URL_ODDS_MULTI, params=params)
+            
+            # Log rate limit
+            remaining = response.headers.get("x-ratelimit-remaining", "?")
             if remaining != "?" and int(remaining) < 20:
                 self.logger.warning(f"Rate limit baixo: {remaining} requisições restantes!")
             
@@ -169,16 +239,15 @@ class Bet365Scraper(BaseScraper):
             return []
             
         except httpx.HTTPStatusError as e:
-            self.logger.error(f"HTTP Error buscando {sport}: {e.response.status_code}")
+            self.logger.error(f"HTTP Error buscando odds: {e.response.status_code}")
             return []
         except Exception as e:
-            self.logger.error(f"Erro buscando {sport}: {e}")
+            self.logger.error(f"Erro buscando odds: {e}")
             return []
     
-    def _parse_football(self, events: List[Dict]) -> List[ScrapedOdds]:
-        """Parseia eventos de futebol."""
+    def _parse_odds_response(self, events: List[Dict], league_mapping: Dict[str, str], sport_type: str) -> List[ScrapedOdds]:
+        """Parseia resposta de odds."""
         results = []
-        skipped_leagues = set()
         
         for event in events:
             try:
@@ -187,10 +256,9 @@ class Bet365Scraper(BaseScraper):
                 
                 league = event.get("league", {})
                 league_slug = league.get("slug", "")
-                league_name = self.LEAGUE_MAPPING.get(league_slug)
+                league_name = league_mapping.get(league_slug)
                 
                 if not league_name:
-                    skipped_leagues.add(league_slug)
                     continue
                 
                 home = event.get("home", "")
@@ -203,9 +271,14 @@ class Bet365Scraper(BaseScraper):
                 bookmakers = event.get("bookmakers", {})
                 bet365_markets = bookmakers.get("Bet365", [])
                 
+                if not bet365_markets:
+                    continue
+                
                 # Encontrar mercado 1X2 ou ML
+                market_names = ["1X2", "ML"] if sport_type == "football" else ["ML"]
+                
                 for market in bet365_markets:
-                    if market.get("name") in ["1X2", "ML"]:
+                    if market.get("name") in market_names:
                         odds_list = market.get("odds", [])
                         if not odds_list:
                             continue
@@ -213,13 +286,16 @@ class Bet365Scraper(BaseScraper):
                         odds = odds_list[0]
                         
                         home_odd = self._safe_float(odds.get("home"))
-                        draw_odd = self._safe_float(odds.get("draw"))
                         away_odd = self._safe_float(odds.get("away"))
                         
                         if not home_odd or not away_odd:
                             continue
                         
-                        # URL direta da Bet365 (já vem pronta!)
+                        draw_odd = None
+                        if sport_type == "football":
+                            draw_odd = self._safe_float(odds.get("draw"))
+                        
+                        # URL direta da Bet365
                         urls = event.get("urls", {})
                         bet365_url = urls.get("Bet365", "")
                         
@@ -237,8 +313,8 @@ class Bet365Scraper(BaseScraper):
                             home_odd=home_odd,
                             draw_odd=draw_odd,
                             away_odd=away_odd,
-                            sport="football",
-                            market_type="1x2",
+                            sport=sport_type,
+                            market_type="1x2" if sport_type == "football" else "moneyline",
                             odds_type="PA",
                             extra_data={
                                 "source": "odds-api.io",
@@ -250,82 +326,7 @@ class Bet365Scraper(BaseScraper):
                         break
                         
             except Exception as e:
-                self.logger.debug(f"Erro parseando evento football: {e}")
-        
-        if skipped_leagues:
-            self.logger.debug(f"Ligas não mapeadas: {skipped_leagues}")
-        
-        return results
-    
-    def _parse_basketball(self, events: List[Dict]) -> List[ScrapedOdds]:
-        """Parseia eventos de basketball (NBA)."""
-        results = []
-        
-        for event in events:
-            try:
-                if not isinstance(event, dict):
-                    continue
-                
-                league = event.get("league", {})
-                league_slug = league.get("slug", "")
-                league_name = self.NBA_LEAGUE_MAPPING.get(league_slug)
-                
-                if not league_name:
-                    continue
-                
-                home = event.get("home", "")
-                away = event.get("away", "")
-                
-                if not home or not away:
-                    continue
-                
-                bookmakers = event.get("bookmakers", {})
-                bet365_markets = bookmakers.get("Bet365", [])
-                
-                for market in bet365_markets:
-                    if market.get("name") == "ML":  # Moneyline
-                        odds_list = market.get("odds", [])
-                        if not odds_list:
-                            continue
-                        
-                        odds = odds_list[0]
-                        
-                        home_odd = self._safe_float(odds.get("home"))
-                        away_odd = self._safe_float(odds.get("away"))
-                        
-                        if not home_odd or not away_odd:
-                            continue
-                        
-                        urls = event.get("urls", {})
-                        bet365_url = urls.get("Bet365", "")
-                        
-                        match_date = self._parse_datetime(event.get("date", ""))
-                        if not match_date:
-                            continue
-                        
-                        scraped = ScrapedOdds(
-                            bookmaker_name="bet365",
-                            home_team_raw=home,
-                            away_team_raw=away,
-                            league_raw=league_name,
-                            match_date=match_date,
-                            home_odd=home_odd,
-                            draw_odd=None,  # Basketball não tem empate
-                            away_odd=away_odd,
-                            sport="basketball",
-                            market_type="moneyline",
-                            odds_type="PA",
-                            extra_data={
-                                "source": "odds-api.io",
-                                "event_id": event.get("id"),
-                                "bet365_url": bet365_url,
-                            }
-                        )
-                        results.append(scraped)
-                        break
-                        
-            except Exception as e:
-                self.logger.debug(f"Erro parseando NBA: {e}")
+                self.logger.debug(f"Erro parseando evento: {e}")
         
         return results
     
@@ -353,7 +354,6 @@ class Bet365Scraper(BaseScraper):
 
 # Teste local
 if __name__ == "__main__":
-    import asyncio
     from dotenv import load_dotenv
     
     load_dotenv()
