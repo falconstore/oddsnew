@@ -1,11 +1,9 @@
 """
-Scraper para Bet365 via API RadarOdds.
-Faz login automático e renova token quando necessário.
-
-A API do RadarOdds já faz o trabalho pesado de parsear o WebSocket da Bet365,
-então usamos como proxy para obter as odds.
+Scraper para Bet365 via odds-api.io.
+API simples, sem necessidade de login complexo.
 """
 
+import time
 import httpx
 from datetime import datetime
 from typing import List, Optional, Dict, Any
@@ -20,139 +18,67 @@ from base_scraper import BaseScraper, ScrapedOdds, LeagueConfig
 
 class Bet365Scraper(BaseScraper):
     """
-    Scraper para Bet365 usando API do RadarOdds como fonte.
+    Scraper para Bet365 usando odds-api.io.
     
-    Fluxo:
-    1. Faz login com email/senha → obtém filter_token
-    2. Usa token para buscar snapshot de odds
-    3. Filtra apenas dados da Bet365
-    4. Se token expirar, refaz login automaticamente
+    Vantagens:
+    - API simples (apenas API key)
+    - Já traz URL direta da Bet365
+    - Estrutura clara e fácil de parsear
+    
+    Rate Limit: 100 requisições por ~10 minutos
     """
     
-    LOGIN_URL = "https://app.radarodds.com.br/api/login"
-    SNAPSHOT_URL = "https://app.radarodds.com.br/api/snapshot"
+    BASE_URL = "https://api.odds-api.io/v3/odds/updated"
     
-    # Mapeamento RadarOdds -> Sistema interno (sincronizado com banco de dados)
+    # Mapeamento slug da API -> nome do sistema
     LEAGUE_MAPPING = {
         # Brasil
-        "Brasil - Série A": "Brasileirão Série A",
-        "Brasil - Paulista": "Paulistao",
+        "brazil-serie-a": "Brasileirão Série A",
+        "brazil-paulista": "Paulistao",
+        "brazil-mineiro": "Campeonato Mineiro",
         
         # Europa - Top Leagues
-        "Inglaterra - Premier League": "Premier League",
-        "Espanha - La Liga": "La Liga",
-        "Alemanha - Bundesliga": "Bundesliga",
-        "França - Ligue 1": "Ligue 1",
-        "Itália - Série A": "Serie A",
-        "Holanda - Eredivisie": "Eredivisie",
+        "premier-league": "Premier League",
+        "la-liga": "La Liga",
+        "bundesliga": "Bundesliga",
+        "ligue-1": "Ligue 1",
+        "serie-a": "Serie A",
+        "eredivisie": "Eredivisie",
         
         # Copas Nacionais
-        "Inglaterra - FA Cup": "FA Cup",
-        "Inglaterra - EFL cup": "EFL Cup",
-        "Espanha - Copa del Rey": "Copa do Rei",
+        "fa-cup": "FA Cup",
+        "efl-cup": "EFL Cup",
+        "copa-del-rey": "Copa do Rei",
         
         # Competições Continentais
-        "Europa - UEFA Champions League": "Champions League",
-        "Europa - UEFA Europa League": "Liga Europa",
-        "Internacional - Conference League": "Liga da Conferencia",
-        
-        # Basketball
-        "EUA - NBA": "NBA",
-        "Estados Unidos - NBA": "NBA",
+        "champions-league": "Champions League",
+        "europa-league": "Liga Europa",
+        "conference-league": "Liga da Conferencia",
+    }
+    
+    # Mapeamento para NBA
+    NBA_LEAGUE_MAPPING = {
+        "nba": "NBA",
     }
     
     def __init__(self):
-        super().__init__(name="bet365", base_url="https://www.bet365.bet.br")
+        super().__init__(name="bet365", base_url="https://www.bet365.com")
         self.client: Optional[httpx.AsyncClient] = None
-        self.filter_token: Optional[str] = None
-        self.session_cookie: Optional[str] = None
+        self.api_key: Optional[str] = None
         self.logger = logger.bind(component="bet365")
     
     async def setup(self):
-        """Inicializa cliente HTTP e faz login se necessário."""
+        """Inicializa cliente HTTP com API key."""
         from config import settings
         
-        self.client = httpx.AsyncClient(
-            timeout=30.0,
-            headers={
-                "accept": "*/*",
-                "accept-language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
-                "origin": "https://app.radarodds.com.br",
-                "referer": "https://app.radarodds.com.br/",
-                "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-            }
-        )
+        self.api_key = getattr(settings, 'odds_api_key', None)
         
-        # Tentar usar token cacheado primeiro (se configurado no .env)
-        self.filter_token = getattr(settings, 'radarodds_filter_token', None)
+        if not self.api_key:
+            self.logger.error("ODDS_API_KEY não configurada no .env!")
+            return
         
-        # Se não tiver token, fazer login
-        if not self.filter_token:
-            await self._login(settings)
-        
-        if self.filter_token:
-            self.logger.info("Bet365 Scraper inicializado via RadarOdds")
-        else:
-            self.logger.warning("Bet365 Scraper sem token - verifique credenciais")
-    
-    async def _login(self, settings) -> bool:
-        """
-        Faz login no RadarOdds e obtém filter_token dos cookies.
-        
-        Returns:
-            True se login bem sucedido, False caso contrário
-        """
-        # Usar email como username (campo esperado pela API)
-        username = getattr(settings, 'radarodds_email', None)
-        password = getattr(settings, 'radarodds_password', None)
-        
-        if not username or not password:
-            self.logger.error(
-                "Credenciais RadarOdds não configuradas! "
-                "Adicione RADARODDS_EMAIL e RADARODDS_PASSWORD no .env"
-            )
-            return False
-        
-        try:
-            self.logger.debug(f"Fazendo login no RadarOdds com {username}...")
-            
-            response = await self.client.post(
-                self.LOGIN_URL,
-                json={"username": username, "password": password}
-            )
-            
-            if response.status_code == 401:
-                self.logger.error("Credenciais RadarOdds inválidas!")
-                return False
-            
-            response.raise_for_status()
-            
-            # Extrair tokens dos cookies Set-Cookie
-            self.filter_token = response.cookies.get("ra_filter_token")
-            self.session_cookie = response.cookies.get("ra_sess")
-            
-            # Fallback: tentar do JSON se não veio nos cookies
-            if not self.filter_token:
-                try:
-                    data = response.json()
-                    self.filter_token = data.get("filter_token")
-                except:
-                    pass
-            
-            if self.filter_token:
-                self.logger.info("Login RadarOdds realizado com sucesso")
-                self.logger.debug(f"Token: {self.filter_token[:20]}...")
-                return True
-            else:
-                self.logger.error("Token não encontrado nos cookies nem no JSON")
-                return False
-                
-        except httpx.HTTPStatusError as e:
-            self.logger.error(f"Erro HTTP no login RadarOdds: {e.response.status_code}")
-            return False
-        except Exception as e:
-            self.logger.error(f"Erro no login RadarOdds: {e}")
-            return False
+        self.client = httpx.AsyncClient(timeout=30.0)
+        self.logger.info("Bet365 Scraper inicializado via odds-api.io")
     
     async def teardown(self):
         """Fecha cliente HTTP."""
@@ -160,216 +86,269 @@ class Bet365Scraper(BaseScraper):
             await self.client.aclose()
             self.client = None
     
-    async def get_available_leagues(self) -> List[LeagueConfig]:
-        """Retorna lista de ligas suportadas."""
-        return [
-            LeagueConfig(league_id=k, name=v, url="", country="")
-            for k, v in self.LEAGUE_MAPPING.items()
-        ]
+    def get_available_leagues(self) -> List[LeagueConfig]:
+        """Retorna ligas disponíveis."""
+        leagues = []
+        for slug, name in self.LEAGUE_MAPPING.items():
+            leagues.append(LeagueConfig(
+                id=slug,
+                name=name,
+                url=slug,
+                country="Unknown"
+            ))
+        return leagues
     
     async def scrape_league(self, league: LeagueConfig) -> List[ScrapedOdds]:
-        """
-        Não utilizado - este scraper busca todas as ligas de uma vez.
-        Mantido para compatibilidade com interface BaseScraper.
-        """
+        """Não usado - scrape_all busca todas as ligas de uma vez."""
         return []
     
     async def scrape_all(self) -> List[ScrapedOdds]:
-        """
-        Busca todas as partidas do RadarOdds e filtra apenas Bet365.
-        
-        Override do método base para buscar tudo de uma vez,
-        já que a API retorna todas as ligas em uma única chamada.
-        """
-        if not self.client:
+        """Busca odds de Football e Basketball."""
+        if not self.client or not self.api_key:
             await self.setup()
         
-        if not self.filter_token:
-            self.logger.error("Sem token válido, abortando scrape")
+        if not self.api_key:
+            self.logger.error("API key não disponível, abortando scrape")
             return []
         
+        results = []
+        
         try:
-            # Adiciona token no header E cookies
-            self.client.headers["x-filter-token"] = self.filter_token
-            if self.session_cookie:
-                self.client.cookies.set("ra_sess", self.session_cookie)
-                self.client.cookies.set("ra_filter_token", self.filter_token)
+            # Buscar Football
+            football_data = await self._fetch_sport("Football")
+            football_odds = self._parse_football(football_data)
+            results.extend(football_odds)
+            self.logger.info(f"Football: {len(football_odds)} partidas coletadas")
             
-            self.logger.debug("Buscando snapshot do RadarOdds...")
+            # Buscar Basketball (NBA)
+            basketball_data = await self._fetch_sport("Basketball")
+            basketball_odds = self._parse_basketball(basketball_data)
+            results.extend(basketball_odds)
+            self.logger.info(f"Basketball: {len(basketball_odds)} partidas coletadas")
             
-            response = await self.client.get(
-                self.SNAPSHOT_URL,
-                params={"window_days": 3}
-            )
+        except Exception as e:
+            self.logger.error(f"Erro no scrape_all: {e}")
+        
+        self.logger.info(f"Bet365 Total: {len(results)} partidas via odds-api.io")
+        return results
+    
+    async def _fetch_sport(self, sport: str) -> List[Dict]:
+        """Busca odds para um esporte específico."""
+        try:
+            # Timestamp atual (requisito da API - max 1 min)
+            since = int(time.time())
             
-            # Se 401/403, token expirou - tentar relogar
-            if response.status_code in [401, 403]:
-                self.logger.warning("Token expirado, refazendo login...")
-                self.filter_token = None
-                
-                from config import settings
-                if await self._login(settings):
-                    # Reaplicar header E cookies após relogin
-                    self.client.headers["x-filter-token"] = self.filter_token
-                    if self.session_cookie:
-                        self.client.cookies.set("ra_sess", self.session_cookie)
-                        self.client.cookies.set("ra_filter_token", self.filter_token)
-                    
-                    response = await self.client.get(
-                        self.SNAPSHOT_URL,
-                        params={"window_days": 3}
-                    )
-                else:
-                    return []
+            params = {
+                "apiKey": self.api_key,
+                "sport": sport,
+                "bookmaker": "Bet365",
+                "since": since,
+            }
+            
+            self.logger.debug(f"Buscando {sport} com since={since}")
+            response = await self.client.get(self.BASE_URL, params=params)
+            
+            # Log rate limit
+            remaining = response.headers.get("x-ratelimit-remaining", "?")
+            reset = response.headers.get("x-ratelimit-reset", "?")
+            self.logger.debug(f"Rate limit: {remaining} restantes, reset: {reset}")
+            
+            if remaining != "?" and int(remaining) < 20:
+                self.logger.warning(f"Rate limit baixo: {remaining} requisições restantes!")
             
             response.raise_for_status()
             data = response.json()
             
-            # Debug: mostrar estrutura da resposta
-            if isinstance(data, dict):
-                self.logger.debug(f"Resposta é dict com keys: {list(data.keys())}")
-                items = data.get("items", data.get("data", []))
-            elif isinstance(data, list):
-                self.logger.debug(f"Resposta é lista com {len(data)} elementos")
-                items = data
-            else:
-                self.logger.error(f"Resposta inesperada: {type(data)}")
-                return []
+            if isinstance(data, list):
+                return data
+            elif isinstance(data, dict) and "data" in data:
+                return data.get("data", [])
+            elif isinstance(data, dict) and "items" in data:
+                return data.get("items", [])
             
-            results = self._parse_response(items)
-            self.logger.info(f"Bet365: {len(results)} partidas coletadas via RadarOdds")
-            return results
+            return []
             
         except httpx.HTTPStatusError as e:
-            self.logger.error(f"Erro HTTP RadarOdds: {e.response.status_code}")
+            self.logger.error(f"HTTP Error buscando {sport}: {e.response.status_code}")
             return []
         except Exception as e:
-            self.logger.error(f"Erro ao buscar RadarOdds: {e}")
+            self.logger.error(f"Erro buscando {sport}: {e}")
             return []
     
-    def _parse_response(self, data: List[Dict[str, Any]]) -> List[ScrapedOdds]:
-        """
-        Parseia resposta do RadarOdds e extrai apenas odds da Bet365.
-        
-        Estrutura esperada:
-        [
-            {
-                "type": "odds.best",
-                "match": {"team1": "...", "team2": "...", "competition": "..."},
-                "books": [
-                    {"bookmaker": "bet365", "odd1": 1.5, "oddX": 3.0, "odd2": 5.0, ...},
-                    ...
-                ]
-            },
-            ...
-        ]
-        """
+    def _parse_football(self, events: List[Dict]) -> List[ScrapedOdds]:
+        """Parseia eventos de futebol."""
         results = []
         skipped_leagues = set()
         
-        for item in data:
+        for event in events:
             try:
-                # Pular se não for dict
-                if not isinstance(item, dict):
-                    self.logger.debug(f"Item não é dict: {type(item)} - {str(item)[:100]}")
+                if not isinstance(event, dict):
                     continue
                 
-                # Apenas itens do tipo odds.best
-                if item.get("type") != "odds.best":
-                    continue
-                
-                match_info = item.get("match", {})
-                books = item.get("books", [])
-                
-                # Encontrar Bet365 no array de bookmakers
-                bet365_data = next(
-                    (b for b in books if b.get("bookmaker") == "bet365"),
-                    None
-                )
-                
-                if not bet365_data:
-                    continue  # Bet365 não tem odds para esta partida
-                
-                # Verificar se temos odds válidas
-                odd1 = bet365_data.get("odd1")
-                oddX = bet365_data.get("oddX")
-                odd2 = bet365_data.get("odd2")
-                
-                if not all([odd1, oddX, odd2]):
-                    continue
-                
-                # Mapear liga para nome interno
-                competition = match_info.get("competition", "")
-                league_name = self.LEAGUE_MAPPING.get(competition)
+                league = event.get("league", {})
+                league_slug = league.get("slug", "")
+                league_name = self.LEAGUE_MAPPING.get(league_slug)
                 
                 if not league_name:
-                    skipped_leagues.add(competition)
+                    skipped_leagues.add(league_slug)
                     continue
                 
-                # Parsear data/hora
-                match_date = self._parse_datetime(
-                    match_info.get("date", ""),
-                    match_info.get("kickoff_display", "")
-                )
+                home = event.get("home", "")
+                away = event.get("away", "")
                 
-                # Criar objeto de odds
-                scraped = ScrapedOdds(
-                    bookmaker_name="bet365",
-                    home_team_raw=match_info.get("team1", "").strip(),
-                    away_team_raw=match_info.get("team2", "").strip(),
-                    league_raw=league_name,
-                    match_date=match_date,
-                    home_odd=float(odd1),
-                    draw_odd=float(oddX),
-                    away_odd=float(odd2),
-                    sport="football",
-                    market_type="1x2",
-                    odds_type="PA",  # Bet365 usa odds padrão (não Super Odds)
-                    extra_data={
-                        "source": "radarodds",
-                        "href": bet365_data.get("href", ""),
-                        "updated_at": bet365_data.get("updated_at", ""),
-                        "is_best_home": bet365_data.get("isBest1", False),
-                        "is_best_draw": bet365_data.get("isBestX", False),
-                        "is_best_away": bet365_data.get("isBest2", False),
-                    }
-                )
-                results.append(scraped)
+                if not home or not away:
+                    continue
                 
+                # Extrair odds do Bet365
+                bookmakers = event.get("bookmakers", {})
+                bet365_markets = bookmakers.get("Bet365", [])
+                
+                # Encontrar mercado 1X2 ou ML
+                for market in bet365_markets:
+                    if market.get("name") in ["1X2", "ML"]:
+                        odds_list = market.get("odds", [])
+                        if not odds_list:
+                            continue
+                        
+                        odds = odds_list[0]
+                        
+                        home_odd = self._safe_float(odds.get("home"))
+                        draw_odd = self._safe_float(odds.get("draw"))
+                        away_odd = self._safe_float(odds.get("away"))
+                        
+                        if not home_odd or not away_odd:
+                            continue
+                        
+                        # URL direta da Bet365 (já vem pronta!)
+                        urls = event.get("urls", {})
+                        bet365_url = urls.get("Bet365", "")
+                        
+                        # Parse date
+                        match_date = self._parse_datetime(event.get("date", ""))
+                        if not match_date:
+                            continue
+                        
+                        scraped = ScrapedOdds(
+                            bookmaker_name="bet365",
+                            home_team_raw=home,
+                            away_team_raw=away,
+                            league_raw=league_name,
+                            match_date=match_date,
+                            home_odd=home_odd,
+                            draw_odd=draw_odd,
+                            away_odd=away_odd,
+                            sport="football",
+                            market_type="1x2",
+                            odds_type="PA",
+                            extra_data={
+                                "source": "odds-api.io",
+                                "event_id": event.get("id"),
+                                "bet365_url": bet365_url,
+                            }
+                        )
+                        results.append(scraped)
+                        break
+                        
             except Exception as e:
-                self.logger.debug(f"Erro parseando partida: {e}")
-                continue
+                self.logger.debug(f"Erro parseando evento football: {e}")
         
-        # Log de ligas não mapeadas (para facilitar expansão)
         if skipped_leagues:
             self.logger.debug(f"Ligas não mapeadas: {skipped_leagues}")
         
         return results
     
-    def _parse_datetime(self, date_str: str, time_str: str) -> datetime:
-        """
-        Parseia formato do RadarOdds para datetime.
+    def _parse_basketball(self, events: List[Dict]) -> List[ScrapedOdds]:
+        """Parseia eventos de basketball (NBA)."""
+        results = []
         
-        Args:
-            date_str: "21/01" (dia/mês)
-            time_str: "20:01" (hora:minuto)
-            
-        Returns:
-            datetime object
-        """
+        for event in events:
+            try:
+                if not isinstance(event, dict):
+                    continue
+                
+                league = event.get("league", {})
+                league_slug = league.get("slug", "")
+                league_name = self.NBA_LEAGUE_MAPPING.get(league_slug)
+                
+                if not league_name:
+                    continue
+                
+                home = event.get("home", "")
+                away = event.get("away", "")
+                
+                if not home or not away:
+                    continue
+                
+                bookmakers = event.get("bookmakers", {})
+                bet365_markets = bookmakers.get("Bet365", [])
+                
+                for market in bet365_markets:
+                    if market.get("name") == "ML":  # Moneyline
+                        odds_list = market.get("odds", [])
+                        if not odds_list:
+                            continue
+                        
+                        odds = odds_list[0]
+                        
+                        home_odd = self._safe_float(odds.get("home"))
+                        away_odd = self._safe_float(odds.get("away"))
+                        
+                        if not home_odd or not away_odd:
+                            continue
+                        
+                        urls = event.get("urls", {})
+                        bet365_url = urls.get("Bet365", "")
+                        
+                        match_date = self._parse_datetime(event.get("date", ""))
+                        if not match_date:
+                            continue
+                        
+                        scraped = ScrapedOdds(
+                            bookmaker_name="bet365",
+                            home_team_raw=home,
+                            away_team_raw=away,
+                            league_raw=league_name,
+                            match_date=match_date,
+                            home_odd=home_odd,
+                            draw_odd=None,  # Basketball não tem empate
+                            away_odd=away_odd,
+                            sport="basketball",
+                            market_type="moneyline",
+                            odds_type="PA",
+                            extra_data={
+                                "source": "odds-api.io",
+                                "event_id": event.get("id"),
+                                "bet365_url": bet365_url,
+                            }
+                        )
+                        results.append(scraped)
+                        break
+                        
+            except Exception as e:
+                self.logger.debug(f"Erro parseando NBA: {e}")
+        
+        return results
+    
+    def _safe_float(self, value: Any) -> Optional[float]:
+        """Converte valor para float de forma segura."""
+        if value is None:
+            return None
         try:
-            now = datetime.now()
-            day, month = date_str.split("/")
-            hour, minute = time_str.split(":")
-            
-            year = now.year
-            # Se o mês for menor que o atual, provavelmente é ano que vem
-            if int(month) < now.month:
-                year += 1
-            
-            return datetime(year, int(month), int(day), int(hour), int(minute))
+            return float(value)
+        except (ValueError, TypeError):
+            return None
+    
+    def _parse_datetime(self, date_str: str) -> Optional[datetime]:
+        """Parseia string de data ISO 8601."""
+        if not date_str:
+            return None
+        try:
+            # Handle ISO format with Z suffix
+            if date_str.endswith("Z"):
+                date_str = date_str[:-1] + "+00:00"
+            return datetime.fromisoformat(date_str)
         except Exception:
-            return datetime.now()
+            return None
 
 
 # Teste local
@@ -383,15 +362,17 @@ if __name__ == "__main__":
         scraper = Bet365Scraper()
         await scraper.setup()
         
-        if scraper.filter_token:
+        if scraper.api_key:
             odds = await scraper.scrape_all()
             print(f"\nTotal: {len(odds)} partidas da Bet365")
             
             for o in odds[:5]:
                 print(f"  {o.home_team_raw} x {o.away_team_raw} ({o.league_raw})")
                 print(f"    Odds: {o.home_odd} / {o.draw_odd} / {o.away_odd}")
+                if o.extra_data.get("bet365_url"):
+                    print(f"    URL: {o.extra_data['bet365_url']}")
         else:
-            print("Falha no login - verifique credenciais no .env")
+            print("API key não configurada - adicione ODDS_API_KEY no .env")
         
         await scraper.teardown()
     

@@ -218,6 +218,14 @@ function generateBookmakerLink(
     }
   }
   
+  // Bet365 - URL direta do odds-api.io
+  if (name.includes('bet365')) {
+    const bet365Url = extraData.bet365_url as string;
+    if (bet365Url) {
+      return bet365Url;
+    }
+  }
+  
   if (name.includes('aposta1')) {
     const eventId = extraData.aposta1_event_id;
     const champId = extraData.aposta1_champ_id;
