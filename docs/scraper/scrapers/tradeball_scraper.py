@@ -1,29 +1,50 @@
 """
 Tradeball Scraper - Scrapes odds from Tradeball (Betbra Dball Exchange).
-Uses Playwright to bypass authentication and fetch API data.
-API: https://tradeball.betbra.bet.br/api/feedDball/list
+Uses auth token from env var (TRADEBALL_AUTH_TOKEN) for direct API calls.
+Fallback to Playwright browser-based session if no token provided.
 
+API: https://tradeball.betbra.bet.br/api/feedDball/list
 Fetches today + next 3 days of matches.
+
+## How to get the token:
+1. Open https://tradeball.betbra.bet.br in Chrome and login
+2. Open DevTools (F12) → Network tab
+3. Filter by "feedDball" or "list"
+4. Click any request with status 200
+5. Copy:
+   - Header `Authorization`: the value after "Bearer "
+   - Header `Cookie`: the full value
+6. Set env vars:
+   export TRADEBALL_AUTH_TOKEN="27459028|lAf4ZXPMWTye..."
+   export TRADEBALL_COOKIES="BIAB_TZ=180; _fbp=fb.2...; BIAB_CUSTOMER=eyJ..."
+7. Restart the scraper
+
+Note: The token expires after a few hours. Monitor logs for 401 errors.
 """
 
 import json
-import re
+import os
 import uuid
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
-from playwright.async_api import async_playwright, Browser, BrowserContext, Page
+
+import httpx
+from loguru import logger
 
 from base_scraper import BaseScraper, ScrapedOdds, LeagueConfig
-from loguru import logger
 
 
 class TradeballScraper(BaseScraper):
     """
     Scraper for Tradeball (Betbra Dball Exchange).
     Fetches today + next 3 days of matches.
+    
+    Supports two modes:
+    1. Token mode (preferred): Uses TRADEBALL_AUTH_TOKEN env var for direct API calls
+    2. Browser mode (fallback): Uses Playwright for session-based auth (requires login)
     """
     
-    # Mapeamento de ligas por clId da API
+    # League mapping by clId from API
     LEAGUE_MAPPING = {
         # Brasil
         35: {"name": "Paulistão", "country": "Brazil"},
@@ -47,15 +68,40 @@ class TradeballScraper(BaseScraper):
             name="tradeball",
             base_url="https://tradeball.betbra.bet.br"
         )
+        self._auth_token: Optional[str] = None
+        self._cookies: Optional[str] = None
+        self._use_token_mode = False
+        
+        # Browser vars (only used if no token)
         self._playwright = None
-        self._browser: Optional[Browser] = None
-        self._context: Optional[BrowserContext] = None
-        self._page: Optional[Page] = None
+        self._browser = None
+        self._context = None
+        self._page = None
+        
         self.logger = logger.bind(component="tradeball")
     
     async def setup(self):
-        """Initialize Playwright and establish session with proper warm-up."""
+        """Initialize scraper - check for token first, fallback to browser."""
         self.logger.debug("Initializing Tradeball scraper...")
+        
+        # Check for manual token override via env var (PRIORITY)
+        manual_token = os.environ.get("TRADEBALL_AUTH_TOKEN")
+        manual_cookies = os.environ.get("TRADEBALL_COOKIES")
+        
+        if manual_token:
+            self.logger.info("Using token from TRADEBALL_AUTH_TOKEN env var")
+            self._auth_token = manual_token
+            self._cookies = manual_cookies or ""
+            self._use_token_mode = True
+            return  # Skip browser setup - use direct API calls
+        
+        # Fallback: try browser-based session (may not work without login)
+        self.logger.warning("No TRADEBALL_AUTH_TOKEN found, attempting browser mode (may fail)")
+        await self._setup_browser()
+    
+    async def _setup_browser(self):
+        """Initialize Playwright browser for session-based auth."""
+        from playwright.async_api import async_playwright
         
         self._playwright = await async_playwright().start()
         self._browser = await self._playwright.chromium.launch(
@@ -71,12 +117,11 @@ class TradeballScraper(BaseScraper):
         
         self._page = await self._context.new_page()
         
-        # Step 1: Navigate to main page
+        # Navigate to main page
         await self._page.goto(self.base_url, wait_until="domcontentloaded", timeout=30000)
         await self._page.wait_for_timeout(1000)
         
-        # Step 2: Navigate to the trading feed page to fully initialize session
-        # This page triggers all necessary authentication cookies/tokens
+        # Navigate to the trading feed page to initialize session
         await self._page.goto(
             "https://tradeball.betbra.bet.br/dballTradingFeed",
             wait_until="networkidle",
@@ -84,10 +129,10 @@ class TradeballScraper(BaseScraper):
         )
         await self._page.wait_for_timeout(2000)
         
-        self.logger.info("Tradeball session initialized with trading feed warm-up")
+        self.logger.info("Tradeball browser session initialized")
     
     async def teardown(self):
-        """Close browser resources."""
+        """Close resources."""
         if self._page:
             await self._page.close()
         if self._context:
@@ -144,46 +189,115 @@ class TradeballScraper(BaseScraper):
         
         return all_odds
     
+    def _build_api_url(self, date_str: Optional[str] = None) -> str:
+        """Build the API URL with proper filters."""
+        import urllib.parse
+        
+        if date_str:
+            # Future day: marketId=3, with date in filter
+            filter_obj = {
+                "line": 1,
+                "periodTypeId": 1,
+                "tradingTypeId": 2,
+                "marketId": 3,
+                "date": date_str
+            }
+        else:
+            # Today: marketId=2, without date
+            filter_obj = {
+                "line": 1,
+                "periodTypeId": 1,
+                "tradingTypeId": 2,
+                "marketId": 2
+            }
+        
+        filter_json = json.dumps(filter_obj, separators=(',', ':'))
+        filter_encoded = urllib.parse.quote(filter_json, safe='')
+        app_id = str(uuid.uuid4())
+        
+        return (
+            f"{self.API_BASE}?page=1"
+            f"&filter={filter_encoded}"
+            f"&start=0&limit=50"
+            f"&sort=%5B%7B%22property%22:%22created_at%22,%22direction%22:%22desc%22%7D%5D"
+            f"&requiredDictionaries%5B%5D=LeagueGroup"
+            f"&requiredDictionaries%5B%5D=TimeZone"
+            f"&init=true"
+            f"&version=0"
+            f"&uniqAppId={app_id}"
+            f"&locale=pt"
+        )
+    
     async def _fetch_day(self, date_str: Optional[str] = None) -> List[ScrapedOdds]:
-        """Fetch all matches for a specific day using page.evaluate fetch (browser context)."""
+        """Fetch all matches for a specific day."""
+        url = self._build_api_url(date_str)
+        
+        if self._use_token_mode:
+            return await self._fetch_with_token(url, date_str)
+        else:
+            return await self._fetch_with_browser(url, date_str)
+    
+    async def _fetch_with_token(self, url: str, date_str: Optional[str]) -> List[ScrapedOdds]:
+        """Fetch using direct HTTP request with auth token (faster, no browser)."""
+        headers = {
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "pt-BR,pt;q=0.9",
+            "Authorization": f"Bearer {self._auth_token}",
+            "X-Requested-With": "XMLHttpRequest",
+            "Referer": "https://tradeball.betbra.bet.br/dballTradingFeed",
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+        }
+        
+        # Parse cookies string into dict
+        cookies = {}
+        if self._cookies:
+            for cookie in self._cookies.split("; "):
+                if "=" in cookie:
+                    key, value = cookie.split("=", 1)
+                    cookies[key] = value
+        
+        async with httpx.AsyncClient(cookies=cookies, timeout=30.0) as client:
+            try:
+                response = await client.get(url, headers=headers)
+                
+                if response.status_code == 401:
+                    self.logger.error(
+                        "Token expired! Update TRADEBALL_AUTH_TOKEN env var. "
+                        "See scraper docstring for instructions."
+                    )
+                    return []
+                
+                if response.status_code == 403:
+                    self.logger.error(
+                        "Access forbidden (403). Possible geo-block or token issue. "
+                        "Ensure VPS is in Brazil or use a Brazilian proxy."
+                    )
+                    return []
+                
+                if response.status_code != 200:
+                    self.logger.error(f"HTTP {response.status_code}: {response.text[:200]}")
+                    return []
+                
+                # Check if response is JSON
+                content_type = response.headers.get("content-type", "")
+                if "application/json" not in content_type:
+                    self.logger.warning(f"Non-JSON response: {response.text[:100]}")
+                    return []
+                
+                data = response.json()
+                self.logger.debug(f"Token fetch for {date_str or 'today'}: {len(data.get('data', []))} events")
+                return self._parse_response(data)
+                
+            except httpx.TimeoutException:
+                self.logger.error(f"Request timeout for {date_str or 'today'}")
+                return []
+            except Exception as e:
+                self.logger.error(f"Request failed for {date_str or 'today'}: {e}")
+                return []
+    
+    async def _fetch_with_browser(self, url: str, date_str: Optional[str]) -> List[ScrapedOdds]:
+        """Fetch using browser context (slower, requires session)."""
         try:
-            if date_str:
-                # Future day: marketId=3, with date in filter
-                filter_obj = {
-                    "line": 1,
-                    "periodTypeId": 1,
-                    "tradingTypeId": 2,
-                    "marketId": 3,
-                    "date": date_str
-                }
-            else:
-                # Today: marketId=2, without date
-                filter_obj = {
-                    "line": 1,
-                    "periodTypeId": 1,
-                    "tradingTypeId": 2,
-                    "marketId": 2
-                }
-            
-            import urllib.parse
-            filter_json = json.dumps(filter_obj, separators=(',', ':'))
-            filter_encoded = urllib.parse.quote(filter_json, safe='')
-            app_id = str(uuid.uuid4())
-            
-            url = (
-                f"{self.API_BASE}?page=1"
-                f"&filter={filter_encoded}"
-                f"&start=0&limit=50"
-                f"&sort=%5B%7B%22property%22:%22created_at%22,%22direction%22:%22desc%22%7D%5D"
-                f"&requiredDictionaries%5B%5D=LeagueGroup"
-                f"&requiredDictionaries%5B%5D=TimeZone"
-                f"&init=true"
-                f"&version=0"
-                f"&uniqAppId={app_id}"
-                f"&locale=pt"
-            )
-            
-            # Use page.evaluate fetch directly (works with browser session context)
             fetch_result = await self._page.evaluate("""
                 async (url) => {
                     try {
@@ -195,7 +309,7 @@ class TradeballScraper(BaseScraper):
                             }
                         });
                         const text = await resp.text();
-                        return { status: resp.status, text: text, url: resp.url };
+                        return { status: resp.status, text: text };
                     } catch (e) {
                         return { error: e.message };
                     }
@@ -203,37 +317,30 @@ class TradeballScraper(BaseScraper):
             """, url)
             
             if fetch_result and fetch_result.get("error"):
-                self.logger.error(f"Fetch error for {date_str or 'today'}: {fetch_result.get('error')}")
+                self.logger.error(f"Browser fetch error: {fetch_result.get('error')}")
                 return []
             
             status = fetch_result.get("status", 0)
             fetch_text = fetch_result.get("text", "").strip()
-            final_url = fetch_result.get("url", "")
             
-            self.logger.debug(f"Fetch result: status={status}, url={final_url[:60]}..., size={len(fetch_text)} bytes")
+            self.logger.debug(f"Browser fetch: status={status}, size={len(fetch_text)} bytes")
             
-            # Log preview of response for debugging
-            if fetch_text and len(fetch_text) < 500:
-                self.logger.debug(f"Response preview: {fetch_text[:200]}")
+            if status == 401:
+                self.logger.error(
+                    "Unauthenticated (401). Browser session not valid. "
+                    "Set TRADEBALL_AUTH_TOKEN env var instead."
+                )
+                return []
             
             if fetch_text.startswith('[') or fetch_text.startswith('{'):
                 data = json.loads(fetch_text)
-                
-                # Log the structure to understand empty responses
-                if isinstance(data, dict):
-                    self.logger.debug(f"Response keys: {list(data.keys())}")
-                    if "data" in data:
-                        self.logger.debug(f"data array length: {len(data.get('data', []))}")
-                elif isinstance(data, list):
-                    self.logger.debug(f"Response array length: {len(data)}")
-                
                 return self._parse_response(data)
             else:
-                self.logger.warning(f"Response not JSON for {date_str or 'today'}: {fetch_text[:100]}")
+                self.logger.warning(f"Non-JSON response: {fetch_text[:100]}")
                 return []
             
         except Exception as e:
-            self.logger.error(f"Fetch failed for {date_str or 'today'}: {e}")
+            self.logger.error(f"Browser fetch failed: {e}")
             return []
     
     def _parse_response(self, data: Any) -> List[ScrapedOdds]:
