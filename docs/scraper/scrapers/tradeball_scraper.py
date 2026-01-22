@@ -54,7 +54,7 @@ class TradeballScraper(BaseScraper):
         self.logger = logger.bind(component="tradeball")
     
     async def setup(self):
-        """Initialize Playwright and establish session."""
+        """Initialize Playwright and establish session with proper warm-up."""
         self.logger.debug("Initializing Tradeball scraper...")
         
         self._playwright = await async_playwright().start()
@@ -71,11 +71,20 @@ class TradeballScraper(BaseScraper):
         
         self._page = await self._context.new_page()
         
-        # Navigate to establish session cookies
+        # Step 1: Navigate to main page
         await self._page.goto(self.base_url, wait_until="domcontentloaded", timeout=30000)
+        await self._page.wait_for_timeout(1000)
+        
+        # Step 2: Navigate to the trading feed page to fully initialize session
+        # This page triggers all necessary authentication cookies/tokens
+        await self._page.goto(
+            "https://tradeball.betbra.bet.br/dballTradingFeed",
+            wait_until="networkidle",
+            timeout=30000
+        )
         await self._page.wait_for_timeout(2000)
         
-        self.logger.info("Tradeball session initialized")
+        self.logger.info("Tradeball session initialized with trading feed warm-up")
     
     async def teardown(self):
         """Close browser resources."""
@@ -136,22 +145,7 @@ class TradeballScraper(BaseScraper):
         return all_odds
     
     async def _fetch_day(self, date_str: Optional[str] = None) -> List[ScrapedOdds]:
-        """Fetch all matches for a specific day using page.goto (browser context)."""
-        captured_json = None
-        
-        async def capture_response(response):
-            """Intercept API response to get raw JSON before any rendering."""
-            nonlocal captured_json
-            if self.API_BASE in response.url and captured_json is None:
-                try:
-                    content_type = response.headers.get("content-type", "")
-                    if "application/json" in content_type or response.url.startswith(self.API_BASE):
-                        body = await response.body()
-                        captured_json = body.decode("utf-8")
-                        self.logger.debug(f"Intercepted JSON response ({len(captured_json)} bytes)")
-                except Exception as e:
-                    self.logger.debug(f"Failed to capture response: {e}")
-        
+        """Fetch all matches for a specific day using page.evaluate fetch (browser context)."""
         try:
             if date_str:
                 # Future day: marketId=3, with date in filter
@@ -172,11 +166,8 @@ class TradeballScraper(BaseScraper):
                 }
             
             import urllib.parse
-            # JSON compacto sem espaços (como a URL original)
             filter_json = json.dumps(filter_obj, separators=(',', ':'))
             filter_encoded = urllib.parse.quote(filter_json, safe='')
-            
-            # UUID único como o site usa
             app_id = str(uuid.uuid4())
             
             url = (
@@ -192,91 +183,54 @@ class TradeballScraper(BaseScraper):
                 f"&locale=pt"
             )
             
-            # Register response interceptor BEFORE navigation
-            self._page.on("response", capture_response)
-            
-            try:
-                # Navigate to API URL
-                response = await self._page.goto(url, wait_until="domcontentloaded", timeout=30000)
-                
-                # Wait a moment for response interception
-                await self._page.wait_for_timeout(500)
-                
-                # Log response info for debugging
-                if response:
-                    self.logger.debug(f"Response status: {response.status}, URL: {response.url[:80]}...")
-                
-                # Priority 1: Use intercepted JSON (most reliable)
-                if captured_json:
-                    try:
-                        data = json.loads(captured_json)
-                        self.logger.debug(f"Parsed {len(data) if isinstance(data, list) else 'dict'} from intercepted response")
-                        return self._parse_response(data)
-                    except json.JSONDecodeError as e:
-                        self.logger.warning(f"Intercepted content not valid JSON: {e}")
-                
-                # Priority 2: Try response.body() directly
-                if response and response.status == 200:
-                    try:
-                        body = await response.body()
-                        body_text = body.decode("utf-8").strip()
-                        
-                        # Remove BOM if present
-                        if body_text.startswith('\ufeff'):
-                            body_text = body_text[1:]
-                        
-                        if body_text.startswith('[') or body_text.startswith('{'):
-                            data = json.loads(body_text)
-                            self.logger.debug(f"Parsed {len(data) if isinstance(data, list) else 'dict'} from response.body()")
-                            return self._parse_response(data)
-                        else:
-                            self.logger.debug(f"Response body not JSON, starts with: {body_text[:100]}")
-                    except Exception as e:
-                        self.logger.debug(f"response.body() failed: {e}")
-                
-                # Priority 3: Fallback to page.evaluate fetch (uses browser context)
-                self.logger.debug("Trying page.evaluate fetch as fallback...")
-                try:
-                    fetch_result = await self._page.evaluate("""
-                        async (url) => {
-                            try {
-                                const resp = await fetch(url, {
-                                    credentials: 'include',
-                                    headers: {
-                                        'Accept': 'application/json, text/plain, */*',
-                                        'X-Requested-With': 'XMLHttpRequest'
-                                    }
-                                });
-                                const text = await resp.text();
-                                return { status: resp.status, text: text };
-                            } catch (e) {
-                                return { error: e.message };
+            # Use page.evaluate fetch directly (works with browser session context)
+            fetch_result = await self._page.evaluate("""
+                async (url) => {
+                    try {
+                        const resp = await fetch(url, {
+                            credentials: 'include',
+                            headers: {
+                                'Accept': 'application/json, text/plain, */*',
+                                'X-Requested-With': 'XMLHttpRequest'
                             }
-                        }
-                    """, url)
-                    
-                    if fetch_result and not fetch_result.get("error"):
-                        fetch_text = fetch_result.get("text", "").strip()
-                        if fetch_text.startswith('[') or fetch_text.startswith('{'):
-                            data = json.loads(fetch_text)
-                            self.logger.debug(f"Parsed {len(data) if isinstance(data, list) else 'dict'} from page.evaluate fetch")
-                            return self._parse_response(data)
-                        else:
-                            self.logger.debug(f"Fetch result not JSON: {fetch_text[:100]}")
-                    else:
-                        self.logger.debug(f"Fetch error: {fetch_result.get('error')}")
-                except Exception as e:
-                    self.logger.debug(f"page.evaluate fetch failed: {e}")
-                
-                self.logger.warning(f"No valid JSON found for {date_str or 'today'}")
+                        });
+                        const text = await resp.text();
+                        return { status: resp.status, text: text, url: resp.url };
+                    } catch (e) {
+                        return { error: e.message };
+                    }
+                }
+            """, url)
+            
+            if fetch_result and fetch_result.get("error"):
+                self.logger.error(f"Fetch error for {date_str or 'today'}: {fetch_result.get('error')}")
                 return []
+            
+            status = fetch_result.get("status", 0)
+            fetch_text = fetch_result.get("text", "").strip()
+            final_url = fetch_result.get("url", "")
+            
+            self.logger.debug(f"Fetch result: status={status}, url={final_url[:60]}..., size={len(fetch_text)} bytes")
+            
+            # Log preview of response for debugging
+            if fetch_text and len(fetch_text) < 500:
+                self.logger.debug(f"Response preview: {fetch_text[:200]}")
+            
+            if fetch_text.startswith('[') or fetch_text.startswith('{'):
+                data = json.loads(fetch_text)
                 
-            finally:
-                # Remove the response handler to avoid accumulation
-                try:
-                    self._page.remove_listener("response", capture_response)
-                except:
-                    pass
+                # Log the structure to understand empty responses
+                if isinstance(data, dict):
+                    self.logger.debug(f"Response keys: {list(data.keys())}")
+                    if "data" in data:
+                        self.logger.debug(f"data array length: {len(data.get('data', []))}")
+                elif isinstance(data, list):
+                    self.logger.debug(f"Response array length: {len(data)}")
+                
+                return self._parse_response(data)
+            else:
+                self.logger.warning(f"Response not JSON for {date_str or 'today'}: {fetch_text[:100]}")
+                return []
             
         except Exception as e:
             self.logger.error(f"Fetch failed for {date_str or 'today'}: {e}")
