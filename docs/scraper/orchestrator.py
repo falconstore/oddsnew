@@ -397,10 +397,10 @@ class Orchestrator:
                 continue
             
             # Match league (cache lookup)
-            league_id = self.league_matcher.find_league_id(odds.league_raw)
-            if not league_id:
-                self.logger.warning(f"Unknown league: {odds.league_raw}")
-                continue
+        league_id = self.league_matcher.find_league_id(odds.league_raw)
+        if not league_id:
+            # Silenciado - ligas não cadastradas são ignoradas sem log
+            continue
             
             # Determine if this is basketball
             is_basketball = odds.sport == "basketball" or odds.league_raw.upper() == "NBA"
@@ -440,22 +440,12 @@ class Orchestrator:
                     odds.league_raw  # Pass league name for cross-league detection
                 )
             
-            if not home_team_id:
-                unmatched_teams.append((odds.home_team_raw, odds.bookmaker_name))
-                # [DIAG] log only when failing
-                if odds.league_raw in ('Bundesliga', 'Ligue 1'):
-                    self.logger.warning(
-                        f"[DIAG] UNMATCHED home='{odds.home_team_raw}' in {odds.league_raw}"
-                    )
-                continue
-            if not away_team_id:
-                unmatched_teams.append((odds.away_team_raw, odds.bookmaker_name))
-                # [DIAG] log only when failing
-                if odds.league_raw in ('Bundesliga', 'Ligue 1'):
-                    self.logger.warning(
-                        f"[DIAG] UNMATCHED away='{odds.away_team_raw}' in {odds.league_raw}"
-                    )
-                continue
+        if not home_team_id:
+            unmatched_teams.append((odds.home_team_raw, odds.bookmaker_name))
+            continue
+        if not away_team_id:
+            unmatched_teams.append((odds.away_team_raw, odds.bookmaker_name))
+            continue
             
             item = {
                 "odds": odds,
