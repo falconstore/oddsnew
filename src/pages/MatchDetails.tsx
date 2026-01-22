@@ -264,13 +264,9 @@ function generateBookmakerLink(
     }
   }
   
-  // Tradeball (Betbra Dball Exchange)
+  // Tradeball (Betbra Dball Exchange) - sem deep link por jogo
   if (name.includes('tradeball')) {
-    const eventId = extraData.tradeball_event_id;
-    if (eventId) {
-      return `https://tradeball.betbra.bet.br/dballTradingFeed?event=${eventId}`;
-    }
-    return 'https://tradeball.betbra.bet.br/dballTradingFeed';
+    return 'https://betbra.bet.br/tradeball/dballTradingFeed';
   }
   
   return null;
