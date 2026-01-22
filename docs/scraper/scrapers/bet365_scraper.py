@@ -116,13 +116,13 @@ class Bet365Scraper(BaseScraper):
         results = []
         
         try:
-            # Buscar Football
-            football_results = await self._scrape_sport("Football", self.LEAGUE_MAPPING, "football")
+            # Buscar Football (slug em minúsculo conforme API)
+            football_results = await self._scrape_sport("football", self.LEAGUE_MAPPING, "football")
             results.extend(football_results)
             self.logger.info(f"Football: {len(football_results)} partidas coletadas")
             
-            # Buscar Basketball (NBA)
-            basketball_results = await self._scrape_sport("Basketball", self.NBA_LEAGUE_MAPPING, "basketball")
+            # Buscar Basketball/NBA (slug em minúsculo conforme API)
+            basketball_results = await self._scrape_sport("basketball", self.NBA_LEAGUE_MAPPING, "basketball")
             results.extend(basketball_results)
             self.logger.info(f"Basketball: {len(basketball_results)} partidas coletadas")
             
