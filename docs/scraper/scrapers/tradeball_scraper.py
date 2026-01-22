@@ -21,7 +21,6 @@ Note: VPS must have Brazilian IP or use a Brazilian proxy (site is geo-blocked).
 """
 
 import json
-import os
 import uuid
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
@@ -30,6 +29,7 @@ import httpx
 from loguru import logger
 
 from base_scraper import BaseScraper, ScrapedOdds, LeagueConfig
+from config import settings
 
 
 class TradeballScraper(BaseScraper):
@@ -83,23 +83,23 @@ class TradeballScraper(BaseScraper):
         """Initialize scraper with authentication (token > auto-login > anonymous)."""
         self.logger.debug("Initializing Tradeball scraper...")
         
-        # Priority 1: Manual token from env var (fastest, no browser needed)
-        manual_token = os.environ.get("TRADEBALL_AUTH_TOKEN")
-        manual_cookies = os.environ.get("TRADEBALL_COOKIES")
+        # Priority 1: Manual token from settings/.env (fastest, no browser needed)
+        manual_token = settings.tradeball_auth_token
+        manual_cookies = settings.tradeball_cookies
         
         if manual_token:
-            self.logger.info("Using token from TRADEBALL_AUTH_TOKEN env var")
+            self.logger.info("Using token from TRADEBALL_AUTH_TOKEN (.env)")
             self._auth_token = manual_token
             self._cookies = manual_cookies or ""
             self._use_token_mode = True
             return  # Skip browser setup - use direct API calls
         
-        # Priority 2: Auto-login with credentials
-        username = os.environ.get("TRADEBALL_USERNAME")
-        password = os.environ.get("TRADEBALL_PASSWORD")
+        # Priority 2: Auto-login with credentials from settings/.env
+        username = settings.tradeball_username
+        password = settings.tradeball_password
         
         if username and password:
-            self.logger.info("Credentials found, attempting auto-login...")
+            self.logger.info("Credentials found in .env, attempting auto-login...")
             await self._setup_browser()
             
             login_success = await self._perform_login(username, password)
@@ -112,7 +112,7 @@ class TradeballScraper(BaseScraper):
                 return
         
         # Priority 3: Anonymous browser session (will likely fail)
-        self.logger.warning("No auth configured (set TRADEBALL_USERNAME/PASSWORD or TRADEBALL_AUTH_TOKEN)")
+        self.logger.warning("No auth configured (set TRADEBALL_USERNAME/PASSWORD in .env)")
         await self._setup_browser()
     
     async def _setup_browser(self):
@@ -318,11 +318,11 @@ class TradeballScraper(BaseScraper):
     
     async def _retry_with_relogin(self, url: str, date_str: Optional[str]) -> List[ScrapedOdds]:
         """Attempt to re-login and retry fetch after 401 error."""
-        username = os.environ.get("TRADEBALL_USERNAME")
-        password = os.environ.get("TRADEBALL_PASSWORD")
+        username = settings.tradeball_username
+        password = settings.tradeball_password
         
         if not username or not password:
-            self.logger.error("Cannot re-login: no credentials configured")
+            self.logger.error("Cannot re-login: no credentials configured in .env")
             return []
         
         self.logger.info("Attempting re-login after 401...")
