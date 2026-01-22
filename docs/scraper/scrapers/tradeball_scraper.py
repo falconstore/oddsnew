@@ -135,7 +135,7 @@ class TradeballScraper(BaseScraper):
         return all_odds
     
     async def _fetch_day(self, date_str: Optional[str] = None) -> List[ScrapedOdds]:
-        """Fetch all matches for a specific day using direct HTTP request."""
+        """Fetch all matches for a specific day using page.goto (browser context)."""
         try:
             if date_str:
                 # Future day: marketId=3, with date in filter
@@ -168,26 +168,57 @@ class TradeballScraper(BaseScraper):
                 f"&version=0&locale=pt"
             )
             
-            # Use Playwright's request API - gets raw JSON using browser session cookies
-            response = await self._context.request.fetch(
-                url,
-                headers={
-                    "Accept": "application/json, text/plain, */*",
-                    "X-Requested-With": "XMLHttpRequest",
-                    "Referer": "https://tradeball.betbra.bet.br/dballTradingFeed"
-                }
-            )
+            # Use page.goto() like betbra_scraper - browser handles authentication
+            response = await self._page.goto(url, wait_until="domcontentloaded", timeout=30000)
             
-            if response.status != 200:
-                self.logger.error(f"API error for {date_str or 'today'}: status={response.status}")
+            if not response or response.status != 200:
+                self.logger.error(f"API error for {date_str or 'today'}: status={response.status if response else 'no response'}")
                 return []
             
-            # Get raw JSON directly (no HTML rendering!)
-            data = await response.json()
+            # Extract JSON from page content (browser may wrap it in HTML)
+            body_text = await self._page.content()
             
-            self.logger.debug(f"Fetched {len(data) if isinstance(data, list) else 'dict'} items for {date_str or 'today'}")
+            # Try to find JSON array or object in the response
+            # First try: look for content in <pre> tag (common for JSON display)
+            pre_match = re.search(r'<pre[^>]*>(.*?)</pre>', body_text, re.DOTALL | re.IGNORECASE)
+            if pre_match:
+                json_text = pre_match.group(1).strip()
+                json_text = json_text.replace('&quot;', '"').replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>')
+                try:
+                    data = json.loads(json_text)
+                    self.logger.debug(f"Parsed {len(data) if isinstance(data, list) else 'dict'} items from <pre> for {date_str or 'today'}")
+                    return self._parse_response(data)
+                except json.JSONDecodeError:
+                    pass
             
-            return self._parse_response(data)
+            # Second try: extract from body directly (strip all HTML tags)
+            body_match = re.search(r'<body[^>]*>(.*?)</body>', body_text, re.DOTALL | re.IGNORECASE)
+            if body_match:
+                body_content = body_match.group(1).strip()
+                # Remove all HTML tags
+                body_clean = re.sub(r'<[^>]+>', '', body_content).strip()
+                # Decode HTML entities
+                body_clean = body_clean.replace('&quot;', '"').replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>')
+                if body_clean and (body_clean.startswith('[') or body_clean.startswith('{')):
+                    try:
+                        data = json.loads(body_clean)
+                        self.logger.debug(f"Parsed {len(data) if isinstance(data, list) else 'dict'} items from body for {date_str or 'today'}")
+                        return self._parse_response(data)
+                    except json.JSONDecodeError as e:
+                        self.logger.debug(f"JSON decode error: {e}, content preview: {body_clean[:200]}")
+            
+            # Third try: raw regex for JSON structures
+            json_match = re.search(r'(\[[\s\S]*\]|\{[\s\S]*\})', body_text)
+            if json_match:
+                try:
+                    data = json.loads(json_match.group(1))
+                    self.logger.debug(f"Parsed {len(data) if isinstance(data, list) else 'dict'} items from regex for {date_str or 'today'}")
+                    return self._parse_response(data)
+                except json.JSONDecodeError:
+                    pass
+            
+            self.logger.warning(f"No valid JSON found for {date_str or 'today'}")
+            return []
             
         except Exception as e:
             self.logger.error(f"Fetch failed for {date_str or 'today'}: {e}")
