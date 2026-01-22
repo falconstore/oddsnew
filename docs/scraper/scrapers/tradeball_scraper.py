@@ -135,7 +135,7 @@ class TradeballScraper(BaseScraper):
         return all_odds
     
     async def _fetch_day(self, date_str: Optional[str] = None) -> List[ScrapedOdds]:
-        """Fetch all matches for a specific day."""
+        """Fetch all matches for a specific day using direct HTTP request."""
         try:
             if date_str:
                 # Future day: marketId=3, with date in filter
@@ -168,52 +168,26 @@ class TradeballScraper(BaseScraper):
                 f"&version=0&locale=pt"
             )
             
-            # Use response interception to get raw JSON before HTML rendering
-            json_data = None
+            # Use Playwright's request API - gets raw JSON using browser session cookies
+            response = await self._context.request.fetch(
+                url,
+                headers={
+                    "Accept": "application/json, text/plain, */*",
+                    "X-Requested-With": "XMLHttpRequest",
+                    "Referer": "https://tradeball.betbra.bet.br/dballTradingFeed"
+                }
+            )
             
-            async def handle_response(response):
-                nonlocal json_data
-                if "feedDball/list" in response.url:
-                    try:
-                        json_data = await response.json()
-                    except Exception:
-                        pass
+            if response.status != 200:
+                self.logger.error(f"API error for {date_str or 'today'}: status={response.status}")
+                return []
             
-            self._page.on("response", handle_response)
+            # Get raw JSON directly (no HTML rendering!)
+            data = await response.json()
             
-            try:
-                await self._page.goto(url, wait_until="networkidle", timeout=30000)
-                await self._page.wait_for_timeout(1000)
-            finally:
-                self._page.remove_listener("response", handle_response)
+            self.logger.debug(f"Fetched {len(data) if isinstance(data, list) else 'dict'} items for {date_str or 'today'}")
             
-            if json_data is not None:
-                return self._parse_response(json_data)
-            
-            # Fallback: extract from body text
-            body_text = await self._page.content()
-            
-            # Try to extract from <pre> first (Chrome renders JSON in <pre>)
-            pre_match = re.search(r'<pre[^>]*>(.*?)</pre>', body_text, re.DOTALL)
-            if pre_match:
-                json_text = pre_match.group(1).strip()
-                # Clean HTML entities
-                json_text = json_text.replace('&quot;', '"').replace('&amp;', '&')
-                data = json.loads(json_text)
-                return self._parse_response(data)
-            
-            # Try to extract from body directly
-            body_match = re.search(r'<body[^>]*>(.*?)</body>', body_text, re.DOTALL | re.IGNORECASE)
-            if body_match:
-                body_content = body_match.group(1).strip()
-                # Remove all HTML tags
-                body_clean = re.sub(r'<[^>]+>', '', body_content).strip()
-                if body_clean.startswith('[') or body_clean.startswith('{'):
-                    data = json.loads(body_clean)
-                    return self._parse_response(data)
-            
-            self.logger.warning(f"No JSON found for {date_str or 'today'}")
-            return []
+            return self._parse_response(data)
             
         except Exception as e:
             self.logger.error(f"Fetch failed for {date_str or 'today'}: {e}")
