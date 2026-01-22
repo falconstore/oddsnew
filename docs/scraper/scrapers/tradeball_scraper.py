@@ -22,8 +22,9 @@ class TradeballScraper(BaseScraper):
         "Spain LaLiga": {"name": "La Liga", "country": "Spain"},
         "Germany Bundesliga": {"name": "Bundesliga", "country": "Germany"},
         "Italy Serie A": {"name": "Serie A", "country": "Italy"},
-        "Brazil Paulista": {"name": "Paulistão", "country": "Brazil"},
+        "Brazil Paulista": {"name": "Paulistao", "country": "Brazil"},
         "Brazil Serie A": {"name": "Brasileirão Série A", "country": "Brazil"},
+        "France Ligue 1": {"name": "Ligue 1", "country": "France"},
     }
     
     API_BASE = "https://tradeball.betbra.bet.br/api/feedDball/list"
