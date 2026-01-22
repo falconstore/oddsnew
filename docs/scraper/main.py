@@ -56,6 +56,7 @@ from scrapers.esportivabet_nba_scraper import EsportivabetNBAScraper
 from scrapers.jogodeouro_scraper import JogodeOuroScraper
 from scrapers.jogodeouro_nba_scraper import JogodeOuroNBAScraper
 from scrapers.bet365_scraper import Bet365Scraper
+from scrapers.tradeball_scraper import TradeballScraper
 
 
 def setup_logging():
@@ -113,7 +114,8 @@ def create_orchestrator() -> Orchestrator:
     orchestrator.register_scraper(Aposta1Scraper())
     orchestrator.register_scraper(EsportivabetScraper())
     orchestrator.register_scraper(JogodeOuroScraper())
-    orchestrator.register_scraper(Bet365Scraper())  # Via RadarOdds API
+    orchestrator.register_scraper(Bet365Scraper())  # Via odds-api.io
+    orchestrator.register_scraper(TradeballScraper())  # Betbra Dball Exchange
     
     # Register scrapers - NBA Basketball
     orchestrator.register_scraper(BetanoNBAScraper())
