@@ -218,12 +218,22 @@ function generateBookmakerLink(
     }
   }
   
-  // Bet365 - URL direta do odds-api.io
+  // Bet365 - URL direta do odds-api.io ou fallback via event_id
   if (name.includes('bet365')) {
+    // Prioridade 1: URL direta da API
     const bet365Url = extraData.bet365_url as string;
     if (bet365Url) {
       return bet365Url;
     }
+    
+    // Prioridade 2: Construir URL via event_id
+    const eventId = extraData.event_id;
+    if (eventId) {
+      return `https://www.bet365.com/#/AC/B1/C1/D8/E${eventId}/F3/`;
+    }
+    
+    // Prioridade 3: Fallback genérico
+    return 'https://www.bet365.com/';
   }
   
   if (name.includes('aposta1')) {
