@@ -137,6 +137,21 @@ class TradeballScraper(BaseScraper):
     
     async def _fetch_day(self, date_str: Optional[str] = None) -> List[ScrapedOdds]:
         """Fetch all matches for a specific day using page.goto (browser context)."""
+        captured_json = None
+        
+        async def capture_response(response):
+            """Intercept API response to get raw JSON before any rendering."""
+            nonlocal captured_json
+            if self.API_BASE in response.url and captured_json is None:
+                try:
+                    content_type = response.headers.get("content-type", "")
+                    if "application/json" in content_type or response.url.startswith(self.API_BASE):
+                        body = await response.body()
+                        captured_json = body.decode("utf-8")
+                        self.logger.debug(f"Intercepted JSON response ({len(captured_json)} bytes)")
+                except Exception as e:
+                    self.logger.debug(f"Failed to capture response: {e}")
+        
         try:
             if date_str:
                 # Future day: marketId=3, with date in filter
@@ -177,57 +192,91 @@ class TradeballScraper(BaseScraper):
                 f"&locale=pt"
             )
             
-            # Use page.goto() like betbra_scraper - browser handles authentication
-            response = await self._page.goto(url, wait_until="domcontentloaded", timeout=30000)
+            # Register response interceptor BEFORE navigation
+            self._page.on("response", capture_response)
             
-            if not response or response.status != 200:
-                self.logger.error(f"API error for {date_str or 'today'}: status={response.status if response else 'no response'}")
-                return []
-            
-            # Extract JSON from page content (browser may wrap it in HTML)
-            body_text = await self._page.content()
-            
-            # Try to find JSON array or object in the response
-            # First try: look for content in <pre> tag (common for JSON display)
-            pre_match = re.search(r'<pre[^>]*>(.*?)</pre>', body_text, re.DOTALL | re.IGNORECASE)
-            if pre_match:
-                json_text = pre_match.group(1).strip()
-                json_text = json_text.replace('&quot;', '"').replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>')
-                try:
-                    data = json.loads(json_text)
-                    self.logger.debug(f"Parsed {len(data) if isinstance(data, list) else 'dict'} items from <pre> for {date_str or 'today'}")
-                    return self._parse_response(data)
-                except json.JSONDecodeError:
-                    pass
-            
-            # Second try: extract from body directly (strip all HTML tags)
-            body_match = re.search(r'<body[^>]*>(.*?)</body>', body_text, re.DOTALL | re.IGNORECASE)
-            if body_match:
-                body_content = body_match.group(1).strip()
-                # Remove all HTML tags
-                body_clean = re.sub(r'<[^>]+>', '', body_content).strip()
-                # Decode HTML entities
-                body_clean = body_clean.replace('&quot;', '"').replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>')
-                if body_clean and (body_clean.startswith('[') or body_clean.startswith('{')):
+            try:
+                # Navigate to API URL
+                response = await self._page.goto(url, wait_until="domcontentloaded", timeout=30000)
+                
+                # Wait a moment for response interception
+                await self._page.wait_for_timeout(500)
+                
+                # Log response info for debugging
+                if response:
+                    self.logger.debug(f"Response status: {response.status}, URL: {response.url[:80]}...")
+                
+                # Priority 1: Use intercepted JSON (most reliable)
+                if captured_json:
                     try:
-                        data = json.loads(body_clean)
-                        self.logger.debug(f"Parsed {len(data) if isinstance(data, list) else 'dict'} items from body for {date_str or 'today'}")
+                        data = json.loads(captured_json)
+                        self.logger.debug(f"Parsed {len(data) if isinstance(data, list) else 'dict'} from intercepted response")
                         return self._parse_response(data)
                     except json.JSONDecodeError as e:
-                        self.logger.debug(f"JSON decode error: {e}, content preview: {body_clean[:200]}")
-            
-            # Third try: raw regex for JSON structures
-            json_match = re.search(r'(\[[\s\S]*\]|\{[\s\S]*\})', body_text)
-            if json_match:
+                        self.logger.warning(f"Intercepted content not valid JSON: {e}")
+                
+                # Priority 2: Try response.body() directly
+                if response and response.status == 200:
+                    try:
+                        body = await response.body()
+                        body_text = body.decode("utf-8").strip()
+                        
+                        # Remove BOM if present
+                        if body_text.startswith('\ufeff'):
+                            body_text = body_text[1:]
+                        
+                        if body_text.startswith('[') or body_text.startswith('{'):
+                            data = json.loads(body_text)
+                            self.logger.debug(f"Parsed {len(data) if isinstance(data, list) else 'dict'} from response.body()")
+                            return self._parse_response(data)
+                        else:
+                            self.logger.debug(f"Response body not JSON, starts with: {body_text[:100]}")
+                    except Exception as e:
+                        self.logger.debug(f"response.body() failed: {e}")
+                
+                # Priority 3: Fallback to page.evaluate fetch (uses browser context)
+                self.logger.debug("Trying page.evaluate fetch as fallback...")
                 try:
-                    data = json.loads(json_match.group(1))
-                    self.logger.debug(f"Parsed {len(data) if isinstance(data, list) else 'dict'} items from regex for {date_str or 'today'}")
-                    return self._parse_response(data)
-                except json.JSONDecodeError:
+                    fetch_result = await self._page.evaluate("""
+                        async (url) => {
+                            try {
+                                const resp = await fetch(url, {
+                                    credentials: 'include',
+                                    headers: {
+                                        'Accept': 'application/json, text/plain, */*',
+                                        'X-Requested-With': 'XMLHttpRequest'
+                                    }
+                                });
+                                const text = await resp.text();
+                                return { status: resp.status, text: text };
+                            } catch (e) {
+                                return { error: e.message };
+                            }
+                        }
+                    """, url)
+                    
+                    if fetch_result and not fetch_result.get("error"):
+                        fetch_text = fetch_result.get("text", "").strip()
+                        if fetch_text.startswith('[') or fetch_text.startswith('{'):
+                            data = json.loads(fetch_text)
+                            self.logger.debug(f"Parsed {len(data) if isinstance(data, list) else 'dict'} from page.evaluate fetch")
+                            return self._parse_response(data)
+                        else:
+                            self.logger.debug(f"Fetch result not JSON: {fetch_text[:100]}")
+                    else:
+                        self.logger.debug(f"Fetch error: {fetch_result.get('error')}")
+                except Exception as e:
+                    self.logger.debug(f"page.evaluate fetch failed: {e}")
+                
+                self.logger.warning(f"No valid JSON found for {date_str or 'today'}")
+                return []
+                
+            finally:
+                # Remove the response handler to avoid accumulation
+                try:
+                    self._page.remove_listener("response", capture_response)
+                except:
                     pass
-            
-            self.logger.warning(f"No valid JSON found for {date_str or 'today'}")
-            return []
             
         except Exception as e:
             self.logger.error(f"Fetch failed for {date_str or 'today'}: {e}")
