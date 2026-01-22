@@ -207,9 +207,14 @@ class TradeballScraper(BaseScraper):
         odds_list = []
         
         matches = data.get("data", [])
+        self.logger.info(f"API retornou {len(matches)} eventos para {date_str or 'today'}")
+        
         if not matches:
-            self.logger.debug(f"No matches found for {date_str or 'today'}")
             return []
+        
+        # Log clIds encontrados para descobrir mapeamentos faltantes
+        cl_ids = set(m.get("clId") for m in matches)
+        self.logger.info(f"clIds encontrados: {cl_ids}")
         
         for match in matches:
             try:
@@ -217,6 +222,7 @@ class TradeballScraper(BaseScraper):
                 cl_id = match.get("clId")
                 league_info = self.LEAGUE_MAPPING.get(cl_id)
                 if not league_info:
+                    self.logger.debug(f"Liga ignorada: clId={cl_id}, {match.get('ht')} vs {match.get('at')}")
                     continue  # Skip unknown leagues
                 
                 # Team names
@@ -259,7 +265,7 @@ class TradeballScraper(BaseScraper):
                 match_url = f"https://tradeball.betbra.bet.br/dballEvent/{event_id}" if event_id else None
                 
                 odds = ScrapedOdds(
-                    bookmaker="betbra",
+                    bookmaker="tradeball",
                     home_team=home_team,
                     away_team=away_team,
                     league=league_info["name"],
