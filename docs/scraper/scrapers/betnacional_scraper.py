@@ -151,22 +151,37 @@ class BetnacionalScraper(BaseScraper):
         
         self._page = await self._context.new_page()
         
-        # Warm-up: resolve Cloudflare
-        try:
-            self.logger.info("[Betnacional] Warm-up: resolvendo Cloudflare...")
-            await self._page.goto(self.WARMUP_URL, wait_until="domcontentloaded", timeout=15000)
-            await self._page.wait_for_timeout(1500)
-            
-            # First API request to establish session
-            first_api_url = f"{self.API_BASE_URL}?sport_id=1&category_id=0&tournament_id=17&markets=1&filter_time_event="
-            await self._page.goto(first_api_url, wait_until="load", timeout=10000)
-            await self._page.wait_for_timeout(500)
-            
-            self._setup_done = True
-            self.logger.info("[Betnacional] Warm-up concluido")
-        except Exception as e:
-            self.logger.warning(f"[Betnacional] Warm-up falhou: {e}")
-            self._setup_done = True
+        # Warm-up com retry
+        max_retries = 2
+        for attempt in range(max_retries):
+            try:
+                self.logger.info(f"[Betnacional] Warm-up tentativa {attempt + 1}/{max_retries}...")
+                await self._page.goto(self.WARMUP_URL, wait_until="domcontentloaded", timeout=20000)
+                await self._page.wait_for_timeout(2000)
+                
+                # Primeira requisição API para estabelecer sessão
+                first_api_url = f"{self.API_BASE_URL}?sport_id=1&category_id=0&tournament_id=17&markets=1&filter_time_event="
+                await self._page.goto(first_api_url, wait_until="load", timeout=15000)
+                await self._page.wait_for_timeout(500)
+                
+                self._setup_done = True
+                self.logger.info("[Betnacional] Warm-up concluido com sucesso")
+                return  # Sucesso, sair do loop
+                
+            except Exception as e:
+                self.logger.warning(f"[Betnacional] Warm-up tentativa {attempt + 1} falhou: {e}")
+                if attempt < max_retries - 1:
+                    # Recriar page para próxima tentativa
+                    try:
+                        await self._page.close()
+                    except:
+                        pass
+                    self._page = await self._context.new_page()
+                    await asyncio.sleep(2)
+                else:
+                    # Última tentativa falhou - raise para não continuar com browser inválido
+                    self.logger.error("[Betnacional] Warm-up falhou após todas tentativas!")
+                    raise RuntimeError(f"Betnacional warm-up failed: {e}")
     
     async def teardown(self):
         """Close Playwright resources."""
@@ -189,26 +204,39 @@ class BetnacionalScraper(BaseScraper):
     
     async def scrape_all(self) -> List[ScrapedOdds]:
         """Scrape all sports using shared Playwright session."""
-        if not self._context:
-            await self.setup()
-        
         all_odds = []
         
         try:
+            # Setup com tratamento de erro
+            if not self._context:
+                await self.setup()
+            
             # Football leagues (1X2)
             for league_id, config in self.FOOTBALL_LEAGUES.items():
-                odds = await self._scrape_sport(config, self.SPORT_FOOTBALL, self.MARKET_1X2, "football")
-                all_odds.extend(odds)
-                self.logger.info(f"[Betnacional] {config['name']}: {len(odds)} jogos")
+                try:
+                    odds = await self._scrape_sport(config, self.SPORT_FOOTBALL, self.MARKET_1X2, "football")
+                    all_odds.extend(odds)
+                    self.logger.info(f"[Betnacional] {config['name']}: {len(odds)} jogos")
+                except Exception as e:
+                    self.logger.error(f"[Betnacional] Erro em {config['name']}: {e}")
+                    continue
             
             # Basketball leagues (Moneyline)
             for league_id, config in self.BASKETBALL_LEAGUES.items():
-                odds = await self._scrape_sport(config, self.SPORT_BASKETBALL, self.MARKET_MONEYLINE, "basketball")
-                all_odds.extend(odds)
-                self.logger.info(f"[Betnacional NBA] {config['name']}: {len(odds)} jogos")
+                try:
+                    odds = await self._scrape_sport(config, self.SPORT_BASKETBALL, self.MARKET_MONEYLINE, "basketball")
+                    all_odds.extend(odds)
+                    self.logger.info(f"[Betnacional NBA] {config['name']}: {len(odds)} jogos")
+                except Exception as e:
+                    self.logger.error(f"[Betnacional NBA] Erro em {config['name']}: {e}")
+                    continue
             
             self.logger.info(f"[Betnacional] Total: {len(all_odds)} odds coletadas")
             
+        except RuntimeError as e:
+            # Setup falhou completamente
+            self.logger.error(f"[Betnacional] Scraper não pode iniciar: {e}")
+            return []
         finally:
             await self.teardown()
         
@@ -236,10 +264,19 @@ class BetnacionalScraper(BaseScraper):
         tournament_id = config["tournament_id"]
         league_name = config["name"]
         
+        # Verificar se page ainda está válida
+        if not self._page or self._page.is_closed():
+            self.logger.warning(f"[Betnacional] {league_name}: Page inválida, tentando recriar...")
+            try:
+                self._page = await self._context.new_page()
+            except Exception as e:
+                self.logger.error(f"[Betnacional] Não foi possível recriar page: {e}")
+                return []
+        
         url = f"{self.API_BASE_URL}?sport_id={sport_id}&category_id=0&tournament_id={tournament_id}&markets={market_id}&filter_time_event="
         
         try:
-            response = await self._page.goto(url, wait_until="load", timeout=8000)
+            response = await self._page.goto(url, wait_until="load", timeout=10000)
             
             if response and response.ok:
                 body_text = await self._page.evaluate("() => document.body.innerText")
