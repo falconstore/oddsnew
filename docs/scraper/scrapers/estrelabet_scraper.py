@@ -27,6 +27,16 @@ class EstrelabetScraper(BaseScraper):
         "serie_a": {"champ_id": "2942", "name": "Serie A", "country": "Italia"},
         "premier_league": {"champ_id": "2936", "name": "Premier League", "country": "Inglaterra"},
         "la_liga": {"champ_id": "2941", "name": "La Liga", "country": "Espanha"},
+	    "bundesliga": {"champ_id": "2950", "name": "Bundesliga", "country": "Alemanha"},
+	    "ligue_1": {"champ_id": "2943", "name": "Ligue 1", "country": "Franca"},
+	    "paulista": {"champ_id": "3436", "name": "Paulistao A1", "country": "Brasil"},
+	    "fa_cup": {"champ_id": "2935", "name": "FA Cup", "country": "Inglaterra"},
+	    "efl_cup": {"champ_id": "2972", "name": "EFL Cup", "country": "Inglaterra"},
+	    "champions_league": {"champ_id": "16808", "name": "Champions League", "country": "Europa"},
+        "copa_do_rei": {"champ_id": "2973", "name": "Copa do Rei", "country": "Espanha"},
+        "liga_europa": {"champ_id": "16809", "name": "Liga Europa", "country": "Europa"},
+        "liga_da_conferencia": {"champ_id": "31608", "name": "Liga da Conferencia", "country": "Europa"},
+        "eredivisie": {"champ_id": "3065", "name": "Eredivisie", "country": "Holanda"},
     }
     
     # Basketball leagues (sportId=67, market typeId=219 for Moneyline)
