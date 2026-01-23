@@ -1,687 +1,449 @@
 """
+Betnacional Unified Scraper - Football and NBA Basketball.
+Uses Playwright for Cloudflare bypass with optimized page.goto.
 
-Betnacional Scraper - Playwright only (Cloudflare bypass).
+Sport IDs:
+- Football: sport_id=1, markets=1 (1X2)
+- Basketball: sport_id=2, markets=219 (Moneyline)
 
-Otimizado com page.goto + wait_until="load" para maior velocidade.
-
-
-
-API: https://prod-global-bff-events.bet6.com.br/api/odds/1/events-by-seasons
-
+Outcome IDs:
+- Football: 1=Home, 2=Draw, 3=Away
+- Basketball: 4=Home, 5=Away
 """
 
-
-
 import asyncio
-
 import json
-
 from datetime import datetime
-
 from typing import List, Optional, Dict, Any
-
 from loguru import logger
-
 from collections import defaultdict
 
-
-
 from base_scraper import BaseScraper, ScrapedOdds, LeagueConfig
-
 from playwright.async_api import async_playwright, Browser, BrowserContext, Page
 
 
-
-
-
 class BetnacionalScraper(BaseScraper):
-
     """
-
-    Scraper para Betnacional usando Playwright.
-
-    Otimizado para fazer requisições paralelas via context.request.
-
+    Unified scraper for Betnacional using Playwright.
+    Handles both Football (1X2) and Basketball (Moneyline).
+    Single browser session for all sports.
     """
-
     
-
     API_BASE_URL = "https://prod-global-bff-events.bet6.com.br/api/odds/1/events-by-seasons"
-
     WARMUP_URL = "https://betnacional.bet.br/sports/futebol"
-
     
-
-    # Ligas configuradas (tournament_id da API)
-
-    LEAGUES = {
-
+    # Sport IDs
+    SPORT_FOOTBALL = "1"
+    SPORT_BASKETBALL = "2"
+    
+    # Market IDs
+    MARKET_1X2 = "1"
+    MARKET_MONEYLINE = "219"
+    
+    # Football leagues
+    FOOTBALL_LEAGUES = {
         "premier_league": {
-
             "tournament_id": "17",
-
             "name": "Premier League",
-
             "country": "Inglaterra"
-
         },
-
         "serie_a": {
-
             "tournament_id": "23",
-
             "name": "Serie A",
-
             "country": "Italia"
-
         },
-
         "la_liga": {
-
             "tournament_id": "8",
-
             "name": "La Liga",
-
             "country": "Espanha"
-
         },
-
         "bundesliga": {
-
             "tournament_id": "35",
-
             "name": "Bundesliga",
-
             "country": "Alemanha"
-
         },
-
         "ligue_1": {
-
             "tournament_id": "34",
-
             "name": "Ligue 1",
-
             "country": "Franca"
-
         },
-
         "paulistao": {
-
             "tournament_id": "372",
-
             "name": "Paulistao",
-
             "country": "Brasil"
-
         },
-
         "fa_cup": {
-
             "tournament_id": "19",
-
             "name": "FA Cup",
-
             "country": "Inglaterra"
-
         },
-
         "efl_cup": {
-
             "tournament_id": "21",
-
             "name": "EFL Cup",
-
             "country": "Inglaterra"
-
         },
-
         "champions_league": {
-
             "tournament_id": "7",
-
             "name": "Champions League",
-
             "country": "Europa"
-
         },
-
         "liga_europa": {
-
             "tournament_id": "679",
-
             "name": "Liga Europa",
-
             "country": "Europa"
-
         },
-
         "eredivisie": {
-
             "tournament_id": "37",
-
             "name": "Eredivisie",
-
             "country": "Holanda"
-
         },
     }
-
     
-
+    # Basketball leagues
+    BASKETBALL_LEAGUES = {
+        "nba": {
+            "tournament_id": "132",
+            "name": "NBA",
+            "country": "USA"
+        }
+    }
+    
+    # Compatibility alias
+    LEAGUES = FOOTBALL_LEAGUES
+    
     def __init__(self):
-
         super().__init__(name="betnacional", base_url="https://betnacional.bet.br")
-
         self.logger = logger.bind(component="betnacional")
-
         # Playwright resources
-
         self._playwright = None
-
         self._browser: Optional[Browser] = None
-
         self._context: Optional[BrowserContext] = None
-
         self._page: Optional[Page] = None
-
         self._setup_done = False
-
     
-
     async def setup(self):
-
-        """Inicializa Playwright e resolve Cloudflare uma vez."""
-
-        self.logger.info("Iniciando Playwright Betnacional...")
-
+        """Initialize Playwright and resolve Cloudflare once."""
+        self.logger.info("[Betnacional] Iniciando Playwright...")
         self._playwright = await async_playwright().start()
-
         
-
         self._browser = await self._playwright.chromium.launch(
-
             headless=True,
-
             args=[
-
                 "--disable-blink-features=AutomationControlled",
-
                 "--disable-dev-shm-usage",
-
                 "--no-sandbox",
-
             ]
-
         )
-
         
-
         self._context = await self._browser.new_context(
-
             user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
-
             locale="pt-BR",
-
             timezone_id="America/Sao_Paulo",
-
             viewport={"width": 1920, "height": 1080},
-
         )
-
         
-
-        # Stealth: esconder webdriver
-
+        # Stealth: hide webdriver
         await self._context.add_init_script("""
-
             Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-
             Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
-
             Object.defineProperty(navigator, 'languages', { get: () => ['pt-BR', 'pt', 'en-US', 'en'] });
-
         """)
-
         
-
         self._page = await self._context.new_page()
-
         
-
-        # Warm-up: resolver Cloudflare + primeira requisição API
-
+        # Warm-up: resolve Cloudflare
         try:
-
-            self.logger.info("Warm-up: resolvendo Cloudflare...")
-
+            self.logger.info("[Betnacional] Warm-up: resolvendo Cloudflare...")
             await self._page.goto(self.WARMUP_URL, wait_until="domcontentloaded", timeout=15000)
-
             await self._page.wait_for_timeout(1500)
-
             
-
-            # Fazer primeira requisição API via page.goto para estabelecer sessão
-
+            # First API request to establish session
             first_api_url = f"{self.API_BASE_URL}?sport_id=1&category_id=0&tournament_id=17&markets=1&filter_time_event="
-
             await self._page.goto(first_api_url, wait_until="load", timeout=10000)
-
             await self._page.wait_for_timeout(500)
-
             
-
             self._setup_done = True
-
-            self.logger.info("Warm-up concluido")
-
+            self.logger.info("[Betnacional] Warm-up concluido")
         except Exception as e:
-
-            self.logger.warning(f"Warm-up falhou: {e}")
-
+            self.logger.warning(f"[Betnacional] Warm-up falhou: {e}")
             self._setup_done = True
-
     
-
     async def teardown(self):
-
-        """Fecha recursos do Playwright."""
-
+        """Close Playwright resources."""
         if self._page:
-
             await self._page.close()
-
         if self._context:
-
             await self._context.close()
-
         if self._browser:
-
             await self._browser.close()
-
         if self._playwright:
-
             await self._playwright.stop()
-
-
+        self.logger.info("[Betnacional] Playwright encerrado")
 
     async def get_available_leagues(self) -> List[LeagueConfig]:
-
+        """Return list of configured football leagues (for compatibility)."""
         return [
-
             LeagueConfig(league_id=k, name=v["name"], url="", country=v["country"]) 
-
-            for k, v in self.LEAGUES.items()
-
+            for k, v in self.FOOTBALL_LEAGUES.items()
         ]
-
     
-
     async def scrape_all(self) -> List[ScrapedOdds]:
-
-        """Busca todas as ligas sequencialmente com page.goto otimizado."""
-
+        """Scrape all sports using shared Playwright session."""
         if not self._context:
-
             await self.setup()
-
         
-
-        leagues = await self.get_available_leagues()
-
-        self.logger.info(f"Buscando {len(leagues)} ligas...")
-
-        
-
         all_odds = []
-
-        for league in leagues:
-
-            result = await self._fetch_league_fast(league)
-
-            all_odds.extend(result)
-
-            self.logger.info(f"Collected {len(result)} odds from {league.name}")
-
         
-
-        return all_odds
-
-    
-
-    async def _fetch_league_fast(self, league: LeagueConfig) -> List[ScrapedOdds]:
-
-        """Busca odds via page.goto otimizado (load ao invés de networkidle)."""
-
-        league_config = self.LEAGUES.get(league.league_id)
-
-        if not league_config:
-
-            for k, v in self.LEAGUES.items():
-
-                if v["name"] == league.name:
-
-                    league_config = v
-
-                    break
-
-        
-
-        if not league_config:
-
-            self.logger.warning(f"Liga nao configurada: {league.name}")
-
-            return []
-
-        
-
-        tournament_id = league_config["tournament_id"]
-
-        url = f"{self.API_BASE_URL}?sport_id=1&category_id=0&tournament_id={tournament_id}&markets=1&filter_time_event="
-
-        
-
         try:
-
-            # page.goto com wait_until="load" é mais rápido que "networkidle"
-
-            response = await self._page.goto(url, wait_until="load", timeout=8000)
-
+            # Football leagues (1X2)
+            for league_id, config in self.FOOTBALL_LEAGUES.items():
+                odds = await self._scrape_sport(config, self.SPORT_FOOTBALL, self.MARKET_1X2, "football")
+                all_odds.extend(odds)
+                self.logger.info(f"[Betnacional] {config['name']}: {len(odds)} jogos")
             
+            # Basketball leagues (Moneyline)
+            for league_id, config in self.BASKETBALL_LEAGUES.items():
+                odds = await self._scrape_sport(config, self.SPORT_BASKETBALL, self.MARKET_MONEYLINE, "basketball")
+                all_odds.extend(odds)
+                self.logger.info(f"[Betnacional NBA] {config['name']}: {len(odds)} jogos")
+            
+            self.logger.info(f"[Betnacional] Total: {len(all_odds)} odds coletadas")
+            
+        finally:
+            await self.teardown()
+        
+        return all_odds
+    
+    async def scrape_league(self, league: LeagueConfig) -> List[ScrapedOdds]:
+        """Scrape odds for a specific football league (compatibility method)."""
+        if not self._context:
+            await self.setup()
+        
+        league_config = None
+        for k, v in self.FOOTBALL_LEAGUES.items():
+            if v["name"] == league.name or k == league.league_id:
+                league_config = v
+                break
+        
+        if not league_config:
+            self.logger.warning(f"[Betnacional] Liga nao configurada: {league.name}")
+            return []
+        
+        return await self._scrape_sport(league_config, self.SPORT_FOOTBALL, self.MARKET_1X2, "football")
 
+    async def _scrape_sport(self, config: Dict[str, Any], sport_id: str, market_id: str, sport_type: str) -> List[ScrapedOdds]:
+        """Generic method to scrape any sport."""
+        tournament_id = config["tournament_id"]
+        league_name = config["name"]
+        
+        url = f"{self.API_BASE_URL}?sport_id={sport_id}&category_id=0&tournament_id={tournament_id}&markets={market_id}&filter_time_event="
+        
+        try:
+            response = await self._page.goto(url, wait_until="load", timeout=8000)
+            
             if response and response.ok:
-
                 body_text = await self._page.evaluate("() => document.body.innerText")
-
                 data = json.loads(body_text)
-
-                return self._parse_odds(data, league.name)
-
-            else:
-
-                status = response.status if response else "N/A"
-
-                self.logger.warning(f"{league.name}: HTTP {status}")
-
-                return []
-
                 
-
+                if sport_type == "basketball":
+                    return self._parse_basketball_odds(data, league_name)
+                else:
+                    return self._parse_football_odds(data, league_name)
+            else:
+                status = response.status if response else "N/A"
+                self.logger.warning(f"[Betnacional] {league_name}: HTTP {status}")
+                return []
+                
         except Exception as e:
-
-            self.logger.error(f"{league.name}: {e}")
-
+            self.logger.error(f"[Betnacional] {league_name}: {e}")
             return []
 
-    
-
-    async def scrape_league(self, league: LeagueConfig) -> List[ScrapedOdds]:
-
-        """Fallback para scrape individual (compatibilidade)."""
-
-        if not self._context:
-
-            await self.setup()
-
-        
-
-        return await self._fetch_league_api(league)
-
-
-
-    def _parse_odds(self, data: Dict[str, Any], league_name: str) -> List[ScrapedOdds]:
-
-        """
-
-        Parseia a resposta da API.
-
-        
-
-        Estrutura da resposta:
-
-        {
-
-            "odds": [
-
-                {
-
-                    "event_id": 61300903,
-
-                    "home": "Everton",
-
-                    "away": "Brentford",
-
-                    "date_start": "2026-01-04 12:00:00",
-
-                    "odd": 2.45,
-
-                    "outcome_id": "1",  # 1=Casa, 2=Empate, 3=Fora
-
-                    ...
-
-                },
-
-                ...
-
-            ]
-
-        }
-
-        """
-
+    def _parse_football_odds(self, data: Dict[str, Any], league_name: str) -> List[ScrapedOdds]:
+        """Parse football API response (1X2 market)."""
         results = []
-
         odds_list = data.get("odds", [])
-
         
-
         if not odds_list:
-
-            self.logger.debug(f"Nenhuma odd retornada para {league_name}")
-
             return results
-
         
-
-        # Agrupar odds por event_id
-
+        # Group odds by event_id
         events: Dict[int, Dict[str, Any]] = defaultdict(lambda: {
-
             "home": None,
-
             "away": None,
-
             "date_start": None,
-
             "odds": {}
-
         })
-
         
-
         for odd in odds_list:
-
             try:
-
                 event_id = odd.get("event_id")
-
                 if not event_id:
-
                     continue
-
                 
-
                 outcome_id = odd.get("outcome_id")
-
                 price = odd.get("odd")
-
                 
-
                 if outcome_id and price:
-
                     events[event_id]["odds"][outcome_id] = float(price)
-
                 
-
-                # Preencher dados do evento (apenas uma vez)
-
                 if events[event_id]["home"] is None:
-
                     events[event_id]["home"] = odd.get("home", "").strip()
-
                     events[event_id]["away"] = odd.get("away", "").strip()
-
                     events[event_id]["date_start"] = odd.get("date_start")
-
                     
-
             except Exception as e:
-
-                self.logger.debug(f"Erro ao processar odd: {e}")
-
+                self.logger.debug(f"[Betnacional] Erro ao processar odd: {e}")
                 continue
-
         
-
-        # Converter eventos agrupados em ScrapedOdds
-
+        # Convert grouped events to ScrapedOdds
         for event_id, event_data in events.items():
-
             try:
-
                 odds = event_data["odds"]
-
                 
-
-                # Precisamos das 3 odds para 1X2
-
+                # Football: 1=Home, 2=Draw, 3=Away
                 if "1" not in odds or "2" not in odds or "3" not in odds:
-
                     continue
-
                 
-
                 home_team = event_data["home"]
-
                 away_team = event_data["away"]
-
                 
-
                 if not home_team or not away_team:
-
                     continue
-
                 
-
-                # Parse da data
-
                 date_str = event_data["date_start"]
-
                 try:
-
                     match_date = datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
-
                 except:
-
                     match_date = datetime.now()
-
                 
-
                 scraped = ScrapedOdds(
-
                     bookmaker_name="betnacional",
-
                     home_team_raw=home_team,
-
                     away_team_raw=away_team,
-
                     league_raw=league_name,
-
                     match_date=match_date,
-
                     home_odd=odds["1"],
-
                     draw_odd=odds["2"],
-
                     away_odd=odds["3"],
-
                     market_type="1x2",
-
                     odds_type="SO",
-
                     extra_data={
-
                         "event_id": str(event_id)
-
                     }
-
                 )
-
                 results.append(scraped)
-
                 
-
             except Exception as e:
-
-                self.logger.debug(f"Erro ao criar ScrapedOdds: {e}")
-
+                self.logger.debug(f"[Betnacional] Erro ao criar ScrapedOdds: {e}")
                 continue
-
         
+        return results
 
-        self.logger.info(f"Betnacional: {len(results)} jogos parseados ({league_name})")
-
+    def _parse_basketball_odds(self, data: Dict[str, Any], league_name: str) -> List[ScrapedOdds]:
+        """Parse basketball API response (Moneyline market)."""
+        results = []
+        odds_list = data.get("odds", [])
+        
+        if not odds_list:
+            return results
+        
+        # Group odds by event_id
+        events: Dict[int, Dict[str, Any]] = defaultdict(lambda: {
+            "home": None,
+            "away": None,
+            "date_start": None,
+            "odds": {}
+        })
+        
+        for odd in odds_list:
+            try:
+                event_id = odd.get("event_id")
+                if not event_id:
+                    continue
+                
+                outcome_id = odd.get("outcome_id")
+                price = odd.get("odd")
+                
+                if outcome_id and price:
+                    events[event_id]["odds"][outcome_id] = float(price)
+                
+                if events[event_id]["home"] is None:
+                    events[event_id]["home"] = odd.get("home", "").strip()
+                    events[event_id]["away"] = odd.get("away", "").strip()
+                    events[event_id]["date_start"] = odd.get("date_start")
+                    
+            except Exception as e:
+                self.logger.debug(f"[Betnacional NBA] Erro ao processar odd: {e}")
+                continue
+        
+        # Convert grouped events to ScrapedOdds
+        for event_id, event_data in events.items():
+            try:
+                odds = event_data["odds"]
+                
+                # Basketball: 4=Home, 5=Away
+                if "4" not in odds or "5" not in odds:
+                    self.logger.debug(f"[Betnacional NBA] Evento {event_id} incompleto: {odds.keys()}")
+                    continue
+                
+                home_team = event_data["home"]
+                away_team = event_data["away"]
+                
+                if not home_team or not away_team:
+                    continue
+                
+                date_str = event_data["date_start"]
+                try:
+                    match_date = datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
+                except:
+                    match_date = datetime.utcnow()
+                
+                scraped = ScrapedOdds(
+                    bookmaker_name="betnacional",
+                    home_team_raw=home_team,
+                    away_team_raw=away_team,
+                    league_raw=league_name,
+                    match_date=match_date,
+                    home_odd=odds["4"],
+                    draw_odd=None,  # No draw in basketball
+                    away_odd=odds["5"],
+                    sport="basketball",
+                    market_type="moneyline",
+                    odds_type="SO",
+                    extra_data={
+                        "event_id": str(event_id),
+                        "sport_type": "basketball"
+                    }
+                )
+                results.append(scraped)
+                
+            except Exception as e:
+                self.logger.debug(f"[Betnacional NBA] Erro ao criar ScrapedOdds: {e}")
+                continue
+        
         return results
 
 
-
-
-
-# Teste direto
-
+# Direct test
 if __name__ == "__main__":
-
     async def run():
-
         s = BetnacionalScraper()
-
-        await s.setup()
-
         
-
-        try:
-
-            import time
-
-            start = time.time()
-
-            
-
-            # Teste com scrape_all (paralelo)
-
-            odds = await s.scrape_all()
-
-            
-
-            elapsed = time.time() - start
-
-            print(f"\n--- Resultado: {len(odds)} jogos em {elapsed:.2f}s ---")
-
-            
-
-            for o in odds[:5]:  # Mostra só 5
-
-                print(f"{o.home_team_raw} x {o.away_team_raw} ({o.league_raw})")
-
-                print(f"  Odds: {o.home_odd:.2f} - {o.draw_odd:.2f} - {o.away_odd:.2f}")
-
-                print("-" * 40)
-
-        finally:
-
-            await s.teardown()
-
+        import time
+        start = time.time()
+        
+        odds = await s.scrape_all()
+        
+        elapsed = time.time() - start
+        print(f"\n--- Resultado: {len(odds)} jogos em {elapsed:.2f}s ---")
+        
+        football = [o for o in odds if o.sport != "basketball"]
+        basketball = [o for o in odds if o.sport == "basketball"]
+        
+        print(f"Futebol: {len(football)} jogos")
+        print(f"Basquete: {len(basketball)} jogos")
+        
+        for o in basketball[:3]:
+            print(f"  {o.home_team_raw} x {o.away_team_raw}: {o.home_odd:.2f} / {o.away_odd:.2f}")
     
-
     asyncio.run(run())
-
