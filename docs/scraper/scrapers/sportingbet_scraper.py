@@ -87,6 +87,18 @@ class SportingbetScraper(BaseScraper):
             "name": "Liga Europa",
             "country": "Europa"
         },
+     "eredivisie": {
+            "region_id": "36",
+            "competition_id": "102847",
+            "name": "Eredivisie",
+            "country": "Holanda"
+        },
+     "liga_da_conferencia": {
+            "region_id": "7",
+            "competition_id": "102919",
+            "name": "Liga da Conferência",
+            "country": "Europa"
+        },
     }
     
     def __init__(self):
