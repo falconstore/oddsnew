@@ -1,7 +1,6 @@
 """
-Scraper para KTO (API Kambi).
-A Kambi retorna odds inteiras (ex: 1580) que precisam ser divididas por 1000.
-Suporta SO (Super Odds) e PA (Pagamento Antecipado) via endpoints separados.
+KTO Unified Scraper - Football (SO + PA) and Basketball (Moneyline).
+Uses Kambi API with odds divided by 1000.
 """
 
 import httpx
@@ -13,79 +12,38 @@ from base_scraper import BaseScraper, ScrapedOdds, LeagueConfig
 
 class KtoScraper(BaseScraper):
     """
-    Scraper para KTO (Usando API da Kambi).
-    A Kambi retorna odds inteiras (ex: 1580) que precisam ser divididas por 1000.
-    Suporta SO (Super Odds) e PA (Pagamento Antecipado).
+    Unified scraper for KTO Brazil - Football and Basketball.
+    Uses Kambi API with odds divided by 1000.
     """
     
-    # URL base da API Kambi (KTO Brasil)
     API_BASE = "https://us1.offering-api.kambicdn.com/offering/v2018/ktobr/listView"
     
-    # Categoria para PA (Pagamento Antecipado / Full Time - 2UP)
+    # Criterion IDs by market
+    SO_CRITERION_ID = 1001159858       # Resultado Final (Football Super Odds)
+    PA_CRITERION_ID = 2100089307       # Full Time - 2UP (Football Early Payout)
+    MONEYLINE_CRITERION_ID = 1001159732  # Vencedor da partida (Basketball)
+    
+    # Category ID for PA
     PA_CATEGORY_ID = "10028163"
     
-    # Criterion IDs para cada tipo de mercado
-    SO_CRITERION_ID = 1001159858  # Resultado Final
-    PA_CRITERION_ID = 2100089307  # Full Time - 2UP
+    # Football Leagues
+    FOOTBALL_LEAGUES = {
+        "serie_a": {"path": "football/italy/serie_a", "name": "Serie A", "country": "Itália"},
+        "premier_league": {"path": "football/england/premier_league", "name": "Premier League", "country": "Inglaterra"},
+        "la_liga": {"path": "football/spain/la_liga", "name": "La Liga", "country": "Espanha"},
+        "bundesliga": {"path": "football/germany/bundesliga", "name": "Bundesliga", "country": "Alemanha"},
+        "ligue_1": {"path": "football/france/ligue_1", "name": "Ligue 1", "country": "Franca"},
+        "paulista": {"path": "football/brazil/paulista_a1", "name": "Paulistao A1", "country": "Brasil"},
+        "efl_cup": {"path": "football/england/efl_cup", "name": "EFL Cup", "country": "Inglaterra"},
+        "copa_do_rei": {"path": "football/spain/copa_del_rey", "name": "Copa do rei", "country": "Espanha"},
+        "champions_league": {"path": "football/champions_league/all", "name": "Champions League", "country": "Europa"},
+        "liga_europa": {"path": "football/europa_league/all", "name": "Liga Europa", "country": "Europa"},
+        "eredivisie": {"path": "football/netherlands/eredivisie", "name": "Eredivisie", "country": "Holanda"},
+    }
     
-    # Configuração das Ligas (Caminhos da URL)
-    LEAGUES = {
-        "serie_a": {
-            "path": "football/italy/serie_a", 
-            "name": "Serie A",
-            "country": "Itália"
-        },
-        "premier_league": {
-            "path": "football/england/premier_league", 
-            "name": "Premier League",
-            "country": "Inglaterra"
-        },
-        "la_liga": {
-            "path": "football/spain/la_liga", 
-            "name": "La Liga",
-            "country": "Espanha"
-        },
-	 "bundesliga": {
-            "path": "football/germany/bundesliga", 
-            "name": "Bundesliga",
-            "country": "Alemanha"
-        },
-	 "ligue_1": {
-            "path": "football/france/ligue_1", 
-            "name": "Ligue 1",
-            "country": "Franca"
-        },
-	 "paulista": {
-            "path": "football/brazil/paulista_a1", 
-            "name": "Paulistao A1",
-            "country": "Brasil"
-    },
- 	 "efl_cup": {
-            "path": "football/england/efl_cup", 
-            "name": "EFL Cup",
-            "country": "Inglaterra"
-        },
-	 "copa_do_rei": {
-            "path": "football/spain/copa_del_rey", 
-            "name": "Copa do rei",
-            "country": "Espanha"
-        },
-     "champions_league": {
-            "path": "football/champions_league/all", 
-            "name": "Champions League",
-            "country": "Europa"
-        },
-     "liga_europa": {
-            "path": "football/europa_league/all", 
-            "name": "Liga Europa",
-            "country": "Europa"
-        },
-     "eredivisie": {
-            "path": "football/netherlands/eredivisie", 
-            "name": "Eredivisie",
-            "country": "Holanda"
-        },
-
+    # Basketball Leagues
+    BASKETBALL_LEAGUES = {
+        "nba": {"path": "basketball/nba", "name": "NBA", "country": "EUA"},
     }
     
     def __init__(self):
@@ -94,63 +52,131 @@ class KtoScraper(BaseScraper):
         self.logger = logger.bind(component="kto")
     
     async def setup(self):
-        self.logger.info("Iniciando sessão HTTP KTO...")
+        """Initialize HTTP client."""
+        self.logger.info("[KTO] Iniciando sessao HTTP...")
         self.client = httpx.AsyncClient(
             timeout=30.0,
             headers={
                 "accept": "*/*",
                 "origin": "https://www.kto.bet.br",
                 "referer": "https://www.kto.bet.br/",
-                "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
             }
         )
     
     async def teardown(self):
+        """Close HTTP client."""
         if self.client:
             await self.client.aclose()
             self.client = None
 
     async def get_available_leagues(self) -> List[LeagueConfig]:
-        return [
-            LeagueConfig(league_id=k, name=v["name"], url=v["path"], country=v["country"]) 
-            for k, v in self.LEAGUES.items()
-        ]
+        """Return list of configured leagues (football + basketball)."""
+        leagues = []
+        for k, v in self.FOOTBALL_LEAGUES.items():
+            leagues.append(LeagueConfig(league_id=k, name=v["name"], url=v["path"], country=v["country"]))
+        for k, v in self.BASKETBALL_LEAGUES.items():
+            leagues.append(LeagueConfig(league_id=k, name=v["name"], url=v["path"], country=v["country"]))
+        return leagues
+    
+    async def scrape_all(self) -> List[ScrapedOdds]:
+        """Scrape all leagues for both sports using a single HTTP session."""
+        all_odds = []
+        await self.setup()
+        
+        try:
+            # Football (SO + PA)
+            for league_id, config in self.FOOTBALL_LEAGUES.items():
+                try:
+                    odds = await self._scrape_football(league_id, config)
+                    all_odds.extend(odds)
+                except Exception as e:
+                    self.logger.error(f"[KTO] Erro na liga {config['name']}: {e}")
+            
+            # Basketball (Moneyline only)
+            for league_id, config in self.BASKETBALL_LEAGUES.items():
+                try:
+                    odds = await self._scrape_basketball(league_id, config)
+                    all_odds.extend(odds)
+                except Exception as e:
+                    self.logger.error(f"[KTO] Erro na liga {config['name']}: {e}")
+                    
+        finally:
+            await self.teardown()
+        
+        self.logger.info(f"[KTO] Total: {len(all_odds)} odds coletadas")
+        return all_odds
     
     async def scrape_league(self, league: LeagueConfig) -> List[ScrapedOdds]:
-        if not self.client: 
+        """Legacy method for compatibility with base scraper."""
+        if not self.client:
             await self.setup()
         
-        # Pega o caminho da liga
-        path = self.LEAGUES.get(league.league_id, {}).get("path")
-        if not path:
-            for k, v in self.LEAGUES.items():
-                if v["name"] == league.name:
-                    path = v["path"]
-                    break
+        # Check if it's a basketball league
+        if league.league_id in self.BASKETBALL_LEAGUES:
+            config = self.BASKETBALL_LEAGUES[league.league_id]
+            return await self._scrape_basketball(league.league_id, config)
         
-        if not path: 
-            return []
+        # Otherwise it's football
+        if league.league_id in self.FOOTBALL_LEAGUES:
+            config = self.FOOTBALL_LEAGUES[league.league_id]
+            return await self._scrape_football(league.league_id, config)
         
-        all_results = []
-        
-        # Buscar SO (Super Odds) - sem category
-        so_results = await self._fetch_odds(path, league.name, odds_type="SO", category=None)
-        all_results.extend(so_results)
-        
-        # Buscar PA (Pagamento Antecipado) - com category
-        pa_results = await self._fetch_odds(path, league.name, odds_type="PA", category=self.PA_CATEGORY_ID)
-        all_results.extend(pa_results)
-        
-        so_count = len([r for r in all_results if r.odds_type == "SO"])
-        pa_count = len([r for r in all_results if r.odds_type == "PA"])
-        self.logger.info(f"KTO {league.name}: {so_count} SO + {pa_count} PA = {len(all_results)} total")
-        
-        return all_results
+        return []
 
-    async def _fetch_odds(self, path: str, league_name: str, odds_type: str, category: Optional[str]) -> List[ScrapedOdds]:
-        """Busca odds de um endpoint específico (SO ou PA)."""
-        url = f"{self.API_BASE}/{path}/all/matches.json"
+    async def _scrape_football(self, league_id: str, config: dict) -> List[ScrapedOdds]:
+        """Scrape SO and PA odds for a football league."""
+        results = []
+        path = config["path"]
+        league_name = config["name"]
         
+        # SO (Super Odds)
+        so_results = await self._fetch_odds(path, league_name, "SO", None, "football")
+        results.extend(so_results)
+        
+        # PA (Pagamento Antecipado)
+        pa_results = await self._fetch_odds(path, league_name, "PA", self.PA_CATEGORY_ID, "football")
+        results.extend(pa_results)
+        
+        so_count = len([r for r in results if r.odds_type == "SO"])
+        pa_count = len([r for r in results if r.odds_type == "PA"])
+        self.logger.info(f"[KTO] {league_name}: {so_count} SO + {pa_count} PA = {len(results)} total")
+        
+        return results
+    
+    async def _scrape_basketball(self, league_id: str, config: dict) -> List[ScrapedOdds]:
+        """Scrape Moneyline odds for a basketball league."""
+        path = config["path"]
+        league_name = config["name"]
+        
+        url = f"{self.API_BASE}/{path}/all/all/matches.json"
+        params = {
+            "channel_id": "1",
+            "client_id": "200",
+            "lang": "pt_BR",
+            "market": "BR",
+            "useCombined": "true",
+            "useCombinedLive": "true"
+        }
+        
+        self.logger.info(f"[KTO] Buscando {league_name} (Moneyline)...")
+        
+        try:
+            response = await self.client.get(url, params=params)
+            response.raise_for_status()
+            data = response.json()
+            return self._parse_basketball_response(data, league_name)
+        except httpx.HTTPStatusError as e:
+            self.logger.error(f"[KTO] Erro HTTP ({league_name}): {e.response.status_code}")
+            return []
+        except Exception as e:
+            self.logger.error(f"[KTO] Erro ({league_name}): {e}")
+            return []
+
+    async def _fetch_odds(self, path: str, league_name: str, odds_type: str, 
+                          category: Optional[str], sport: str) -> List[ScrapedOdds]:
+        """Fetch odds from Kambi API for a specific market type."""
+        url = f"{self.API_BASE}/{path}/all/matches.json"
         params = {
             "channel_id": "1",
             "client_id": "200",
@@ -162,18 +188,23 @@ class KtoScraper(BaseScraper):
         if category:
             params["category"] = category
         
-        self.logger.debug(f"Buscando KTO {odds_type}: {league_name}...")
+        self.logger.debug(f"[KTO] Buscando {odds_type}: {league_name}...")
         
         try:
             response = await self.client.get(url, params=params)
             response.raise_for_status()
             data = response.json()
-            return self._parse_kambi_response(data, league_name, path, odds_type)
+            return self._parse_football_response(data, league_name, path, odds_type)
+        except httpx.HTTPStatusError as e:
+            self.logger.error(f"[KTO] Erro HTTP ({league_name}/{odds_type}): {e.response.status_code}")
+            return []
         except Exception as e:
-            self.logger.error(f"Erro na KTO ({odds_type}): {e}")
+            self.logger.error(f"[KTO] Erro ({league_name}/{odds_type}): {e}")
             return []
 
-    def _parse_kambi_response(self, data: Dict[str, Any], league_name: str, league_path: str, odds_type: str) -> List[ScrapedOdds]:
+    def _parse_football_response(self, data: Dict[str, Any], league_name: str, 
+                                  league_path: str, odds_type: str) -> List[ScrapedOdds]:
+        """Parse Kambi API response for football (1X2)."""
         results = []
         events_list = data.get("events", [])
         
@@ -188,14 +219,13 @@ class KtoScraper(BaseScraper):
                 event = item.get("event", {})
                 bet_offers = item.get("betOffers", [])
                 
-                if not event or not bet_offers: 
+                if not event or not bet_offers:
                     continue
                 
                 event_id = event.get("id")
                 home_team = event.get("homeName")
                 away_team = event.get("awayName")
                 
-                # Se não tiver nomes separados, tenta separar pelo delimitador
                 if not home_team or not away_team:
                     event_name = event.get("name", "")
                     if " - " in event_name:
@@ -203,26 +233,25 @@ class KtoScraper(BaseScraper):
                     else:
                         continue
 
-                # Data
+                # Parse date
                 try:
                     dt = datetime.fromisoformat(event.get("start", "").replace("Z", "+00:00"))
                 except:
                     dt = datetime.now()
 
-                # Procurar mercado correto para o tipo
+                # Find the correct market
                 match_offer = None
                 for offer in bet_offers:
                     criteria = offer.get("criterion", {})
                     criteria_id = criteria.get("id")
-                    
                     if criteria_id in valid_criteria:
                         match_offer = offer
                         break
                 
-                if not match_offer: 
+                if not match_offer:
                     continue
                 
-                # Extrair Odds
+                # Extract odds (divide by 1000)
                 outcomes = match_offer.get("outcomes", [])
                 raw_odds = {}
                 
@@ -231,12 +260,11 @@ class KtoScraper(BaseScraper):
                     out_type = out.get("type")
                     odds_int = out.get("odds")
                     
-                    if not odds_int: 
+                    if not odds_int:
                         continue
                     
                     decimal_odd = odds_int / 1000.0
                     
-                    # Usar label ou type para identificar o outcome
                     if label == "1" or out_type == "OT_ONE":
                         raw_odds['home'] = decimal_odd
                     elif label == "X" or out_type == "OT_CROSS":
@@ -255,7 +283,7 @@ class KtoScraper(BaseScraper):
                         draw_odd=raw_odds['draw'],
                         away_odd=raw_odds['away'],
                         market_type="1x2",
-                        odds_type=odds_type,  # SO ou PA
+                        odds_type=odds_type,
                         extra_data={
                             "event_id": str(event_id),
                             "kambi_offer_id": str(match_offer.get("id")),
@@ -265,36 +293,130 @@ class KtoScraper(BaseScraper):
                         }
                     )
                     results.append(scraped)
+                    
             except Exception as e:
                 continue
+        
+        return results
 
+    def _parse_basketball_response(self, data: Dict[str, Any], league_name: str) -> List[ScrapedOdds]:
+        """Parse Kambi API response for basketball (Moneyline)."""
+        results = []
+        events_list = data.get("events", [])
+        
+        for item in events_list:
+            try:
+                event = item.get("event", {})
+                bet_offers = item.get("betOffers", [])
+                
+                if not event or not bet_offers:
+                    continue
+                
+                event_id = event.get("id")
+                home_team = event.get("homeName")
+                away_team = event.get("awayName")
+                
+                if not home_team or not away_team:
+                    event_name = event.get("name", "")
+                    if " - " in event_name:
+                        parts = event_name.split(" - ")
+                        home_team = parts[0].strip()
+                        away_team = parts[1].strip()
+                    else:
+                        continue
+
+                # Parse date
+                try:
+                    dt = datetime.fromisoformat(event.get("start", "").replace("Z", "+00:00"))
+                except:
+                    dt = datetime.now()
+
+                # Find Moneyline market
+                match_offer = None
+                for offer in bet_offers:
+                    criterion = offer.get("criterion", {})
+                    if criterion.get("id") == self.MONEYLINE_CRITERION_ID:
+                        match_offer = offer
+                        break
+                
+                if not match_offer:
+                    continue
+                
+                # Extract odds (divide by 1000)
+                outcomes = match_offer.get("outcomes", [])
+                home_odd = None
+                away_odd = None
+                
+                for out in outcomes:
+                    out_type = out.get("type")
+                    odds_int = out.get("odds")
+                    
+                    if not odds_int:
+                        continue
+                    
+                    decimal_odd = odds_int / 1000.0
+                    
+                    if out_type == "OT_ONE":
+                        home_odd = decimal_odd
+                    elif out_type == "OT_TWO":
+                        away_odd = decimal_odd
+                
+                if home_odd and away_odd:
+                    # Generate slugs for deep links
+                    home_slug = home_team.strip().lower().replace(" ", "-")
+                    away_slug = away_team.strip().lower().replace(" ", "-")
+                    
+                    scraped = ScrapedOdds(
+                        bookmaker_name="kto",
+                        home_team_raw=home_team.strip(),
+                        away_team_raw=away_team.strip(),
+                        league_raw=league_name,
+                        match_date=dt,
+                        home_odd=home_odd,
+                        draw_odd=None,  # No draw in basketball
+                        away_odd=away_odd,
+                        sport="basketball",
+                        market_type="moneyline",
+                        extra_data={
+                            "event_id": str(event_id),
+                            "kambi_offer_id": str(match_offer.get("id")),
+                            "sport_type": "basketball",
+                            "home_team_slug": home_slug,
+                            "away_team_slug": away_slug
+                        }
+                    )
+                    results.append(scraped)
+                    
+            except Exception as e:
+                self.logger.debug(f"[KTO] Erro ao processar evento NBA: {e}")
+                continue
+        
+        self.logger.info(f"[KTO] {league_name} (Moneyline): {len(results)} jogos coletados")
         return results
 
 
-# Teste direto
+# Test
 if __name__ == "__main__":
     import asyncio
 
     async def run():
         s = KtoScraper()
-        # Teste Premier League
-        lg = LeagueConfig(league_id="premier_league", name="Premier League", url="", country="England")
-        odds = await s.scrape_league(lg)
+        odds = await s.scrape_all()
         
         print(f"\n--- Resultado ({len(odds)} odds) ---")
         
-        # Agrupar por tipo
-        so_odds = [o for o in odds if o.odds_type == "SO"]
-        pa_odds = [o for o in odds if o.odds_type == "PA"]
-        
-        print(f"\n SO (Super Odds): {len(so_odds)} jogos")
-        for o in so_odds[:3]:
-            print(f"  {o.home_team_raw} x {o.away_team_raw}")
+        # Football
+        football = [o for o in odds if o.sport == "football"]
+        print(f"\nFutebol: {len(football)} odds")
+        for o in football[:3]:
+            print(f"  {o.home_team_raw} x {o.away_team_raw} ({o.odds_type})")
             print(f"    Odds: {o.home_odd:.2f} - {o.draw_odd:.2f} - {o.away_odd:.2f}")
         
-        print(f"\n PA (Pagamento Antecipado): {len(pa_odds)} jogos")
-        for o in pa_odds[:3]:
+        # Basketball
+        basketball = [o for o in odds if o.sport == "basketball"]
+        print(f"\nBasquete: {len(basketball)} odds")
+        for o in basketball[:3]:
             print(f"  {o.home_team_raw} x {o.away_team_raw}")
-            print(f"    Odds: {o.home_odd:.2f} - {o.draw_odd:.2f} - {o.away_odd:.2f}")
+            print(f"    Odds: {o.home_odd:.2f} - {o.away_odd:.2f}")
             
     asyncio.run(run())
