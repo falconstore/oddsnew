@@ -16,15 +16,16 @@ class TradeballScraper(BaseScraper):
     API: https://tradeball.betbra.bet.br/api/feedDball/list
     """
     
-    # Mapeamento de nomes de ligas para deixar mais limpo
     LEAGUE_MAPPING = {
         "England Premier League": {"name": "Premier League", "country": "England"},
         "Spain LaLiga": {"name": "La Liga", "country": "Spain"},
         "Germany Bundesliga": {"name": "Bundesliga", "country": "Germany"},
         "Italy Serie A": {"name": "Serie A", "country": "Italy"},
+        "Brazil Paulista": {"name": "Paulistão", "country": "Brazil"},
         "Brazil Paulista": {"name": "Paulistao", "country": "Brazil"},
         "Brazil Serie A": {"name": "Brasileirão Série A", "country": "Brazil"},
         "France Ligue 1": {"name": "Ligue 1", "country": "France"},
+        "Holland Eredivisie": {"name": "Eredivisie", "country": "Netherlands"},
     }
     
     API_BASE = "https://tradeball.betbra.bet.br/api/feedDball/list"
@@ -92,43 +93,51 @@ class TradeballScraper(BaseScraper):
         try:
             await self.setup()
             
-            # HOJE
-            self.logger.info("Buscando jogos de HOJE...")
-            today_odds = await self._fetch_day(None)
-            all_odds.extend(today_odds)
+            # HOJE: Busca em 3 mercados diferentes para garantir que pega AO VIVO e PRE-MATCH
+            self.logger.info("Buscando jogos de HOJE (Tentando IDs 1, 2 e 3)...")
+            today_date = today.strftime("%Y-%m-%d")
             
-            # Próximos dias (Pegando 3 dias para frente)
+            # Market 1 (Ao Vivo), 2 (Odds Normais), 3 (Exchange)
+            for m_id in [1, 2, 3]:
+                odds = await self._fetch_day(today_date, market_id=m_id)
+                if odds:
+                    self.logger.info(f"  -> Market ID {m_id} retornou {len(odds)} jogos")
+                    all_odds.extend(odds)
+            
+            # Próximos dias (Aqui o ID 3 funciona bem)
             for days_ahead in range(1, 4):
                 target_date = today + timedelta(days=days_ahead)
                 date_str = target_date.strftime("%Y-%m-%d")
                 self.logger.info(f"Buscando jogos de {date_str}...")
-                day_odds = await self._fetch_day(date_str)
+                day_odds = await self._fetch_day(date_str, market_id=3)
                 all_odds.extend(day_odds)
             
-            self.logger.info(f"Tradeball Total: {len(all_odds)} jogos coletados")
-            
+            # Remove duplicatas (caso um jogo apareça em dois marketIDs hoje)
+            unique_odds = {o.extra_data.get("tradeball_event_id"): o for o in all_odds}.values()
+            final_odds = list(unique_odds)
+
+            self.logger.info(f"Tradeball Total: {len(final_odds)} jogos coletados (únicos)")
+            return final_odds
+
         except Exception as e:
             self.logger.error(f"Erro geral no Tradeball: {e}")
+            return []
         finally:
             await self.teardown()
-        
-        return all_odds
     
-    async def _fetch_day(self, date_str: Optional[str] = None) -> List[ScrapedOdds]:
-        if date_str:
-            filter_dict = {
-                "line": 1, "periodTypeId": 1, "tradingTypeId": 2, "marketId": 3, "date": date_str
-            }
-        else:
-            filter_dict = {
-                "line": 1, "periodTypeId": 1, "tradingTypeId": 2, "marketId": 3
-            }
-            filter_dict["date"] = datetime.now().strftime("%Y-%m-%d")
+    async def _fetch_day(self, date_str: str, market_id: int = 3) -> List[ScrapedOdds]:
+        filter_dict = {
+            "line": 1, 
+            "periodTypeId": 1, 
+            "tradingTypeId": 2, 
+            "marketId": market_id, # Agora aceita o ID dinâmico
+            "date": date_str
+        }
 
         params = {
             "page": 1,
             "filter": json.dumps(filter_dict, separators=(',', ':')),
-            "start": 0, "limit": 50,
+            "start": 0, "limit": 100, # Aumentei o limite
             "sort": '[{"property":"created_at","direction":"desc"}]',
             "requiredDictionaries[]": ["LeagueGroup", "TimeZone"],
             "init": "true",
@@ -140,14 +149,7 @@ class TradeballScraper(BaseScraper):
         headers = {
             "accept": "application/json, text/plain, */*",
             "authorization": f"Bearer {self._auth_token}",
-            "priority": "u=1, i",
             "referer": "https://tradeball.betbra.bet.br/dballTradingFeed", 
-            "sec-ch-ua": '"Chromium";v="142", "Google Chrome";v="142", "Not_A Brand";v="99"',
-            "sec-ch-ua-mobile": "?0",
-            "sec-ch-ua-platform": '"macOS"',
-            "sec-fetch-dest": "empty",
-            "sec-fetch-mode": "cors",
-            "sec-fetch-site": "same-origin",
             "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
             "x-requested-with": "XMLHttpRequest"
         }
@@ -155,26 +157,25 @@ class TradeballScraper(BaseScraper):
         try:
             async with httpx.AsyncClient(timeout=30.0, cookies=self._cookies) as client:
                 response = await client.get(self.API_BASE, headers=headers, params=params)
+                if response.status_code != 200:
+                    return []
                 data = response.json()
-                return self._parse_response(data, date_str)
+                return self._parse_response(data)
         except Exception as e:
-            self.logger.error(f"Erro na requisição: {e}")
+            self.logger.error(f"Erro na requisição ({date_str}, MK={market_id}): {e}")
             return []
     
-    def _parse_response(self, data: Dict[str, Any], date_str: Optional[str]) -> List[ScrapedOdds]:
+    def _parse_response(self, data: Dict[str, Any]) -> List[ScrapedOdds]:
         odds_list = []
         matches = data.get("init", [])
         
         if not matches:
             return []
         
-        self.logger.info(f"Processando {len(matches)} eventos de {date_str or 'hoje'}")
-
         for match in matches:
             try:
                 cl_name = match.get("clName", "").strip()
                 
-                # Mapeamento opcional de nomes
                 if cl_name in self.LEAGUE_MAPPING:
                     league_name = self.LEAGUE_MAPPING[cl_name]["name"]
                     league_country = self.LEAGUE_MAPPING[cl_name]["country"]
@@ -202,7 +203,6 @@ class TradeballScraper(BaseScraper):
                 event_id = match.get("ceId")
                 match_url = f"https://tradeball.betbra.bet.br/dballEvent/{event_id}" if event_id else ""
                 
-                # Mapeamento para os campos do seu BaseScraper
                 odds = ScrapedOdds(
                     bookmaker_name="tradeball",
                     home_team_raw=home_team,
@@ -226,21 +226,18 @@ class TradeballScraper(BaseScraper):
                 odds_list.append(odds)
                 
             except Exception as e:
-                self.logger.debug(f"Erro parseando partida: {e}")
                 continue
         
         return odds_list
     
     def _parse_match_date(self, date_value: Any) -> Optional[datetime]:
-        if not date_value:
-            return None
+        if not date_value: return None
         try:
             if isinstance(date_value, str):
                 return datetime.strptime(date_value, "%Y-%m-%d %H:%M:%S")
             if isinstance(date_value, (int, float)):
                 return datetime.fromtimestamp(date_value / 1000)
-        except:
-            pass
+        except: pass
         return None
 
 if __name__ == "__main__":
@@ -248,8 +245,7 @@ if __name__ == "__main__":
     async def test():
         scraper = TradeballScraper()
         odds = await scraper.scrape_all()
-        print(f"\nTotal coletado: {len(odds)}")
+        print(f"\nTotal Final: {len(odds)}")
         if odds:
-            # CORRIGIDO: Usando os nomes certos da sua classe (home_team_raw, etc)
-            print(f"Exemplo: [{odds[0].league_raw}] {odds[0].home_team_raw} x {odds[0].away_team_raw} -> {odds[0].home_odd}")
+            print(f"Exemplo: {odds[0].home_team_raw} x {odds[0].away_team_raw} ({odds[0].home_odd})")
     asyncio.run(test())
