@@ -184,15 +184,36 @@ class BetnacionalScraper(BaseScraper):
                     raise RuntimeError(f"Betnacional warm-up failed: {e}")
     
     async def teardown(self):
-        """Close Playwright resources."""
+        """Close Playwright resources and reset references for next cycle."""
         if self._page:
-            await self._page.close()
+            try:
+                await self._page.close()
+            except:
+                pass
+            self._page = None
+        
         if self._context:
-            await self._context.close()
+            try:
+                await self._context.close()
+            except:
+                pass
+            self._context = None
+        
         if self._browser:
-            await self._browser.close()
+            try:
+                await self._browser.close()
+            except:
+                pass
+            self._browser = None
+        
         if self._playwright:
-            await self._playwright.stop()
+            try:
+                await self._playwright.stop()
+            except:
+                pass
+            self._playwright = None
+        
+        self._setup_done = False
         self.logger.info("[Betnacional] Playwright encerrado")
 
     async def get_available_leagues(self) -> List[LeagueConfig]:
