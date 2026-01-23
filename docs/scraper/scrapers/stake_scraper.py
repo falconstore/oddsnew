@@ -73,6 +73,26 @@ class StakeScraper(BaseScraper):
             "name": "Copa do Rei",
             "country": "Espanha"
         },
+    "champions_league": {
+            "tournament_id": "1000093381",
+            "name": "Champions League",
+            "country": "Europa"
+        },
+    "liga_europa": {
+            "tournament_id": "2000051195",
+            "name": "Liga Europa",
+            "country": "Europa"
+        },
+    "liga_da_conferencia": {
+            "tournament_id": "2000130522",
+            "name": "Liga da Conferencia",
+            "country": "Europa"
+        },
+    "eredivisie": {
+            "tournament_id": "1000094980",
+            "name": "Eredivisie",
+            "country": "Holanda"
+        },
     }
     
     def __init__(self):
