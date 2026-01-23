@@ -1,6 +1,27 @@
+"""
+Scraper for Tradeball (Betbra Dball Exchange).
+API: https://tradeball.betbra.bet.br/api/feedDball/list
+
+AUTENTICAÇÃO:
+O Tradeball requer token Bearer + cookies de sessão.
+
+COMO RENOVAR (quando parar de funcionar - erro 401/403):
+1. Abra https://tradeball.betbra.bet.br no browser
+2. Faça login com suas credenciais
+3. Abra DevTools (F12) > Network > Filtrar por "feedDball"
+4. Recarregue a página ou clique em algum jogo
+5. Copie do header "Authorization": Bearer <TOKEN>
+6. Copie todos os cookies da aba "Cookies" ou do header "Cookie"
+7. Atualize no .env:
+   TRADEBALL_AUTH_TOKEN=<novo_token>
+   TRADEBALL_COOKIES=<cookies_completos>
+
+O token expira aproximadamente a cada 30 dias.
+
+DIAGNÓSTICO:
+Execute `python diagnose_tradeball.py` para verificar status do token/cookies.
+"""
 import json
-import uuid
-import urllib.parse
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 
@@ -10,11 +31,9 @@ from loguru import logger
 from base_scraper import BaseScraper, ScrapedOdds, LeagueConfig
 from config import settings
 
+
 class TradeballScraper(BaseScraper):
-    """
-    Scraper for Tradeball (Betbra Dball Exchange).
-    API: https://tradeball.betbra.bet.br/api/feedDball/list
-    """
+    """Scraper unificado para Tradeball (Betbra Dball Exchange) - Futebol."""
     
     LEAGUE_MAPPING = {
         "England Premier League": {"name": "Premier League", "country": "England"},
@@ -93,6 +112,10 @@ class TradeballScraper(BaseScraper):
         try:
             await self.setup()
             
+            # Log de diagnóstico inicial
+            self.logger.info(f"Token: {self._auth_token[:30] if self._auth_token else 'NENHUM'}...")
+            self.logger.info(f"Cookies: {len(self._cookies)} configurados")
+            
             # HOJE: Busca em 3 mercados diferentes para garantir que pega AO VIVO e PRE-MATCH
             self.logger.info("Buscando jogos de HOJE (Tentando IDs 1, 2 e 3)...")
             today_date = today.strftime("%Y-%m-%d")
@@ -120,7 +143,7 @@ class TradeballScraper(BaseScraper):
             return final_odds
 
         except Exception as e:
-            self.logger.error(f"Erro geral no Tradeball: {e}")
+            self.logger.exception(f"Erro geral no Tradeball: {e}")
             return []
         finally:
             await self.teardown()
@@ -157,12 +180,32 @@ class TradeballScraper(BaseScraper):
         try:
             async with httpx.AsyncClient(timeout=30.0, cookies=self._cookies) as client:
                 response = await client.get(self.API_BASE, headers=headers, params=params)
-                if response.status_code != 200:
+                
+                # Log detalhado de erros HTTP
+                if response.status_code == 401:
+                    self.logger.error(f"[{date_str}] TOKEN EXPIRADO (401) - Renovar TRADEBALL_AUTH_TOKEN no .env!")
                     return []
+                elif response.status_code == 403:
+                    self.logger.error(f"[{date_str}] COOKIES INVÁLIDOS (403) - Atualizar TRADEBALL_COOKIES no .env!")
+                    return []
+                elif response.status_code != 200:
+                    self.logger.warning(f"[{date_str}] Status HTTP inesperado: {response.status_code}")
+                    self.logger.debug(f"Response body: {response.text[:500]}")
+                    return []
+                
                 data = response.json()
+                
+                # Log se resposta veio vazia
+                if not data.get("init"):
+                    self.logger.warning(f"[{date_str}] API retornou dados vazios. Chaves: {list(data.keys())}")
+                
                 return self._parse_response(data)
+                
+        except httpx.TimeoutException:
+            self.logger.error(f"[{date_str}] Timeout na requisição (30s)")
+            return []
         except Exception as e:
-            self.logger.error(f"Erro na requisição ({date_str}, MK={market_id}): {e}")
+            self.logger.error(f"Erro na requisição ({date_str}, MK={market_id}): {type(e).__name__}: {e}")
             return []
     
     def _parse_response(self, data: Dict[str, Any]) -> List[ScrapedOdds]:
@@ -170,7 +213,12 @@ class TradeballScraper(BaseScraper):
         matches = data.get("init", [])
         
         if not matches:
+            self.logger.debug("Nenhum match na chave 'init'")
             return []
+        
+        self.logger.debug(f"Processando {len(matches)} matches...")
+        parsed_count = 0
+        error_count = 0
         
         for match in matches:
             try:
@@ -224,9 +272,15 @@ class TradeballScraper(BaseScraper):
                     }
                 )
                 odds_list.append(odds)
+                parsed_count += 1
                 
             except Exception as e:
+                error_count += 1
+                self.logger.warning(f"Erro ao parsear match: {e} - {match.get('cthName', 'N/A')} vs {match.get('ctaName', 'N/A')}")
                 continue
+        
+        if error_count > 0:
+            self.logger.warning(f"Parse: {parsed_count} OK, {error_count} erros")
         
         return odds_list
     
