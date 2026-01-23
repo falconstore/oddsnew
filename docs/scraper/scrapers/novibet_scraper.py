@@ -42,7 +42,7 @@ class NovibetScraper(BaseScraper):
 
 
 
-    #  ID CONFIRMADO PELO SEU CURL
+    # ✅ ID CONFIRMADO PELO SEU CURL
 
 
 
@@ -82,7 +82,7 @@ class NovibetScraper(BaseScraper):
 
  	
 
-	"bundesliga": {"competition_id": "5910745", "name": "Bundesliga", "country": "Alemanha"},
+	    "bundesliga": {"competition_id": "5910745", "name": "Bundesliga", "country": "Alemanha"},
 
 
 
@@ -90,18 +90,35 @@ class NovibetScraper(BaseScraper):
 
 
 
-	"paulistao": {"competition_id": "4381204", "name": "Paulistao A1", "country": "Brasil"},
+	    "paulistao": {"competition_id": "4381204", "name": "Paulistao A1", "country": "Brasil"},
 
 
 
-	"fa_cup": {"competition_id": "4373638", "name": "FA Cup", "country": "Inglaterra"},
+    	"fa_cup": {"competition_id": "4373638", "name": "FA Cup", "country": "Inglaterra"},
 
 
-	"efl_cup": {"competition_id": "4373738", "name": "EFL Cup", "country": "Inglaterra"},
+
+	    "efl_cup": {"competition_id": "4373738", "name": "EFL Cup", "country": "Inglaterra"},
 
 
-	"copa_do_rei": {"competition_id": "4375979", "name": "Copa do Rei", "country": "Espanha"},
 
+	    "copa_do_rei": {"competition_id": "4375979", "name": "Copa do Rei", "country": "Espanha"},
+
+
+
+	    "champions_league": {"competition_id": "6508093", "name": "Champions League", "country": "Europa"},
+
+
+
+	    "liga_europa": {"competition_id": "6505458", "name": "Liga Europa", "country": "Europa"},
+        
+
+
+	    "liga_da_conferencia": {"competition_id": "6505560", "name": "Liga da Conferencia", "country": "Europa"},
+
+
+
+        "eredivisie": {"competition_id": "5910927", "name": "Eredivisie", "country": "Holanda"},
 
     }
 
@@ -483,7 +500,7 @@ class NovibetScraper(BaseScraper):
 
 
 
-                self.logger.warning(f" Erro 622 na {league.name}: ID {competition_id} inválido/vazio hoje.")
+                self.logger.warning(f"⚠️ Erro 622 na {league.name}: ID {competition_id} inválido/vazio hoje.")
 
 
 
@@ -495,7 +512,7 @@ class NovibetScraper(BaseScraper):
 
 
 
-                self.logger.error(f" Bloqueio 403 na {league.name}. Cookies expiraram ou WAF pegou.")
+                self.logger.error(f"⛔ Bloqueio 403 na {league.name}. Cookies expiraram ou WAF pegou.")
 
 
 
