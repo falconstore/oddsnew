@@ -59,7 +59,7 @@ class KtoScraper(BaseScraper):
             "path": "football/brazil/paulista_a1", 
             "name": "Paulistao A1",
             "country": "Brasil"
- 	},
+    },
  	 "efl_cup": {
             "path": "football/england/efl_cup", 
             "name": "EFL Cup",
@@ -69,6 +69,21 @@ class KtoScraper(BaseScraper):
             "path": "football/spain/copa_del_rey", 
             "name": "Copa do rei",
             "country": "Espanha"
+        },
+     "champions_league": {
+            "path": "football/champions_league/all", 
+            "name": "Champions League",
+            "country": "Europa"
+        },
+     "liga_europa": {
+            "path": "football/europa_league/all", 
+            "name": "Liga Europa",
+            "country": "Europa"
+        },
+     "eredivisie": {
+            "path": "football/netherlands/eredivisie", 
+            "name": "Eredivisie",
+            "country": "Holanda"
         },
 
     }
