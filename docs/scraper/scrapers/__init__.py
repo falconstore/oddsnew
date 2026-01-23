@@ -26,7 +26,7 @@ from .esportivabet_scraper import EsportivabetScraper
 from .esportivabet_nba_scraper import EsportivabetNBAScraper
 from .jogodeouro_scraper import JogodeOuroScraper
 from .jogodeouro_nba_scraper import JogodeOuroNBAScraper
-from .estrelabet_nba_scraper import EstrelabetNBAScraper
+# EstrelabetNBAScraper removed - unified into EstrelabetScraper
 from .stake_nba_scraper import StakeNBAScraper
 from .bet365_scraper import Bet365Scraper
 from .tradeball_scraper import TradeballScraper
@@ -44,7 +44,7 @@ __all__ = [
     "Aposta1Scraper", "Aposta1NBAScraper", 
     "EsportivabetScraper", "EsportivabetNBAScraper", 
     "JogodeOuroScraper", "JogodeOuroNBAScraper",
-    "EstrelabetNBAScraper",
+    # EstrelabetNBAScraper unified into EstrelabetScraper
     "Bet365Scraper",
     "TradeballScraper"
 ]

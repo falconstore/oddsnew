@@ -397,33 +397,29 @@ class Orchestrator:
                 continue
             
             # Match league (cache lookup)
-        league_id = self.league_matcher.find_league_id(odds.league_raw)
-        if not league_id:
-            # Silenciado - ligas não cadastradas são ignoradas sem log
-            continue
+            league_id = self.league_matcher.find_league_id(odds.league_raw)
+            if not league_id:
+                # Silenciado - ligas não cadastradas são ignoradas sem log
+                continue
             
             # Determine if this is basketball
             is_basketball = odds.sport == "basketball" or odds.league_raw.upper() == "NBA"
             
-            # NBA normalization logging removed (too verbose)
-            
             # Match teams - use full method for primary bookmaker to auto-create
             normalized_bookmaker = odds.bookmaker_name.strip().lower()
-            
-            # [DIAG] logs moved to after team matching (only when failing)
             
             if normalized_bookmaker == self.team_matcher.primary_bookmaker:
                 home_team_id = await self.team_matcher.find_team_id(
                     odds.home_team_raw, 
                     odds.bookmaker_name,
                     league_id,
-                    odds.league_raw  # Pass league name for better logging
+                    odds.league_raw
                 )
                 away_team_id = await self.team_matcher.find_team_id(
                     odds.away_team_raw, 
                     odds.bookmaker_name,
                     league_id,
-                    odds.league_raw  # Pass league name for better logging
+                    odds.league_raw
                 )
             else:
                 # Other bookmakers use cache-only with league-scoping + cross-league fallback
@@ -431,21 +427,21 @@ class Orchestrator:
                     odds.home_team_raw, 
                     odds.bookmaker_name,
                     league_id,
-                    odds.league_raw  # Pass league name for cross-league detection
+                    odds.league_raw
                 )
                 away_team_id = self.team_matcher.find_team_id_cached(
                     odds.away_team_raw, 
                     odds.bookmaker_name,
                     league_id,
-                    odds.league_raw  # Pass league name for cross-league detection
+                    odds.league_raw
                 )
             
-        if not home_team_id:
-            unmatched_teams.append((odds.home_team_raw, odds.bookmaker_name))
-            continue
-        if not away_team_id:
-            unmatched_teams.append((odds.away_team_raw, odds.bookmaker_name))
-            continue
+            if not home_team_id:
+                unmatched_teams.append((odds.home_team_raw, odds.bookmaker_name))
+                continue
+            if not away_team_id:
+                unmatched_teams.append((odds.away_team_raw, odds.bookmaker_name))
+                continue
             
             item = {
                 "odds": odds,
