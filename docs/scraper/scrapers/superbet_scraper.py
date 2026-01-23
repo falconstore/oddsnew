@@ -122,7 +122,6 @@ class SuperbetScraper(BaseScraper):
 
         },
 
-
 	"copa_do_rei": {
 
             "id": "26",
@@ -133,6 +132,45 @@ class SuperbetScraper(BaseScraper):
 
         },
 
+        "champions_league": {
+
+            "id": "80794",
+
+            "name": "Champions League",
+
+            "country": "Europa",
+
+        },
+
+        "liga_europa": {
+
+            "id": "688",
+
+            "name": "Liga Europa",
+
+            "country": "Europa",
+
+        },
+
+        "liga_da_conferencia": {
+
+            "id": "56652",
+
+            "name": "Liga da Conferencia",
+
+            "country": "Europa",
+
+        },
+    
+        "eredivisie": {
+
+            "id": "256",
+
+            "name": "Eredivisie",
+
+            "country": "Holanda",
+
+        },    
 
     }
 
