@@ -173,7 +173,7 @@ export default function ProcedureControl() {
 
   return (
     <Layout>
-      <div className="space-y-6 md:space-y-8">
+      <div className="space-y-4 md:space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
           <div>
@@ -193,12 +193,12 @@ export default function ProcedureControl() {
         </div>
 
         {/* Stats Row 1 */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 md:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-2 md:gap-3">
           {/* Month Selector Card */}
-          <Card className="p-6 flex flex-col">
-            <div className="flex items-center justify-between mb-4">
+          <Card className="p-4 flex flex-col">
+            <div className="flex items-center justify-between">
               <div className="flex-1">
-                <p className="text-xs text-muted-foreground font-medium mb-2">Mês Atual</p>
+                <p className="text-[10px] text-muted-foreground font-medium mb-1">Mês Atual</p>
                 <Select
                   value={selectedMonth.toISOString()}
                   onValueChange={(value) => setSelectedMonth(new Date(value))}
@@ -216,12 +216,12 @@ export default function ProcedureControl() {
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="text-[10px] text-muted-foreground mt-0.5">
                   {format(selectedMonth, 'yyyy', { locale: ptBR })}
                 </p>
               </div>
-              <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center backdrop-blur-sm flex-shrink-0">
-                <Calendar className="w-6 h-6 text-primary" />
+              <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center backdrop-blur-sm flex-shrink-0">
+                <Calendar className="w-5 h-5 text-primary" />
               </div>
             </div>
           </Card>
@@ -253,7 +253,7 @@ export default function ProcedureControl() {
         </div>
 
         {/* Stats Row 2 */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 md:gap-3">
           <StatCard
             title="Procedimentos Abertos"
             value={getOpenProcedures(procedures, selectedMonth)}
