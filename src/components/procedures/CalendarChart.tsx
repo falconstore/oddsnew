@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
 
 interface CalendarChartProps {
   data: { date: string; profit: number; count: number }[];
@@ -27,23 +28,29 @@ export function CalendarChart({ data, title, selectedMonth }: CalendarChartProps
   const getColorIntensity = (profit: number) => {
     if (profit > 0) {
       const intensity = Math.min((profit / maxProfit) * 100, 100);
+      // Mapear intensidade para opacidade (0.15 a 0.75)
+      const opacity = (intensity / 100) * 0.6 + 0.15;
       return {
-        bg: `rgba(34, 197, 94, ${(intensity / 100) * 0.7 + 0.1})`, // success green
-        border: `rgba(34, 197, 94, ${Math.min((intensity / 100) + 0.3, 1)})`,
-        text: intensity > 40 ? 'text-white' : 'text-foreground'
+        colorClass: 'bg-success',
+        borderClass: 'border-success',
+        opacity,
+        textClass: intensity > 40 ? 'text-success-foreground' : 'text-foreground'
       };
     } else if (profit < 0) {
       const intensity = Math.min((Math.abs(profit) / Math.abs(maxLoss)) * 100, 100);
+      const opacity = (intensity / 100) * 0.6 + 0.15;
       return {
-        bg: `rgba(239, 68, 68, ${(intensity / 100) * 0.7 + 0.1})`, // destructive red
-        border: `rgba(239, 68, 68, ${Math.min((intensity / 100) + 0.3, 1)})`,
-        text: intensity > 40 ? 'text-white' : 'text-foreground'
+        colorClass: 'bg-destructive',
+        borderClass: 'border-destructive',
+        opacity,
+        textClass: intensity > 40 ? 'text-destructive-foreground' : 'text-foreground'
       };
     }
     return {
-      bg: 'hsl(var(--muted) / 0.3)',
-      border: 'hsl(var(--border))',
-      text: 'text-muted-foreground'
+      colorClass: 'bg-muted',
+      borderClass: 'border-border',
+      opacity: 0.3,
+      textClass: 'text-muted-foreground'
     };
   };
 
@@ -82,22 +89,26 @@ export function CalendarChart({ data, title, selectedMonth }: CalendarChartProps
             return (
               <div
                 key={day.toString()}
-                className={`aspect-square rounded-lg border-2 p-1 sm:p-1.5 md:p-2 flex flex-col justify-center items-center transition-all hover:scale-105 group relative ${
-                  isToday ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''
-                }`}
+                className={cn(
+                  "aspect-square rounded-lg border-2 p-1 sm:p-1.5 md:p-2 flex flex-col justify-center items-center transition-all hover:scale-105 group relative",
+                  colors.borderClass,
+                  isToday && 'ring-2 ring-primary ring-offset-2 ring-offset-background'
+                )}
                 style={{
-                  backgroundColor: colors.bg,
-                  borderColor: colors.border
+                  backgroundColor: `hsl(var(--${colors.colorClass.replace('bg-', '')}) / ${colors.opacity})`
                 }}
               >
                 {/* Número do dia */}
-                <div className={`text-sm sm:text-base md:text-lg lg:text-xl font-bold ${colors.text} leading-none`}>
+                <div className={cn(
+                  "text-sm sm:text-base md:text-lg lg:text-xl font-bold leading-none",
+                  colors.textClass
+                )}>
                   {format(day, 'd')}
                 </div>
                 
                 {/* Informações do dia */}
                 {dayData.count > 0 ? (
-                  <div className={`text-center ${colors.text} w-full mt-0.5`}>
+                  <div className={cn("text-center w-full mt-0.5", colors.textClass)}>
                     <div className="text-[7px] sm:text-[8px] md:text-[9px] font-medium leading-tight">
                       {dayData.count} proc.
                     </div>
@@ -106,7 +117,10 @@ export function CalendarChart({ data, title, selectedMonth }: CalendarChartProps
                     </div>
                   </div>
                 ) : (
-                  <div className={`text-[6px] sm:text-[7px] md:text-[8px] ${colors.text} text-center mt-0.5 opacity-60`}>
+                  <div className={cn(
+                    "text-[6px] sm:text-[7px] md:text-[8px] text-center mt-0.5 opacity-60",
+                    colors.textClass
+                  )}>
                     Sem dados
                   </div>
                 )}
@@ -126,7 +140,7 @@ export function CalendarChart({ data, title, selectedMonth }: CalendarChartProps
         {/* Legenda */}
         <div className="mt-4 flex flex-wrap items-center justify-center gap-4 text-[10px] sm:text-xs text-muted-foreground">
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 sm:w-4 sm:h-4 rounded border-2" style={{ backgroundColor: 'rgba(239, 68, 68, 0.7)', borderColor: 'rgba(239, 68, 68, 1)' }} />
+            <div className="w-3 h-3 sm:w-4 sm:h-4 rounded border-2 bg-destructive/70 border-destructive" />
             <span>Prejuízo</span>
           </div>
           <div className="flex items-center gap-2">
@@ -134,7 +148,7 @@ export function CalendarChart({ data, title, selectedMonth }: CalendarChartProps
             <span>Sem movimentação</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 sm:w-4 sm:h-4 rounded border-2" style={{ backgroundColor: 'rgba(34, 197, 94, 0.7)', borderColor: 'rgba(34, 197, 94, 1)' }} />
+            <div className="w-3 h-3 sm:w-4 sm:h-4 rounded border-2 bg-success/70 border-success" />
             <span>Lucro</span>
           </div>
         </div>

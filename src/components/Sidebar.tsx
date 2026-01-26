@@ -24,13 +24,48 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useState } from 'react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 
-const FootballIcon = () => <span className="text-base">⚽</span>;
-const BasketballIcon = () => <span className="text-base">🏀</span>;
+// Ícone SVG personalizado para Futebol - segue o estilo Lucide
+const FootballIcon = ({ className }: { className?: string }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    <circle cx="12" cy="12" r="10" />
+    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+    <path d="M2 12h20" />
+  </svg>
+);
+
+// Ícone SVG personalizado para Basquete - segue o estilo Lucide
+const BasketballIcon = ({ className }: { className?: string }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    <circle cx="12" cy="12" r="10" />
+    <path d="M12 2v20" />
+    <path d="M2 12h20" />
+    <path d="M4.93 4.93c4.08 2.39 8.16 4.78 14.14 0" />
+    <path d="M4.93 19.07c4.08-2.39 8.16-4.78 14.14 0" />
+  </svg>
+);
 
 type NavigationItem = {
   name: string;
   href: string;
-  icon: LucideIcon | (() => JSX.Element);
+  icon: React.ComponentType<{ className?: string }>;
   adminOnly?: boolean;
   pageKey: PageKey;
 };
