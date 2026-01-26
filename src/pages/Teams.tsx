@@ -149,12 +149,10 @@ const Teams = () => {
                 setFormData({ standard_name: '', league_id: '', status: 'active', logo_url: '' });
               }
             }}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Novo Time
-                </Button>
-              </DialogTrigger>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Novo Time
               </Button>
             </DialogTrigger>
             <DialogContent aria-describedby="team-dialog-description">
