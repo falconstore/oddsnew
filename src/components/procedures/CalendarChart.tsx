@@ -60,24 +60,24 @@ export function CalendarChart({ data, title, selectedMonth }: CalendarChartProps
 
   return (
     <Card>
-      <CardHeader className="pb-2">
+      <CardHeader className="pb-1">
         <CardTitle className="text-base">{title}</CardTitle>
       </CardHeader>
       <CardContent>
         {/* Cabeçalho dos dias da semana */}
-        <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-2">
+        <div className="grid grid-cols-7 gap-1 mb-1">
           {weekDays.map(day => (
-            <div key={day} className="text-center text-[10px] sm:text-xs font-semibold text-muted-foreground pb-2">
+            <div key={day} className="text-center text-xs sm:text-sm font-semibold text-muted-foreground pb-1">
               {day}
             </div>
           ))}
         </div>
 
         {/* Grid do calendário */}
-        <div className="grid grid-cols-7 gap-1 sm:gap-2">
+        <div className="grid grid-cols-7 gap-1">
           {/* Espaços vazios antes do primeiro dia */}
           {[...Array(firstDayOfWeek)].map((_, index) => (
-            <div key={`empty-${index}`} className="aspect-square" />
+            <div key={`empty-${index}`} className="aspect-[4/3]" />
           ))}
 
           {/* Dias do mês */}
@@ -90,9 +90,9 @@ export function CalendarChart({ data, title, selectedMonth }: CalendarChartProps
               <div
                 key={day.toString()}
                 className={cn(
-                  "aspect-square rounded-lg border-2 p-1 sm:p-1.5 md:p-2 flex flex-col justify-center items-center transition-all hover:scale-105 group relative",
+                  "aspect-[4/3] rounded-md border p-1 flex flex-col justify-center items-center transition-all hover:scale-105 group relative",
                   colors.borderClass,
-                  isToday && 'ring-2 ring-primary ring-offset-2 ring-offset-background'
+                  isToday && 'ring-2 ring-primary ring-offset-1 ring-offset-background'
                 )}
                 style={{
                   backgroundColor: `hsl(var(--${colors.colorClass.replace('bg-', '')}) / ${colors.opacity})`
@@ -100,7 +100,7 @@ export function CalendarChart({ data, title, selectedMonth }: CalendarChartProps
               >
                 {/* Número do dia */}
                 <div className={cn(
-                  "text-sm sm:text-base md:text-lg lg:text-xl font-bold leading-none",
+                  "text-lg sm:text-xl md:text-2xl font-bold leading-none",
                   colors.textClass
                 )}>
                   {format(day, 'd')}
@@ -108,17 +108,17 @@ export function CalendarChart({ data, title, selectedMonth }: CalendarChartProps
                 
                 {/* Informações do dia */}
                 {dayData.count > 0 ? (
-                  <div className={cn("text-center w-full mt-0.5", colors.textClass)}>
-                    <div className="text-[7px] sm:text-[8px] md:text-[9px] font-medium leading-tight">
+                  <div className={cn("text-center w-full", colors.textClass)}>
+                    <div className="text-[9px] sm:text-[10px] md:text-xs font-medium leading-tight">
                       {dayData.count} proc.
                     </div>
-                    <div className="text-[8px] sm:text-[9px] md:text-[10px] font-bold leading-tight">
+                    <div className="text-[10px] sm:text-xs md:text-sm font-bold leading-tight">
                       R$ {dayData.profit.toFixed(0)}
                     </div>
                   </div>
                 ) : (
                   <div className={cn(
-                    "text-[6px] sm:text-[7px] md:text-[8px] text-center mt-0.5 opacity-60",
+                    "text-[8px] sm:text-[9px] md:text-[10px] text-center opacity-60",
                     colors.textClass
                   )}>
                     Sem dados
@@ -138,17 +138,17 @@ export function CalendarChart({ data, title, selectedMonth }: CalendarChartProps
         </div>
 
         {/* Legenda */}
-        <div className="mt-4 flex flex-wrap items-center justify-center gap-4 text-[10px] sm:text-xs text-muted-foreground">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 sm:w-4 sm:h-4 rounded border-2 bg-destructive/70 border-destructive" />
+        <div className="mt-2 flex flex-wrap items-center justify-center gap-3 text-xs text-muted-foreground">
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded border bg-destructive/70 border-destructive" />
             <span>Prejuízo</span>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-muted/30 border-2 border-border" />
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded bg-muted/30 border border-border" />
             <span>Sem movimentação</span>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 sm:w-4 sm:h-4 rounded border-2 bg-success/70 border-success" />
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded border bg-success/70 border-success" />
             <span>Lucro</span>
           </div>
         </div>
