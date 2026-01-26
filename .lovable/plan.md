@@ -1,9 +1,26 @@
 
-# Plano: Nova Aba Betbra Affiliate
+# Plano: Nova Aba Assinaturas (Controle de Pagamentos)
 
 ## Visao Geral
 
-Criar uma nova aba "Betbra" no sistema para gerenciar dados de afiliacao da Betbra, seguindo os mesmos padroes de UI/UX ja estabelecidos no Controle de Procedimentos. A tabela `betbra_affiliate_data` ja existe no Supabase secundario (Procedures).
+Criar uma nova aba "Assinaturas" no sistema para gerenciar assinantes e pagamentos, seguindo o padrao de UI/UX ja estabelecido nas abas "Controle de Procedimentos" e "Betbra". A tabela `subscribers` ja existe no Supabase secundario (Procedures).
+
+---
+
+## Schema da Tabela (subscribers)
+
+```text
+id                 uuid        PK, default uuid_generate_v4()
+created_date       timestamptz default now()
+updated_date       timestamptz default now()
+created_by         text        nullable
+full_name          text        NOT NULL
+telegram_link      text        nullable
+amount_paid        numeric     NOT NULL
+payment_date       date        NOT NULL
+plan               text        NOT NULL
+situation          text        default 'Ativo'
+```
 
 ---
 
@@ -11,14 +28,14 @@ Criar uma nova aba "Betbra" no sistema para gerenciar dados de afiliacao da Betb
 
 | Arquivo | Descricao |
 |---------|-----------|
-| `src/pages/BetbraAffiliate.tsx` | Pagina principal com dashboard, graficos e tabela |
-| `src/components/betbra/BetbraModal.tsx` | Modal para adicionar/editar registros |
-| `src/components/betbra/BetbraTable.tsx` | Tabela compacta de registros |
-| `src/components/betbra/BetbraStats.tsx` | Cards de estatisticas (CPA, NGR, Turnover, etc) |
-| `src/components/betbra/BetbraCharts.tsx` | Graficos de Turnover e NGR |
-| `src/hooks/useBetbraData.ts` | Hook TanStack Query para CRUD |
-| `src/types/betbra.ts` | Tipos TypeScript para dados Betbra |
-| `src/lib/betbraUtils.ts` | Funcoes utilitarias (calculos CPA, filtros) |
+| `src/pages/Subscriptions.tsx` | Pagina principal com dashboard de assinantes |
+| `src/components/subscriptions/SubscriptionModal.tsx` | Modal para adicionar/editar assinantes |
+| `src/components/subscriptions/SubscriptionTable.tsx` | Tabela compacta de assinantes |
+| `src/components/subscriptions/SubscriptionStats.tsx` | Cards de estatisticas |
+| `src/components/subscriptions/SubscriptionFilters.tsx` | Filtros de busca e status |
+| `src/hooks/useSubscriptions.ts` | Hook TanStack Query para CRUD |
+| `src/types/subscriptions.ts` | Tipos TypeScript |
+| `src/lib/subscriptionUtils.ts` | Funcoes utilitarias (calculos, filtros) |
 
 ---
 
@@ -26,126 +43,171 @@ Criar uma nova aba "Betbra" no sistema para gerenciar dados de afiliacao da Betb
 
 | Arquivo | Mudanca |
 |---------|---------|
-| `src/types/auth.ts` | Adicionar `BETBRA_AFFILIATE` em PAGE_KEYS |
-| `src/components/Sidebar.tsx` | Adicionar link para /betbra |
-| `src/components/AnimatedRoutes.tsx` | Adicionar rota /betbra |
+| `src/types/auth.ts` | Adicionar `SUBSCRIPTIONS` em PAGE_KEYS e PAGE_CONFIG |
+| `src/components/Sidebar.tsx` | Adicionar link para /subscriptions |
+| `src/components/AnimatedRoutes.tsx` | Adicionar rota /subscriptions |
 
 ---
 
-## Schema da Tabela (betbra_affiliate_data)
-
-```text
-id                 uuid        PK, default gen_random_uuid()
-created_date       timestamptz default now()
-updated_date       timestamptz default now()
-created_by         text        nullable
-date               date        NOT NULL
-registros          numeric     NOT NULL
-numero_de_apostas  numeric     NOT NULL
-ngr                numeric     NOT NULL
-turnover           numeric     NOT NULL
-cpa                numeric     NOT NULL
-```
-
----
-
-## Tipos TypeScript
+## Tipos TypeScript (src/types/subscriptions.ts)
 
 ```typescript
-// src/types/betbra.ts
-export interface BetbraEntry {
+export interface Subscriber {
   id: string;
   created_date: string | null;
   updated_date: string | null;
   created_by: string | null;
-  date: string;
-  registros: number;
-  numero_de_apostas: number;
-  ngr: number;
-  turnover: number;
-  cpa: number;
+  full_name: string;
+  telegram_link: string | null;
+  amount_paid: number;
+  payment_date: string;
+  plan: string;
+  situation: string;
+}
+
+export type SubscriberPlan = 'Semanal' | 'Mensal' | 'Trimestral' | 'Semestral' | 'Anual';
+
+export type SubscriberSituation = 
+  | 'Ativo'
+  | 'Cobrado' 
+  | 'Lembrete Enviado'
+  | 'Removido do Grupo'
+  | 'Pago via LastLink'
+  | 'Pago via Hotmart'
+  | 'Pagamento Pendente'
+  | 'Outro';
+
+export interface SubscriptionFilters {
+  searchName: string;
+  plan: string;
+  status: string;
+  situation: string;
+  daysRemaining: string;
+}
+
+export interface SubscriptionStats {
+  totalReceived: number;
+  pendingCount: number;
+  totalSubscribers: number;
+  activeCount: number;
+  expiredCount: number;
+  removedCount: number;
 }
 ```
 
 ---
 
-## Hook de Dados (useBetbraData.ts)
+## Funcionalidades Principais
 
-Seguindo o padrao de `useProcedures.ts`:
+### 1. Cards de Estatisticas (6 cards)
 
-- `useBetbraData()` - Fetch com refetch a cada 10s
-- `useCreateBetbraEntry()` - Criar registro
-- `useUpdateBetbraEntry()` - Atualizar registro
-- `useDeleteBetbraEntry()` - Deletar registro
+| Card | Icone | Cor | Valor |
+|------|-------|-----|-------|
+| Total Recebido | DollarSign | Verde | Soma de amount_paid |
+| Pagamentos Pendentes | AlertCircle | Amarelo | Qtd com situation = "Pagamento Pendente" ou "Lembrete Enviado" |
+| Total Assinantes | Users | Azul | Total de registros |
+| Ativos | UserCheck | Verde | Ativos com dias > 0 |
+| Expirados | UserX | Laranja | Ativos com dias <= 0 |
+| Removidos | UserX | Vermelho | Qtd com situation = "Removido do Grupo" |
+
+### 2. Filtros
+
+| Filtro | Tipo | Opcoes |
+|--------|------|--------|
+| Buscar por Nome | Input texto | Busca parcial |
+| Plano | Select | Todos, Semanal, Mensal, Trimestral, Semestral, Anual |
+| Status | Select | Todos, Ativo, Expirado |
+| Situacao | Select | Todos, Ativo, Cobrado, Lembrete Enviado, etc |
+| Vencimento | Select | Todos, Ativos (>7 dias), Vencendo (<=7 dias), Expirados |
+
+### 3. Calculo de Dias Restantes
+
+| Plano | Dias |
+|-------|------|
+| Semanal | 7 |
+| Mensal | 30 |
+| Trimestral | 90 |
+| Semestral | 180 |
+| Anual | 365 |
+
+**Formula:** `Data Pagamento + Dias do Plano - Hoje = Dias Restantes`
+
+### 4. Tabela (Desktop)
+
+| Coluna | Tipo | Ordenavel |
+|--------|------|-----------|
+| Nome | texto | Sim |
+| Telegram | link | Nao |
+| Valor | currency | Sim |
+| Data Pagamento | date | Sim |
+| Plano | badge | Sim |
+| Dias Restantes | numero/texto | Sim |
+| Status | badge | Sim |
+| Situacao | texto | Nao |
+| Acoes | botoes | Nao |
+
+### 5. Cards Mobile
+
+Layout compacto para dispositivos moveis com todas as informacoes em cards empilhados.
 
 ---
 
-## Pagina Principal (BetbraAffiliate.tsx)
-
-### Layout
+## Layout da Pagina
 
 ```text
 +-------------------------------------------------------+
-|  Header: Betbra + Exportar CSV + Atualizar + Adicionar |
+|  Header: Assinaturas + Atualizar + Adicionar          |
 +-------------------------------------------------------+
-|  Seletor Periodo  |  Seletor Mes                      |
+|  [R$ Total] [Pendentes] [Total] [Ativos] [Expir] [Rem] |
 +-------------------------------------------------------+
-|  [CPA Total] [CPA R$] [Revenue Share] [Turnover] [Total]
+|  Filtros: Nome | Plano | Status | Situacao | Vencim.  |
 +-------------------------------------------------------+
-|  [Grafico Turnover Diario]  |  [Grafico NGR Diario]  |
-+-------------------------------------------------------+
-|  [Grafico NGR Acumulado Mensal]                       |
-+-------------------------------------------------------+
-|  Tabela de Registros com paginacao                    |
+|  Tabela de Assinantes (Desktop) / Cards (Mobile)      |
 +-------------------------------------------------------+
 ```
-
-### Funcionalidades
-
-1. **Filtro por Periodo**: Semana / Mes / Ano
-2. **Seletor de Mes**: Lista meses disponiveis nos dados
-3. **Cards de Estatisticas**:
-   - CPA Total (contagem)
-   - CPA R$ (calculado por niveis: 1-29=R$50, 30-49=R$60, 50-70=R$70, 71-99=R$85, 100+=R$100)
-   - Revenue Share (NGR * 15% se NGR > 10k)
-   - Turnover R$ (turnover * 0.5% / 2)
-   - Total (soma de todos os valores)
-4. **Graficos**:
-   - Turnover Diario (BarChart)
-   - NGR Diario (BarChart)
-   - NGR Acumulado (LineChart)
-5. **Tabela**:
-   - Ordenacao por coluna
-   - Paginacao (10 por pagina)
-   - Busca
-   - Agrupamento (dia/semana/mes)
 
 ---
 
-## Calculos de Valores
+## Hook de Dados (useSubscriptions.ts)
 
-### CPA R$ (Niveis)
+Seguindo padrao de useBetbraData.ts:
 
-```text
-CPA >= 100: R$ 100/CPA
-CPA >= 71:  R$ 85/CPA
-CPA >= 50:  R$ 70/CPA
-CPA >= 30:  R$ 60/CPA
-CPA >= 1:   R$ 50/CPA
-```
+- `useSubscriptions()` - Fetch com refetch a cada 10s
+- `useCreateSubscriber()` - Criar assinante
+- `useUpdateSubscriber()` - Atualizar assinante  
+- `useDeleteSubscriber()` - Deletar assinante
 
-### Revenue Share
+---
 
-```text
-Se NGR > 10.000: NGR * 15%
-Senao: R$ 0
-```
+## Modal de Assinante
 
-### Turnover R$
+### Campos do Formulario
 
-```text
-(Turnover * 0.5%) / 2
-```
+| Campo | Tipo | Obrigatorio |
+|-------|------|-------------|
+| Nome Completo | texto | Sim |
+| Link Telegram | texto | Nao |
+| Valor Pago | numero | Sim |
+| Data Pagamento | date | Sim |
+| Plano | select | Sim |
+| Situacao | select | Sim |
+
+### Opcoes de Plano
+- Semanal
+- Mensal
+- Trimestral
+- Semestral
+- Anual
+
+### Opcoes de Situacao
+- Ativo
+- Cobrado
+- Lembrete Enviado
+- Removido do Grupo
+- Pago via LastLink
+- Pago via Hotmart
+- Pagamento Pendente
+- Outro
 
 ---
 
@@ -155,10 +217,10 @@ Senao: R$ 0
 |----------|---------------|
 | Cards | Padding p-4, rounded-xl, bg-card |
 | Tabela | Compacta (py-1 px-1.5), text-xs, h-9 rows |
-| Graficos | Altura h-64, usando HSL colors do tema |
 | Fontes | text-xs para dados, text-sm para titulos |
-| Cores | Usar variaveis --success, --destructive, --primary |
-| Modal | Design consistente com ProcedureModal |
+| Cores | Usar variaveis HSL do tema (--success, --destructive, --primary) |
+| Modal | Dialog do Radix, design consistente |
+| Badges | Cores semanticas por status/plano |
 
 ---
 
@@ -166,25 +228,25 @@ Senao: R$ 0
 
 ### Sidebar
 
-Adicionar item logo apos "Controle Procedimentos":
+Adicionar item apos "Betbra":
 
 ```typescript
 { 
-  name: 'Betbra', 
-  href: '/betbra', 
-  icon: TrendingUp,  // ou icone customizado
+  name: 'Assinaturas', 
+  href: '/subscriptions', 
+  icon: CreditCard,
   adminOnly: true, 
-  pageKey: PAGE_KEYS.BETBRA_AFFILIATE 
+  pageKey: PAGE_KEYS.SUBSCRIPTIONS 
 }
 ```
 
 ### Rota
 
 ```typescript
-<Route path="/betbra" element={
-  <RequireAuth requireAdmin pageKey={PAGE_KEYS.BETBRA_AFFILIATE}>
+<Route path="/subscriptions" element={
+  <RequireAuth requireAdmin pageKey={PAGE_KEYS.SUBSCRIPTIONS}>
     <PageTransition>
-      <BetbraAffiliate />
+      <Subscriptions />
     </PageTransition>
   </RequireAuth>
 } />
@@ -192,77 +254,43 @@ Adicionar item logo apos "Controle Procedimentos":
 
 ---
 
-## Componentes Detalhados
+## Cores de Status
 
-### BetbraStats.tsx
+| Status | Cor Badge |
+|--------|-----------|
+| Ativo (>7 dias) | Verde (success) |
+| Vencendo (1-7 dias) | Amarelo (warning) |
+| Expirado (<=0 dias) | Vermelho (destructive) |
 
-5 cards em grid responsivo:
-
-| Card | Cor | Valor |
-|------|-----|-------|
-| CPA Total | Azul | Soma de todos CPAs |
-| CPA R$ | Ciano | Valor calculado por nivel |
-| Revenue Share R$ | Verde | NGR * 15% (se > 10k) |
-| Turnover R$ | Roxo | (Turnover * 0.5%) / 2 |
-| Total | Amarelo | Soma de CPA R$ + Revenue + Turnover |
-
-### BetbraCharts.tsx
-
-3 graficos usando Recharts:
-
-1. **Turnover Diario**: BarChart roxo
-2. **NGR Diario**: BarChart verde
-3. **NGR Acumulado**: LineChart verde com pontos
-
-### BetbraTable.tsx
-
-Colunas:
-
-| Coluna | Tipo | Ordenavel |
-|--------|------|-----------|
-| Data | date | Sim |
-| Registros | number | Sim |
-| Apostas | number | Sim |
-| NGR | currency | Sim |
-| Turnover | currency | Sim |
-| CPA | number | Sim |
-| Acoes | buttons | Nao |
-
-### BetbraModal.tsx
-
-Campos do formulario:
-
-| Campo | Tipo | Obrigatorio |
-|-------|------|-------------|
-| Data | date | Sim |
-| Registros | number | Sim |
-| Numero de Apostas | number | Sim |
-| NGR | number (decimal) | Sim |
-| Turnover | number (decimal) | Sim |
-| CPA | number | Sim |
+| Situacao | Cor Texto |
+|----------|-----------|
+| Ativo | Verde |
+| Pagamento Pendente | Amarelo |
+| Removido do Grupo | Vermelho |
+| Outros | Cinza |
 
 ---
 
 ## Resumo de Implementacao
 
 ### Etapa 1: Tipos e Utils
-- Criar `src/types/betbra.ts`
-- Criar `src/lib/betbraUtils.ts`
+- Criar `src/types/subscriptions.ts`
+- Criar `src/lib/subscriptionUtils.ts`
 
 ### Etapa 2: Hook de Dados
-- Criar `src/hooks/useBetbraData.ts`
+- Criar `src/hooks/useSubscriptions.ts`
 
 ### Etapa 3: Componentes
-- Criar `src/components/betbra/BetbraStats.tsx`
-- Criar `src/components/betbra/BetbraCharts.tsx`
-- Criar `src/components/betbra/BetbraTable.tsx`
-- Criar `src/components/betbra/BetbraModal.tsx`
+- Criar `src/components/subscriptions/SubscriptionStats.tsx`
+- Criar `src/components/subscriptions/SubscriptionFilters.tsx`
+- Criar `src/components/subscriptions/SubscriptionTable.tsx`
+- Criar `src/components/subscriptions/SubscriptionModal.tsx`
 
 ### Etapa 4: Pagina Principal
-- Criar `src/pages/BetbraAffiliate.tsx`
+- Criar `src/pages/Subscriptions.tsx`
 
 ### Etapa 5: Navegacao
-- Atualizar `src/types/auth.ts` (PAGE_KEYS)
+- Atualizar `src/types/auth.ts` (PAGE_KEYS + PAGE_CONFIG)
 - Atualizar `src/components/Sidebar.tsx`
 - Atualizar `src/components/AnimatedRoutes.tsx`
 
@@ -270,9 +298,10 @@ Campos do formulario:
 
 ## Resultado Esperado
 
-- Nova aba "Betbra" no menu lateral (apenas para admins)
-- Dashboard completo com estatisticas e graficos
-- Tabela compacta com ordenacao e paginacao
-- Modal para CRUD de registros
+- Nova aba "Assinaturas" no menu lateral (apenas para admins)
+- Dashboard com 6 cards de estatisticas
+- Filtros completos (nome, plano, status, situacao, vencimento)
+- Tabela responsiva com calculo automatico de dias restantes
+- Modal para CRUD de assinantes
 - UI consistente com o resto do sistema
-- Calculos automaticos de CPA, Revenue Share e Turnover
+- Cores semanticas para status de vencimento
