@@ -16,8 +16,12 @@ import { calculateStats, filterSubscribers } from '@/lib/subscriptionUtils';
 import { Subscriber, SubscriberFormData, SubscriptionFilters as Filters } from '@/types/subscriptions';
 import { RefreshCw, Plus, CreditCard } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { useAuth } from '@/contexts/AuthContext';
+import { PAGE_KEYS } from '@/types/auth';
 
 export default function Subscriptions() {
+  const { canEditPage } = useAuth();
+  const canEdit = canEditPage(PAGE_KEYS.SUBSCRIPTIONS);
   const { data: subscribers = [], isLoading, refetch, isRefetching } = useSubscriptions();
   const createMutation = useCreateSubscriber();
   const updateMutation = useUpdateSubscriber();
@@ -108,10 +112,12 @@ export default function Subscriptions() {
               <RefreshCw className={`h-4 w-4 mr-1.5 ${isRefetching ? 'animate-spin' : ''}`} />
               Atualizar
             </Button>
-            <Button size="sm" onClick={() => handleOpenModal()}>
-              <Plus className="h-4 w-4 mr-1.5" />
-              Adicionar
-            </Button>
+            {canEdit && (
+              <Button size="sm" onClick={() => handleOpenModal()}>
+                <Plus className="h-4 w-4 mr-1.5" />
+                Adicionar
+              </Button>
+            )}
           </div>
         </div>
 
@@ -147,8 +153,8 @@ export default function Subscriptions() {
             ) : (
               <SubscriptionTable
                 subscribers={filteredSubscribers}
-                onEdit={handleOpenModal}
-                onDelete={handleDeleteClick}
+                onEdit={canEdit ? handleOpenModal : undefined}
+                onDelete={canEdit ? handleDeleteClick : undefined}
               />
             )}
           </CardContent>

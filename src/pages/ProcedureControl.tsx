@@ -43,8 +43,12 @@ import { ColumnCustomizer } from '@/components/procedures/ColumnCustomizer';
 import { NotificationPanel } from '@/components/procedures/NotificationPanel';
 import { MountainChart } from '@/components/procedures/MountainChart';
 import { CalendarChart } from '@/components/procedures/CalendarChart';
+import { useAuth } from '@/contexts/AuthContext';
+import { PAGE_KEYS } from '@/types/auth';
 
 export default function ProcedureControl() {
+  const { canEditPage } = useAuth();
+  const canEdit = canEditPage(PAGE_KEYS.PROCEDURE_CONTROL);
   const { data: procedures = [], refetch } = useProcedures();
   const deleteProcedure = useDeleteProcedure();
   const toggleFavorite = useToggleFavorite();
@@ -180,16 +184,18 @@ export default function ProcedureControl() {
             <h1 className="text-xl md:text-2xl lg:text-3xl font-bold mb-2">Controle de Procedimentos</h1>
             <p className="text-muted-foreground text-xs md:text-sm">Rastreie e gerencie procedimentos de apostas</p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setShowImportModal(true)}>
-              <Upload className="w-4 h-4 mr-2" />
-              Importar CSV
-            </Button>
-            <Button onClick={handleAdd}>
-              <Plus className="w-4 h-4 mr-2" />
-              Adicionar
-            </Button>
-          </div>
+          {canEdit && (
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setShowImportModal(true)}>
+                <Upload className="w-4 h-4 mr-2" />
+                Importar CSV
+              </Button>
+              <Button onClick={handleAdd}>
+                <Plus className="w-4 h-4 mr-2" />
+                Adicionar
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Stats Row 1 */}
@@ -347,14 +353,14 @@ export default function ProcedureControl() {
             <ProcedureTable
               procedures={filteredProcedures}
               visibleColumns={visibleColumns}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
+              onEdit={canEdit ? handleEdit : undefined}
+              onDelete={canEdit ? handleDelete : undefined}
               onToggleFavorite={handleToggleFavorite}
             />
             <ProcedureMobileCards
               procedures={filteredProcedures}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
+              onEdit={canEdit ? handleEdit : undefined}
+              onDelete={canEdit ? handleDelete : undefined}
               onToggleFavorite={handleToggleFavorite}
             />
           </CardContent>

@@ -4,12 +4,11 @@ import { PageKey } from '@/types/auth';
 
 interface RequireAuthProps {
   children: React.ReactNode;
-  requireAdmin?: boolean;
   pageKey?: PageKey;
 }
 
-export const RequireAuth = ({ children, requireAdmin = false, pageKey }: RequireAuthProps) => {
-  const { user, loading, isAdmin, isApproved, userStatus, canAccessPage } = useAuth();
+export const RequireAuth = ({ children, pageKey }: RequireAuthProps) => {
+  const { user, loading, isApproved, canViewPage } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -29,28 +28,14 @@ export const RequireAuth = ({ children, requireAdmin = false, pageKey }: Require
     return <Navigate to="/login" replace />;
   }
 
-  // Verificar se requer admin
-  if (requireAdmin && !isAdmin) {
+  // Verificar permissão de visualização da página
+  if (pageKey && !canViewPage(pageKey)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center space-y-2">
           <p className="text-destructive font-medium">Acesso negado</p>
           <p className="text-muted-foreground text-sm">
-            Você precisa ser administrador para acessar esta página.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  // Verificar permissão granular da página
-  if (pageKey && !canAccessPage(pageKey)) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center space-y-2">
-          <p className="text-destructive font-medium">Acesso negado</p>
-          <p className="text-muted-foreground text-sm">
-            Você não tem permissão para acessar esta página.
+            Você não tem permissão para visualizar esta página.
           </p>
         </div>
       </div>

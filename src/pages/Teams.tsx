@@ -14,8 +14,12 @@ import { MultiSelectPopover } from '@/components/ui/multi-select-popover';
 import { Plus, Pencil, Trash2, Tag, X, Search, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import type { Team, EntityStatus } from '@/types/database';
+import { useAuth } from '@/contexts/AuthContext';
+import { PAGE_KEYS } from '@/types/auth';
 
 const Teams = () => {
+  const { canEditPage } = useAuth();
+  const canEdit = canEditPage(PAGE_KEYS.TEAMS);
   const [searchParams, setSearchParams] = useSearchParams();
   const { data: teams, isLoading } = useTeams();
   const { data: leagues } = useLeagues();
@@ -137,17 +141,20 @@ const Teams = () => {
             <h1 className="text-xl sm:text-2xl font-bold">Times</h1>
             <p className="text-muted-foreground text-sm">Gerencie times e seus aliases para normalização</p>
           </div>
-          <Dialog open={isDialogOpen} onOpenChange={(open) => {
-            setIsDialogOpen(open);
-            if (!open) {
-              setEditingTeam(null);
-              setFormData({ standard_name: '', league_id: '', status: 'active', logo_url: '' });
-            }
-          }}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Novo Time
+          {canEdit && (
+            <Dialog open={isDialogOpen} onOpenChange={(open) => {
+              setIsDialogOpen(open);
+              if (!open) {
+                setEditingTeam(null);
+                setFormData({ standard_name: '', league_id: '', status: 'active', logo_url: '' });
+              }
+            }}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Novo Time
+                </Button>
+              </DialogTrigger>
               </Button>
             </DialogTrigger>
             <DialogContent aria-describedby="team-dialog-description">
@@ -219,7 +226,8 @@ const Teams = () => {
                 </div>
               </form>
             </DialogContent>
-          </Dialog>
+            </Dialog>
+          )}
         </div>
 
         {/* Filters with Search */}
@@ -286,23 +294,25 @@ const Teams = () => {
                   </AccordionTrigger>
                   <AccordionContent>
                     <div className="space-y-4 pt-4">
-                      <div className="flex flex-wrap gap-2">
-                        <Button variant="outline" size="sm" onClick={() => handleEdit(team)}>
-                          <Pencil className="h-4 w-4 sm:mr-1" /> 
-                          <span className="hidden sm:inline">Editar</span>
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => {
-                          setSelectedTeamForAlias(team);
-                          setIsAliasDialogOpen(true);
-                        }}>
-                          <Tag className="h-4 w-4 sm:mr-1" /> 
-                          <span className="hidden sm:inline">Add Alias</span>
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => handleDelete(team.id)}>
-                          <Trash2 className="h-4 w-4 sm:mr-1" /> 
-                          <span className="hidden sm:inline">Excluir</span>
-                        </Button>
-                      </div>
+                      {canEdit && (
+                        <div className="flex flex-wrap gap-2">
+                          <Button variant="outline" size="sm" onClick={() => handleEdit(team)}>
+                            <Pencil className="h-4 w-4 sm:mr-1" /> 
+                            <span className="hidden sm:inline">Editar</span>
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => {
+                            setSelectedTeamForAlias(team);
+                            setIsAliasDialogOpen(true);
+                          }}>
+                            <Tag className="h-4 w-4 sm:mr-1" /> 
+                            <span className="hidden sm:inline">Add Alias</span>
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => handleDelete(team.id)}>
+                            <Trash2 className="h-4 w-4 sm:mr-1" /> 
+                            <span className="hidden sm:inline">Excluir</span>
+                          </Button>
+                        </div>
+                      )}
                       
                       <div>
                         <Label className="text-sm text-muted-foreground">Aliases (nomes alternativos)</Label>
@@ -315,9 +325,11 @@ const Teams = () => {
                                   {alias.bookmaker_source}
                                 </span>
                               )}
-                              <button onClick={() => deleteAlias.mutate(alias.id)} className="ml-1 hover:text-destructive">
-                                <X className="h-3 w-3" />
-                              </button>
+                              {canEdit && (
+                                <button onClick={() => deleteAlias.mutate(alias.id)} className="ml-1 hover:text-destructive">
+                                  <X className="h-3 w-3" />
+                                </button>
+                              )}
                             </Badge>
                           ))}
                           {getTeamAliases(team.id).length === 0 && (

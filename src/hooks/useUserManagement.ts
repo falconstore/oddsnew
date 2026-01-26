@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { UserProfile, UserPermission, UserRole, UserStatus, AppRole, PAGE_KEYS } from '@/types/auth';
+import { UserProfile, UserPermission, UserRole, UserStatus, AppRole, PAGE_KEYS, PageKey, DEFAULT_USER_PERMISSIONS } from '@/types/auth';
 import { useToast } from '@/hooks/use-toast';
 
 export interface UserWithDetails {
@@ -44,7 +44,7 @@ export function useUserManagement() {
       // Combinar dados
       const usersWithDetails: UserWithDetails[] = (profiles || []).map((profile) => ({
         id: profile.user_id,
-        email: '', // Será preenchido se necessário via auth.users (apenas admin)
+        email: '',
         profile,
         roles: (roles || []).filter((r) => r.user_id === profile.user_id),
         permissions: (permissions || []).filter((p) => p.user_id === profile.user_id),
@@ -98,20 +98,15 @@ export function useUserManagement() {
   };
 
   const createDefaultPermissions = async (userId: string) => {
-    const defaultPages = [
-      PAGE_KEYS.DASHBOARD,
-      PAGE_KEYS.MONITOR_FUTEBOL,
-      PAGE_KEYS.MONITOR_BASQUETE,
-      PAGE_KEYS.SETTINGS,
-    ];
-
-    for (const pageKey of defaultPages) {
+    for (const perm of DEFAULT_USER_PERMISSIONS) {
       await supabase
         .from('user_permissions')
         .upsert({
           user_id: userId,
-          page_key: pageKey,
-          can_access: true,
+          page_key: perm.pageKey,
+          can_view: perm.canView,
+          can_edit: perm.canEdit,
+          can_access: perm.canView, // Legacy compatibility
         }, { onConflict: 'user_id,page_key' });
     }
   };
@@ -169,27 +164,34 @@ export function useUserManagement() {
         .upsert({
           user_id: userId,
           page_key: pageKey,
-          can_access: true,
+          can_view: true,
+          can_edit: true,
+          can_access: true, // Legacy compatibility
         }, { onConflict: 'user_id,page_key' });
     }
   };
 
-  const updatePermission = async (userId: string, pageKey: string, canAccess: boolean) => {
+  const updatePermission = async (
+    userId: string, 
+    pageKey: string, 
+    canView: boolean, 
+    canEdit: boolean
+  ) => {
     try {
+      // Se não pode ver, também não pode editar
+      const finalCanEdit = canView ? canEdit : false;
+      
       const { error } = await supabase
         .from('user_permissions')
         .upsert({
           user_id: userId,
           page_key: pageKey,
-          can_access: canAccess,
+          can_view: canView,
+          can_edit: finalCanEdit,
+          can_access: canView, // Legacy compatibility
         }, { onConflict: 'user_id,page_key' });
 
       if (error) throw error;
-
-      toast({
-        title: 'Sucesso',
-        description: 'Permissão atualizada.',
-      });
 
       await fetchUsers();
     } catch (error) {
@@ -202,9 +204,43 @@ export function useUserManagement() {
     }
   };
 
+  const updateAllPermissions = async (
+    userId: string, 
+    permissions: { pageKey: string; canView: boolean; canEdit: boolean }[]
+  ) => {
+    try {
+      for (const perm of permissions) {
+        const finalCanEdit = perm.canView ? perm.canEdit : false;
+        
+        await supabase
+          .from('user_permissions')
+          .upsert({
+            user_id: userId,
+            page_key: perm.pageKey,
+            can_view: perm.canView,
+            can_edit: finalCanEdit,
+            can_access: perm.canView, // Legacy compatibility
+          }, { onConflict: 'user_id,page_key' });
+      }
+
+      toast({
+        title: 'Sucesso',
+        description: 'Permissões atualizadas.',
+      });
+
+      await fetchUsers();
+    } catch (error) {
+      console.error('Error updating permissions:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível atualizar as permissões.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const deleteUser = async (userId: string) => {
     try {
-      // Deletar perfil (cascade vai deletar roles e permissions)
       const { error } = await supabase
         .from('user_profiles')
         .delete()
@@ -239,6 +275,8 @@ export function useUserManagement() {
     updateUserStatus,
     setUserRole,
     updatePermission,
+    updateAllPermissions,
     deleteUser,
+    grantAllPermissions,
   };
 }

@@ -19,14 +19,13 @@ import {
   FileText,
   TrendingUp,
   CreditCard,
-  type LucideIcon
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useState } from 'react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 
-// Ícone SVG personalizado para Futebol - segue o estilo Lucide
+// Ícone SVG personalizado para Futebol
 const FootballIcon = ({ className }: { className?: string }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -44,7 +43,7 @@ const FootballIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-// Ícone SVG personalizado para Basquete - segue o estilo Lucide
+// Ícone SVG personalizado para Basquete
 const BasketballIcon = ({ className }: { className?: string }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -68,7 +67,6 @@ type NavigationItem = {
   name: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
-  adminOnly?: boolean;
   pageKey: PageKey;
 };
 
@@ -76,20 +74,20 @@ const navigation: NavigationItem[] = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard, pageKey: PAGE_KEYS.DASHBOARD },
   { name: 'Monitor Futebol', href: '/monitor-futebol', icon: FootballIcon, pageKey: PAGE_KEYS.MONITOR_FUTEBOL },
   { name: 'Monitor Basquete', href: '/monitor-basquete', icon: BasketballIcon, pageKey: PAGE_KEYS.MONITOR_BASQUETE },
-  { name: 'Controle Procedimentos', href: '/procedures', icon: FileText, adminOnly: true, pageKey: PAGE_KEYS.PROCEDURE_CONTROL },
-  { name: 'Betbra Affiliate', href: '/betbra', icon: TrendingUp, adminOnly: true, pageKey: PAGE_KEYS.BETBRA_AFFILIATE },
-  { name: 'Assinaturas', href: '/subscriptions', icon: CreditCard, adminOnly: true, pageKey: PAGE_KEYS.SUBSCRIPTIONS },
-  { name: 'Ligas', href: '/leagues', icon: Trophy, adminOnly: true, pageKey: PAGE_KEYS.LEAGUES },
-  { name: 'Times', href: '/teams', icon: Users, adminOnly: true, pageKey: PAGE_KEYS.TEAMS },
-  { name: 'Casas de Apostas', href: '/bookmakers', icon: Building2, adminOnly: true, pageKey: PAGE_KEYS.BOOKMAKERS },
+  { name: 'Controle Procedimentos', href: '/procedures', icon: FileText, pageKey: PAGE_KEYS.PROCEDURE_CONTROL },
+  { name: 'Betbra Affiliate', href: '/betbra', icon: TrendingUp, pageKey: PAGE_KEYS.BETBRA_AFFILIATE },
+  { name: 'Assinaturas', href: '/subscriptions', icon: CreditCard, pageKey: PAGE_KEYS.SUBSCRIPTIONS },
+  { name: 'Ligas', href: '/leagues', icon: Trophy, pageKey: PAGE_KEYS.LEAGUES },
+  { name: 'Times', href: '/teams', icon: Users, pageKey: PAGE_KEYS.TEAMS },
+  { name: 'Casas de Apostas', href: '/bookmakers', icon: Building2, pageKey: PAGE_KEYS.BOOKMAKERS },
   { name: 'Configurações', href: '/settings', icon: Settings, pageKey: PAGE_KEYS.SETTINGS },
-  { name: 'Gerenciar Usuários', href: '/admin/users', icon: UserCog, adminOnly: true, pageKey: PAGE_KEYS.ADMIN_USERS },
-  { name: 'Logs / Diagnóstico', href: '/admin/logs', icon: FileWarning, adminOnly: true, pageKey: PAGE_KEYS.ADMIN_LOGS },
+  { name: 'Gerenciar Usuários', href: '/admin/users', icon: UserCog, pageKey: PAGE_KEYS.ADMIN_USERS },
+  { name: 'Logs / Diagnóstico', href: '/admin/logs', icon: FileWarning, pageKey: PAGE_KEYS.ADMIN_LOGS },
 ];
 
 export function Sidebar() {
   const location = useLocation();
-  const { user, isAdmin, signOut, canAccessPage, userProfile } = useAuth();
+  const { user, isAdmin, signOut, canViewPage, userProfile } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   // Swipe gesture to close sidebar on mobile
@@ -98,11 +96,9 @@ export function Sidebar() {
     onSwipeLeft: () => setMobileOpen(false),
   });
 
-  // Filter navigation based on granular permissions and adminOnly
+  // Filtrar navegação baseado em permissões de visualização
   const filteredNavigation = navigation.filter(item => {
-    if (item.adminOnly && !isAdmin) return false;
-    if (!isAdmin && !canAccessPage(item.pageKey)) return false;
-    return true;
+    return canViewPage(item.pageKey);
   });
 
   const handleSignOut = async () => {
