@@ -24,8 +24,12 @@ import { BetbraStats } from '@/components/betbra/BetbraStats';
 import { BetbraCharts } from '@/components/betbra/BetbraCharts';
 import { BetbraTable, BetbraMobileCards } from '@/components/betbra/BetbraTable';
 import { BetbraModal } from '@/components/betbra/BetbraModal';
+import { useAuth } from '@/contexts/AuthContext';
+import { PAGE_KEYS } from '@/types/auth';
 
 export default function BetbraAffiliate() {
+  const { canEditPage } = useAuth();
+  const canEdit = canEditPage(PAGE_KEYS.BETBRA_AFFILIATE);
   const { data: entries = [], refetch, isRefetching } = useBetbraData();
   const deleteEntry = useDeleteBetbraEntry();
 
@@ -106,10 +110,12 @@ export default function BetbraAffiliate() {
               <RefreshCw className={`w-4 h-4 mr-2 ${isRefetching ? 'animate-spin' : ''}`} />
               Atualizar
             </Button>
-            <Button onClick={handleAdd}>
-              <Plus className="w-4 h-4 mr-2" />
-              Adicionar
-            </Button>
+            {canEdit && (
+              <Button onClick={handleAdd}>
+                <Plus className="w-4 h-4 mr-2" />
+                Adicionar
+              </Button>
+            )}
           </div>
         </div>
 
@@ -172,15 +178,15 @@ export default function BetbraAffiliate() {
             <div className="hidden lg:block">
               <BetbraTable
                 entries={filteredEntries}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
+                onEdit={canEdit ? handleEdit : undefined}
+                onDelete={canEdit ? handleDelete : undefined}
               />
             </div>
             {/* Mobile Cards */}
             <BetbraMobileCards
               entries={filteredEntries}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
+              onEdit={canEdit ? handleEdit : undefined}
+              onDelete={canEdit ? handleDelete : undefined}
             />
           </CardContent>
         </Card>

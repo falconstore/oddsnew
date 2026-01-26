@@ -12,8 +12,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Plus, Pencil, Trash2, ExternalLink, ChevronDown, Trophy } from "lucide-react";
 import type { Bookmaker, EntityStatus } from "@/types/database";
+import { useAuth } from "@/contexts/AuthContext";
+import { PAGE_KEYS } from "@/types/auth";
 
-// Dados das ligas por bookmaker (baseado nos scrapers)
 const BOOKMAKER_LEAGUES: Record<string, string[]> = {
   superbet: ["Premier League", "Serie A", "La Liga"],
   sportingbet: ["Premier League", "La Liga", "Serie A"],
@@ -31,6 +32,9 @@ const BOOKMAKER_LEAGUES: Record<string, string[]> = {
 };
 
 const Bookmakers = () => {
+  const { canEditPage } = useAuth();
+  const canEdit = canEditPage(PAGE_KEYS.BOOKMAKERS);
+  
   const { data: bookmakers, isLoading } = useBookmakers();
   const createBookmaker = useCreateBookmaker();
   const updateBookmaker = useUpdateBookmaker();
@@ -98,82 +102,84 @@ const Bookmakers = () => {
             <h1 className="text-2xl font-bold">Casas de Apostas</h1>
             <p className="text-muted-foreground">Gerencie as fontes de dados de odds</p>
           </div>
-          <Dialog
-            open={isDialogOpen}
-            onOpenChange={(open) => {
-              setIsDialogOpen(open);
-              if (!open) {
-                setEditing(null);
-                setFormData({ name: "", website_url: "", priority: 0, status: "active" });
-              }
-            }}
-          >
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Nova Casa
-              </Button>
-            </DialogTrigger>
-            <DialogContent aria-describedby="bookmaker-dialog-description">
-              <DialogHeader>
-                <DialogTitle>{editing ? "Editar Casa de Apostas" : "Nova Casa de Apostas"}</DialogTitle>
-                <p id="bookmaker-dialog-description" className="text-sm text-muted-foreground">
-                  {editing ? "Altere os dados da casa de apostas." : "Preencha os dados para cadastrar uma nova casa."}
-                </p>
-              </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Nome</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="Ex: Bet365"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="website">Website</Label>
-                  <Input
-                    id="website"
-                    value={formData.website_url}
-                    onChange={(e) => setFormData({ ...formData, website_url: e.target.value })}
-                    placeholder="https://bet365.com"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="priority">Prioridade (ordenação)</Label>
-                  <Input
-                    id="priority"
-                    type="number"
-                    value={formData.priority}
-                    onChange={(e) => setFormData({ ...formData, priority: parseInt(e.target.value) || 0 })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="status">Status</Label>
-                  <Select
-                    value={formData.status}
-                    onValueChange={(v) => setFormData({ ...formData, status: v as EntityStatus })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="active">Ativo</SelectItem>
-                      <SelectItem value="inactive">Inativo</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex justify-end gap-2">
-                  <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                    Cancelar
-                  </Button>
-                  <Button type="submit">{editing ? "Salvar" : "Criar"}</Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
+          {canEdit && (
+            <Dialog
+              open={isDialogOpen}
+              onOpenChange={(open) => {
+                setIsDialogOpen(open);
+                if (!open) {
+                  setEditing(null);
+                  setFormData({ name: "", website_url: "", priority: 0, status: "active" });
+                }
+              }}
+            >
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nova Casa
+                </Button>
+              </DialogTrigger>
+              <DialogContent aria-describedby="bookmaker-dialog-description">
+                <DialogHeader>
+                  <DialogTitle>{editing ? "Editar Casa de Apostas" : "Nova Casa de Apostas"}</DialogTitle>
+                  <p id="bookmaker-dialog-description" className="text-sm text-muted-foreground">
+                    {editing ? "Altere os dados da casa de apostas." : "Preencha os dados para cadastrar uma nova casa."}
+                  </p>
+                </DialogHeader>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Nome</Label>
+                    <Input
+                      id="name"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      placeholder="Ex: Bet365"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="website">Website</Label>
+                    <Input
+                      id="website"
+                      value={formData.website_url}
+                      onChange={(e) => setFormData({ ...formData, website_url: e.target.value })}
+                      placeholder="https://bet365.com"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="priority">Prioridade (ordenação)</Label>
+                    <Input
+                      id="priority"
+                      type="number"
+                      value={formData.priority}
+                      onChange={(e) => setFormData({ ...formData, priority: parseInt(e.target.value) || 0 })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="status">Status</Label>
+                    <Select
+                      value={formData.status}
+                      onValueChange={(v) => setFormData({ ...formData, status: v as EntityStatus })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">Ativo</SelectItem>
+                        <SelectItem value="inactive">Inativo</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                      Cancelar
+                    </Button>
+                    <Button type="submit">{editing ? "Salvar" : "Criar"}</Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
 
         <Card>
@@ -186,13 +192,13 @@ const Bookmakers = () => {
                   <TableHead>Prioridade</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Ligas</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
+                  {canEdit && <TableHead className="text-right">Ações</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading && (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center">
+                    <TableCell colSpan={canEdit ? 6 : 5} className="text-center">
                       Carregando...
                     </TableCell>
                   </TableRow>
@@ -250,18 +256,20 @@ const Bookmakers = () => {
                               <span className="text-muted-foreground text-sm">Não configurado</span>
                             )}
                           </TableCell>
-                          <TableCell className="text-right">
-                            <Button variant="ghost" size="icon" onClick={() => handleEdit(bookmaker)}>
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={() => handleDelete(bookmaker.id)}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </TableCell>
+                          {canEdit && (
+                            <TableCell className="text-right">
+                              <Button variant="ghost" size="icon" onClick={() => handleEdit(bookmaker)}>
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" onClick={() => handleDelete(bookmaker.id)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          )}
                         </TableRow>
                         <CollapsibleContent asChild>
                           <TableRow className="bg-muted/30 hover:bg-muted/30">
-                            <TableCell colSpan={6} className="py-3">
+                            <TableCell colSpan={canEdit ? 6 : 5} className="py-3">
                               <div className="flex flex-wrap gap-2 pl-4">
                                 {leagues.map((league) => (
                                   <Badge key={league} variant="outline" className="text-xs">
@@ -278,7 +286,7 @@ const Bookmakers = () => {
                 })}
                 {!isLoading && (!bookmakers || bookmakers.length === 0) && (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground">
+                    <TableCell colSpan={canEdit ? 6 : 5} className="text-center text-muted-foreground">
                       Nenhuma casa de apostas cadastrada
                     </TableCell>
                   </TableRow>

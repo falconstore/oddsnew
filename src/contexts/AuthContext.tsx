@@ -15,7 +15,8 @@ interface AuthContextType {
   userStatus: UserStatus | null;
   userProfile: UserProfile | null;
   userPermissions: UserPermission[];
-  canAccessPage: (pageKey: PageKey) => boolean;
+  canViewPage: (pageKey: PageKey) => boolean;
+  canEditPage: (pageKey: PageKey) => boolean;
   refreshUserData: () => Promise<void>;
 }
 
@@ -112,13 +113,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => subscription.unsubscribe();
   }, []);
 
-  const canAccessPage = (pageKey: PageKey): boolean => {
-    // Admins têm acesso a tudo
+  const canViewPage = (pageKey: PageKey): boolean => {
+    // Admins têm acesso total
     if (isAdmin) return true;
     
-    // Verificar permissão específica
+    // Verificar permissão específica de visualização
     const permission = userPermissions.find(p => p.page_key === pageKey);
-    return permission?.can_access ?? false;
+    // Suporte para migração: usar can_view ou fallback para can_access
+    return permission?.can_view ?? permission?.can_access ?? false;
+  };
+
+  const canEditPage = (pageKey: PageKey): boolean => {
+    // Admins têm acesso total
+    if (isAdmin) return true;
+    
+    // Verificar permissão específica de edição
+    const permission = userPermissions.find(p => p.page_key === pageKey);
+    // Suporte para migração: usar can_edit ou fallback para can_access
+    return permission?.can_edit ?? permission?.can_access ?? false;
   };
 
   const signIn = async (email: string, password: string) => {
@@ -127,8 +139,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signUp = async (email: string, password: string, fullName: string, phone: string) => {
-    // Criar conta no Supabase Auth com metadata
-    // O perfil será criado automaticamente pelo trigger do banco
     const { error } = await supabase.auth.signUp({
       email,
       password,
@@ -145,7 +155,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return { error: error as Error | null };
     }
 
-    // Perfil será criado automaticamente pelo trigger handle_new_user()
     return { error: null };
   };
 
@@ -160,7 +169,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUserPermissions([]);
   };
 
-  // Combinar loading states - considerar carregando enquanto auth OU dados do usuário estão carregando
+  // Combinar loading states
   const isLoading = loading || (!!user && userDataLoading);
 
   return (
@@ -176,7 +185,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       userStatus,
       userProfile,
       userPermissions,
-      canAccessPage,
+      canViewPage,
+      canEditPage,
       refreshUserData
     }}>
       {children}

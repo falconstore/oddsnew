@@ -70,58 +70,58 @@ export function AnimatedRoutes() {
           </RequireAuth>
         } />
         
-        {/* Admin-only routes */}
+        {/* All pages now use granular permissions instead of requireAdmin */}
         <Route path="/leagues" element={
-          <RequireAuth requireAdmin pageKey={PAGE_KEYS.LEAGUES}>
+          <RequireAuth pageKey={PAGE_KEYS.LEAGUES}>
             <PageTransition>
               <Leagues />
             </PageTransition>
           </RequireAuth>
         } />
         <Route path="/teams" element={
-          <RequireAuth requireAdmin pageKey={PAGE_KEYS.TEAMS}>
+          <RequireAuth pageKey={PAGE_KEYS.TEAMS}>
             <PageTransition>
               <Teams />
             </PageTransition>
           </RequireAuth>
         } />
         <Route path="/bookmakers" element={
-          <RequireAuth requireAdmin pageKey={PAGE_KEYS.BOOKMAKERS}>
+          <RequireAuth pageKey={PAGE_KEYS.BOOKMAKERS}>
             <PageTransition>
               <Bookmakers />
             </PageTransition>
           </RequireAuth>
         } />
         <Route path="/admin/users" element={
-          <RequireAuth requireAdmin pageKey={PAGE_KEYS.ADMIN_USERS}>
+          <RequireAuth pageKey={PAGE_KEYS.ADMIN_USERS}>
             <PageTransition>
               <AdminUsers />
             </PageTransition>
           </RequireAuth>
         } />
         <Route path="/admin/logs" element={
-          <RequireAuth requireAdmin pageKey={PAGE_KEYS.ADMIN_LOGS}>
+          <RequireAuth pageKey={PAGE_KEYS.ADMIN_LOGS}>
             <PageTransition>
               <AdminLogs />
             </PageTransition>
           </RequireAuth>
         } />
         <Route path="/procedures" element={
-          <RequireAuth requireAdmin pageKey={PAGE_KEYS.PROCEDURE_CONTROL}>
+          <RequireAuth pageKey={PAGE_KEYS.PROCEDURE_CONTROL}>
             <PageTransition>
               <ProcedureControl />
             </PageTransition>
           </RequireAuth>
         } />
         <Route path="/betbra" element={
-          <RequireAuth requireAdmin pageKey={PAGE_KEYS.BETBRA_AFFILIATE}>
+          <RequireAuth pageKey={PAGE_KEYS.BETBRA_AFFILIATE}>
             <PageTransition>
               <BetbraAffiliate />
             </PageTransition>
           </RequireAuth>
         } />
         <Route path="/subscriptions" element={
-          <RequireAuth requireAdmin pageKey={PAGE_KEYS.SUBSCRIPTIONS}>
+          <RequireAuth pageKey={PAGE_KEYS.SUBSCRIPTIONS}>
             <PageTransition>
               <Subscriptions />
             </PageTransition>

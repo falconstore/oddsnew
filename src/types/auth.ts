@@ -16,7 +16,9 @@ export interface UserPermission {
   id: string;
   user_id: string;
   page_key: string;
-  can_access: boolean;
+  can_view: boolean;
+  can_edit: boolean;
+  can_access?: boolean; // Legacy - para compatibilidade durante migração
   created_at: string;
 }
 
@@ -45,18 +47,62 @@ export const PAGE_KEYS = {
 
 export type PageKey = typeof PAGE_KEYS[keyof typeof PAGE_KEYS];
 
-// Configuração de páginas com labels
-export const PAGE_CONFIG: Record<PageKey, { label: string; adminOnly: boolean }> = {
-  [PAGE_KEYS.DASHBOARD]: { label: 'Dashboard', adminOnly: false },
-  [PAGE_KEYS.MONITOR_FUTEBOL]: { label: 'Monitor Futebol', adminOnly: false },
-  [PAGE_KEYS.MONITOR_BASQUETE]: { label: 'Monitor Basquete', adminOnly: false },
-  [PAGE_KEYS.LEAGUES]: { label: 'Ligas', adminOnly: true },
-  [PAGE_KEYS.TEAMS]: { label: 'Times', adminOnly: true },
-  [PAGE_KEYS.BOOKMAKERS]: { label: 'Casas de Apostas', adminOnly: true },
-  [PAGE_KEYS.SETTINGS]: { label: 'Configurações', adminOnly: false },
-  [PAGE_KEYS.ADMIN_USERS]: { label: 'Gerenciar Usuários', adminOnly: true },
-  [PAGE_KEYS.ADMIN_LOGS]: { label: 'Logs / Diagnóstico', adminOnly: true },
-  [PAGE_KEYS.PROCEDURE_CONTROL]: { label: 'Controle de Procedimentos', adminOnly: true },
-  [PAGE_KEYS.BETBRA_AFFILIATE]: { label: 'Betbra Affiliate', adminOnly: true },
-  [PAGE_KEYS.SUBSCRIPTIONS]: { label: 'Assinaturas', adminOnly: true },
+// Configuração de páginas com labels e descrições
+export const PAGE_CONFIG: Record<PageKey, { label: string; description: string }> = {
+  [PAGE_KEYS.DASHBOARD]: { 
+    label: 'Dashboard', 
+    description: 'Visão geral do sistema'
+  },
+  [PAGE_KEYS.MONITOR_FUTEBOL]: { 
+    label: 'Monitor Futebol', 
+    description: 'Monitor de odds de futebol'
+  },
+  [PAGE_KEYS.MONITOR_BASQUETE]: { 
+    label: 'Monitor Basquete', 
+    description: 'Monitor de odds de basquete'
+  },
+  [PAGE_KEYS.LEAGUES]: { 
+    label: 'Ligas', 
+    description: 'Gerenciar campeonatos'
+  },
+  [PAGE_KEYS.TEAMS]: { 
+    label: 'Times', 
+    description: 'Gerenciar times e aliases'
+  },
+  [PAGE_KEYS.BOOKMAKERS]: { 
+    label: 'Casas de Apostas', 
+    description: 'Gerenciar fontes de odds'
+  },
+  [PAGE_KEYS.SETTINGS]: { 
+    label: 'Configurações', 
+    description: 'Configurações do sistema'
+  },
+  [PAGE_KEYS.ADMIN_USERS]: { 
+    label: 'Gerenciar Usuários', 
+    description: 'Aprovar e gerenciar usuários'
+  },
+  [PAGE_KEYS.ADMIN_LOGS]: { 
+    label: 'Logs / Diagnóstico', 
+    description: 'Visualizar logs do sistema'
+  },
+  [PAGE_KEYS.PROCEDURE_CONTROL]: { 
+    label: 'Controle de Procedimentos', 
+    description: 'Gerenciar procedimentos de apostas'
+  },
+  [PAGE_KEYS.BETBRA_AFFILIATE]: { 
+    label: 'Betbra Affiliate', 
+    description: 'Dados de afiliação Betbra'
+  },
+  [PAGE_KEYS.SUBSCRIPTIONS]: { 
+    label: 'Assinaturas', 
+    description: 'Controle de pagamentos'
+  },
 };
+
+// Permissões padrão para novos usuários aprovados
+export const DEFAULT_USER_PERMISSIONS: { pageKey: PageKey; canView: boolean; canEdit: boolean }[] = [
+  { pageKey: PAGE_KEYS.DASHBOARD, canView: true, canEdit: true },
+  { pageKey: PAGE_KEYS.MONITOR_FUTEBOL, canView: true, canEdit: true },
+  { pageKey: PAGE_KEYS.MONITOR_BASQUETE, canView: true, canEdit: true },
+  { pageKey: PAGE_KEYS.SETTINGS, canView: true, canEdit: true },
+];

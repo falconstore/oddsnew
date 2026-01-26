@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Layout } from '@/components/Layout';
 import { useUserManagement, UserWithDetails } from '@/hooks/useUserManagement';
 import { PAGE_KEYS, PAGE_CONFIG, PageKey, UserStatus } from '@/types/auth';
@@ -21,6 +21,7 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from '@/components/ui/dialog';
 import { 
   CheckCircle, 
@@ -30,13 +31,31 @@ import {
   User, 
   Settings,
   Trash2,
-  Loader2
+  Loader2,
+  Eye,
+  Pencil,
+  Save
 } from 'lucide-react';
 
+interface PermissionState {
+  [pageKey: string]: { canView: boolean; canEdit: boolean };
+}
+
 const AdminUsers = () => {
-  const { users, loading, updateUserStatus, setUserRole, updatePermission, deleteUser } = useUserManagement();
+  const { 
+    users, 
+    loading, 
+    updateUserStatus, 
+    setUserRole, 
+    updateAllPermissions, 
+    deleteUser,
+    grantAllPermissions 
+  } = useUserManagement();
+  
   const [selectedUser, setSelectedUser] = useState<UserWithDetails | null>(null);
   const [permissionsOpen, setPermissionsOpen] = useState(false);
+  const [permissionState, setPermissionState] = useState<PermissionState>({});
+  const [saving, setSaving] = useState(false);
 
   const getStatusBadge = (status: UserStatus | undefined) => {
     switch (status) {
@@ -54,8 +73,12 @@ const AdminUsers = () => {
     return user.roles.some(r => r.role === 'admin');
   };
 
-  const hasPermission = (user: UserWithDetails, pageKey: string) => {
-    return user.permissions.some(p => p.page_key === pageKey && p.can_access);
+  const getUserPermission = (user: UserWithDetails, pageKey: string) => {
+    const perm = user.permissions.find(p => p.page_key === pageKey);
+    return {
+      canView: perm?.can_view ?? perm?.can_access ?? false,
+      canEdit: perm?.can_edit ?? perm?.can_access ?? false,
+    };
   };
 
   const filterUsersByStatus = (status: UserStatus | 'all') => {
@@ -65,8 +88,95 @@ const AdminUsers = () => {
 
   const openPermissions = (user: UserWithDetails) => {
     setSelectedUser(user);
+    
+    // Inicializar estado de permissões
+    const initialState: PermissionState = {};
+    Object.values(PAGE_KEYS).forEach(pageKey => {
+      const perm = getUserPermission(user, pageKey);
+      initialState[pageKey] = perm;
+    });
+    setPermissionState(initialState);
     setPermissionsOpen(true);
   };
+
+  const handlePermissionChange = (pageKey: string, field: 'canView' | 'canEdit', value: boolean) => {
+    setPermissionState(prev => {
+      const updated = { ...prev };
+      if (field === 'canView') {
+        updated[pageKey] = { 
+          canView: value, 
+          // Se desmarcar visualizar, desmarcar editar também
+          canEdit: value ? prev[pageKey]?.canEdit ?? false : false 
+        };
+      } else {
+        updated[pageKey] = { 
+          ...prev[pageKey], 
+          canEdit: value 
+        };
+      }
+      return updated;
+    });
+  };
+
+  const handleSelectAllView = (checked: boolean) => {
+    setPermissionState(prev => {
+      const updated: PermissionState = {};
+      Object.values(PAGE_KEYS).forEach(pageKey => {
+        updated[pageKey] = { 
+          canView: checked, 
+          canEdit: checked ? prev[pageKey]?.canEdit ?? false : false 
+        };
+      });
+      return updated;
+    });
+  };
+
+  const handleSelectAllEdit = (checked: boolean) => {
+    setPermissionState(prev => {
+      const updated: PermissionState = {};
+      Object.values(PAGE_KEYS).forEach(pageKey => {
+        updated[pageKey] = { 
+          canView: prev[pageKey]?.canView ?? false, 
+          canEdit: prev[pageKey]?.canView ? checked : false 
+        };
+      });
+      return updated;
+    });
+  };
+
+  const handleSavePermissions = async () => {
+    if (!selectedUser) return;
+    
+    setSaving(true);
+    const permissions = Object.entries(permissionState).map(([pageKey, perm]) => ({
+      pageKey,
+      canView: perm.canView,
+      canEdit: perm.canEdit,
+    }));
+    
+    await updateAllPermissions(selectedUser.id, permissions);
+    setSaving(false);
+    setPermissionsOpen(false);
+  };
+
+  const handleMakeAdmin = async (user: UserWithDetails) => {
+    await setUserRole(user.id, 'admin', true);
+  };
+
+  const handleRemoveAdmin = async (user: UserWithDetails) => {
+    await setUserRole(user.id, 'admin', false);
+  };
+
+  // Calcular totais de seleção
+  const allViewChecked = useMemo(() => 
+    Object.values(permissionState).every(p => p.canView),
+    [permissionState]
+  );
+  
+  const allEditChecked = useMemo(() => 
+    Object.values(permissionState).every(p => p.canEdit),
+    [permissionState]
+  );
 
   if (loading) {
     return (
@@ -214,7 +324,10 @@ const AdminUsers = () => {
                                   <Button
                                     size="sm"
                                     variant={hasAdminRole(user) ? "secondary" : "outline"}
-                                    onClick={() => setUserRole(user.id, 'admin', !hasAdminRole(user))}
+                                    onClick={() => hasAdminRole(user) 
+                                      ? handleRemoveAdmin(user) 
+                                      : handleMakeAdmin(user)
+                                    }
                                   >
                                     <Shield className="h-4 w-4 mr-1" />
                                     {hasAdminRole(user) ? 'Remover Admin' : 'Tornar Admin'}
@@ -260,38 +373,108 @@ const AdminUsers = () => {
         </Card>
       </div>
 
-      {/* Modal de Permissões */}
+      {/* Modal de Permissões Redesenhado */}
       <Dialog open={permissionsOpen} onOpenChange={setPermissionsOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Permissões de Acesso</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings className="h-5 w-5" />
+              Permissões de {selectedUser?.profile?.full_name}
+            </DialogTitle>
             <DialogDescription>
-              Configure quais páginas {selectedUser?.profile?.full_name} pode acessar.
+              Configure quais páginas o usuário pode visualizar e editar.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            {Object.entries(PAGE_CONFIG).map(([key, config]) => (
-              <div key={key} className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id={key}
-                    checked={selectedUser ? hasPermission(selectedUser, key) : false}
-                    onCheckedChange={(checked) => {
-                      if (selectedUser) {
-                        updatePermission(selectedUser.id, key, !!checked);
-                      }
-                    }}
-                  />
-                  <label htmlFor={key} className="text-sm font-medium cursor-pointer">
-                    {config.label}
-                  </label>
-                </div>
-                {config.adminOnly && (
-                  <Badge variant="outline" className="text-xs">Admin</Badge>
-                )}
-              </div>
-            ))}
+          
+          <div className="border rounded-lg overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/50">
+                  <TableHead className="w-[50%]">Página</TableHead>
+                  <TableHead className="w-[25%] text-center">
+                    <div className="flex items-center justify-center gap-2">
+                      <Eye className="h-4 w-4" />
+                      <span>Visualizar</span>
+                    </div>
+                  </TableHead>
+                  <TableHead className="w-[25%] text-center">
+                    <div className="flex items-center justify-center gap-2">
+                      <Pencil className="h-4 w-4" />
+                      <span>Editar</span>
+                    </div>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {/* Linha de seleção total */}
+                <TableRow className="bg-primary/5 font-medium">
+                  <TableCell>Selecionar Todos</TableCell>
+                  <TableCell className="text-center">
+                    <Checkbox
+                      checked={allViewChecked}
+                      onCheckedChange={(checked) => handleSelectAllView(!!checked)}
+                    />
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Checkbox
+                      checked={allEditChecked}
+                      onCheckedChange={(checked) => handleSelectAllEdit(!!checked)}
+                    />
+                  </TableCell>
+                </TableRow>
+                
+                {Object.entries(PAGE_CONFIG).map(([key, config]) => {
+                  const perm = permissionState[key] || { canView: false, canEdit: false };
+                  return (
+                    <TableRow key={key}>
+                      <TableCell>
+                        <div>
+                          <p className="font-medium text-sm">{config.label}</p>
+                          <p className="text-xs text-muted-foreground">{config.description}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Checkbox
+                          checked={perm.canView}
+                          onCheckedChange={(checked) => 
+                            handlePermissionChange(key, 'canView', !!checked)
+                          }
+                        />
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Checkbox
+                          checked={perm.canEdit}
+                          disabled={!perm.canView}
+                          onCheckedChange={(checked) => 
+                            handlePermissionChange(key, 'canEdit', !!checked)
+                          }
+                        />
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
           </div>
+
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={() => setPermissionsOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSavePermissions} disabled={saving}>
+              {saving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Salvando...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  Salvar Permissões
+                </>
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </Layout>
