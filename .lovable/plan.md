@@ -1,149 +1,128 @@
 
-# Plano: Rebranding da Pagina de Controle de Procedimentos
 
-## Visao Geral
+# Plano: Ajustes de UI - Calendário, Tabela e Ícones da Sidebar
 
-Atualizar a pagina de Controle de Procedimentos para seguir o design system atual do OddsCompare, deixando as linhas mais compactas e corrigindo o CalendarChart com a logica de degradee do arquivo original.
+## Visão Geral
 
----
+Três ajustes para melhorar a experiência visual:
 
-## Mudancas Principais
-
-### 1. CalendarChart - Correcao Completa
-
-O calendario atual esta simplificado. Sera substituido pela versao completa do arquivo `CalendarChart.jsx` enviado, adaptada para TypeScript e usando as variaveis CSS do design system:
-
-| Atual | Corrigido |
-|-------|-----------|
-| Cores fixas por faixa de lucro | Degradee dinamico baseado no max/min lucro do mes |
-| Sem indicador de "hoje" | Anel azul para o dia atual |
-| Tooltip simples | Informacoes detalhadas (quantidade de procedimentos + valor) |
-| Celulas pequenas | Celulas proporcionais com mais informacao visivel |
-
-**Alteracoes tecnicas:**
-- Usar `eachDayOfInterval` para gerar dias
-- Implementar `getColorIntensity()` com calculo dinamico de opacidade
-- Adicionar anel de destaque para o dia atual (`isSameDay`)
-- Estilos inline para cores RGBA dinamicas (compativel com dark/light mode)
-- Manter responsividade com tamanhos de fonte adaptativos
+1. **CalendarChart**: Otimizar cores para modo escuro usando variáveis CSS
+2. **Tabela**: Aumentar fonte mantendo colunas compactas
+3. **Sidebar**: Padronizar ícones removendo emojis
 
 ---
 
-### 2. Tabela - Linhas Mais Compactas
+## 1. CalendarChart - Modo Escuro Otimizado
 
-Reduzir padding das celulas da tabela para tornar a visualizacao mais densa:
+### Problema Atual
+As cores RGBA fixas (green 34,197,94 e red 239,68,68) não se adaptam bem ao tema, podendo ter contraste ruim no modo claro.
 
-| Componente | Antes | Depois |
-|------------|-------|--------|
-| TableCell | `p-4` | `py-2 px-3` |
-| TableHead | `h-12` | `h-10` |
-| Botoes de acao | `size="sm"` | `size="icon" h-7 w-7` |
-| Badges | `text-xs` | `text-[10px]` |
-| Star button | padding normal | `p-0.5` |
+### Solução
+Usar as variáveis CSS do design system (`--success` e `--destructive`) convertidas para RGBA dinâmico:
 
----
+| Antes | Depois |
+|-------|--------|
+| `rgba(34, 197, 94, opacity)` | Usar classe Tailwind com opacity dinâmica |
+| `rgba(239, 68, 68, opacity)` | Usar classe Tailwind com opacity dinâmica |
+| Cores inline fixas | Classes CSS adaptáveis ao tema |
 
-### 3. StatCards - Alinhamento com Design System
+**Implementação técnica:**
+- Criar classes CSS dinâmicas baseadas na intensidade
+- Usar `hsl(var(--success))` e `hsl(var(--destructive))` 
+- Manter o cálculo de intensidade proporcional ao max/min do mês
+- Garantir texto legível com `text-white` para alta intensidade e `text-foreground` para baixa
 
-Os StatCards ja estao bons, mas farei pequenos ajustes para consistencia:
-
-| Ajuste | Descricao |
-|--------|-----------|
-| Padding | Reduzir de `p-6` para `p-4` |
-| Altura icone | Reduzir de `w-12 h-12` para `w-10 h-10` |
-| Tamanho titulo | Manter `text-xs` |
-
----
-
-### 4. ProcedureFilters - Layout Mais Compacto
-
-| Ajuste | Descricao |
-|--------|-----------|
-| CardContent padding | Reduzir de `pt-6` para `pt-4 pb-4` |
-| Gap entre filtros | Manter `gap-4` |
-| Labels | Manter `text-xs` |
+### Escala de Opacidade
+```text
+Intensidade 0-20%:   opacidade 0.15
+Intensidade 20-40%:  opacidade 0.30
+Intensidade 40-60%:  opacidade 0.45
+Intensidade 60-80%:  opacidade 0.60
+Intensidade 80-100%: opacidade 0.75
+```
 
 ---
 
-### 5. MountainChart - Pequenos Ajustes
+## 2. Tabela - Aumentar Fonte e Manter Compacta
 
-| Ajuste | Descricao |
-|--------|-----------|
-| Altura | Manter `h-64` |
-| Usar cores HSL do sistema | Ja implementado corretamente |
+### Problema Atual
+A fonte `text-[10px]` está muito pequena, dificultando a leitura.
+
+### Ajustes de Tamanho
+
+| Elemento | Antes | Depois |
+|----------|-------|--------|
+| TableHead (cabeçalho) | `text-[10px]` | `text-xs` (12px) |
+| TableCell (dados) | `text-[10px]` | `text-xs` (12px) |
+| Nº Procedimento | `text-xs` | `text-sm font-semibold` (14px) |
+| Badges (categoria/status) | `text-[10px]` | `text-[11px]` |
+| Tags | `text-[9px]` | `text-[10px]` |
+| Valores monetários | `text-[10px]` | `text-xs` (12px) |
+
+### Manter Compacto
+- Padding das células: manter `py-1 px-2`
+- Altura das linhas: manter `h-9`
+- Truncar textos longos com `max-w` e `truncate`
 
 ---
 
-### 6. NotificationPanel - Compactacao
+## 3. Sidebar - Padronizar Ícones
 
-| Ajuste | Descricao |
-|--------|-----------|
-| Padding itens | Reduzir de `p-4` para `p-3` |
-| Max-height | Reduzir de `max-h-96` para `max-h-72` |
-| Icone alerta | Reduzir de `w-8 h-8` para `w-6 h-6` |
+### Problema Atual
+Futebol e Basquete usam emojis (⚽🏀), enquanto os demais usam ícones Lucide. Isso quebra a consistência visual.
 
----
+### Opções de Padronização
 
-### 7. ProcedureMobileCards - Alinhamento
+**Opção A: Usar apenas ícones Lucide (Recomendado)**
+- Mais consistente com o design system
+- Melhor para acessibilidade
+- Cores seguem o tema automaticamente
 
-| Ajuste | Descricao |
-|--------|-----------|
-| Padding card | Reduzir de `p-4` para `p-3` |
-| Espacamento | Reduzir `space-y-4` para `space-y-3` |
+| Item | Antes | Depois |
+|------|-------|--------|
+| Monitor Futebol | ⚽ | `<Circle />` ou ícone SVG personalizado |
+| Monitor Basquete | 🏀 | `<Circle />` ou ícone SVG personalizado |
+
+**Opção B: Usar emojis em todos**
+- Menos consistente
+- Emojis variam entre sistemas operacionais
+
+### Implementação (Opção A)
+Como o Lucide não tem ícones de futebol/basquete nativos, criaremos componentes SVG personalizados que seguem o estilo do design system:
+
+```text
+FootballIcon: Círculo com padrão de bola de futebol
+BasketballIcon: Círculo com linhas de bola de basquete
+```
+
+Ambos usarão `currentColor` para herdar a cor do texto da sidebar.
 
 ---
 
 ## Arquivos Modificados
 
-| Arquivo | Tipo de Mudanca |
-|---------|-----------------|
-| `src/components/procedures/CalendarChart.tsx` | Reescrita completa com logica de degradee |
-| `src/components/procedures/ProcedureTable.tsx` | Compactacao de linhas |
-| `src/components/procedures/ProcedureStats.tsx` | Ajustes de padding |
-| `src/components/procedures/ProcedureFilters.tsx` | Compactacao |
-| `src/components/procedures/NotificationPanel.tsx` | Compactacao |
-| `src/components/procedures/ProcedureMobileCards.tsx` | Compactacao |
-| `src/pages/ProcedureControl.tsx` | Ajustes de spacing |
+| Arquivo | Mudança |
+|---------|---------|
+| `src/components/procedures/CalendarChart.tsx` | Cores adaptáveis ao tema |
+| `src/components/procedures/ProcedureTable.tsx` | Aumentar fontes |
+| `src/components/Sidebar.tsx` | Substituir emojis por ícones SVG |
 
 ---
 
-## Detalhes Tecnicos
+## Resumo Visual Esperado
 
-### CalendarChart - Nova Implementacao
+### Tabela
+- Fontes maiores e mais legíveis (12-14px ao invés de 10px)
+- Linhas continuam compactas (altura h-9)
+- Melhor hierarquia visual (número do procedimento em destaque)
 
-```text
-Logica de cores dinamicas:
+### Calendário  
+- Cores verde/vermelho que se adaptam ao tema claro e escuro
+- Mesmo gradiente de intensidade proporcional ao lucro/prejuízo
+- Texto sempre legível independente do tema
 
-1. Calcular maxProfit e maxLoss do mes
-2. Para cada dia:
-   - Se lucro > 0: intensidade = (lucro / maxProfit) * 100
-   - Se lucro < 0: intensidade = (|prejuizo| / |maxLoss|) * 100
-   - Se lucro = 0: cor neutra
-3. Aplicar opacidade baseada na intensidade (0.1 a 0.8)
-4. Verde para lucro, vermelho para prejuizo
-5. Highlight azul para dia atual
-```
+### Sidebar
+- Ícones consistentes em todas as abas
+- Futebol e Basquete com ícones SVG personalizados
+- Cores seguem o tema automaticamente
 
-### Tabela Compacta - Exemplo de Estrutura
-
-```text
-Antes:
-- TableHead: h-12 px-4
-- TableCell: p-4
-- Botoes: h-8 w-8
-
-Depois:
-- TableHead: h-10 px-3
-- TableCell: py-2 px-3
-- Botoes: h-7 w-7
-```
-
----
-
-## Resultado Esperado
-
-- Calendario com degradee dinamico mostrando intensidade do lucro/prejuizo
-- Tabela com linhas 40% mais compactas
-- UI consistente com o resto do sistema (OddsMonitor, Dashboard)
-- Melhor aproveitamento do espaco vertical
-- Indicador visual do dia atual no calendario
