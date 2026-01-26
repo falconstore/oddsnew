@@ -1,128 +1,80 @@
 
 
-# Plano: Ajustes de UI - Calendário, Tabela e Ícones da Sidebar
+# Plano: Compactar Calendário e Aumentar Fontes
 
-## Visão Geral
+## Problema Atual
 
-Três ajustes para melhorar a experiência visual:
-
-1. **CalendarChart**: Otimizar cores para modo escuro usando variáveis CSS
-2. **Tabela**: Aumentar fonte mantendo colunas compactas
-3. **Sidebar**: Padronizar ícones removendo emojis
-
----
-
-## 1. CalendarChart - Modo Escuro Otimizado
-
-### Problema Atual
-As cores RGBA fixas (green 34,197,94 e red 239,68,68) não se adaptam bem ao tema, podendo ter contraste ruim no modo claro.
-
-### Solução
-Usar as variáveis CSS do design system (`--success` e `--destructive`) convertidas para RGBA dinâmico:
-
-| Antes | Depois |
-|-------|--------|
-| `rgba(34, 197, 94, opacity)` | Usar classe Tailwind com opacity dinâmica |
-| `rgba(239, 68, 68, opacity)` | Usar classe Tailwind com opacity dinâmica |
-| Cores inline fixas | Classes CSS adaptáveis ao tema |
-
-**Implementação técnica:**
-- Criar classes CSS dinâmicas baseadas na intensidade
-- Usar `hsl(var(--success))` e `hsl(var(--destructive))` 
-- Manter o cálculo de intensidade proporcional ao max/min do mês
-- Garantir texto legível com `text-white` para alta intensidade e `text-foreground` para baixa
-
-### Escala de Opacidade
-```text
-Intensidade 0-20%:   opacidade 0.15
-Intensidade 20-40%:  opacidade 0.30
-Intensidade 40-60%:  opacidade 0.45
-Intensidade 60-80%:  opacidade 0.60
-Intensidade 80-100%: opacidade 0.75
-```
+Analisando a imagem e o código:
+- Células usam `aspect-square` que ocupa muito espaço vertical
+- Fontes muito pequenas: 7-10px para informações, 14-20px para números
+- Muito espaço vazio dentro das células
+- Calendário ocupa quase a tela inteira desnecessariamente
 
 ---
 
-## 2. Tabela - Aumentar Fonte e Manter Compacta
+## Solução
 
-### Problema Atual
-A fonte `text-[10px]` está muito pequena, dificultando a leitura.
-
-### Ajustes de Tamanho
+### Mudanças no Layout
 
 | Elemento | Antes | Depois |
 |----------|-------|--------|
-| TableHead (cabeçalho) | `text-[10px]` | `text-xs` (12px) |
-| TableCell (dados) | `text-[10px]` | `text-xs` (12px) |
-| Nº Procedimento | `text-xs` | `text-sm font-semibold` (14px) |
-| Badges (categoria/status) | `text-[10px]` | `text-[11px]` |
-| Tags | `text-[9px]` | `text-[10px]` |
-| Valores monetários | `text-[10px]` | `text-xs` (12px) |
+| Célula | `aspect-square` | `aspect-[4/3]` (mais largo que alto) |
+| Padding célula | `p-1 sm:p-1.5 md:p-2` | `p-1` fixo |
+| Gap entre células | `gap-1 sm:gap-2` | `gap-1` fixo |
+| Border | `border-2` | `border` (1px) |
+| Rounded | `rounded-lg` | `rounded-md` |
 
-### Manter Compacto
-- Padding das células: manter `py-1 px-2`
-- Altura das linhas: manter `h-9`
-- Truncar textos longos com `max-w` e `truncate`
+### Aumento das Fontes Internas
+
+| Elemento | Antes | Depois |
+|----------|-------|--------|
+| Número do dia | `text-sm sm:text-base md:text-lg lg:text-xl` | `text-lg sm:text-xl md:text-2xl` |
+| "X proc." | `text-[7px] sm:text-[8px] md:text-[9px]` | `text-[9px] sm:text-[10px] md:text-xs` |
+| "R$ valor" | `text-[8px] sm:text-[9px] md:text-[10px]` | `text-[10px] sm:text-xs md:text-sm` |
+| "Sem dados" | `text-[6px] sm:text-[7px] md:text-[8px]` | `text-[8px] sm:text-[9px] md:text-[10px]` |
+| Dias da semana | `text-[10px] sm:text-xs` | `text-xs sm:text-sm` |
+
+### Compactação do Card
+
+| Elemento | Antes | Depois |
+|----------|-------|--------|
+| CardHeader | `pb-2` | `pb-1` |
+| Legenda margin | `mt-4` | `mt-2` |
+| Legenda gap | `gap-4` | `gap-3` |
+| Legenda ícones | `w-3 h-3 sm:w-4 sm:h-4` | `w-3 h-3` fixo |
 
 ---
 
-## 3. Sidebar - Padronizar Ícones
-
-### Problema Atual
-Futebol e Basquete usam emojis (⚽🏀), enquanto os demais usam ícones Lucide. Isso quebra a consistência visual.
-
-### Opções de Padronização
-
-**Opção A: Usar apenas ícones Lucide (Recomendado)**
-- Mais consistente com o design system
-- Melhor para acessibilidade
-- Cores seguem o tema automaticamente
-
-| Item | Antes | Depois |
-|------|-------|--------|
-| Monitor Futebol | ⚽ | `<Circle />` ou ícone SVG personalizado |
-| Monitor Basquete | 🏀 | `<Circle />` ou ícone SVG personalizado |
-
-**Opção B: Usar emojis em todos**
-- Menos consistente
-- Emojis variam entre sistemas operacionais
-
-### Implementação (Opção A)
-Como o Lucide não tem ícones de futebol/basquete nativos, criaremos componentes SVG personalizados que seguem o estilo do design system:
+## Resultado Visual Esperado
 
 ```text
-FootballIcon: Círculo com padrão de bola de futebol
-BasketballIcon: Círculo com linhas de bola de basquete
-```
+Antes:
+┌─────────────────────────────────────┐
+│           Calendário                │
+│  ┌────┐ ┌────┐ ┌────┐ ┌────┐       │
+│  │ 1  │ │ 2  │ │ 3  │ │ 4  │       │  <- Células quadradas, fontes minúsculas
+│  │9p  │ │10p │ │16p │ │15p │       │
+│  │R$53│ │R$119│ │R$43│ │R$25│       │
+│  └────┘ └────┘ └────┘ └────┘       │
+│         (muito espaço)              │
+└─────────────────────────────────────┘
 
-Ambos usarão `currentColor` para herdar a cor do texto da sidebar.
+Depois:
+┌─────────────────────────────────────┐
+│ Calendário                          │
+│ ┌───┐┌───┐┌───┐┌───┐┌───┐┌───┐┌───┐│
+│ │ 1 ││ 2 ││ 3 ││ 4 ││ 5 ││ 6 ││ 7 ││  <- Células retangulares compactas
+│ │9p ││10p││16p││15p││10p││10p││18p││     com fontes maiores e mais legíveis
+│ │R$53││R$119││R$43││R$25││R$191││R$112││R$204│
+│ └───┘└───┘└───┘└───┘└───┘└───┘└───┘│
+└─────────────────────────────────────┘
+```
 
 ---
 
-## Arquivos Modificados
+## Arquivo Modificado
 
 | Arquivo | Mudança |
 |---------|---------|
-| `src/components/procedures/CalendarChart.tsx` | Cores adaptáveis ao tema |
-| `src/components/procedures/ProcedureTable.tsx` | Aumentar fontes |
-| `src/components/Sidebar.tsx` | Substituir emojis por ícones SVG |
-
----
-
-## Resumo Visual Esperado
-
-### Tabela
-- Fontes maiores e mais legíveis (12-14px ao invés de 10px)
-- Linhas continuam compactas (altura h-9)
-- Melhor hierarquia visual (número do procedimento em destaque)
-
-### Calendário  
-- Cores verde/vermelho que se adaptam ao tema claro e escuro
-- Mesmo gradiente de intensidade proporcional ao lucro/prejuízo
-- Texto sempre legível independente do tema
-
-### Sidebar
-- Ícones consistentes em todas as abas
-- Futebol e Basquete com ícones SVG personalizados
-- Cores seguem o tema automaticamente
+| `src/components/procedures/CalendarChart.tsx` | Compactação de layout + aumento de fontes |
 
