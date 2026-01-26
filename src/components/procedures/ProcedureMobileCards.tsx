@@ -33,9 +33,9 @@ export function ProcedureMobileCards({
   };
 
   return (
-    <div className="lg:hidden space-y-4">
+    <div className="lg:hidden space-y-3">
       {procedures.map((proc) => (
-        <div key={proc.id} className="bg-card rounded-xl p-4 border border-border">
+        <div key={proc.id} className="bg-card rounded-xl p-3 border border-border">
           <div className="flex justify-between items-start mb-3">
             <div className="flex items-start gap-2">
               <Button

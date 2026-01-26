@@ -117,8 +117,8 @@ export function NotificationPanel({ procedures, onDismiss, onProcedureClick }: N
       <CardHeader className="bg-gradient-to-r from-destructive/10 to-orange-500/10">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-destructive/20 rounded-xl flex items-center justify-center">
-              <AlertCircle className="w-5 h-5 text-destructive" />
+            <div className="w-8 h-8 bg-destructive/20 rounded-lg flex items-center justify-center">
+              <AlertCircle className="w-4 h-4 text-destructive" />
             </div>
             <div>
               <CardTitle className="text-lg">Procedimentos Precisam de Atenção</CardTitle>
@@ -136,8 +136,8 @@ export function NotificationPanel({ procedures, onDismiss, onProcedureClick }: N
           )}
         </div>
       </CardHeader>
-      <CardContent className="pt-4">
-        <div className="space-y-3 max-h-96 overflow-y-auto">
+      <CardContent className="pt-3">
+        <div className="space-y-2 max-h-72 overflow-y-auto">
           {urgentProcs.slice(0, 10).map((proc) => {
             const Icon = proc.icon;
             const colors = getColorClasses(proc.color);
@@ -146,13 +146,13 @@ export function NotificationPanel({ procedures, onDismiss, onProcedureClick }: N
             return (
               <div
                 key={proc.id}
-                className={`bg-card rounded-lg p-4 border ${colors.border} hover:bg-accent/50 transition-all cursor-pointer`}
+                className={`bg-card rounded-lg p-3 border ${colors.border} hover:bg-accent/50 transition-all cursor-pointer`}
                 onClick={() => onProcedureClick?.(proc)}
               >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-start gap-3 flex-1">
-                    <div className={`mt-1 w-8 h-8 rounded-lg flex items-center justify-center ${colors.bg}`}>
-                      <Icon className={`w-4 h-4 ${colors.text}`} />
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-2 flex-1">
+                    <div className={`mt-0.5 w-6 h-6 rounded-md flex items-center justify-center ${colors.bg}`}>
+                      <Icon className={`w-3 h-3 ${colors.text}`} />
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">

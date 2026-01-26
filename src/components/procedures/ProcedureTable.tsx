@@ -39,127 +39,130 @@ export function ProcedureTable({
     <div className="hidden lg:block overflow-x-auto">
       <Table>
         <TableHeader>
-          <TableRow>
-            <TableHead className="w-10"></TableHead>
-            {visibleColumns.includes('date') && <TableHead className="text-xs">Data</TableHead>}
-            {visibleColumns.includes('procedure_number') && <TableHead className="text-xs">Nº Procedimento</TableHead>}
-            {visibleColumns.includes('platform') && <TableHead className="text-xs">Plataforma</TableHead>}
-            {visibleColumns.includes('promotion_name') && <TableHead className="text-xs">Promoção</TableHead>}
-            {visibleColumns.includes('category') && <TableHead className="text-xs">Categoria</TableHead>}
-            {visibleColumns.includes('status') && <TableHead className="text-xs">Status</TableHead>}
-            {visibleColumns.includes('freebet_reference') && <TableHead className="text-xs">Ref. Freebet</TableHead>}
-            {visibleColumns.includes('freebet_value') && <TableHead className="text-xs">Freebet</TableHead>}
-            {visibleColumns.includes('profit_loss') && <TableHead className="text-xs">Lucro/Prejuízo</TableHead>}
-            {visibleColumns.includes('tags') && <TableHead className="text-xs">Tags</TableHead>}
-            {visibleColumns.includes('telegram_link') && <TableHead className="text-xs">Link</TableHead>}
-            {visibleColumns.includes('dp') && <TableHead className="text-xs">DP</TableHead>}
-            {visibleColumns.includes('actions') && <TableHead className="text-xs">Ações</TableHead>}
+          <TableRow className="h-10">
+            <TableHead className="w-8 px-2"></TableHead>
+            {visibleColumns.includes('date') && <TableHead className="text-[10px] px-2">Data</TableHead>}
+            {visibleColumns.includes('procedure_number') && <TableHead className="text-[10px] px-2">Nº Proc.</TableHead>}
+            {visibleColumns.includes('platform') && <TableHead className="text-[10px] px-2">Plataforma</TableHead>}
+            {visibleColumns.includes('promotion_name') && <TableHead className="text-[10px] px-2">Promoção</TableHead>}
+            {visibleColumns.includes('category') && <TableHead className="text-[10px] px-2">Categoria</TableHead>}
+            {visibleColumns.includes('status') && <TableHead className="text-[10px] px-2">Status</TableHead>}
+            {visibleColumns.includes('freebet_reference') && <TableHead className="text-[10px] px-2">Ref. FB</TableHead>}
+            {visibleColumns.includes('freebet_value') && <TableHead className="text-[10px] px-2">Freebet</TableHead>}
+            {visibleColumns.includes('profit_loss') && <TableHead className="text-[10px] px-2">L/P</TableHead>}
+            {visibleColumns.includes('tags') && <TableHead className="text-[10px] px-2">Tags</TableHead>}
+            {visibleColumns.includes('telegram_link') && <TableHead className="text-[10px] px-2">Link</TableHead>}
+            {visibleColumns.includes('dp') && <TableHead className="text-[10px] px-2">DP</TableHead>}
+            {visibleColumns.includes('actions') && <TableHead className="text-[10px] px-2">Ações</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
           {procedures.map((proc) => (
-            <TableRow key={proc.id}>
-              <TableCell className="w-10">
+            <TableRow key={proc.id} className="h-9">
+              <TableCell className="w-8 py-1 px-2">
                 <Button
                   variant="ghost"
-                  size="sm"
+                  size="icon"
                   onClick={() => onToggleFavorite(proc)}
-                  className={proc.is_favorite ? 'text-yellow-400' : 'text-muted-foreground'}
+                  className={`h-6 w-6 p-0 ${proc.is_favorite ? 'text-yellow-400' : 'text-muted-foreground'}`}
                 >
-                  <Star className={`w-4 h-4 ${proc.is_favorite ? 'fill-yellow-400' : ''}`} />
+                  <Star className={`w-3.5 h-3.5 ${proc.is_favorite ? 'fill-yellow-400' : ''}`} />
                 </Button>
               </TableCell>
-              {visibleColumns.includes('date') && <TableCell className="text-xs">{formatProcedureDate(proc.date)}</TableCell>}
-              {visibleColumns.includes('procedure_number') && <TableCell className="text-sm font-medium">{proc.procedure_number}</TableCell>}
-              {visibleColumns.includes('platform') && <TableCell className="text-xs">{proc.platform}</TableCell>}
-              {visibleColumns.includes('promotion_name') && <TableCell className="text-xs">{proc.promotion_name || '-'}</TableCell>}
+              {visibleColumns.includes('date') && <TableCell className="text-[10px] py-1 px-2">{formatProcedureDate(proc.date)}</TableCell>}
+              {visibleColumns.includes('procedure_number') && <TableCell className="text-xs font-medium py-1 px-2">{proc.procedure_number}</TableCell>}
+              {visibleColumns.includes('platform') && <TableCell className="text-[10px] py-1 px-2">{proc.platform}</TableCell>}
+              {visibleColumns.includes('promotion_name') && <TableCell className="text-[10px] py-1 px-2 max-w-[120px] truncate">{proc.promotion_name || '-'}</TableCell>}
               {visibleColumns.includes('category') && (
-                <TableCell>
-                  <Badge variant="outline" className="border-primary/30 text-primary text-xs">
+                <TableCell className="py-1 px-2">
+                  <Badge variant="outline" className="border-primary/30 text-primary text-[10px] px-1.5 py-0">
                     {translateCategory(proc.category)}
                   </Badge>
                 </TableCell>
               )}
               {visibleColumns.includes('status') && (
-                <TableCell>
-                  <Badge className={`text-xs ${getStatusClasses(proc.status)}`}>
+                <TableCell className="py-1 px-2">
+                  <Badge className={`text-[10px] px-1.5 py-0 ${getStatusClasses(proc.status)}`}>
                     {proc.status}
                   </Badge>
                 </TableCell>
               )}
-              {visibleColumns.includes('freebet_reference') && <TableCell className="text-xs">{proc.freebet_reference || '-'}</TableCell>}
+              {visibleColumns.includes('freebet_reference') && <TableCell className="text-[10px] py-1 px-2">{proc.freebet_reference || '-'}</TableCell>}
               {visibleColumns.includes('freebet_value') && (
-                <TableCell>
+                <TableCell className="py-1 px-2">
                   {proc.freebet_value ? (
-                    <span className="text-purple-400 font-semibold text-xs">
+                    <span className="text-purple-400 font-semibold text-[10px]">
                       R$ {proc.freebet_value.toFixed(2)}
                     </span>
                   ) : (
-                    <span className="text-muted-foreground text-xs">-</span>
+                    <span className="text-muted-foreground text-[10px]">-</span>
                   )}
                 </TableCell>
               )}
               {visibleColumns.includes('profit_loss') && (
-                <TableCell className={`text-xs font-semibold ${proc.profit_loss >= 0 ? 'text-success' : 'text-destructive'}`}>
+                <TableCell className={`text-[10px] font-semibold py-1 px-2 ${proc.profit_loss >= 0 ? 'text-success' : 'text-destructive'}`}>
                   R$ {proc.profit_loss?.toFixed(2)}
                 </TableCell>
               )}
               {visibleColumns.includes('tags') && (
-                <TableCell>
-                  <div className="flex flex-wrap gap-1">
+                <TableCell className="py-1 px-2">
+                  <div className="flex flex-wrap gap-0.5">
                     {proc.tags && proc.tags.length > 0 ? (
-                      proc.tags.map((tag, idx) => (
-                        <Badge key={idx} variant="outline" className="bg-primary/10 text-primary border-primary/30 text-xs">
-                          <Tag className="w-3 h-3 mr-1" />
+                      proc.tags.slice(0, 2).map((tag, idx) => (
+                        <Badge key={idx} variant="outline" className="bg-primary/10 text-primary border-primary/30 text-[9px] px-1 py-0">
+                          <Tag className="w-2.5 h-2.5 mr-0.5" />
                           {tag}
                         </Badge>
                       ))
                     ) : (
-                      <span className="text-muted-foreground text-xs">-</span>
+                      <span className="text-muted-foreground text-[10px]">-</span>
+                    )}
+                    {proc.tags && proc.tags.length > 2 && (
+                      <span className="text-[9px] text-muted-foreground">+{proc.tags.length - 2}</span>
                     )}
                   </div>
                 </TableCell>
               )}
               {visibleColumns.includes('telegram_link') && (
-                <TableCell>
+                <TableCell className="py-1 px-2">
                   {proc.telegram_link ? (
                     <a href={proc.telegram_link} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary/80">
-                      <ExternalLink className="w-4 h-4" />
+                      <ExternalLink className="w-3.5 h-3.5" />
                     </a>
                   ) : (
-                    <span className="text-muted-foreground text-xs">-</span>
+                    <span className="text-muted-foreground text-[10px]">-</span>
                   )}
                 </TableCell>
               )}
               {visibleColumns.includes('dp') && (
-                <TableCell>
+                <TableCell className="py-1 px-2">
                   {proc.dp ? (
-                    <Badge className="bg-success/20 text-success border-success/30 text-xs">
+                    <Badge className="bg-success/20 text-success border-success/30 text-[10px] px-1 py-0">
                       ✓
                     </Badge>
                   ) : (
-                    <span className="text-muted-foreground text-xs">-</span>
+                    <span className="text-muted-foreground text-[10px]">-</span>
                   )}
                 </TableCell>
               )}
               {visibleColumns.includes('actions') && (
-                <TableCell>
-                  <div className="flex gap-2">
+                <TableCell className="py-1 px-2">
+                  <div className="flex gap-1">
                     <Button
                       variant="ghost"
-                      size="sm"
+                      size="icon"
                       onClick={() => onEdit(proc)}
-                      className="text-primary hover:text-primary/80"
+                      className="h-7 w-7 text-primary hover:text-primary/80"
                     >
-                      <Pencil className="w-4 h-4" />
+                      <Pencil className="w-3.5 h-3.5" />
                     </Button>
                     <Button
                       variant="ghost"
-                      size="sm"
+                      size="icon"
                       onClick={() => onDelete(proc.id)}
-                      className="text-destructive hover:text-destructive/80"
+                      className="h-7 w-7 text-destructive hover:text-destructive/80"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="w-3.5 h-3.5" />
                     </Button>
                   </div>
                 </TableCell>
