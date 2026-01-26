@@ -16,6 +16,7 @@ import Settings from '@/pages/Settings';
 import Login from '@/pages/Login';
 import AdminUsers from '@/pages/admin/Users';
 import AdminLogs from '@/pages/admin/Logs';
+import ProcedureControl from '@/pages/ProcedureControl';
 import NotFound from '@/pages/NotFound';
 
 export function AnimatedRoutes() {
@@ -100,6 +101,13 @@ export function AnimatedRoutes() {
           <RequireAuth requireAdmin pageKey={PAGE_KEYS.ADMIN_LOGS}>
             <PageTransition>
               <AdminLogs />
+            </PageTransition>
+          </RequireAuth>
+        } />
+        <Route path="/procedures" element={
+          <RequireAuth requireAdmin pageKey={PAGE_KEYS.PROCEDURE_CONTROL}>
+            <PageTransition>
+              <ProcedureControl />
             </PageTransition>
           </RequireAuth>
         } />
