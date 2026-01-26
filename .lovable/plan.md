@@ -1,307 +1,304 @@
 
-# Plano: Nova Aba Assinaturas (Controle de Pagamentos)
+# Plano: Refatorar Sistema de Permissoes de Usuario
 
-## Visao Geral
+## Problemas do Sistema Atual
 
-Criar uma nova aba "Assinaturas" no sistema para gerenciar assinantes e pagamentos, seguindo o padrao de UI/UX ja estabelecido nas abas "Controle de Procedimentos" e "Betbra". A tabela `subscribers` ja existe no Supabase secundario (Procedures).
+1. **Conflito de logica**: O Sidebar usa `adminOnly` que esconde paginas de nao-admins, mesmo que eles tenham permissao no banco
+2. **Permissoes limitadas**: Apenas `can_access` (booleano) - nao diferencia visualizar de editar
+3. **Interface confusa**: Modal de permissoes simples, dificil gerenciar
+4. **Dependencia de admin**: Muitas funcoes so ativam se o usuario for admin
 
 ---
 
-## Schema da Tabela (subscribers)
+## Nova Arquitetura de Permissoes
+
+### Estrutura da Tabela (Atualizada)
 
 ```text
-id                 uuid        PK, default uuid_generate_v4()
-created_date       timestamptz default now()
-updated_date       timestamptz default now()
-created_by         text        nullable
-full_name          text        NOT NULL
-telegram_link      text        nullable
-amount_paid        numeric     NOT NULL
-payment_date       date        NOT NULL
-plan               text        NOT NULL
-situation          text        default 'Ativo'
+user_permissions
+├── id (uuid)
+├── user_id (uuid FK)
+├── page_key (text) 
+├── can_view (boolean) -- NOVO: pode visualizar a aba
+├── can_edit (boolean) -- NOVO: pode editar/criar/deletar na aba
+└── created_at (timestamptz)
+```
+
+### Niveis de Acesso por Aba
+
+| Nivel | can_view | can_edit | Descricao |
+|-------|----------|----------|-----------|
+| Nenhum | false | false | Aba nao aparece no menu |
+| Visualizar | true | false | Pode ver dados, botoes de acao desativados |
+| Completo | true | true | Pode ver e editar tudo |
+
+---
+
+## Mudancas no Banco de Dados
+
+### Migration SQL
+
+```sql
+-- Adicionar coluna can_edit
+ALTER TABLE public.user_permissions 
+ADD COLUMN IF NOT EXISTS can_view BOOLEAN DEFAULT false NOT NULL;
+
+ALTER TABLE public.user_permissions 
+ADD COLUMN IF NOT EXISTS can_edit BOOLEAN DEFAULT false NOT NULL;
+
+-- Migrar dados existentes (can_access -> can_view)
+UPDATE public.user_permissions 
+SET can_view = can_access, can_edit = can_access;
+
+-- Remover coluna antiga (opcional, manter por seguranca)
+-- ALTER TABLE public.user_permissions DROP COLUMN can_access;
+
+-- Atualizar funcao de verificacao
+CREATE OR REPLACE FUNCTION public.can_view_page(_user_id UUID, _page_key TEXT)
+RETURNS BOOLEAN LANGUAGE SQL STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT COALESCE(
+    (SELECT can_view FROM public.user_permissions 
+     WHERE user_id = _user_id AND page_key = _page_key),
+    false
+  )
+$$;
+
+CREATE OR REPLACE FUNCTION public.can_edit_page(_user_id UUID, _page_key TEXT)
+RETURNS BOOLEAN LANGUAGE SQL STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT COALESCE(
+    (SELECT can_edit FROM public.user_permissions 
+     WHERE user_id = _user_id AND page_key = _page_key),
+    false
+  )
+$$;
 ```
 
 ---
 
-## Estrutura de Arquivos a Criar
+## Mudancas nos Arquivos
 
-| Arquivo | Descricao |
-|---------|-----------|
-| `src/pages/Subscriptions.tsx` | Pagina principal com dashboard de assinantes |
-| `src/components/subscriptions/SubscriptionModal.tsx` | Modal para adicionar/editar assinantes |
-| `src/components/subscriptions/SubscriptionTable.tsx` | Tabela compacta de assinantes |
-| `src/components/subscriptions/SubscriptionStats.tsx` | Cards de estatisticas |
-| `src/components/subscriptions/SubscriptionFilters.tsx` | Filtros de busca e status |
-| `src/hooks/useSubscriptions.ts` | Hook TanStack Query para CRUD |
-| `src/types/subscriptions.ts` | Tipos TypeScript |
-| `src/lib/subscriptionUtils.ts` | Funcoes utilitarias (calculos, filtros) |
+### 1. src/types/auth.ts
+
+Atualizar interface UserPermission:
+
+```typescript
+export interface UserPermission {
+  id: string;
+  user_id: string;
+  page_key: string;
+  can_view: boolean;  // Substituir can_access
+  can_edit: boolean;  // NOVO
+  created_at: string;
+}
+```
+
+Remover `adminOnly` do PAGE_CONFIG:
+
+```typescript
+export const PAGE_CONFIG: Record<PageKey, { 
+  label: string; 
+  description: string; // NOVO: descricao da aba
+  icon: string;        // NOVO: icone para referencia
+}> = {
+  [PAGE_KEYS.DASHBOARD]: { 
+    label: 'Dashboard', 
+    description: 'Visao geral do sistema',
+    icon: 'LayoutDashboard'
+  },
+  // ... demais paginas
+};
+```
+
+### 2. src/contexts/AuthContext.tsx
+
+Atualizar funcoes de verificacao:
+
+```typescript
+interface AuthContextType {
+  // ... existentes
+  canViewPage: (pageKey: PageKey) => boolean;  // NOVO
+  canEditPage: (pageKey: PageKey) => boolean;  // NOVO
+  // Remover canAccessPage
+}
+
+// Implementacao
+const canViewPage = (pageKey: PageKey): boolean => {
+  if (isAdmin) return true;
+  const permission = userPermissions.find(p => p.page_key === pageKey);
+  return permission?.can_view ?? false;
+};
+
+const canEditPage = (pageKey: PageKey): boolean => {
+  if (isAdmin) return true;
+  const permission = userPermissions.find(p => p.page_key === pageKey);
+  return permission?.can_edit ?? false;
+};
+```
+
+### 3. src/components/Sidebar.tsx
+
+Remover `adminOnly` e usar apenas `canViewPage`:
+
+```typescript
+const filteredNavigation = navigation.filter(item => {
+  // Admin ve tudo
+  if (isAdmin) return true;
+  // Outros usuarios: verificar permissao de visualizacao
+  return canViewPage(item.pageKey);
+});
+```
+
+### 4. src/components/RequireAuth.tsx
+
+Simplificar para usar apenas permissoes:
+
+```typescript
+// Remover requireAdmin prop
+// Usar apenas pageKey para verificar acesso
+
+if (pageKey && !canViewPage(pageKey)) {
+  return <Navigate to="/" replace />;
+}
+```
+
+### 5. src/hooks/useUserManagement.ts
+
+Atualizar funcoes de permissao:
+
+```typescript
+const updatePermission = async (
+  userId: string, 
+  pageKey: string, 
+  canView: boolean, 
+  canEdit: boolean
+) => {
+  // Se nao pode ver, tambem nao pode editar
+  const finalCanEdit = canView ? canEdit : false;
+  
+  await supabase
+    .from('user_permissions')
+    .upsert({
+      user_id: userId,
+      page_key: pageKey,
+      can_view: canView,
+      can_edit: finalCanEdit,
+    }, { onConflict: 'user_id,page_key' });
+};
+```
+
+### 6. src/pages/admin/Users.tsx
+
+Redesenhar interface de permissoes com tabela visual:
+
+```text
++--------------------------------------------------+
+| Permissoes de [Nome do Usuario]                  |
++--------------------------------------------------+
+| Pagina              | Visualizar | Editar        |
++--------------------------------------------------+
+| Dashboard           |    [x]     |   [ ]         |
+| Monitor Futebol     |    [x]     |   [ ]         |
+| Monitor Basquete    |    [x]     |   [ ]         |
+| Controle Proced.    |    [x]     |   [x]         |
+| Betbra Affiliate    |    [ ]     |   [ ]         |
+| Assinaturas         |    [x]     |   [x]         |
+| Ligas               |    [ ]     |   [ ]         |
+| Times               |    [ ]     |   [ ]         |
+| Casas de Apostas    |    [ ]     |   [ ]         |
+| Configuracoes       |    [x]     |   [x]         |
+| Gerenciar Usuarios  |    [ ]     |   [ ]         |
+| Logs / Diagnostico  |    [ ]     |   [ ]         |
++--------------------------------------------------+
+| [ ] Conceder acesso total (Admin)                |
++--------------------------------------------------+
+| [Cancelar]                        [Salvar]       |
++--------------------------------------------------+
+```
+
+### 7. Paginas com Edicao (Procedures, Betbra, Subscriptions, etc.)
+
+Adicionar verificacao de `canEditPage` para botoes de acao:
+
+```typescript
+const { canEditPage } = useAuth();
+const canEdit = canEditPage(PAGE_KEYS.PROCEDURE_CONTROL);
+
+// Renderizar botoes condicionalmente
+{canEdit && (
+  <Button onClick={handleAdd}>
+    <Plus className="h-4 w-4 mr-2" />
+    Adicionar
+  </Button>
+)}
+
+// Na tabela
+{canEdit && (
+  <TableCell>
+    <Button size="icon" onClick={() => handleEdit(item)}>
+      <Edit className="h-4 w-4" />
+    </Button>
+    <Button size="icon" variant="destructive" onClick={() => handleDelete(item.id)}>
+      <Trash2 className="h-4 w-4" />
+    </Button>
+  </TableCell>
+)}
+```
 
 ---
 
-## Arquivos a Modificar
+## Fluxo de Aprovacao Simplificado
+
+1. **Usuario se cadastra** -> Status: `pending`
+2. **Admin aprova** -> Status: `approved`, cria permissoes padrao:
+   - Dashboard: view + edit
+   - Monitor Futebol: view + edit
+   - Monitor Basquete: view + edit
+   - Configuracoes: view + edit
+3. **Admin configura permissoes** -> Via modal com tabela de checkboxes
+4. **Opcao "Tornar Admin"** -> Marca todas as permissoes como true + adiciona role admin
+
+---
+
+## Resumo de Arquivos a Modificar
 
 | Arquivo | Mudanca |
 |---------|---------|
-| `src/types/auth.ts` | Adicionar `SUBSCRIPTIONS` em PAGE_KEYS e PAGE_CONFIG |
-| `src/components/Sidebar.tsx` | Adicionar link para /subscriptions |
-| `src/components/AnimatedRoutes.tsx` | Adicionar rota /subscriptions |
+| `src/types/auth.ts` | Atualizar UserPermission, remover adminOnly |
+| `src/contexts/AuthContext.tsx` | Adicionar canViewPage/canEditPage |
+| `src/components/Sidebar.tsx` | Usar canViewPage, remover adminOnly |
+| `src/components/RequireAuth.tsx` | Simplificar, remover requireAdmin |
+| `src/hooks/useUserManagement.ts` | Atualizar funcoes de permissao |
+| `src/pages/admin/Users.tsx` | Novo modal de permissoes com tabela |
+| `src/pages/ProcedureControl.tsx` | Verificar canEditPage |
+| `src/pages/BetbraAffiliate.tsx` | Verificar canEditPage |
+| `src/pages/Subscriptions.tsx` | Verificar canEditPage |
+| `src/pages/Teams.tsx` | Verificar canEditPage |
+| `src/pages/Leagues.tsx` | Verificar canEditPage |
+| `src/pages/Bookmakers.tsx` | Verificar canEditPage |
+| `src/components/AnimatedRoutes.tsx` | Remover requireAdmin |
+| `docs/migration-permissions-v2.sql` | NOVO: Migration do banco |
 
 ---
 
-## Tipos TypeScript (src/types/subscriptions.ts)
+## Beneficios da Nova Arquitetura
 
-```typescript
-export interface Subscriber {
-  id: string;
-  created_date: string | null;
-  updated_date: string | null;
-  created_by: string | null;
-  full_name: string;
-  telegram_link: string | null;
-  amount_paid: number;
-  payment_date: string;
-  plan: string;
-  situation: string;
-}
-
-export type SubscriberPlan = 'Semanal' | 'Mensal' | 'Trimestral' | 'Semestral' | 'Anual';
-
-export type SubscriberSituation = 
-  | 'Ativo'
-  | 'Cobrado' 
-  | 'Lembrete Enviado'
-  | 'Removido do Grupo'
-  | 'Pago via LastLink'
-  | 'Pago via Hotmart'
-  | 'Pagamento Pendente'
-  | 'Outro';
-
-export interface SubscriptionFilters {
-  searchName: string;
-  plan: string;
-  status: string;
-  situation: string;
-  daysRemaining: string;
-}
-
-export interface SubscriptionStats {
-  totalReceived: number;
-  pendingCount: number;
-  totalSubscribers: number;
-  activeCount: number;
-  expiredCount: number;
-  removedCount: number;
-}
-```
+1. **Simplicidade**: Um unico sistema de permissoes, sem conflito admin/permissoes
+2. **Granularidade**: Controle fino de visualizar vs editar por aba
+3. **Flexibilidade**: Qualquer combinacao de permissoes possivel
+4. **Clareza visual**: Tabela mostra claramente o que cada usuario pode fazer
+5. **Seguranca**: Admin ainda tem bypass total, mas qualquer usuario pode receber permissoes especificas
+6. **Manutencao**: Adicionar nova aba = adicionar no PAGE_KEYS, permissoes funcionam automaticamente
 
 ---
 
-## Funcionalidades Principais
+## Ordem de Implementacao
 
-### 1. Cards de Estatisticas (6 cards)
-
-| Card | Icone | Cor | Valor |
-|------|-------|-----|-------|
-| Total Recebido | DollarSign | Verde | Soma de amount_paid |
-| Pagamentos Pendentes | AlertCircle | Amarelo | Qtd com situation = "Pagamento Pendente" ou "Lembrete Enviado" |
-| Total Assinantes | Users | Azul | Total de registros |
-| Ativos | UserCheck | Verde | Ativos com dias > 0 |
-| Expirados | UserX | Laranja | Ativos com dias <= 0 |
-| Removidos | UserX | Vermelho | Qtd com situation = "Removido do Grupo" |
-
-### 2. Filtros
-
-| Filtro | Tipo | Opcoes |
-|--------|------|--------|
-| Buscar por Nome | Input texto | Busca parcial |
-| Plano | Select | Todos, Semanal, Mensal, Trimestral, Semestral, Anual |
-| Status | Select | Todos, Ativo, Expirado |
-| Situacao | Select | Todos, Ativo, Cobrado, Lembrete Enviado, etc |
-| Vencimento | Select | Todos, Ativos (>7 dias), Vencendo (<=7 dias), Expirados |
-
-### 3. Calculo de Dias Restantes
-
-| Plano | Dias |
-|-------|------|
-| Semanal | 7 |
-| Mensal | 30 |
-| Trimestral | 90 |
-| Semestral | 180 |
-| Anual | 365 |
-
-**Formula:** `Data Pagamento + Dias do Plano - Hoje = Dias Restantes`
-
-### 4. Tabela (Desktop)
-
-| Coluna | Tipo | Ordenavel |
-|--------|------|-----------|
-| Nome | texto | Sim |
-| Telegram | link | Nao |
-| Valor | currency | Sim |
-| Data Pagamento | date | Sim |
-| Plano | badge | Sim |
-| Dias Restantes | numero/texto | Sim |
-| Status | badge | Sim |
-| Situacao | texto | Nao |
-| Acoes | botoes | Nao |
-
-### 5. Cards Mobile
-
-Layout compacto para dispositivos moveis com todas as informacoes em cards empilhados.
-
----
-
-## Layout da Pagina
-
-```text
-+-------------------------------------------------------+
-|  Header: Assinaturas + Atualizar + Adicionar          |
-+-------------------------------------------------------+
-|  [R$ Total] [Pendentes] [Total] [Ativos] [Expir] [Rem] |
-+-------------------------------------------------------+
-|  Filtros: Nome | Plano | Status | Situacao | Vencim.  |
-+-------------------------------------------------------+
-|  Tabela de Assinantes (Desktop) / Cards (Mobile)      |
-+-------------------------------------------------------+
-```
-
----
-
-## Hook de Dados (useSubscriptions.ts)
-
-Seguindo padrao de useBetbraData.ts:
-
-- `useSubscriptions()` - Fetch com refetch a cada 10s
-- `useCreateSubscriber()` - Criar assinante
-- `useUpdateSubscriber()` - Atualizar assinante  
-- `useDeleteSubscriber()` - Deletar assinante
-
----
-
-## Modal de Assinante
-
-### Campos do Formulario
-
-| Campo | Tipo | Obrigatorio |
-|-------|------|-------------|
-| Nome Completo | texto | Sim |
-| Link Telegram | texto | Nao |
-| Valor Pago | numero | Sim |
-| Data Pagamento | date | Sim |
-| Plano | select | Sim |
-| Situacao | select | Sim |
-
-### Opcoes de Plano
-- Semanal
-- Mensal
-- Trimestral
-- Semestral
-- Anual
-
-### Opcoes de Situacao
-- Ativo
-- Cobrado
-- Lembrete Enviado
-- Removido do Grupo
-- Pago via LastLink
-- Pago via Hotmart
-- Pagamento Pendente
-- Outro
-
----
-
-## UI/UX (Padrao do Sistema)
-
-| Elemento | Especificacao |
-|----------|---------------|
-| Cards | Padding p-4, rounded-xl, bg-card |
-| Tabela | Compacta (py-1 px-1.5), text-xs, h-9 rows |
-| Fontes | text-xs para dados, text-sm para titulos |
-| Cores | Usar variaveis HSL do tema (--success, --destructive, --primary) |
-| Modal | Dialog do Radix, design consistente |
-| Badges | Cores semanticas por status/plano |
-
----
-
-## Navegacao
-
-### Sidebar
-
-Adicionar item apos "Betbra":
-
-```typescript
-{ 
-  name: 'Assinaturas', 
-  href: '/subscriptions', 
-  icon: CreditCard,
-  adminOnly: true, 
-  pageKey: PAGE_KEYS.SUBSCRIPTIONS 
-}
-```
-
-### Rota
-
-```typescript
-<Route path="/subscriptions" element={
-  <RequireAuth requireAdmin pageKey={PAGE_KEYS.SUBSCRIPTIONS}>
-    <PageTransition>
-      <Subscriptions />
-    </PageTransition>
-  </RequireAuth>
-} />
-```
-
----
-
-## Cores de Status
-
-| Status | Cor Badge |
-|--------|-----------|
-| Ativo (>7 dias) | Verde (success) |
-| Vencendo (1-7 dias) | Amarelo (warning) |
-| Expirado (<=0 dias) | Vermelho (destructive) |
-
-| Situacao | Cor Texto |
-|----------|-----------|
-| Ativo | Verde |
-| Pagamento Pendente | Amarelo |
-| Removido do Grupo | Vermelho |
-| Outros | Cinza |
-
----
-
-## Resumo de Implementacao
-
-### Etapa 1: Tipos e Utils
-- Criar `src/types/subscriptions.ts`
-- Criar `src/lib/subscriptionUtils.ts`
-
-### Etapa 2: Hook de Dados
-- Criar `src/hooks/useSubscriptions.ts`
-
-### Etapa 3: Componentes
-- Criar `src/components/subscriptions/SubscriptionStats.tsx`
-- Criar `src/components/subscriptions/SubscriptionFilters.tsx`
-- Criar `src/components/subscriptions/SubscriptionTable.tsx`
-- Criar `src/components/subscriptions/SubscriptionModal.tsx`
-
-### Etapa 4: Pagina Principal
-- Criar `src/pages/Subscriptions.tsx`
-
-### Etapa 5: Navegacao
-- Atualizar `src/types/auth.ts` (PAGE_KEYS + PAGE_CONFIG)
-- Atualizar `src/components/Sidebar.tsx`
-- Atualizar `src/components/AnimatedRoutes.tsx`
-
----
-
-## Resultado Esperado
-
-- Nova aba "Assinaturas" no menu lateral (apenas para admins)
-- Dashboard com 6 cards de estatisticas
-- Filtros completos (nome, plano, status, situacao, vencimento)
-- Tabela responsiva com calculo automatico de dias restantes
-- Modal para CRUD de assinantes
-- UI consistente com o resto do sistema
-- Cores semanticas para status de vencimento
+1. Criar migration SQL para atualizar tabela
+2. Atualizar tipos em `auth.ts`
+3. Atualizar `AuthContext.tsx` com novas funcoes
+4. Atualizar `Sidebar.tsx` para usar novas funcoes
+5. Atualizar `RequireAuth.tsx` (simplificar)
+6. Atualizar `useUserManagement.ts`
+7. Redesenhar modal em `Users.tsx`
+8. Atualizar `AnimatedRoutes.tsx` (remover requireAdmin)
+9. Adicionar verificacao canEditPage nas paginas de edicao
