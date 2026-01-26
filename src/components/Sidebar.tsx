@@ -17,6 +17,7 @@ import {
   UserCog,
   FileWarning,
   FileText,
+  TrendingUp,
   type LucideIcon
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -75,6 +76,7 @@ const navigation: NavigationItem[] = [
   { name: 'Monitor Futebol', href: '/monitor-futebol', icon: FootballIcon, pageKey: PAGE_KEYS.MONITOR_FUTEBOL },
   { name: 'Monitor Basquete', href: '/monitor-basquete', icon: BasketballIcon, pageKey: PAGE_KEYS.MONITOR_BASQUETE },
   { name: 'Controle Procedimentos', href: '/procedures', icon: FileText, adminOnly: true, pageKey: PAGE_KEYS.PROCEDURE_CONTROL },
+  { name: 'Betbra Affiliate', href: '/betbra', icon: TrendingUp, adminOnly: true, pageKey: PAGE_KEYS.BETBRA_AFFILIATE },
   { name: 'Ligas', href: '/leagues', icon: Trophy, adminOnly: true, pageKey: PAGE_KEYS.LEAGUES },
   { name: 'Times', href: '/teams', icon: Users, adminOnly: true, pageKey: PAGE_KEYS.TEAMS },
   { name: 'Casas de Apostas', href: '/bookmakers', icon: Building2, adminOnly: true, pageKey: PAGE_KEYS.BOOKMAKERS },

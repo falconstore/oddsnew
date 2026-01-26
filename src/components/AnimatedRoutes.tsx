@@ -17,6 +17,7 @@ import Login from '@/pages/Login';
 import AdminUsers from '@/pages/admin/Users';
 import AdminLogs from '@/pages/admin/Logs';
 import ProcedureControl from '@/pages/ProcedureControl';
+import BetbraAffiliate from '@/pages/BetbraAffiliate';
 import NotFound from '@/pages/NotFound';
 
 export function AnimatedRoutes() {
@@ -108,6 +109,13 @@ export function AnimatedRoutes() {
           <RequireAuth requireAdmin pageKey={PAGE_KEYS.PROCEDURE_CONTROL}>
             <PageTransition>
               <ProcedureControl />
+            </PageTransition>
+          </RequireAuth>
+        } />
+        <Route path="/betbra" element={
+          <RequireAuth requireAdmin pageKey={PAGE_KEYS.BETBRA_AFFILIATE}>
+            <PageTransition>
+              <BetbraAffiliate />
             </PageTransition>
           </RequireAuth>
         } />
