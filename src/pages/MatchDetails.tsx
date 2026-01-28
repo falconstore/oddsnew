@@ -94,7 +94,8 @@ function generateBookmakerLink(
   }
   
   if (name.includes('superbet')) {
-    const eventId = extraData.superbet_event_id;
+    // Aceitar ambos: superbet_event_id ou event_id (scraper envia event_id)
+    const eventId = extraData.superbet_event_id || extraData.event_id;
     const leagueId = extraData.superbet_league_id;
     const sportType = extraData.sport_type as string;
     
@@ -240,8 +241,22 @@ function generateBookmakerLink(
     const eventId = extraData.aposta1_event_id;
     const champId = extraData.aposta1_champ_id;
     const categoryId = extraData.aposta1_category_id;
+    const sportType = extraData.sport_type as string;
+    
+    // Link completo com champ e category (futebol)
     if (eventId && champId && categoryId) {
-      return `https://www.aposta1.bet.br/esportes#/sport/66/category/${categoryId}/championship/${champId}/event/${eventId}`;
+      const sportId = sportType === 'basketball' ? '67' : '66';
+      return `https://www.aposta1.bet.br/esportes#/sport/${sportId}/category/${categoryId}/championship/${champId}/event/${eventId}`;
+    }
+    
+    // Fallback: link direto para NBA (sem champ/category)
+    if (eventId && sportType === 'basketball') {
+      return `https://www.aposta1.bet.br/esportes#/sport/67/event/${eventId}`;
+    }
+    
+    // Fallback generico futebol
+    if (eventId) {
+      return `https://www.aposta1.bet.br/esportes#/sport/66/event/${eventId}`;
     }
   }
   
