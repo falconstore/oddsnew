@@ -260,13 +260,16 @@ class NovibetScraper(BaseScraper):
                     market_id = market.get("marketId")
                     tag = tag_map.get(market_id, "")
                     
-                    # Identify odds type by tag
+                    # Identify odds type by tag - APENAS aceitar SO ou PA explicitos
                     if tag == self.TAG_SUPER_ODDS:
                         odds_type = "SO"
                     elif tag == self.TAG_EARLY_PAYOUT_FOOTBALL:
                         odds_type = "PA"
                     else:
-                        odds_type = "PA"  # Default
+                        # Ignorar markets sem tag conhecida
+                        if tag:
+                            self.logger.debug(f"[Novibet] Tag desconhecida ignorada: {tag}")
+                        continue  # NAO classificar como PA por default
                     
                     temp_h, temp_d, temp_a = 0.0, 0.0, 0.0
                     for bet in market.get("betItems", []):
@@ -308,7 +311,11 @@ class NovibetScraper(BaseScraper):
                         away_odd=odds["away"],
                         market_type="1x2",
                         odds_type=odds_type,
-                        extra_data={"event_id": str(item.get("eventBetContextId"))}
+                    extra_data={
+                        "event_id": str(item.get("eventBetContextId")),
+                        "path": item.get("path", ""),
+                        "sport_type": "football"
+                    }
                     )
                     results.append(scraped)
 
@@ -362,13 +369,16 @@ class NovibetScraper(BaseScraper):
                     market_id = market.get("marketId")
                     tag = tag_map.get(market_id, "")
                     
-                    # Identify odds type by tag
+                    # Identify odds type by tag - APENAS aceitar SO ou PA explicitos
                     if tag == self.TAG_SUPER_ODDS:
                         odds_type = "SO"
                     elif tag == self.TAG_EARLY_PAYOUT_BASKETBALL:
                         odds_type = "PA"
                     else:
-                        odds_type = "PA"  # Default
+                        # Ignorar markets sem tag conhecida
+                        if tag:
+                            self.logger.debug(f"[Novibet NBA] Tag desconhecida ignorada: {tag}")
+                        continue  # NAO classificar como PA por default
                     
                     home_odd, away_odd = 0.0, 0.0
                     for bet in market.get("betItems", []):
@@ -408,7 +418,11 @@ class NovibetScraper(BaseScraper):
                         sport="basketball",
                         market_type="moneyline",
                         odds_type=odds_type,
-                        extra_data={"event_id": str(item.get("eventBetContextId"))}
+                        extra_data={
+                            "event_id": str(item.get("eventBetContextId")),
+                            "path": item.get("path", ""),
+                            "sport_type": "basketball"
+                        }
                     )
                     results.append(scraped)
 
