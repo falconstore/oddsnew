@@ -1,203 +1,108 @@
 
-# Plano: Corrigir Links de Superbet e Aposta1
+# Plano: Corrigir Scraper Novibet - Ignorar Markets sem Tag SO/PA
 
-## Problemas Identificados
+## Problema Identificado
 
-### 1. Superbet (Futebol e Basquete)
+O jogo **Lyon x PAOK** no JSON da Novibet tem:
+- **1 único market** SOCCER_MATCH_RESULT (marketId: 1554525385)
+- **Tag**: `SOCCER_2_GOALS_AHEAD_EARLY_PAYOUT` = PA
+- **Odds corretas**: 2.08 / 3.50 / 3.50
 
-**Causa:** O scraper `superbet_scraper.py` envia `event_id` no `extra_data` (linhas 261-264, 294-297), mas o frontend espera `superbet_event_id`.
+Mas no frontend aparece:
+- Novibet PA: 2.08 / 3.45 / 3.55 (proximo ao correto)
+- Novibet SO: 1.77 / 4.15 / 4.55 (ERRADO - nao deveria existir)
 
-```python
-# Scraper atual (linhas 261-264)
-extra_data={
-    "event_id": str(event.get("eventId", "")),
-    "match_id": str(event.get("matchId", ""))
-}
-```
+## Causa Raiz
 
-```typescript
-// Frontend espera (linha 97-98)
-const eventId = extraData.superbet_event_id;
-const leagueId = extraData.superbet_league_id;
-```
-
-### 2. Aposta1 (Basquete NBA)
-
-**Causa:** O scraper `aposta1_nba_scraper.py` envia apenas `aposta1_event_id`, mas o frontend requer tambem `aposta1_champ_id` e `aposta1_category_id` para construir o link.
+No scraper atual (linha 268-269):
 
 ```python
-# Scraper atual (linhas 273-277)
-extra_data={
-    "aposta1_event_id": str(event_id),
-    "country": "eua",
-    "sport_type": "basketball"
-}
+else:
+    odds_type = "PA"  # Default  ← PROBLEMA
 ```
 
-```typescript
-// Frontend requer (linhas 241-244)
-const eventId = extraData.aposta1_event_id;
-const champId = extraData.aposta1_champ_id;     // FALTANDO
-const categoryId = extraData.aposta1_category_id; // FALTANDO
-if (eventId && champId && categoryId) { ... }
-```
+Quando um market SOCCER_MATCH_RESULT nao tem tag SO nem PA explicita, ele e classificado como PA por default. Isso pode estar capturando markets incorretos ou causando duplicatas.
+
+## Solucao
+
+Mudar a logica para **ignorar** markets sem tag conhecida em vez de classifica-los como PA.
 
 ---
 
-## Solucao: Atualizar Frontend para Aceitar os Campos Corretos
+## Arquivo a Modificar
 
-A solucao mais segura e fazer o frontend aceitar ambos os formatos de campo (`event_id` e `superbet_event_id`), e usar fallbacks para campos faltantes.
-
-### Arquivo a Modificar
-
-| Arquivo | Mudanca |
-|---------|---------|
-| `src/pages/MatchDetails.tsx` | Atualizar funcao `generateBookmakerLink` |
+| Arquivo | Linhas | Mudanca |
+|---------|--------|---------|
+| `docs/scraper/scrapers/novibet_scraper.py` | 263-269 | Ignorar markets sem tag SO/PA |
+| `docs/scraper/scrapers/novibet_scraper.py` | 311 | Adicionar path e sport_type no extra_data |
 
 ---
 
-## Correcoes Especificas
+## Mudancas no Codigo
 
-### 1. Superbet (linhas 96-111)
+### 1. Funcao `_parse_football_response` (linhas 263-269)
 
 **Antes:**
-```typescript
-if (name.includes('superbet')) {
-  const eventId = extraData.superbet_event_id;
-  const leagueId = extraData.superbet_league_id;
-  ...
-}
+```python
+# Identify odds type by tag
+if tag == self.TAG_SUPER_ODDS:
+    odds_type = "SO"
+elif tag == self.TAG_EARLY_PAYOUT_FOOTBALL:
+    odds_type = "PA"
+else:
+    odds_type = "PA"  # Default
 ```
 
 **Depois:**
-```typescript
-if (name.includes('superbet')) {
-  // Aceitar ambos: superbet_event_id ou event_id
-  const eventId = extraData.superbet_event_id || extraData.event_id;
-  const leagueId = extraData.superbet_league_id || extraData.tournament_id;
-  const sportType = extraData.sport_type as string;
-  
-  if (eventId && homeTeam && awayTeam) {
-    // Construir link normalmente
-    ...
-  }
-}
+```python
+# Identify odds type by tag - APENAS aceitar SO ou PA explicitos
+if tag == self.TAG_SUPER_ODDS:
+    odds_type = "SO"
+elif tag == self.TAG_EARLY_PAYOUT_FOOTBALL:
+    odds_type = "PA"
+else:
+    # Ignorar markets sem tag conhecida
+    if tag:
+        self.logger.debug(f"[Novibet] Tag desconhecida ignorada: {tag}")
+    continue  # NAO classificar como PA por default
 ```
 
-### 2. Aposta1 NBA (linhas 239-246)
+### 2. Extra Data com path (linha 311)
 
 **Antes:**
-```typescript
-if (name.includes('aposta1')) {
-  const eventId = extraData.aposta1_event_id;
-  const champId = extraData.aposta1_champ_id;
-  const categoryId = extraData.aposta1_category_id;
-  if (eventId && champId && categoryId) {
-    return `https://www.aposta1.bet.br/esportes#/sport/66/category/${categoryId}/championship/${champId}/event/${eventId}`;
-  }
-}
+```python
+extra_data={"event_id": str(item.get("eventBetContextId"))}
 ```
 
 **Depois:**
-```typescript
-if (name.includes('aposta1')) {
-  const eventId = extraData.aposta1_event_id;
-  const champId = extraData.aposta1_champ_id;
-  const categoryId = extraData.aposta1_category_id;
-  const sportType = extraData.sport_type as string;
-  
-  // Link completo com champ e category (futebol)
-  if (eventId && champId && categoryId) {
-    const sportId = sportType === 'basketball' ? '67' : '66';
-    return `https://www.aposta1.bet.br/esportes#/sport/${sportId}/category/${categoryId}/championship/${champId}/event/${eventId}`;
-  }
-  
-  // Fallback: link direto para NBA (sem champ/category)
-  if (eventId && sportType === 'basketball') {
-    // NBA usa sportId=67
-    return `https://www.aposta1.bet.br/esportes#/sport/67/event/${eventId}`;
-  }
-  
-  // Fallback generico futebol
-  if (eventId) {
-    return `https://www.aposta1.bet.br/esportes#/sport/66/event/${eventId}`;
-  }
+```python
+extra_data={
+    "event_id": str(item.get("eventBetContextId")),
+    "path": item.get("path", ""),
+    "sport_type": "football"
 }
 ```
+
+### 3. Aplicar mesma logica para Basquete
+
+A funcao `_parse_basketball_response` tambem precisa da mesma correcao nas linhas 360-366.
 
 ---
 
 ## Resultado Esperado
 
-| Bookmaker | Esporte | Status Atual | Status Apos Correcao |
-|-----------|---------|--------------|----------------------|
-| Superbet | Futebol | Link nao funciona | Link funcional |
-| Superbet | Basquete | Link nao funciona | Link funcional |
-| Aposta1 | Futebol | Funciona | Continua funcionando |
-| Aposta1 | Basquete | Link nao funciona | Link funcional (fallback) |
+| Jogo | Antes | Depois |
+|------|-------|--------|
+| Ajax x Olympiacos | PA + SO (ambos corretos) | PA + SO (mantido) |
+| Lyon x PAOK | PA + SO (SO errado) | Apenas PA (correto) |
+| Qualquer jogo sem SO | PA + SO fabricado | Apenas PA |
 
 ---
 
-## Implementacao
+## Resumo das Alteracoes
 
-### Unica alteracao necessaria
+1. **Linha 268-269**: Mudar `else: odds_type = "PA"` para `else: continue`
+2. **Linha 311**: Adicionar `path` e `sport_type` no extra_data
+3. **Linhas 363-369**: Mesma correcao para basquete
 
-Atualizar a funcao `generateBookmakerLink` em `src/pages/MatchDetails.tsx` (linhas 66-273) para:
-
-1. **Superbet**: Aceitar `event_id` alem de `superbet_event_id`
-2. **Aposta1**: Adicionar fallback para quando `champ_id` e `category_id` nao estao disponiveis
-
-### Codigo Final
-
-```typescript
-// Superbet (atualizado)
-if (name.includes('superbet')) {
-  const eventId = extraData.superbet_event_id || extraData.event_id;
-  const leagueId = extraData.superbet_league_id;
-  const sportType = extraData.sport_type as string;
-  
-  if (eventId && homeTeam && awayTeam) {
-    const homeSlug = homeTeam.toLowerCase().replace(/\s+/g, '-').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    const awaySlug = awayTeam.toLowerCase().replace(/\s+/g, '-').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    const sportPath = sportType === 'basketball' ? 'basquete' : 'futebol';
-    let url = `https://superbet.bet.br/odds/${sportPath}/${homeSlug}-x-${awaySlug}-${eventId}/`;
-    if (leagueId) {
-      url += `?t=offer-prematch-${leagueId}&mdt=o`;
-    }
-    return url;
-  }
-}
-
-// Aposta1 (atualizado)
-if (name.includes('aposta1')) {
-  const eventId = extraData.aposta1_event_id;
-  const champId = extraData.aposta1_champ_id;
-  const categoryId = extraData.aposta1_category_id;
-  const sportType = extraData.sport_type as string;
-  
-  // Link completo (futebol com champ/category)
-  if (eventId && champId && categoryId) {
-    const sportId = sportType === 'basketball' ? '67' : '66';
-    return `https://www.aposta1.bet.br/esportes#/sport/${sportId}/category/${categoryId}/championship/${champId}/event/${eventId}`;
-  }
-  
-  // Fallback: link direto por event_id (NBA)
-  if (eventId && sportType === 'basketball') {
-    return `https://www.aposta1.bet.br/esportes#/sport/67/event/${eventId}`;
-  }
-  
-  // Fallback: link direto generico (futebol sem metadata)
-  if (eventId) {
-    return `https://www.aposta1.bet.br/esportes#/sport/66/event/${eventId}`;
-  }
-}
-```
-
----
-
-## Beneficios
-
-1. **Retrocompativel**: Aceita dados antigos e novos
-2. **Fallback inteligente**: Gera links funcionais mesmo com dados incompletos
-3. **Sem mudanca no scraper**: Nao requer deploy de alteracoes no backend
-4. **Correcao imediata**: Funciona assim que o frontend for atualizado
+Esta mudanca garante que apenas odds com tags explicitas (ODDS_KEY_0 para SO, SOCCER_2_GOALS_AHEAD_EARLY_PAYOUT para PA) sejam capturadas, evitando dados incorretos no frontend.
