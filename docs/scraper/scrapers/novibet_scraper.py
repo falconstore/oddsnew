@@ -52,6 +52,7 @@ class NovibetScraper(BaseScraper):
         "liga_europa": {"competition_id": "6505458", "name": "Liga Europa", "country": "Europa"},
         "liga_da_conferencia": {"competition_id": "6505560", "name": "Liga da Conferencia", "country": "Europa"},
         "eredivisie": {"competition_id": "5910927", "name": "Eredivisie", "country": "Holanda"},
+        "brasileirao_serie_a": {"competition_id": "5922756", "name": "Brasileirão Série A", "country": "Brasil"},
     }
     
     # Basketball leagues
