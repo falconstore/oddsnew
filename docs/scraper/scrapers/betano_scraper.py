@@ -203,7 +203,10 @@ class BetanoScraper(BaseScraper):
     async def teardown(self):
         """Close browser and aiohttp session."""
         if self._session:
-            await self._session.close()
+            try:
+                await self._session.close()
+            except Exception:
+                pass
             self._session = None
         
         if self._page:

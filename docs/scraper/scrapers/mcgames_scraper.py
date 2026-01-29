@@ -45,12 +45,10 @@ class McgamesScraper(BaseScraper):
     
     API_BASE = "https://sb2frontend-altenar2.biahosted.com/api/widget/GetEvents"
     
-    # Expanded warm-up URLs to ensure API calls
+    # Warm-up URLs (keep lean to avoid overlap)
     WARMUP_URLS = [
         "https://mcgames.bet.br/sports/futebol/italia/serie-a/c-2942",
-        "https://mcgames.bet.br/sports/futebol/inglaterra/premier-league/c-2936",
         "https://mcgames.bet.br/sports/futebol",
-        "https://mcgames.bet.br/sports",
     ]
     
     def __init__(self):
@@ -120,19 +118,7 @@ class McgamesScraper(BaseScraper):
                             token_future.set_result(token)
                             self.logger.info("[Mcgames] Token captured via request interception")
             
-            # Fallback: capture token from response headers too
-            async def handle_response(response):
-                if "biahosted.com" in response.url and not token_future.done():
-                    try:
-                        headers = response.request.headers
-                        if "authorization" in headers:
-                            token_future.set_result(headers["authorization"])
-                            self.logger.info("[Mcgames] Token captured via response fallback")
-                    except:
-                        pass
-            
             page.on("request", handle_request)
-            page.on("response", handle_response)
             
             try:
                 # Try warm-up URLs with extended timeouts
@@ -144,19 +130,13 @@ class McgamesScraper(BaseScraper):
                     self.logger.info(f"[Mcgames] Trying URL {i+1}/{len(self.WARMUP_URLS)}: {target_url}")
                     
                     try:
-                        await page.goto(target_url, wait_until="domcontentloaded", timeout=20000)
-                        await page.wait_for_timeout(3000)
+                        await page.goto(target_url, wait_until="domcontentloaded", timeout=15000)
+                        await page.wait_for_timeout(2000)
                         
-                        # Multiple scrolls to trigger API calls
+                        # Single scroll to trigger API calls
                         if not token_future.done():
-                            await page.evaluate("window.scrollTo(0, 500)")
+                            await page.evaluate("window.scrollTo(0, 1000)")
                             await page.wait_for_timeout(1500)
-                        if not token_future.done():
-                            await page.evaluate("window.scrollTo(0, 1500)")
-                            await page.wait_for_timeout(1500)
-                        if not token_future.done():
-                            await page.evaluate("window.scrollTo(0, 0)")
-                            await page.wait_for_timeout(1000)
                             
                     except Exception as url_error:
                         self.logger.warning(f"[Mcgames] URL {i+1} failed: {url_error}")
