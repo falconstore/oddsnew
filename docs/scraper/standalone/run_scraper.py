@@ -14,7 +14,6 @@ Scrapers disponíveis:
 
 import asyncio
 import argparse
-import signal
 import sys
 from pathlib import Path
 from datetime import datetime, timezone
@@ -26,15 +25,6 @@ from dotenv import load_dotenv
 from loguru import logger
 
 from config import settings
-
-# Global flag for graceful shutdown
-shutdown_requested = False
-
-
-def request_shutdown(signum, frame):
-    """Handle SIGTERM/SIGINT for graceful shutdown."""
-    global shutdown_requested
-    shutdown_requested = True
 
 
 def setup_logging(scraper_name: str, debug: bool = False):
@@ -135,9 +125,7 @@ def get_scraper_class(scraper_name: str):
 
 
 async def run_forever(scraper_name: str, interval: int, log: logger):
-    """Loop infinito para um único scraper com graceful shutdown."""
-    global shutdown_requested
-    
+    """Loop infinito para um único scraper."""
     from shared_resources import get_shared_resources
     from normalizer import OddsNormalizer
     from supabase_client import SupabaseClient
@@ -158,12 +146,11 @@ async def run_forever(scraper_name: str, interval: int, log: logger):
     scraper_class = get_scraper_class(scraper_name)
     scraper = scraper_class()
     
-    # Setup do scraper (browser, etc)
-    await scraper.setup()
+    # NAO chamar setup() aqui - cada scraper gerencia seu proprio setup/teardown dentro de scrape_all()
     
     cycle_count = 0
     
-    while not shutdown_requested:
+    while True:  # Loop simples infinito
         cycle_count += 1
         start_time = datetime.now(timezone.utc)
         error_message = None
@@ -178,7 +165,7 @@ async def run_forever(scraper_name: str, interval: int, log: logger):
             if cycle_count % 10 == 0:
                 await resources.reload_caches()
             
-            # Executar scraping
+            # Executar scraping (scraper gerencia seu proprio setup/teardown)
             odds = await scraper.scrape_all()
             odds_collected = len(odds) if odds else 0
             
@@ -199,22 +186,6 @@ async def run_forever(scraper_name: str, interval: int, log: logger):
         except Exception as e:
             error_message = str(e)[:500]  # Limitar tamanho do erro
             log.error(f"[Cycle {cycle_count}] Error: {e}")
-            
-            # Se for erro crítico do browser, tentar reiniciar
-            if any(x in str(e) for x in ["Target page", "Connection closed", "TargetClosedError", "CancelledError"]):
-                log.warning("Browser crashed, attempting to restart scraper...")
-                try:
-                    # Teardown seguro
-                    try:
-                        await scraper.teardown()
-                    except Exception:
-                        pass
-                    await asyncio.sleep(5)
-                    await scraper.setup()
-                    log.info("Scraper restarted successfully")
-                except Exception as restart_error:
-                    log.error(f"Failed to restart: {restart_error}")
-                    error_message = f"Restart failed: {restart_error}"
         
         # Enviar heartbeat independente do resultado
         try:
@@ -229,21 +200,7 @@ async def run_forever(scraper_name: str, interval: int, log: logger):
         except Exception as hb_error:
             log.warning(f"Failed to send heartbeat: {hb_error}")
         
-        # Check shutdown before sleeping
-        if shutdown_requested:
-            log.info("Shutdown requested, exiting after current cycle...")
-            break
-        
         await asyncio.sleep(interval)
-    
-    # Graceful cleanup
-    log.info("Performing graceful shutdown...")
-    try:
-        await scraper.teardown()
-    except Exception as e:
-        log.warning(f"Error during teardown: {e}")
-    
-    log.info("Scraper stopped gracefully")
 
 
 def parse_args():
@@ -280,10 +237,6 @@ async def main():
     args = parse_args()
     
     log = setup_logging(args.scraper, args.debug)
-    
-    # Register signal handlers for graceful shutdown
-    signal.signal(signal.SIGTERM, request_shutdown)
-    signal.signal(signal.SIGINT, request_shutdown)
     
     log.info("=" * 50)
     log.info(f"Standalone Scraper: {args.scraper}")
