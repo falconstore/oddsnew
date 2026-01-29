@@ -1,52 +1,41 @@
 
+# Plano: Stake Scraper com Requisicoes via Playwright
 
-# Plano: Migrar Stake Scraper para Playwright
+## Diagnostico Atualizado
 
-## Problema Atual
+Os headers que funcionaram mostram:
 
-O scraper Stake usa `httpx` com requisicoes diretas, mas a API da Stake esta bloqueando com **403 Forbidden**:
+| Header | Valor | Significado |
+|--------|-------|-------------|
+| Sec-Fetch-Mode | navigate | Requisicao de navegacao (nao XHR) |
+| Sec-Fetch-Dest | document | Carregando como documento |
+| Sec-Fetch-Site | none | Requisicao direta (nao cross-origin) |
 
-```
-Client error '403 Forbidden' for url 'https://sbweb.stake.bet.br/api/v1/br/pt-br/tournament/.../live-upcoming'
-```
-
-Isso acontece porque:
-1. Stake detecta que as requisicoes vem de servidor (nao browser)
-2. Headers simples nao passam a protecao anti-bot
-3. Falta de cookies de sessao validos
+A API aceita requisicoes de navegacao mas bloqueia XHR/fetch cross-origin (que e o que httpx faz).
 
 ---
 
-## Solucao: Abordagem Hibrida (Playwright + httpx)
+## Solucao: Usar page.goto() do Playwright
 
-Usar o mesmo padrao do Betano scraper:
+Em vez de usar httpx para chamar a API, vamos usar o Playwright para navegar diretamente para as URLs da API e extrair o JSON.
 
 ```text
-┌────────────────────────────────────────────────────────────┐
-│                    FLUXO DE EXECUCAO                       │
-├────────────────────────────────────────────────────────────┤
-│                                                            │
-│  1. SETUP (uma vez por ciclo)                              │
-│     ┌──────────────────┐                                   │
-│     │   Playwright     │  Abre browser headless            │
-│     │   (Chromium)     │  Navega ate stake.bet.br          │
-│     │                  │  Captura cookies de sessao        │
-│     └────────┬─────────┘                                   │
-│              │                                             │
-│              ▼                                             │
-│     ┌──────────────────┐                                   │
-│     │  Cookies válidos │  __cf_bm, cf_clearance, etc       │
-│     └────────┬─────────┘                                   │
-│              │                                             │
-│  2. SCRAPING (multiplas requisicoes)                       │
-│              ▼                                             │
-│     ┌──────────────────┐                                   │
-│     │     httpx        │  Usa cookies capturados           │
-│     │   (rapido)       │  Faz requisicoes API              │
-│     │                  │  Retorna JSON                     │
-│     └──────────────────┘                                   │
-│                                                            │
-└────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                    FLUXO SIMPLIFICADO                       │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  TUDO VIA PLAYWRIGHT (sem httpx)                            │
+│                                                             │
+│  1. page.goto("/tournament/{id}/live-upcoming")             │
+│     └── Retorna JSON com lista de eventos                   │
+│                                                             │
+│  2. page.goto("/events/{id}/odds") para cada evento         │
+│     └── Retorna JSON com odds                               │
+│                                                             │
+│  3. Parsear JSON diretamente do DOM                         │
+│     └── page.content() ou page.evaluate()                   │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -55,54 +44,57 @@ Usar o mesmo padrao do Betano scraper:
 
 ### Arquivo: `docs/scraper/scrapers/stake_scraper.py`
 
-#### 1. Novos Imports
+#### 1. Remover httpx (nao precisa mais)
 
 ```python
-# Antes
-import httpx
+# ANTES
+self.client = httpx.AsyncClient(...)
+response = await self.client.get(url)
+data = response.json()
 
-# Depois
-import httpx
-from playwright.async_api import async_playwright, Browser, BrowserContext, Page
+# DEPOIS
+await self._page.goto(url, wait_until="domcontentloaded")
+content = await self._page.content()
+# Extrair JSON do body
 ```
 
-#### 2. Novos Atributos na Classe
+#### 2. Novo Metodo para Requisicoes via Playwright
 
 ```python
-def __init__(self):
-    super().__init__(name="stake", base_url="https://stake.bet.br")
-    # Playwright
-    self._playwright = None
-    self._browser: Optional[Browser] = None
-    self._context: Optional[BrowserContext] = None
-    self._page: Optional[Page] = None
-    # HTTP client
-    self.client: Optional[httpx.AsyncClient] = None
-    self._cookies: Dict[str, str] = {}
-    self.logger = logger.bind(component="stake")
+async def _fetch_json(self, url: str) -> Dict[str, Any]:
+    """Fetch JSON data by navigating to URL with Playwright."""
+    try:
+        response = await self._page.goto(url, wait_until="domcontentloaded", timeout=15000)
+        
+        if response and response.status == 200:
+            # Extract JSON from page body
+            content = await self._page.evaluate("() => document.body.innerText")
+            return json.loads(content)
+        else:
+            self.logger.debug(f"[Stake] Status {response.status if response else 'None'} para {url}")
+            return {}
+            
+    except Exception as e:
+        self.logger.debug(f"[Stake] Erro ao buscar {url}: {e}")
+        return {}
 ```
 
-#### 3. Novo Metodo setup() com Playwright
+#### 3. Simplificar setup() - Remover httpx
 
 ```python
 async def setup(self):
-    """Initialize Playwright browser and capture session cookies."""
+    """Initialize Playwright browser only."""
     self.logger.info("[Stake] Iniciando browser Playwright...")
     
-    # Start Playwright
     self._playwright = await async_playwright().start()
     self._browser = await self._playwright.chromium.launch(
         headless=True,
-        args=[
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-        ]
+        args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
     )
     
-    # Create browser context
+    # Usar Firefox user-agent (funciona melhor)
     self._context = await self._browser.new_context(
-        user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+        user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:147.0) Gecko/20100101 Firefox/147.0",
         locale="pt-BR",
         timezone_id="America/Sao_Paulo",
         viewport={"width": 1920, "height": 1080},
@@ -110,112 +102,108 @@ async def setup(self):
     
     self._page = await self._context.new_page()
     
-    # Navigate to site to get valid cookies
-    self.logger.info("[Stake] Navegando para capturar cookies...")
-    try:
-        await self._page.goto("https://stake.bet.br/pt-br/sports/", wait_until="domcontentloaded", timeout=30000)
-        await self._page.wait_for_timeout(3000)  # Wait for anti-bot JS
-    except Exception as e:
-        self.logger.warning(f"[Stake] Aviso no carregamento inicial: {e}")
+    # Navegar para o site primeiro (estabelecer sessao)
+    await self._page.goto("https://stake.bet.br/pt-br/sports/", wait_until="domcontentloaded", timeout=30000)
+    await self._page.wait_for_timeout(2000)
     
-    # Capture cookies
-    cookies = await self._context.cookies()
-    self._cookies = {c["name"]: c["value"] for c in cookies}
-    self.logger.info(f"[Stake] Capturados {len(self._cookies)} cookies")
-    
-    # Create httpx client with captured cookies
-    cookie_header = "; ".join([f"{k}={v}" for k, v in self._cookies.items()])
-    
-    self.client = httpx.AsyncClient(
-        timeout=30.0,
-        headers={
-            "Accept": "application/json",
-            "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
-            "Referer": "https://stake.bet.br/",
-            "Origin": "https://stake.bet.br",
-            "Cookie": cookie_header,
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-        }
-    )
+    self.logger.info("[Stake] Browser pronto")
 ```
 
-#### 4. Novo Metodo teardown() Seguro
+#### 4. Atualizar _fetch_events()
 
 ```python
-async def teardown(self):
-    """Close HTTP client and Playwright browser safely."""
-    # Close httpx
-    if self.client:
-        await self.client.aclose()
-    self.client = None
+async def _fetch_events(self, tournament_id: str) -> List[Dict[str, Any]]:
+    """Fetch upcoming events for a tournament via Playwright navigation."""
+    url = f"{self.API_BASE}/tournament/{tournament_id}/live-upcoming"
+    data = await self._fetch_json(url)
     
-    # Close Playwright components safely
+    events = data.get("events", [])
+    return [e for e in events if not e.get("isLive", False)]
+```
+
+#### 5. Atualizar _fetch_event_odds()
+
+```python
+async def _fetch_event_odds(self, event_id: str) -> Dict[str, Any]:
+    """Fetch odds for a single event via Playwright navigation."""
+    url = f"{self.API_BASE}/events/{event_id}/odds"
+    return await self._fetch_json(url)
+```
+
+#### 6. Remover _fetch_so_odds e _fetch_pa_odds com httpx
+
+Substituir por versoes que usam `_fetch_json()`.
+
+---
+
+## Codigo Completo do Novo _fetch_json
+
+```python
+async def _fetch_json(self, url: str) -> Dict[str, Any]:
+    """Fetch JSON data by navigating to URL with Playwright."""
     try:
-        if self._page:
-            await self._page.close()
-    except Exception:
-        pass
-    self._page = None
-    
-    try:
-        if self._context:
-            await self._context.close()
-    except Exception:
-        pass
-    self._context = None
-    
-    try:
-        if self._browser:
-            await self._browser.close()
-    except Exception:
-        pass
-    self._browser = None
-    
-    try:
-        if self._playwright:
-            await self._playwright.stop()
-    except Exception:
-        pass
-    self._playwright = None
-    
-    self._cookies = {}
-    self.logger.info("[Stake] Recursos liberados")
+        # Navigate to API URL directly
+        response = await self._page.goto(url, wait_until="domcontentloaded", timeout=15000)
+        
+        if not response:
+            return {}
+            
+        if response.status != 200:
+            self.logger.debug(f"[Stake] Status {response.status} para {url}")
+            return {}
+        
+        # Wait a bit for content
+        await self._page.wait_for_timeout(500)
+        
+        # Extract JSON from page body (API returns raw JSON)
+        content = await self._page.evaluate("() => document.body.innerText")
+        
+        if content:
+            return json.loads(content)
+        
+        return {}
+        
+    except json.JSONDecodeError as e:
+        self.logger.debug(f"[Stake] JSON invalido em {url}")
+        return {}
+    except Exception as e:
+        self.logger.debug(f"[Stake] Erro ao buscar {url}: {e}")
+        return {}
 ```
 
 ---
 
-## Resumo da Mudanca
+## Resumo das Mudancas
 
 | Componente | Antes | Depois |
 |------------|-------|--------|
-| Setup | httpx simples | Playwright + httpx com cookies |
-| Cookies | Nenhum | Capturados do browser |
-| Anti-bot | Bloqueado (403) | Bypassado |
-| Teardown | Simples | Seguro com try/except |
-| Resto do codigo | Sem mudanca | Sem mudanca |
+| Biblioteca HTTP | httpx | Playwright page.goto() |
+| Tipo de requisicao | XHR/fetch (bloqueado) | Navigate (funciona) |
+| User-Agent | Chrome | Firefox |
+| Cookies | Tentava capturar | Nao precisa |
+| Complexidade | Alta | Baixa |
 
 ---
 
-## Resultado Esperado
+## Performance
 
-Apos a mudanca:
+| Metrica | httpx | Playwright goto |
+|---------|-------|-----------------|
+| Tempo por requisicao | ~100ms | ~500ms |
+| Requisicoes paralelas | Sim | Nao (sequencial) |
+| Funciona | Nao (403) | Sim |
 
-```
-[Stake] Iniciando browser Playwright...
-[Stake] Navegando para capturar cookies...
-[Stake] Capturados 15 cookies
-[Stake] Premier League: 5 SO + 5 PA = 10 total
-[Stake] La Liga: 3 SO + 3 PA = 6 total
-...
-[Stake] Total: 80 odds coletadas
-```
+A desvantagem e que sera mais lento (sequencial), mas pelo menos funciona!
 
 ---
 
-## Notas Tecnicas
+## Otimizacao Futura
 
-1. **Playwright ja instalado**: O Betano e Betbra ja usam, entao a dependencia existe
-2. **Memoria**: Playwright usa mais RAM (~100-150MB vs ~50MB httpx), mas e aceitavel
-3. **Tempo de setup**: Adiciona ~5-10s no inicio de cada ciclo para carregar browser
-4. **Cookies renovados**: A cada ciclo os cookies sao renovados, evitando expiracao
+Se a velocidade for problema, podemos criar multiplas paginas (tabs) para fazer requisicoes em paralelo:
 
+```python
+# Criar 5 paginas para requisicoes paralelas
+pages = [await self._context.new_page() for _ in range(5)]
+```
+
+Mas isso pode ser feito depois de confirmar que a abordagem basica funciona.
