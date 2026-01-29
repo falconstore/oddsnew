@@ -1,6 +1,6 @@
 """
 Stake Unified Scraper - Football (SO + PA) and Basketball (Moneyline).
-Uses Stake API with individual event requests for PA and NBA.
+Uses Playwright to capture cookies, then httpx for API requests.
 """
 
 import asyncio
@@ -8,6 +8,7 @@ import httpx
 from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
 from loguru import logger
+from playwright.async_api import async_playwright, Browser, BrowserContext, Page
 from base_scraper import BaseScraper, ScrapedOdds, LeagueConfig
 
 
@@ -49,27 +50,107 @@ class StakeScraper(BaseScraper):
     
     def __init__(self):
         super().__init__(name="stake", base_url="https://stake.bet.br")
+        # Playwright components
+        self._playwright = None
+        self._browser: Optional[Browser] = None
+        self._context: Optional[BrowserContext] = None
+        self._page: Optional[Page] = None
+        # HTTP client
         self.client: Optional[httpx.AsyncClient] = None
+        self._cookies: Dict[str, str] = {}
         self.logger = logger.bind(component="stake")
     
     async def setup(self):
-        """Initialize HTTP client."""
-        self.logger.info("[Stake] Iniciando sessao HTTP...")
+        """Initialize Playwright browser and capture session cookies."""
+        self.logger.info("[Stake] Iniciando browser Playwright...")
+        
+        # Start Playwright
+        self._playwright = await async_playwright().start()
+        self._browser = await self._playwright.chromium.launch(
+            headless=True,
+            args=[
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+            ]
+        )
+        
+        # Create browser context
+        self._context = await self._browser.new_context(
+            user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+            locale="pt-BR",
+            timezone_id="America/Sao_Paulo",
+            viewport={"width": 1920, "height": 1080},
+        )
+        
+        self._page = await self._context.new_page()
+        
+        # Navigate to site to get valid cookies
+        self.logger.info("[Stake] Navegando para capturar cookies...")
+        try:
+            await self._page.goto("https://stake.bet.br/pt-br/sports/", wait_until="domcontentloaded", timeout=30000)
+            await self._page.wait_for_timeout(3000)  # Wait for anti-bot JS
+        except Exception as e:
+            self.logger.warning(f"[Stake] Aviso no carregamento inicial: {e}")
+        
+        # Capture cookies
+        cookies = await self._context.cookies()
+        self._cookies = {c["name"]: c["value"] for c in cookies}
+        self.logger.info(f"[Stake] Capturados {len(self._cookies)} cookies")
+        
+        # Create httpx client with captured cookies
+        cookie_header = "; ".join([f"{k}={v}" for k, v in self._cookies.items()])
+        
         self.client = httpx.AsyncClient(
             timeout=30.0,
             headers={
                 "Accept": "application/json",
                 "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
                 "Referer": "https://stake.bet.br/",
+                "Origin": "https://stake.bet.br",
+                "Cookie": cookie_header,
                 "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
             }
         )
     
     async def teardown(self):
-        """Close HTTP client."""
+        """Close HTTP client and Playwright browser safely."""
+        # Close httpx
         if self.client:
             await self.client.aclose()
-            self.client = None
+        self.client = None
+        
+        # Close Playwright components safely
+        try:
+            if self._page:
+                await self._page.close()
+        except Exception:
+            pass
+        self._page = None
+        
+        try:
+            if self._context:
+                await self._context.close()
+        except Exception:
+            pass
+        self._context = None
+        
+        try:
+            if self._browser:
+                await self._browser.close()
+        except Exception:
+            pass
+        self._browser = None
+        
+        try:
+            if self._playwright:
+                await self._playwright.stop()
+        except Exception:
+            pass
+        self._playwright = None
+        
+        self._cookies = {}
+        self.logger.info("[Stake] Recursos liberados")
 
     async def get_available_leagues(self) -> List[LeagueConfig]:
         """Return list of configured leagues (football + basketball)."""
