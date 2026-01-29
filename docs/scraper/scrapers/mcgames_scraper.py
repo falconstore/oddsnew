@@ -35,7 +35,7 @@ class McgamesScraper(BaseScraper):
         "paulistao": McgamesLeague(champ_id="3436", name="Paulistao A1", country="brasil"),
         "fa_cup": McgamesLeague(champ_id="2935", name="FA Cup", country="inglaterra"),
         "efl_cup": McgamesLeague(champ_id="2972", name="EFL Cup", country="inglaterra"),
-	    "champions_league": McgamesLeague(champ_id="16808", name="Champions League", country="europa"),
+        "champions_league": McgamesLeague(champ_id="16808", name="Champions League", country="europa"),
         "liga_europa": McgamesLeague(champ_id="16809", name="Liga Europa", country="europa"),
         "liga_da_conferencia": McgamesLeague(champ_id="31608", name="Liga da Conferencia", country="europa"),
         "copa_do_rei": McgamesLeague(champ_id="2973", name="Copa do Rei", country="espanha"),
