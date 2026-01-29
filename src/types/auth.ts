@@ -43,6 +43,7 @@ export const PAGE_KEYS = {
   PROCEDURE_CONTROL: 'procedure_control',
   BETBRA_AFFILIATE: 'betbra_affiliate',
   SUBSCRIPTIONS: 'subscriptions',
+  SCRAPER_STATUS: 'scraper_status',
 } as const;
 
 export type PageKey = typeof PAGE_KEYS[keyof typeof PAGE_KEYS];
@@ -96,6 +97,10 @@ export const PAGE_CONFIG: Record<PageKey, { label: string; description: string }
   [PAGE_KEYS.SUBSCRIPTIONS]: { 
     label: 'Assinaturas', 
     description: 'Controle de pagamentos'
+  },
+  [PAGE_KEYS.SCRAPER_STATUS]: { 
+    label: 'Status Scrapers', 
+    description: 'Monitoramento em tempo real dos scrapers'
   },
 };
 

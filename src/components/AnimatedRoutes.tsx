@@ -16,6 +16,7 @@ import Settings from '@/pages/Settings';
 import Login from '@/pages/Login';
 import AdminUsers from '@/pages/admin/Users';
 import AdminLogs from '@/pages/admin/Logs';
+import ScraperStatus from '@/pages/admin/ScraperStatus';
 import ProcedureControl from '@/pages/ProcedureControl';
 import BetbraAffiliate from '@/pages/BetbraAffiliate';
 import Subscriptions from '@/pages/Subscriptions';
@@ -103,6 +104,13 @@ export function AnimatedRoutes() {
           <RequireAuth pageKey={PAGE_KEYS.ADMIN_LOGS}>
             <PageTransition>
               <AdminLogs />
+            </PageTransition>
+          </RequireAuth>
+        } />
+        <Route path="/admin/scraper-status" element={
+          <RequireAuth pageKey={PAGE_KEYS.SCRAPER_STATUS}>
+            <PageTransition>
+              <ScraperStatus />
             </PageTransition>
           </RequireAuth>
         } />

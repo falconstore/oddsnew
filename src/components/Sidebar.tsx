@@ -18,6 +18,7 @@ import {
   FileWarning,
   FileText,
   TrendingUp,
+  Cpu,
   CreditCard,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -83,6 +84,7 @@ const navigation: NavigationItem[] = [
   { name: 'Configurações', href: '/settings', icon: Settings, pageKey: PAGE_KEYS.SETTINGS },
   { name: 'Gerenciar Usuários', href: '/admin/users', icon: UserCog, pageKey: PAGE_KEYS.ADMIN_USERS },
   { name: 'Logs / Diagnóstico', href: '/admin/logs', icon: FileWarning, pageKey: PAGE_KEYS.ADMIN_LOGS },
+  { name: 'Status Scrapers', href: '/admin/scraper-status', icon: Cpu, pageKey: PAGE_KEYS.SCRAPER_STATUS },
 ];
 
 export function Sidebar() {

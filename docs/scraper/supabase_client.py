@@ -752,3 +752,64 @@ class SupabaseClient:
         except Exception as e:
             self.logger.error(f"Error uploading odds JSON: {e}")
             return False
+    
+    # ==========================================
+    # SCRAPER STATUS / HEARTBEAT
+    # ==========================================
+    
+    async def upsert_scraper_status(
+        self,
+        scraper_name: str,
+        bookmaker_id: str = None,
+        odds_collected: int = 0,
+        odds_inserted: int = 0,
+        cycle_count: int = 0,
+        error: str = None
+    ) -> bool:
+        """
+        Upsert scraper status/heartbeat to the database.
+        
+        Args:
+            scraper_name: Unique scraper identifier (e.g., 'betano', 'bet365_nba')
+            bookmaker_id: UUID of the bookmaker (optional)
+            odds_collected: Number of odds collected in this cycle
+            odds_inserted: Number of odds inserted in this cycle
+            cycle_count: Total cycles executed
+            error: Last error message (if any)
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            now = datetime.now(timezone.utc).isoformat()
+            
+            data = {
+                "scraper_name": scraper_name,
+                "last_heartbeat": now,
+                "odds_collected": odds_collected,
+                "odds_inserted": odds_inserted,
+                "cycle_count": cycle_count,
+                "last_error": error,
+                "status": "error" if error else ("warning" if odds_inserted == 0 else "ok"),
+                "updated_at": now,
+            }
+            
+            # Add bookmaker_id if provided
+            if bookmaker_id:
+                data["bookmaker_id"] = bookmaker_id
+            
+            # Set last_success if we inserted odds
+            if odds_inserted > 0:
+                data["last_success"] = now
+            
+            self.client.table("scraper_status").upsert(
+                data,
+                on_conflict="scraper_name"
+            ).execute()
+            
+            self.logger.debug(f"Updated heartbeat for {scraper_name}")
+            return True
+            
+        except Exception as e:
+            self.logger.warning(f"Failed to update scraper status: {e}")
+            return False
