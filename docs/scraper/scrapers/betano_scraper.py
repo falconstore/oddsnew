@@ -84,6 +84,12 @@ class BetanoScraper(BaseScraper):
             "country": "Espanha",
             "url_path": "/sport/futebol/espanha/copa-do-rei/10067/"
         },
+    "Brasileirao_serie_a": {
+            "id": "10016",
+            "name": "Brasileirao Serie A",
+            "country": "Brasil",
+            "url_path": "/sport/futebol/brasil/brasileirao-serie-a-betano/10016/"
+        },
     }
     
     def __init__(self):
