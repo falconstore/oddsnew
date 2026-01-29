@@ -1,299 +1,238 @@
 
-# Plano: Otimizar Stake Scraper com 10 Abas Paralelas
 
-## Problemas Identificados
+# Plano: Resolver Conflito de Processos PM2 no Stake Scraper
 
-1. **Setup duplicado**: `run_scraper.py` chama `scraper.setup()` na linha 150, e `scrape_all()` chama novamente na linha 184. Isso causa multiplos browsers e `TargetClosedError`.
+## Problema Identificado
 
-2. **Requisicoes sequenciais**: Cada chamada `page.goto()` leva ~500ms. Com 14 ligas de futebol + 1 NBA, e cada liga com ~10 eventos precisando de requisicoes PA individuais, o ciclo demora muito.
-
-3. **Conflito entre processos**: Os logs mostram dois ciclos rodando em paralelo (timestamps intercalados), indicando que o PM2 reinicia o processo enquanto o anterior ainda esta rodando.
-
----
-
-## Solucao: Pool de Paginas + Guard no Setup
+O PM2 esta reiniciando o processo enquanto o ciclo anterior ainda esta em execucao:
 
 ```text
 ┌────────────────────────────────────────────────────────────────┐
-│                    ARQUITETURA OTIMIZADA                       │
+│                    CONFLITO DE PROCESSOS                       │
 ├────────────────────────────────────────────────────────────────┤
 │                                                                │
-│  setup() (uma vez)                                             │
-│     └── Cria 1 browser + 1 context + 10 paginas (pool)         │
-│                                                                │
-│  scrape_all()                                                  │
-│     └── Usa pool de paginas para requisicoes paralelas         │
-│         ├── Liga 1: pega pagina do pool → fetch → devolve      │
-│         ├── Liga 2: pega pagina do pool → fetch → devolve      │
-│         └── ... (ate 10 em paralelo)                           │
-│                                                                │
-│  _fetch_json_parallel(urls)                                    │
-│     └── Distribui URLs entre as 10 paginas                     │
-│     └── asyncio.gather() para executar em paralelo             │
-│                                                                │
-│  teardown()                                                    │
-│     └── Fecha todas as paginas + context + browser             │
+│  Processo 1 (antigo)        Processo 2 (PM2 restart)           │
+│  21:01:43 Sessao...         21:01:51 Starting...               │
+│  21:01:49 Browser pronto    21:02:00 Browser...                │
+│  21:02:12 Premier League    21:02:15 Sessao...                 │
+│  21:02:35 Serie A           21:02:31 Premier League            │
+│          ↓                           ↓                         │
+│    AMBOS RODANDO AO MESMO TEMPO = CONFLITO                     │
 │                                                                │
 └────────────────────────────────────────────────────────────────┘
+```
+
+O guard `if self._page is not None` funciona dentro do mesmo processo, mas o PM2 cria um processo novo que nao compartilha memoria.
+
+---
+
+## Causa Raiz
+
+O `ecosystem.config.js` do PM2 pode estar configurado com:
+- `autorestart: true` sem tempo minimo entre restarts
+- `restart_delay` muito baixo
+- Nenhum `max_restarts` limitando loops de restart
+
+---
+
+## Solucao em Duas Partes
+
+### Parte 1: Ajustar PM2 (ecosystem.config.js)
+
+Adicionar configuracoes para evitar restarts em loop:
+
+```javascript
+{
+  name: 'scraper-stake',
+  script: 'standalone/run_scraper.py',
+  args: '--scraper stake --interval 30',
+  interpreter: '/root/Desktop/scraper/venv/bin/python',
+  
+  // NOVAS CONFIGURACOES
+  restart_delay: 10000,      // 10s entre restarts
+  max_restarts: 5,           // Max 5 restarts em 15 min
+  min_uptime: 30000,         // Processo precisa rodar 30s para ser "estavel"
+  kill_timeout: 30000,       // 30s para processo terminar gracefully
+  wait_ready: true,          // Aguardar sinal de ready (opcional)
+}
+```
+
+### Parte 2: Adicionar Signal Handler no run_scraper.py
+
+Tratar SIGTERM/SIGINT gracefully para evitar que o processo seja morto no meio de um ciclo:
+
+```python
+import signal
+
+# Global flag para shutdown graceful
+shutdown_requested = False
+
+def handle_signal(signum, frame):
+    global shutdown_requested
+    log.warning(f"Recebido sinal {signum}, aguardando fim do ciclo atual...")
+    shutdown_requested = True
+
+async def run_forever(scraper_name, interval, log):
+    global shutdown_requested
+    
+    # Registrar handlers
+    signal.signal(signal.SIGTERM, handle_signal)
+    signal.signal(signal.SIGINT, handle_signal)
+    
+    # ... setup code ...
+    
+    while not shutdown_requested:
+        # ... ciclo de scraping ...
+        
+        if shutdown_requested:
+            log.info("Shutdown graceful solicitado, saindo...")
+            break
+        
+        await asyncio.sleep(interval)
+    
+    # Cleanup
+    await scraper.teardown()
+    log.info("Scraper finalizado gracefully")
 ```
 
 ---
 
 ## Mudancas no Arquivo
 
-### Arquivo: `docs/scraper/scrapers/stake_scraper.py`
+### Arquivo: `docs/scraper/standalone/run_scraper.py`
 
-### 1. Adicionar Guard no setup() para Evitar Reinicializacao
+#### 1. Adicionar Import e Flag Global
 
 ```python
-async def setup(self):
-    """Initialize Playwright browser for API requests."""
-    # GUARD: Evitar reinicializacao se ja esta pronto
-    if self._page is not None:
-        return
+import signal
+
+# Global flag for graceful shutdown
+shutdown_requested = False
+
+def request_shutdown(signum, frame):
+    """Handle SIGTERM/SIGINT for graceful shutdown."""
+    global shutdown_requested
+    shutdown_requested = True
+```
+
+#### 2. Registrar Signal Handlers em main()
+
+```python
+async def main():
+    load_dotenv()
+    args = parse_args()
     
-    self.logger.info("[Stake] Iniciando browser Playwright...")
+    log = setup_logging(args.scraper, args.debug)
+    
+    # Register signal handlers for graceful shutdown
+    signal.signal(signal.SIGTERM, request_shutdown)
+    signal.signal(signal.SIGINT, request_shutdown)
+    
     # ... resto do codigo
 ```
 
-### 2. Adicionar Pool de Paginas
+#### 3. Modificar Loop Principal em run_forever()
 
 ```python
-def __init__(self):
-    super().__init__(name="stake", base_url="https://stake.bet.br")
-    # Playwright components
-    self._playwright = None
-    self._browser: Optional[Browser] = None
-    self._context: Optional[BrowserContext] = None
-    self._page: Optional[Page] = None
-    # NOVO: Pool de paginas para requisicoes paralelas
-    self._page_pool: List[Page] = []
-    self._pool_semaphore: Optional[asyncio.Semaphore] = None
-    self._pool_size = 10
-    self.logger = logger.bind(component="stake")
-```
-
-### 3. Modificar setup() para Criar Pool
-
-```python
-async def setup(self):
-    """Initialize Playwright browser with page pool."""
-    if self._page is not None:
-        return
+async def run_forever(scraper_name, interval, log):
+    global shutdown_requested
     
-    self.logger.info("[Stake] Iniciando browser Playwright...")
+    # ... setup code existente ...
     
-    # Start Playwright
-    self._playwright = await async_playwright().start()
-    self._browser = await self._playwright.chromium.launch(
-        headless=True,
-        args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
-    )
+    while not shutdown_requested:
+        # ... ciclo de scraping ...
+        
+        # Check shutdown before sleeping
+        if shutdown_requested:
+            log.info("Shutdown requested, exiting after current cycle...")
+            break
+        
+        await asyncio.sleep(interval)
     
-    self._context = await self._browser.new_context(
-        user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:147.0) Gecko/20100101 Firefox/147.0",
-        locale="pt-BR",
-        timezone_id="America/Sao_Paulo",
-        viewport={"width": 1920, "height": 1080},
-    )
-    
-    # Pagina principal para compatibilidade
-    self._page = await self._context.new_page()
-    
-    # NOVO: Criar pool de paginas
-    self.logger.info(f"[Stake] Criando pool de {self._pool_size} paginas...")
-    self._page_pool = []
-    for _ in range(self._pool_size):
-        page = await self._context.new_page()
-        self._page_pool.append(page)
-    
-    self._pool_semaphore = asyncio.Semaphore(self._pool_size)
-    
-    # Estabelecer sessao na pagina principal
-    self.logger.info("[Stake] Estabelecendo sessao...")
+    # Graceful cleanup
+    log.info("Performing graceful shutdown...")
     try:
-        await self._page.goto("https://stake.bet.br/pt-br/sports/", wait_until="domcontentloaded", timeout=30000)
-        await self._page.wait_for_timeout(2000)
+        await scraper.teardown()
     except Exception as e:
-        self.logger.warning(f"[Stake] Aviso no carregamento inicial: {e}")
+        log.warning(f"Error during teardown: {e}")
     
-    self.logger.info("[Stake] Browser pronto")
-```
-
-### 4. Novo Metodo para Requisicoes Paralelas
-
-```python
-async def _fetch_json_with_page(self, page: Page, url: str) -> Dict[str, Any]:
-    """Fetch JSON using a specific page from pool."""
-    try:
-        response = await page.goto(url, wait_until="domcontentloaded", timeout=15000)
-        
-        if not response or response.status != 200:
-            return {}
-        
-        await page.wait_for_timeout(200)
-        content = await page.evaluate("() => document.body.innerText")
-        
-        if content:
-            return json.loads(content)
-        return {}
-        
-    except Exception:
-        return {}
-
-async def _fetch_parallel(self, urls: List[str]) -> List[Dict[str, Any]]:
-    """Fetch multiple URLs in parallel using page pool."""
-    if not urls:
-        return []
-    
-    results = [None] * len(urls)
-    
-    async def fetch_one(idx: int, url: str):
-        async with self._pool_semaphore:
-            page = self._page_pool[idx % self._pool_size]
-            results[idx] = await self._fetch_json_with_page(page, url)
-    
-    await asyncio.gather(*[fetch_one(i, url) for i, url in enumerate(urls)])
-    return results
-```
-
-### 5. Otimizar _fetch_all_pa_odds para Usar Paralelismo
-
-```python
-async def _fetch_all_pa_odds(self, event_ids: List[str]) -> Dict[str, Dict[int, float]]:
-    """Fetch PA odds for all events in parallel."""
-    if not event_ids:
-        return {}
-    
-    # Construir URLs
-    urls = [f"{self.API_BASE}/events/{eid}/odds" for eid in event_ids]
-    
-    # Buscar em paralelo
-    responses = await self._fetch_parallel(urls)
-    
-    # Processar resultados
-    results = {}
-    for event_id, data in zip(event_ids, responses):
-        if not data:
-            continue
-        
-        odds_map = {}
-        for odd in data.get("odds", []):
-            if odd.get("marketId") != self.MARKET_PA:
-                continue
-            
-            column_id = odd.get("columnId")
-            odd_values = odd.get("oddValues") or {}
-            odd_value = odd_values.get("decimal") if isinstance(odd_values, dict) else None
-            
-            if column_id is not None and odd_value:
-                odds_map[column_id] = float(odd_value)
-        
-        if odds_map:
-            results[event_id] = odds_map
-    
-    return results
-```
-
-### 6. Remover setup() de scrape_all()
-
-```python
-async def scrape_all(self) -> List[ScrapedOdds]:
-    """Scrape all leagues for both sports using Playwright."""
-    all_odds = []
-    # REMOVIDO: await self.setup() - run_scraper.py ja faz isso
-    
-    try:
-        # Football (SO + PA)
-        for league_id, config in self.FOOTBALL_LEAGUES.items():
-            try:
-                odds = await self._scrape_football(config)
-                all_odds.extend(odds)
-            except Exception as e:
-                self.logger.error(f"[Stake] Erro na liga {config['name']}: {e}")
-        
-        # Basketball (Moneyline)
-        for league_id, config in self.BASKETBALL_LEAGUES.items():
-            try:
-                odds = await self._scrape_basketball(config)
-                all_odds.extend(odds)
-            except Exception as e:
-                self.logger.error(f"[Stake] Erro na liga {config['name']}: {e}")
-                
-    except Exception as e:
-        self.logger.error(f"[Stake] Erro geral: {e}")
-        raise
-    
-    # REMOVIDO: finally teardown() - run_scraper.py gerencia o ciclo de vida
-    
-    self.logger.info(f"[Stake] Total: {len(all_odds)} odds coletadas")
-    return all_odds
-```
-
-### 7. Atualizar teardown() para Limpar Pool
-
-```python
-async def teardown(self):
-    """Close Playwright browser and page pool safely."""
-    # Fechar pool de paginas
-    for page in self._page_pool:
-        try:
-            await page.close()
-        except Exception:
-            pass
-    self._page_pool = []
-    self._pool_semaphore = None
-    
-    # Fechar pagina principal
-    try:
-        if self._page:
-            await self._page.close()
-    except Exception:
-        pass
-    self._page = None
-    
-    # Fechar context, browser, playwright
-    try:
-        if self._context:
-            await self._context.close()
-    except Exception:
-        pass
-    self._context = None
-    
-    try:
-        if self._browser:
-            await self._browser.close()
-    except Exception:
-        pass
-    self._browser = None
-    
-    try:
-        if self._playwright:
-            await self._playwright.stop()
-    except Exception:
-        pass
-    self._playwright = None
-    
-    self.logger.info("[Stake] Recursos liberados")
+    log.info("Scraper stopped gracefully")
 ```
 
 ---
 
-## Impacto na Performance
+### Arquivo: `docs/scraper/ecosystem.config.js`
 
-| Metrica | Antes (Sequencial) | Depois (10 Paralelas) |
-|---------|--------------------|-----------------------|
-| Requisicoes PA por liga | ~500ms x N eventos | ~500ms total (paralelo) |
-| Tempo por liga (10 eventos) | ~5s | ~0.5s |
-| Tempo total (14 ligas) | ~70s | ~7-10s |
-| Uso de memoria | ~150MB | ~250MB (+100MB) |
+Atualizar configuracao do PM2 para o stake:
+
+```javascript
+{
+  name: 'scraper-stake',
+  script: 'standalone/run_scraper.py',
+  args: '--scraper stake --interval 30',
+  interpreter: '/root/Desktop/scraper/venv/bin/python',
+  cwd: '/root/Desktop/scraper',
+  
+  // Prevenir restarts em loop
+  restart_delay: 10000,        // 10s entre restarts
+  max_restarts: 5,             // Max 5 restarts a cada 15 min
+  min_uptime: 30000,           // Precisa rodar 30s para ser estavel
+  
+  // Dar tempo para shutdown graceful
+  kill_timeout: 30000,         // 30s para terminar
+  
+  // Memoria
+  max_memory_restart: '400M',  // Aumentado para 10 paginas
+}
+```
+
+---
+
+## Fluxo Apos Correcoes
+
+```text
+┌────────────────────────────────────────────────────────────────┐
+│                    FLUXO CORRIGIDO                             │
+├────────────────────────────────────────────────────────────────┤
+│                                                                │
+│  1. PM2 envia SIGTERM (restart ou stop)                        │
+│     └── Handler define shutdown_requested = True               │
+│                                                                │
+│  2. Loop principal detecta flag                                │
+│     └── Nao inicia novo ciclo                                  │
+│     └── Aguarda ciclo atual terminar (se em andamento)         │
+│                                                                │
+│  3. Cleanup graceful                                           │
+│     └── Fecha pool de paginas                                  │
+│     └── Fecha browser                                          │
+│     └── Libera recursos                                        │
+│                                                                │
+│  4. Processo termina limpo                                     │
+│     └── PM2 aguarda 10s (restart_delay)                        │
+│     └── Inicia novo processo                                   │
+│                                                                │
+└────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
 ## Resumo das Mudancas
 
-1. **Guard no setup()**: Evita reinicializacao duplicada
-2. **Pool de 10 paginas**: Permite ate 10 requisicoes simultaneas
-3. **_fetch_parallel()**: Novo metodo para distribuir URLs entre paginas
-4. **Remover setup/teardown de scrape_all()**: `run_scraper.py` gerencia o ciclo de vida
-5. **Manter browser aberto**: Entre ciclos, so reinicia se houver erro
+| Arquivo | Mudanca |
+|---------|---------|
+| `run_scraper.py` | Adicionar signal handler para SIGTERM/SIGINT |
+| `run_scraper.py` | Usar flag `shutdown_requested` no loop |
+| `run_scraper.py` | Fazer teardown graceful antes de sair |
+| `ecosystem.config.js` | Adicionar `restart_delay: 10000` |
+| `ecosystem.config.js` | Adicionar `kill_timeout: 30000` |
+| `ecosystem.config.js` | Aumentar `max_memory_restart` para 400M |
+
+---
+
+## Beneficios
+
+1. **Sem conflito de processos**: Novo processo so inicia apos o antigo terminar
+2. **Shutdown graceful**: Browser fecha corretamente, sem erros de "Target closed"
+3. **Recursos liberados**: Memoria e processos chromium sao limpos
+4. **Logs claros**: Sabe exatamente quando e por que o processo parou
+
