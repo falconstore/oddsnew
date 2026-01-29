@@ -26,7 +26,7 @@ class McgamesLeague:
 class McgamesScraper(BaseScraper):
     """Scraper for Mcgames using Altenar API."""
     
-     LEAGUES = {
+    LEAGUES = {
         "serie_a": McgamesLeague(champ_id="2942", name="Serie A", country="italia"),
         "premier_league": McgamesLeague(champ_id="2936", name="Premier League", country="inglaterra"),
         "la_liga": McgamesLeague(champ_id="2941", name="La Liga", country="espanha"),
