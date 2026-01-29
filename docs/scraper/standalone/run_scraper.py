@@ -62,66 +62,58 @@ def setup_logging(scraper_name: str, debug: bool = False):
 
 
 def get_scraper_class(scraper_name: str):
-    """Retorna a classe do scraper pelo nome."""
-    from scrapers import (
-        BetanoScraper, BetanoNBAScraper,
-        SuperbetScraper,
-        BetbraNBAScraper, Br4betNBAScraper,
-        KtoScraper,
-        SportingbetScraper,
-        NovibetScraper,
-        BetnacionalScraper,
-        StakeScraper,
-        McgamesScraper, McgamesNBAScraper,
-        Aposta1Scraper, Aposta1NBAScraper,
-        EsportivabetScraper, EsportivabetNBAScraper,
-        JogodeOuroScraper, JogodeOuroNBAScraper,
-        Bet365Scraper,
-        TradeballScraper,
-    )
+    """Retorna a classe do scraper pelo nome usando lazy import.
     
-    # Importar scrapers que não estão no __init__.py
-    from scrapers.betbra_scraper import BetbraScraper
-    from scrapers.br4bet_scraper import Br4betScraper
-    from scrapers.estrelabet_scraper import EstrelabetScraper
+    Usa importlib para importar APENAS o módulo do scraper solicitado,
+    evitando que um erro de sintaxe em um scraper derrube todos os outros.
+    """
+    import importlib
     
+    # Mapeamento: nome_do_scraper -> (módulo, classe)
     SCRAPER_MAP = {
         # Unified scrapers (Football + NBA)
-        "superbet": SuperbetScraper,
-        "estrelabet": EstrelabetScraper,
-        "kto": KtoScraper,
-        "sportingbet": SportingbetScraper,
-        "novibet": NovibetScraper,
-        "betnacional": BetnacionalScraper,
-        "stake": StakeScraper,
+        "superbet": ("scrapers.superbet_scraper", "SuperbetScraper"),
+        "estrelabet": ("scrapers.estrelabet_scraper", "EstrelabetScraper"),
+        "kto": ("scrapers.kto_scraper", "KtoScraper"),
+        "sportingbet": ("scrapers.sportingbet_scraper", "SportingbetScraper"),
+        "novibet": ("scrapers.novibet_scraper", "NovibetScraper"),
+        "betnacional": ("scrapers.betnacional_scraper", "BetnacionalScraper"),
+        "stake": ("scrapers.stake_scraper", "StakeScraper"),
         
         # Football-only scrapers
-        "betano": BetanoScraper,
-        "betbra": BetbraScraper,
-        "br4bet": Br4betScraper,
-        "mcgames": McgamesScraper,
-        "aposta1": Aposta1Scraper,
-        "esportivabet": EsportivabetScraper,
-        "jogodeouro": JogodeOuroScraper,
-        "bet365": Bet365Scraper,
-        "tradeball": TradeballScraper,
+        "betano": ("scrapers.betano_scraper", "BetanoScraper"),
+        "betbra": ("scrapers.betbra_scraper", "BetbraScraper"),
+        "br4bet": ("scrapers.br4bet_scraper", "Br4betScraper"),
+        "mcgames": ("scrapers.mcgames_scraper", "McgamesScraper"),
+        "aposta1": ("scrapers.aposta1_scraper", "Aposta1Scraper"),
+        "esportivabet": ("scrapers.esportivabet_scraper", "EsportivabetScraper"),
+        "jogodeouro": ("scrapers.jogodeouro_scraper", "JogodeOuroScraper"),
+        "bet365": ("scrapers.bet365_scraper", "Bet365Scraper"),
+        "tradeball": ("scrapers.tradeball_scraper", "TradeballScraper"),
         
         # NBA-only scrapers
-        "betano_nba": BetanoNBAScraper,
-        "betbra_nba": BetbraNBAScraper,
-        "br4bet_nba": Br4betNBAScraper,
-        "mcgames_nba": McgamesNBAScraper,
-        "aposta1_nba": Aposta1NBAScraper,
-        "esportivabet_nba": EsportivabetNBAScraper,
-        "jogodeouro_nba": JogodeOuroNBAScraper,
+        "betano_nba": ("scrapers.betano_nba_scraper", "BetanoNBAScraper"),
+        "betbra_nba": ("scrapers.betbra_nba_scraper", "BetbraNBAScraper"),
+        "br4bet_nba": ("scrapers.br4bet_nba_scraper", "Br4betNBAScraper"),
+        "mcgames_nba": ("scrapers.mcgames_nba_scraper", "McgamesNBAScraper"),
+        "aposta1_nba": ("scrapers.aposta1_nba_scraper", "Aposta1NBAScraper"),
+        "esportivabet_nba": ("scrapers.esportivabet_nba_scraper", "EsportivabetNBAScraper"),
+        "jogodeouro_nba": ("scrapers.jogodeouro_nba_scraper", "JogodeOuroNBAScraper"),
     }
     
-    scraper_class = SCRAPER_MAP.get(scraper_name.lower())
-    if not scraper_class:
+    scraper_key = scraper_name.lower()
+    if scraper_key not in SCRAPER_MAP:
         available = ", ".join(sorted(SCRAPER_MAP.keys()))
         raise ValueError(f"Scraper '{scraper_name}' não encontrado. Disponíveis: {available}")
     
-    return scraper_class
+    module_path, class_name = SCRAPER_MAP[scraper_key]
+    
+    try:
+        module = importlib.import_module(module_path)
+        scraper_class = getattr(module, class_name)
+        return scraper_class
+    except Exception as e:
+        raise ImportError(f"Falha ao importar {class_name} de {module_path}: {e}") from e
 
 
 async def run_forever(scraper_name: str, interval: int, log: logger):

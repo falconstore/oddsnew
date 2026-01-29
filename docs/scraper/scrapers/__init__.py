@@ -1,50 +1,34 @@
 """
 Scrapers Package - All bookmaker-specific scrapers.
 
-Unified scrapers (handle both Football and Basketball):
-- SuperbetScraper
-- KtoScraper
-- StakeScraper
-- SportingbetScraper
-- NovibetScraper
-- BetnacionalScraper
-- EstrelabetScraper
+IMPORTANT: This file intentionally does NOT import scrapers automatically.
+This prevents a syntax error in one scraper from breaking all others.
+
+Use lazy imports via importlib when you need a specific scraper:
+    
+    import importlib
+    module = importlib.import_module("scrapers.superbet_scraper")
+    SuperbetScraper = module.SuperbetScraper
+
+Or import directly when needed:
+    
+    from scrapers.superbet_scraper import SuperbetScraper
+
+Available scrapers:
+    Unified (Football + NBA): superbet, estrelabet, kto, sportingbet, novibet, betnacional, stake
+    Football only: betano, betbra, br4bet, mcgames, aposta1, esportivabet, jogodeouro, bet365, tradeball
+    NBA only: betano_nba, betbra_nba, br4bet_nba, mcgames_nba, aposta1_nba, esportivabet_nba, jogodeouro_nba
 """
 
-from .betano_scraper import BetanoScraper
-from .betano_nba_scraper import BetanoNBAScraper
-from .superbet_scraper import SuperbetScraper
-from .betbra_nba_scraper import BetbraNBAScraper
-from .br4bet_nba_scraper import Br4betNBAScraper
-from .kto_scraper import KtoScraper
-from .sportingbet_scraper import SportingbetScraper
-from .novibet_scraper import NovibetScraper
-from .betnacional_scraper import BetnacionalScraper
-from .stake_scraper import StakeScraper
-from .mcgames_scraper import McgamesScraper
-from .mcgames_nba_scraper import McgamesNBAScraper
-from .aposta1_scraper import Aposta1Scraper
-from .aposta1_nba_scraper import Aposta1NBAScraper
-from .esportivabet_scraper import EsportivabetScraper
-from .esportivabet_nba_scraper import EsportivabetNBAScraper
-from .jogodeouro_scraper import JogodeOuroScraper
-from .jogodeouro_nba_scraper import JogodeOuroNBAScraper
-from .bet365_scraper import Bet365Scraper
-from .tradeball_scraper import TradeballScraper
-
 __all__ = [
-    "BetanoScraper", "BetanoNBAScraper", 
-    "SuperbetScraper",
-    "BetbraNBAScraper", "Br4betNBAScraper",
-    "KtoScraper",
-    "SportingbetScraper",
-    "NovibetScraper",
-    "BetnacionalScraper",
-    "StakeScraper",
-    "McgamesScraper", "McgamesNBAScraper",
-    "Aposta1Scraper", "Aposta1NBAScraper", 
-    "EsportivabetScraper", "EsportivabetNBAScraper", 
-    "JogodeOuroScraper", "JogodeOuroNBAScraper",
-    "Bet365Scraper",
-    "TradeballScraper"
+    # Unified
+    "SuperbetScraper", "EstrelabetScraper", "KtoScraper", 
+    "SportingbetScraper", "NovibetScraper", "BetnacionalScraper", "StakeScraper",
+    # Football
+    "BetanoScraper", "BetbraScraper", "Br4betScraper", "McgamesScraper",
+    "Aposta1Scraper", "EsportivabetScraper", "JogodeOuroScraper", 
+    "Bet365Scraper", "TradeballScraper",
+    # NBA
+    "BetanoNBAScraper", "BetbraNBAScraper", "Br4betNBAScraper", "McgamesNBAScraper",
+    "Aposta1NBAScraper", "EsportivabetNBAScraper", "JogodeOuroNBAScraper",
 ]
