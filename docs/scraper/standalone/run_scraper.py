@@ -14,6 +14,7 @@ Scrapers disponíveis:
 
 import asyncio
 import argparse
+import signal
 import sys
 from pathlib import Path
 from datetime import datetime, timezone
@@ -25,6 +26,15 @@ from dotenv import load_dotenv
 from loguru import logger
 
 from config import settings
+
+# Global flag for graceful shutdown
+shutdown_requested = False
+
+
+def request_shutdown(signum, frame):
+    """Handle SIGTERM/SIGINT for graceful shutdown."""
+    global shutdown_requested
+    shutdown_requested = True
 
 
 def setup_logging(scraper_name: str, debug: bool = False):
@@ -125,7 +135,9 @@ def get_scraper_class(scraper_name: str):
 
 
 async def run_forever(scraper_name: str, interval: int, log: logger):
-    """Loop infinito para um único scraper."""
+    """Loop infinito para um único scraper com graceful shutdown."""
+    global shutdown_requested
+    
     from shared_resources import get_shared_resources
     from normalizer import OddsNormalizer
     from supabase_client import SupabaseClient
@@ -151,7 +163,7 @@ async def run_forever(scraper_name: str, interval: int, log: logger):
     
     cycle_count = 0
     
-    while True:
+    while not shutdown_requested:
         cycle_count += 1
         start_time = datetime.now(timezone.utc)
         error_message = None
@@ -217,7 +229,21 @@ async def run_forever(scraper_name: str, interval: int, log: logger):
         except Exception as hb_error:
             log.warning(f"Failed to send heartbeat: {hb_error}")
         
+        # Check shutdown before sleeping
+        if shutdown_requested:
+            log.info("Shutdown requested, exiting after current cycle...")
+            break
+        
         await asyncio.sleep(interval)
+    
+    # Graceful cleanup
+    log.info("Performing graceful shutdown...")
+    try:
+        await scraper.teardown()
+    except Exception as e:
+        log.warning(f"Error during teardown: {e}")
+    
+    log.info("Scraper stopped gracefully")
 
 
 def parse_args():
@@ -254,6 +280,10 @@ async def main():
     args = parse_args()
     
     log = setup_logging(args.scraper, args.debug)
+    
+    # Register signal handlers for graceful shutdown
+    signal.signal(signal.SIGTERM, request_shutdown)
+    signal.signal(signal.SIGINT, request_shutdown)
     
     log.info("=" * 50)
     log.info(f"Standalone Scraper: {args.scraper}")
