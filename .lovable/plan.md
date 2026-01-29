@@ -1,122 +1,238 @@
 
 
-# Plano: Reverter Alterações Problemáticas
+# Plano: Resolver Conflito de Processos PM2 no Stake Scraper
 
-## Diagnóstico
+## Problema Identificado
 
-Após análise do código, identifiquei que as mudanças que fiz no McGames estão causando a sobrecarga:
+O PM2 esta reiniciando o processo enquanto o ciclo anterior ainda esta em execucao:
 
-### Problema no McGames
+```text
+┌────────────────────────────────────────────────────────────────┐
+│                    CONFLITO DE PROCESSOS                       │
+├────────────────────────────────────────────────────────────────┤
+│                                                                │
+│  Processo 1 (antigo)        Processo 2 (PM2 restart)           │
+│  21:01:43 Sessao...         21:01:51 Starting...               │
+│  21:01:49 Browser pronto    21:02:00 Browser...                │
+│  21:02:12 Premier League    21:02:15 Sessao...                 │
+│  21:02:35 Serie A           21:02:31 Premier League            │
+│          ↓                           ↓                         │
+│    AMBOS RODANDO AO MESMO TEMPO = CONFLITO                     │
+│                                                                │
+└────────────────────────────────────────────────────────────────┘
+```
 
-**Antes (funcional):**
-- 2 URLs de warmup
-- 1 scroll por URL
-- ~3.5s por URL = **~7s total**
-
-**Depois da minha alteração (problemático):**
-- 4 URLs de warmup
-- 3 scrolls por URL com waits longos
-- ~7s+ por URL = **~28s+ total**
-
-O setup está demorando quase o mesmo tempo que o intervalo de 30s, causando overlap de processos.
-
-### Problema no Betano
-
-O guard que adicionei está OK, mas o scraper continua tendo problemas de "Target page closed" porque a sessão aiohttp não está sendo limpa corretamente quando há erros.
+O guard `if self._page is not None` funciona dentro do mesmo processo, mas o PM2 cria um processo novo que nao compartilha memoria.
 
 ---
 
-## Solução
+## Causa Raiz
 
-### Arquivo 1: `docs/scraper/scrapers/mcgames_scraper.py`
+O `ecosystem.config.js` do PM2 pode estar configurado com:
+- `autorestart: true` sem tempo minimo entre restarts
+- `restart_delay` muito baixo
+- Nenhum `max_restarts` limitando loops de restart
 
-Reverter para configuração mais leve (igual ao Br4bet funcional):
+---
 
-**Mudanças:**
-1. Reduzir WARMUP_URLS de 4 para 2
-2. Reduzir timeout de 20s para 15s
-3. Reduzir wait_for_timeout de 3s para 2s
-4. Manter apenas 1 scroll em vez de 3
-5. Remover handler de response (desnecessário)
+## Solucao em Duas Partes
 
-```python
-# WARMUP_URLS reduzido
-WARMUP_URLS = [
-    "https://mcgames.bet.br/sports/futebol/italia/serie-a/c-2942",
-    "https://mcgames.bet.br/sports/futebol",
-]
+### Parte 1: Ajustar PM2 (ecosystem.config.js)
 
-# No loop de warmup (mais enxuto)
-await page.goto(target_url, wait_until="domcontentloaded", timeout=15000)
-await page.wait_for_timeout(2000)
+Adicionar configuracoes para evitar restarts em loop:
 
-# Single scroll
-if not token_future.done():
-    await page.evaluate("window.scrollTo(0, 1000)")
-    await page.wait_for_timeout(1500)
+```javascript
+{
+  name: 'scraper-stake',
+  script: 'standalone/run_scraper.py',
+  args: '--scraper stake --interval 30',
+  interpreter: '/root/Desktop/scraper/venv/bin/python',
+  
+  // NOVAS CONFIGURACOES
+  restart_delay: 10000,      // 10s entre restarts
+  max_restarts: 5,           // Max 5 restarts em 15 min
+  min_uptime: 30000,         // Processo precisa rodar 30s para ser "estavel"
+  kill_timeout: 30000,       // 30s para processo terminar gracefully
+  wait_ready: true,          // Aguardar sinal de ready (opcional)
+}
 ```
 
-### Arquivo 2: `docs/scraper/scrapers/betano_scraper.py`
+### Parte 2: Adicionar Signal Handler no run_scraper.py
 
-Manter o guard pattern (está correto), mas melhorar o tratamento de erro para limpar a sessão aiohttp:
+Tratar SIGTERM/SIGINT gracefully para evitar que o processo seja morto no meio de um ciclo:
 
 ```python
-async def teardown(self):
-    """Close browser and aiohttp session."""
-    # Fechar aiohttp session primeiro (com proteção)
-    if self._session:
-        try:
-            await self._session.close()
-        except Exception:
-            pass
-        self._session = None
+import signal
+
+# Global flag para shutdown graceful
+shutdown_requested = False
+
+def handle_signal(signum, frame):
+    global shutdown_requested
+    log.warning(f"Recebido sinal {signum}, aguardando fim do ciclo atual...")
+    shutdown_requested = True
+
+async def run_forever(scraper_name, interval, log):
+    global shutdown_requested
     
-    # ... resto do código
+    # Registrar handlers
+    signal.signal(signal.SIGTERM, handle_signal)
+    signal.signal(signal.SIGINT, handle_signal)
+    
+    # ... setup code ...
+    
+    while not shutdown_requested:
+        # ... ciclo de scraping ...
+        
+        if shutdown_requested:
+            log.info("Shutdown graceful solicitado, saindo...")
+            break
+        
+        await asyncio.sleep(interval)
+    
+    # Cleanup
+    await scraper.teardown()
+    log.info("Scraper finalizado gracefully")
 ```
 
 ---
 
-## Resumo das Mudanças
+## Mudancas no Arquivo
 
-| Arquivo | Mudança |
+### Arquivo: `docs/scraper/standalone/run_scraper.py`
+
+#### 1. Adicionar Import e Flag Global
+
+```python
+import signal
+
+# Global flag for graceful shutdown
+shutdown_requested = False
+
+def request_shutdown(signum, frame):
+    """Handle SIGTERM/SIGINT for graceful shutdown."""
+    global shutdown_requested
+    shutdown_requested = True
+```
+
+#### 2. Registrar Signal Handlers em main()
+
+```python
+async def main():
+    load_dotenv()
+    args = parse_args()
+    
+    log = setup_logging(args.scraper, args.debug)
+    
+    # Register signal handlers for graceful shutdown
+    signal.signal(signal.SIGTERM, request_shutdown)
+    signal.signal(signal.SIGINT, request_shutdown)
+    
+    # ... resto do codigo
+```
+
+#### 3. Modificar Loop Principal em run_forever()
+
+```python
+async def run_forever(scraper_name, interval, log):
+    global shutdown_requested
+    
+    # ... setup code existente ...
+    
+    while not shutdown_requested:
+        # ... ciclo de scraping ...
+        
+        # Check shutdown before sleeping
+        if shutdown_requested:
+            log.info("Shutdown requested, exiting after current cycle...")
+            break
+        
+        await asyncio.sleep(interval)
+    
+    # Graceful cleanup
+    log.info("Performing graceful shutdown...")
+    try:
+        await scraper.teardown()
+    except Exception as e:
+        log.warning(f"Error during teardown: {e}")
+    
+    log.info("Scraper stopped gracefully")
+```
+
+---
+
+### Arquivo: `docs/scraper/ecosystem.config.js`
+
+Atualizar configuracao do PM2 para o stake:
+
+```javascript
+{
+  name: 'scraper-stake',
+  script: 'standalone/run_scraper.py',
+  args: '--scraper stake --interval 30',
+  interpreter: '/root/Desktop/scraper/venv/bin/python',
+  cwd: '/root/Desktop/scraper',
+  
+  // Prevenir restarts em loop
+  restart_delay: 10000,        // 10s entre restarts
+  max_restarts: 5,             // Max 5 restarts a cada 15 min
+  min_uptime: 30000,           // Precisa rodar 30s para ser estavel
+  
+  // Dar tempo para shutdown graceful
+  kill_timeout: 30000,         // 30s para terminar
+  
+  // Memoria
+  max_memory_restart: '400M',  // Aumentado para 10 paginas
+}
+```
+
+---
+
+## Fluxo Apos Correcoes
+
+```text
+┌────────────────────────────────────────────────────────────────┐
+│                    FLUXO CORRIGIDO                             │
+├────────────────────────────────────────────────────────────────┤
+│                                                                │
+│  1. PM2 envia SIGTERM (restart ou stop)                        │
+│     └── Handler define shutdown_requested = True               │
+│                                                                │
+│  2. Loop principal detecta flag                                │
+│     └── Nao inicia novo ciclo                                  │
+│     └── Aguarda ciclo atual terminar (se em andamento)         │
+│                                                                │
+│  3. Cleanup graceful                                           │
+│     └── Fecha pool de paginas                                  │
+│     └── Fecha browser                                          │
+│     └── Libera recursos                                        │
+│                                                                │
+│  4. Processo termina limpo                                     │
+│     └── PM2 aguarda 10s (restart_delay)                        │
+│     └── Inicia novo processo                                   │
+│                                                                │
+└────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Resumo das Mudancas
+
+| Arquivo | Mudanca |
 |---------|---------|
-| mcgames_scraper.py | Reduzir WARMUP_URLS de 4 para 2 |
-| mcgames_scraper.py | Reduzir timeout de 20s para 15s |
-| mcgames_scraper.py | Reduzir wait de 3s para 2s |
-| mcgames_scraper.py | Usar 1 scroll em vez de 3 |
-| mcgames_scraper.py | Remover handler de response |
-| betano_scraper.py | Adicionar try/except no close da session |
+| `run_scraper.py` | Adicionar signal handler para SIGTERM/SIGINT |
+| `run_scraper.py` | Usar flag `shutdown_requested` no loop |
+| `run_scraper.py` | Fazer teardown graceful antes de sair |
+| `ecosystem.config.js` | Adicionar `restart_delay: 10000` |
+| `ecosystem.config.js` | Adicionar `kill_timeout: 30000` |
+| `ecosystem.config.js` | Aumentar `max_memory_restart` para 400M |
 
 ---
 
-## Comandos para Executar na VPS
+## Beneficios
 
-Após as mudanças serem aplicadas:
-
-```bash
-# 1. Parar scrapers problemáticos
-pm2 stop scraper-mcgames scraper-betano
-
-# 2. Matar processos chromium órfãos
-pkill -f chromium || true
-
-# 3. Atualizar código
-cd ~/Desktop/scraper && git pull
-
-# 4. Aguardar 30s
-sleep 30
-
-# 5. Reiniciar um por vez
-pm2 restart scraper-mcgames
-sleep 60
-pm2 restart scraper-betano
-```
-
----
-
-## Benefícios
-
-1. **Setup mais rápido**: ~7s em vez de ~28s
-2. **Menos overlap**: Tempo entre ciclos respeitado
-3. **Menos carga na VPS**: Menos scrolls = menos chamadas API desnecessárias
+1. **Sem conflito de processos**: Novo processo so inicia apos o antigo terminar
+2. **Shutdown graceful**: Browser fecha corretamente, sem erros de "Target closed"
+3. **Recursos liberados**: Memoria e processos chromium sao limpos
+4. **Logs claros**: Sabe exatamente quando e por que o processo parou
 

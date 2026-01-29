@@ -29,7 +29,7 @@ class BetanoScraper(BaseScraper):
     """
     
     # League configurations with Betano IDs
-     LEAGUES = {
+    LEAGUES = {
         "premier_league": {
             "id": "1",
             "name": "Premier League",
@@ -84,42 +84,6 @@ class BetanoScraper(BaseScraper):
             "country": "Espanha",
             "url_path": "/sport/futebol/espanha/copa-do-rei/10067/"
         },
-     "copa_do_rei": {
-            "id": "10067",
-            "name": "Copa do Rei",
-            "country": "Espanha",
-            "url_path": "/sport/futebol/espanha/copa-do-rei/10067/"
-        },
-     "champions_league": {
-            "id": "182748",
-            "name": "Champions League",
-            "country": "Europa",
-            "url_path": "/sport/futebol/competicoes/liga-dos-campeoes/188566/"
-        },
-    "liga_europa": {
-            "id": "182761",
-            "name": "Liga Europa",
-            "country": "Europa",
-            "url_path": "/sport/futebol/competicoes/liga-europa/188567/"
-        },
-    "liga_da_conferencia": {
-            "id": "196755",
-            "name": "Liga da Confeferencia",
-            "country": "Europa",
-            "url_path": "/sport/futebol/competicoes/liga-conferencia/189602/"
-        },
-    "eredivisie": {
-            "id": "17067",
-            "name": "Eredivisie",
-            "country": "Holanda",
-            "url_path": "/sport/futebol/paises-baixos/eredivisie/17067/"
-        },
-    "Brasileirao_serie_a": {
-            "id": "10016",
-            "name": "Brasileirao Serie A",
-            "country": "Brasil",
-            "url_path": "/sport/futebol/brasil/brasileirao-serie-a-betano/10016/"
-        },
     }
     
     def __init__(self):
@@ -136,13 +100,9 @@ class BetanoScraper(BaseScraper):
     
     async def setup(self):
         """Initialize Playwright browser and capture session cookies."""
-        # GUARD: Prevent duplicate initialization
-        if self._page is not None:
-            return
-        
         await super().setup()
         
-        self.logger.info("Setting up betano scraper")
+        self.logger.debug("Initializing Playwright browser...")
         
         # Start Playwright and browser
         self._playwright = await async_playwright().start()
@@ -203,10 +163,7 @@ class BetanoScraper(BaseScraper):
     async def teardown(self):
         """Close browser and aiohttp session."""
         if self._session:
-            try:
-                await self._session.close()
-            except Exception:
-                pass
+            await self._session.close()
             self._session = None
         
         if self._page:
