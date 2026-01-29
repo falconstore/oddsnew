@@ -1,41 +1,40 @@
 
-# Plano: Stake Scraper com Requisicoes via Playwright
+# Plano: Otimizar Stake Scraper com 10 Abas Paralelas
 
-## Diagnostico Atualizado
+## Problemas Identificados
 
-Os headers que funcionaram mostram:
+1. **Setup duplicado**: `run_scraper.py` chama `scraper.setup()` na linha 150, e `scrape_all()` chama novamente na linha 184. Isso causa multiplos browsers e `TargetClosedError`.
 
-| Header | Valor | Significado |
-|--------|-------|-------------|
-| Sec-Fetch-Mode | navigate | Requisicao de navegacao (nao XHR) |
-| Sec-Fetch-Dest | document | Carregando como documento |
-| Sec-Fetch-Site | none | Requisicao direta (nao cross-origin) |
+2. **Requisicoes sequenciais**: Cada chamada `page.goto()` leva ~500ms. Com 14 ligas de futebol + 1 NBA, e cada liga com ~10 eventos precisando de requisicoes PA individuais, o ciclo demora muito.
 
-A API aceita requisicoes de navegacao mas bloqueia XHR/fetch cross-origin (que e o que httpx faz).
+3. **Conflito entre processos**: Os logs mostram dois ciclos rodando em paralelo (timestamps intercalados), indicando que o PM2 reinicia o processo enquanto o anterior ainda esta rodando.
 
 ---
 
-## Solucao: Usar page.goto() do Playwright
-
-Em vez de usar httpx para chamar a API, vamos usar o Playwright para navegar diretamente para as URLs da API e extrair o JSON.
+## Solucao: Pool de Paginas + Guard no Setup
 
 ```text
-┌─────────────────────────────────────────────────────────────┐
-│                    FLUXO SIMPLIFICADO                       │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  TUDO VIA PLAYWRIGHT (sem httpx)                            │
-│                                                             │
-│  1. page.goto("/tournament/{id}/live-upcoming")             │
-│     └── Retorna JSON com lista de eventos                   │
-│                                                             │
-│  2. page.goto("/events/{id}/odds") para cada evento         │
-│     └── Retorna JSON com odds                               │
-│                                                             │
-│  3. Parsear JSON diretamente do DOM                         │
-│     └── page.content() ou page.evaluate()                   │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────┐
+│                    ARQUITETURA OTIMIZADA                       │
+├────────────────────────────────────────────────────────────────┤
+│                                                                │
+│  setup() (uma vez)                                             │
+│     └── Cria 1 browser + 1 context + 10 paginas (pool)         │
+│                                                                │
+│  scrape_all()                                                  │
+│     └── Usa pool de paginas para requisicoes paralelas         │
+│         ├── Liga 1: pega pagina do pool → fetch → devolve      │
+│         ├── Liga 2: pega pagina do pool → fetch → devolve      │
+│         └── ... (ate 10 em paralelo)                           │
+│                                                                │
+│  _fetch_json_parallel(urls)                                    │
+│     └── Distribui URLs entre as 10 paginas                     │
+│     └── asyncio.gather() para executar em paralelo             │
+│                                                                │
+│  teardown()                                                    │
+│     └── Fecha todas as paginas + context + browser             │
+│                                                                │
+└────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -44,55 +43,53 @@ Em vez de usar httpx para chamar a API, vamos usar o Playwright para navegar dir
 
 ### Arquivo: `docs/scraper/scrapers/stake_scraper.py`
 
-#### 1. Remover httpx (nao precisa mais)
-
-```python
-# ANTES
-self.client = httpx.AsyncClient(...)
-response = await self.client.get(url)
-data = response.json()
-
-# DEPOIS
-await self._page.goto(url, wait_until="domcontentloaded")
-content = await self._page.content()
-# Extrair JSON do body
-```
-
-#### 2. Novo Metodo para Requisicoes via Playwright
-
-```python
-async def _fetch_json(self, url: str) -> Dict[str, Any]:
-    """Fetch JSON data by navigating to URL with Playwright."""
-    try:
-        response = await self._page.goto(url, wait_until="domcontentloaded", timeout=15000)
-        
-        if response and response.status == 200:
-            # Extract JSON from page body
-            content = await self._page.evaluate("() => document.body.innerText")
-            return json.loads(content)
-        else:
-            self.logger.debug(f"[Stake] Status {response.status if response else 'None'} para {url}")
-            return {}
-            
-    except Exception as e:
-        self.logger.debug(f"[Stake] Erro ao buscar {url}: {e}")
-        return {}
-```
-
-#### 3. Simplificar setup() - Remover httpx
+### 1. Adicionar Guard no setup() para Evitar Reinicializacao
 
 ```python
 async def setup(self):
-    """Initialize Playwright browser only."""
+    """Initialize Playwright browser for API requests."""
+    # GUARD: Evitar reinicializacao se ja esta pronto
+    if self._page is not None:
+        return
+    
+    self.logger.info("[Stake] Iniciando browser Playwright...")
+    # ... resto do codigo
+```
+
+### 2. Adicionar Pool de Paginas
+
+```python
+def __init__(self):
+    super().__init__(name="stake", base_url="https://stake.bet.br")
+    # Playwright components
+    self._playwright = None
+    self._browser: Optional[Browser] = None
+    self._context: Optional[BrowserContext] = None
+    self._page: Optional[Page] = None
+    # NOVO: Pool de paginas para requisicoes paralelas
+    self._page_pool: List[Page] = []
+    self._pool_semaphore: Optional[asyncio.Semaphore] = None
+    self._pool_size = 10
+    self.logger = logger.bind(component="stake")
+```
+
+### 3. Modificar setup() para Criar Pool
+
+```python
+async def setup(self):
+    """Initialize Playwright browser with page pool."""
+    if self._page is not None:
+        return
+    
     self.logger.info("[Stake] Iniciando browser Playwright...")
     
+    # Start Playwright
     self._playwright = await async_playwright().start()
     self._browser = await self._playwright.chromium.launch(
         headless=True,
         args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
     )
     
-    # Usar Firefox user-agent (funciona melhor)
     self._context = await self._browser.new_context(
         user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:147.0) Gecko/20100101 Firefox/147.0",
         locale="pt-BR",
@@ -100,110 +97,203 @@ async def setup(self):
         viewport={"width": 1920, "height": 1080},
     )
     
+    # Pagina principal para compatibilidade
     self._page = await self._context.new_page()
     
-    # Navegar para o site primeiro (estabelecer sessao)
-    await self._page.goto("https://stake.bet.br/pt-br/sports/", wait_until="domcontentloaded", timeout=30000)
-    await self._page.wait_for_timeout(2000)
+    # NOVO: Criar pool de paginas
+    self.logger.info(f"[Stake] Criando pool de {self._pool_size} paginas...")
+    self._page_pool = []
+    for _ in range(self._pool_size):
+        page = await self._context.new_page()
+        self._page_pool.append(page)
+    
+    self._pool_semaphore = asyncio.Semaphore(self._pool_size)
+    
+    # Estabelecer sessao na pagina principal
+    self.logger.info("[Stake] Estabelecendo sessao...")
+    try:
+        await self._page.goto("https://stake.bet.br/pt-br/sports/", wait_until="domcontentloaded", timeout=30000)
+        await self._page.wait_for_timeout(2000)
+    except Exception as e:
+        self.logger.warning(f"[Stake] Aviso no carregamento inicial: {e}")
     
     self.logger.info("[Stake] Browser pronto")
 ```
 
-#### 4. Atualizar _fetch_events()
+### 4. Novo Metodo para Requisicoes Paralelas
 
 ```python
-async def _fetch_events(self, tournament_id: str) -> List[Dict[str, Any]]:
-    """Fetch upcoming events for a tournament via Playwright navigation."""
-    url = f"{self.API_BASE}/tournament/{tournament_id}/live-upcoming"
-    data = await self._fetch_json(url)
-    
-    events = data.get("events", [])
-    return [e for e in events if not e.get("isLive", False)]
-```
-
-#### 5. Atualizar _fetch_event_odds()
-
-```python
-async def _fetch_event_odds(self, event_id: str) -> Dict[str, Any]:
-    """Fetch odds for a single event via Playwright navigation."""
-    url = f"{self.API_BASE}/events/{event_id}/odds"
-    return await self._fetch_json(url)
-```
-
-#### 6. Remover _fetch_so_odds e _fetch_pa_odds com httpx
-
-Substituir por versoes que usam `_fetch_json()`.
-
----
-
-## Codigo Completo do Novo _fetch_json
-
-```python
-async def _fetch_json(self, url: str) -> Dict[str, Any]:
-    """Fetch JSON data by navigating to URL with Playwright."""
+async def _fetch_json_with_page(self, page: Page, url: str) -> Dict[str, Any]:
+    """Fetch JSON using a specific page from pool."""
     try:
-        # Navigate to API URL directly
-        response = await self._page.goto(url, wait_until="domcontentloaded", timeout=15000)
+        response = await page.goto(url, wait_until="domcontentloaded", timeout=15000)
         
-        if not response:
-            return {}
-            
-        if response.status != 200:
-            self.logger.debug(f"[Stake] Status {response.status} para {url}")
+        if not response or response.status != 200:
             return {}
         
-        # Wait a bit for content
-        await self._page.wait_for_timeout(500)
-        
-        # Extract JSON from page body (API returns raw JSON)
-        content = await self._page.evaluate("() => document.body.innerText")
+        await page.wait_for_timeout(200)
+        content = await page.evaluate("() => document.body.innerText")
         
         if content:
             return json.loads(content)
-        
         return {}
         
-    except json.JSONDecodeError as e:
-        self.logger.debug(f"[Stake] JSON invalido em {url}")
+    except Exception:
         return {}
-    except Exception as e:
-        self.logger.debug(f"[Stake] Erro ao buscar {url}: {e}")
-        return {}
+
+async def _fetch_parallel(self, urls: List[str]) -> List[Dict[str, Any]]:
+    """Fetch multiple URLs in parallel using page pool."""
+    if not urls:
+        return []
+    
+    results = [None] * len(urls)
+    
+    async def fetch_one(idx: int, url: str):
+        async with self._pool_semaphore:
+            page = self._page_pool[idx % self._pool_size]
+            results[idx] = await self._fetch_json_with_page(page, url)
+    
+    await asyncio.gather(*[fetch_one(i, url) for i, url in enumerate(urls)])
+    return results
 ```
+
+### 5. Otimizar _fetch_all_pa_odds para Usar Paralelismo
+
+```python
+async def _fetch_all_pa_odds(self, event_ids: List[str]) -> Dict[str, Dict[int, float]]:
+    """Fetch PA odds for all events in parallel."""
+    if not event_ids:
+        return {}
+    
+    # Construir URLs
+    urls = [f"{self.API_BASE}/events/{eid}/odds" for eid in event_ids]
+    
+    # Buscar em paralelo
+    responses = await self._fetch_parallel(urls)
+    
+    # Processar resultados
+    results = {}
+    for event_id, data in zip(event_ids, responses):
+        if not data:
+            continue
+        
+        odds_map = {}
+        for odd in data.get("odds", []):
+            if odd.get("marketId") != self.MARKET_PA:
+                continue
+            
+            column_id = odd.get("columnId")
+            odd_values = odd.get("oddValues") or {}
+            odd_value = odd_values.get("decimal") if isinstance(odd_values, dict) else None
+            
+            if column_id is not None and odd_value:
+                odds_map[column_id] = float(odd_value)
+        
+        if odds_map:
+            results[event_id] = odds_map
+    
+    return results
+```
+
+### 6. Remover setup() de scrape_all()
+
+```python
+async def scrape_all(self) -> List[ScrapedOdds]:
+    """Scrape all leagues for both sports using Playwright."""
+    all_odds = []
+    # REMOVIDO: await self.setup() - run_scraper.py ja faz isso
+    
+    try:
+        # Football (SO + PA)
+        for league_id, config in self.FOOTBALL_LEAGUES.items():
+            try:
+                odds = await self._scrape_football(config)
+                all_odds.extend(odds)
+            except Exception as e:
+                self.logger.error(f"[Stake] Erro na liga {config['name']}: {e}")
+        
+        # Basketball (Moneyline)
+        for league_id, config in self.BASKETBALL_LEAGUES.items():
+            try:
+                odds = await self._scrape_basketball(config)
+                all_odds.extend(odds)
+            except Exception as e:
+                self.logger.error(f"[Stake] Erro na liga {config['name']}: {e}")
+                
+    except Exception as e:
+        self.logger.error(f"[Stake] Erro geral: {e}")
+        raise
+    
+    # REMOVIDO: finally teardown() - run_scraper.py gerencia o ciclo de vida
+    
+    self.logger.info(f"[Stake] Total: {len(all_odds)} odds coletadas")
+    return all_odds
+```
+
+### 7. Atualizar teardown() para Limpar Pool
+
+```python
+async def teardown(self):
+    """Close Playwright browser and page pool safely."""
+    # Fechar pool de paginas
+    for page in self._page_pool:
+        try:
+            await page.close()
+        except Exception:
+            pass
+    self._page_pool = []
+    self._pool_semaphore = None
+    
+    # Fechar pagina principal
+    try:
+        if self._page:
+            await self._page.close()
+    except Exception:
+        pass
+    self._page = None
+    
+    # Fechar context, browser, playwright
+    try:
+        if self._context:
+            await self._context.close()
+    except Exception:
+        pass
+    self._context = None
+    
+    try:
+        if self._browser:
+            await self._browser.close()
+    except Exception:
+        pass
+    self._browser = None
+    
+    try:
+        if self._playwright:
+            await self._playwright.stop()
+    except Exception:
+        pass
+    self._playwright = None
+    
+    self.logger.info("[Stake] Recursos liberados")
+```
+
+---
+
+## Impacto na Performance
+
+| Metrica | Antes (Sequencial) | Depois (10 Paralelas) |
+|---------|--------------------|-----------------------|
+| Requisicoes PA por liga | ~500ms x N eventos | ~500ms total (paralelo) |
+| Tempo por liga (10 eventos) | ~5s | ~0.5s |
+| Tempo total (14 ligas) | ~70s | ~7-10s |
+| Uso de memoria | ~150MB | ~250MB (+100MB) |
 
 ---
 
 ## Resumo das Mudancas
 
-| Componente | Antes | Depois |
-|------------|-------|--------|
-| Biblioteca HTTP | httpx | Playwright page.goto() |
-| Tipo de requisicao | XHR/fetch (bloqueado) | Navigate (funciona) |
-| User-Agent | Chrome | Firefox |
-| Cookies | Tentava capturar | Nao precisa |
-| Complexidade | Alta | Baixa |
-
----
-
-## Performance
-
-| Metrica | httpx | Playwright goto |
-|---------|-------|-----------------|
-| Tempo por requisicao | ~100ms | ~500ms |
-| Requisicoes paralelas | Sim | Nao (sequencial) |
-| Funciona | Nao (403) | Sim |
-
-A desvantagem e que sera mais lento (sequencial), mas pelo menos funciona!
-
----
-
-## Otimizacao Futura
-
-Se a velocidade for problema, podemos criar multiplas paginas (tabs) para fazer requisicoes em paralelo:
-
-```python
-# Criar 5 paginas para requisicoes paralelas
-pages = [await self._context.new_page() for _ in range(5)]
-```
-
-Mas isso pode ser feito depois de confirmar que a abordagem basica funciona.
+1. **Guard no setup()**: Evita reinicializacao duplicada
+2. **Pool de 10 paginas**: Permite ate 10 requisicoes simultaneas
+3. **_fetch_parallel()**: Novo metodo para distribuir URLs entre paginas
+4. **Remover setup/teardown de scrape_all()**: `run_scraper.py` gerencia o ciclo de vida
+5. **Manter browser aberto**: Entre ciclos, so reinicia se houver erro
