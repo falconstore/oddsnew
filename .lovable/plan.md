@@ -1,189 +1,173 @@
 
+# Plano: Corrigir Scrapers Betano e McGames
 
-# Plano: Resolver Conflito de Processos PM2 no Stake Scraper
+## Diagnostico
 
-## Problema Identificado
-
-O PM2 esta reiniciando o processo enquanto o ciclo anterior ainda esta em execucao:
-
-```text
-┌────────────────────────────────────────────────────────────────┐
-│                    CONFLITO DE PROCESSOS                       │
-├────────────────────────────────────────────────────────────────┤
-│                                                                │
-│  Processo 1 (antigo)        Processo 2 (PM2 restart)           │
-│  21:01:43 Sessao...         21:01:51 Starting...               │
-│  21:01:49 Browser pronto    21:02:00 Browser...                │
-│  21:02:12 Premier League    21:02:15 Sessao...                 │
-│  21:02:35 Serie A           21:02:31 Premier League            │
-│          ↓                           ↓                         │
-│    AMBOS RODANDO AO MESMO TEMPO = CONFLITO                     │
-│                                                                │
-└────────────────────────────────────────────────────────────────┘
+### Problema 1: Betano - Setup Duplicado
+Os logs mostram:
+```
+21:22:36 | Setting up betano scraper
+21:22:56 | Setting up betano scraper  <-- 2x seguidas!
+21:23:13 | Target page, context or browser has been closed
 ```
 
-O guard `if self._page is not None` funciona dentro do mesmo processo, mas o PM2 cria um processo novo que nao compartilha memoria.
+**Causa**: O `setup()` do Betano nao tem guard pattern. Quando `run_scraper.py` chama `setup()` e depois `scrape_all()` chama internamente, cria dois browsers e o primeiro e fechado/sobrescrito.
+
+### Problema 2: McGames - Token Nao Capturado
+Os logs mostram:
+```
+21:20:07 | [Mcgames] Starting Playwright to capture credentials...
+21:20:15 | Trying URL 1/2: serie-a/c-2942
+21:20:25 | Trying URL 2/2: /sports/futebol
+21:20:38 | FAILED: Could not capture token after all attempts
+```
+
+**Causa**: O site pode ter mudado a forma como expoe o token na API, ou as URLs de warmup nao estao mais gerando chamadas API com authorization header.
 
 ---
 
-## Causa Raiz
+## Solucao
 
-O `ecosystem.config.js` do PM2 pode estar configurado com:
-- `autorestart: true` sem tempo minimo entre restarts
-- `restart_delay` muito baixo
-- Nenhum `max_restarts` limitando loops de restart
+### Arquivo 1: `docs/scraper/scrapers/betano_scraper.py`
 
----
-
-## Solucao em Duas Partes
-
-### Parte 1: Ajustar PM2 (ecosystem.config.js)
-
-Adicionar configuracoes para evitar restarts em loop:
-
-```javascript
-{
-  name: 'scraper-stake',
-  script: 'standalone/run_scraper.py',
-  args: '--scraper stake --interval 30',
-  interpreter: '/root/Desktop/scraper/venv/bin/python',
-  
-  // NOVAS CONFIGURACOES
-  restart_delay: 10000,      // 10s entre restarts
-  max_restarts: 5,           // Max 5 restarts em 15 min
-  min_uptime: 30000,         // Processo precisa rodar 30s para ser "estavel"
-  kill_timeout: 30000,       // 30s para processo terminar gracefully
-  wait_ready: true,          // Aguardar sinal de ready (opcional)
-}
-```
-
-### Parte 2: Adicionar Signal Handler no run_scraper.py
-
-Tratar SIGTERM/SIGINT gracefully para evitar que o processo seja morto no meio de um ciclo:
+#### 1.1 Adicionar Guard no setup()
 
 ```python
-import signal
-
-# Global flag para shutdown graceful
-shutdown_requested = False
-
-def handle_signal(signum, frame):
-    global shutdown_requested
-    log.warning(f"Recebido sinal {signum}, aguardando fim do ciclo atual...")
-    shutdown_requested = True
-
-async def run_forever(scraper_name, interval, log):
-    global shutdown_requested
+async def setup(self):
+    """Initialize Playwright browser and capture session cookies."""
+    # GUARD: Evitar reinicializacao
+    if self._page is not None:
+        return
     
-    # Registrar handlers
-    signal.signal(signal.SIGTERM, handle_signal)
-    signal.signal(signal.SIGINT, handle_signal)
+    await super().setup()
     
-    # ... setup code ...
-    
-    while not shutdown_requested:
-        # ... ciclo de scraping ...
-        
-        if shutdown_requested:
-            log.info("Shutdown graceful solicitado, saindo...")
-            break
-        
-        await asyncio.sleep(interval)
-    
-    # Cleanup
-    await scraper.teardown()
-    log.info("Scraper finalizado gracefully")
-```
-
----
-
-## Mudancas no Arquivo
-
-### Arquivo: `docs/scraper/standalone/run_scraper.py`
-
-#### 1. Adicionar Import e Flag Global
-
-```python
-import signal
-
-# Global flag for graceful shutdown
-shutdown_requested = False
-
-def request_shutdown(signum, frame):
-    """Handle SIGTERM/SIGINT for graceful shutdown."""
-    global shutdown_requested
-    shutdown_requested = True
-```
-
-#### 2. Registrar Signal Handlers em main()
-
-```python
-async def main():
-    load_dotenv()
-    args = parse_args()
-    
-    log = setup_logging(args.scraper, args.debug)
-    
-    # Register signal handlers for graceful shutdown
-    signal.signal(signal.SIGTERM, request_shutdown)
-    signal.signal(signal.SIGINT, request_shutdown)
-    
+    self.logger.info("Setting up betano scraper")
     # ... resto do codigo
 ```
 
-#### 3. Modificar Loop Principal em run_forever()
+#### 1.2 Adicionar teardown() seguro no setup()
 
 ```python
-async def run_forever(scraper_name, interval, log):
-    global shutdown_requested
+async def setup(self):
+    """Initialize Playwright browser and capture session cookies."""
+    # GUARD: Evitar reinicializacao
+    if self._page is not None:
+        return
     
-    # ... setup code existente ...
+    await super().setup()
     
-    while not shutdown_requested:
-        # ... ciclo de scraping ...
-        
-        # Check shutdown before sleeping
-        if shutdown_requested:
-            log.info("Shutdown requested, exiting after current cycle...")
-            break
-        
-        await asyncio.sleep(interval)
+    self.logger.info("Setting up betano scraper")
     
-    # Graceful cleanup
-    log.info("Performing graceful shutdown...")
-    try:
-        await scraper.teardown()
-    except Exception as e:
-        log.warning(f"Error during teardown: {e}")
-    
-    log.info("Scraper stopped gracefully")
+    # Start Playwright and browser
+    self._playwright = await async_playwright().start()
+    # ... resto permanece igual
 ```
 
 ---
 
-### Arquivo: `docs/scraper/ecosystem.config.js`
+### Arquivo 2: `docs/scraper/scrapers/mcgames_scraper.py`
 
-Atualizar configuracao do PM2 para o stake:
+#### 2.1 Adicionar mais URLs de warmup (paginas que garantem chamadas API)
+
+```python
+WARMUP_URLS = [
+    "https://mcgames.bet.br/sports/futebol/italia/serie-a/c-2942",
+    "https://mcgames.bet.br/sports/futebol/inglaterra/premier-league/c-2936",
+    "https://mcgames.bet.br/sports/futebol",
+    "https://mcgames.bet.br/sports",  # URL mais generica
+]
+```
+
+#### 2.2 Aumentar scroll e tempo de espera
+
+```python
+# Dentro do loop de warmup
+try:
+    await page.goto(target_url, wait_until="domcontentloaded", timeout=20000)
+    await page.wait_for_timeout(3000)  # Mais tempo para carregar
+    
+    # Scrolls multiplos para forcar chamadas API
+    if not token_future.done():
+        await page.evaluate("window.scrollTo(0, 500)")
+        await page.wait_for_timeout(1500)
+    if not token_future.done():
+        await page.evaluate("window.scrollTo(0, 1500)")
+        await page.wait_for_timeout(1500)
+    if not token_future.done():
+        await page.evaluate("window.scrollTo(0, 0)")
+        await page.wait_for_timeout(1000)
+```
+
+#### 2.3 Capturar token de response tambem (fallback)
+
+```python
+async def handle_request(request):
+    if "biahosted.com/api" in request.url:
+        headers = request.headers
+        if "authorization" in headers:
+            token = headers["authorization"]
+            if not token_future.done():
+                token_future.set_result(token)
+                self.logger.info("[Mcgames] Token captured via request")
+
+async def handle_response(response):
+    # Fallback: tentar extrair de cookies ou headers de response
+    if "biahosted.com" in response.url and not token_future.done():
+        try:
+            headers = response.request.headers
+            if "authorization" in headers:
+                token_future.set_result(headers["authorization"])
+        except:
+            pass
+
+page.on("request", handle_request)
+page.on("response", handle_response)
+```
+
+---
+
+### Arquivo 3: `docs/scraper/ecosystem.config.js`
+
+#### 3.1 Ajustar configuracao do Betano (igual ao Stake)
 
 ```javascript
 {
-  name: 'scraper-stake',
+  name: 'scraper-betano',
   script: 'standalone/run_scraper.py',
-  args: '--scraper stake --interval 30',
-  interpreter: '/root/Desktop/scraper/venv/bin/python',
-  cwd: '/root/Desktop/scraper',
-  
-  // Prevenir restarts em loop
-  restart_delay: 10000,        // 10s entre restarts
-  max_restarts: 5,             // Max 5 restarts a cada 15 min
-  min_uptime: 30000,           // Precisa rodar 30s para ser estavel
-  
-  // Dar tempo para shutdown graceful
-  kill_timeout: 30000,         // 30s para terminar
-  
-  // Memoria
-  max_memory_restart: '400M',  // Aumentado para 10 paginas
-}
+  interpreter: 'python3',
+  args: '--scraper betano --interval 30',
+  cwd: __dirname,
+  max_memory_restart: '200M',   // Aumentar para Playwright
+  restart_delay: 10000,          // 10s entre restarts
+  max_restarts: 5,               // Menos restarts em loop
+  min_uptime: 30000,             // Precisa rodar 30s
+  kill_timeout: 30000,           // 30s para shutdown
+  autorestart: true,
+  env: {
+    PYTHONUNBUFFERED: '1'
+  }
+},
+```
+
+#### 3.2 Ajustar configuracao do McGames
+
+```javascript
+{
+  name: 'scraper-mcgames',
+  script: 'standalone/run_scraper.py',
+  interpreter: 'python3',
+  args: '--scraper mcgames --interval 30',
+  cwd: __dirname,
+  max_memory_restart: '200M',   // Aumentar para Playwright
+  restart_delay: 10000,
+  max_restarts: 5,
+  min_uptime: 30000,
+  kill_timeout: 30000,
+  autorestart: true,
+  env: {
+    PYTHONUNBUFFERED: '1'
+  }
+},
 ```
 
 ---
@@ -192,24 +176,33 @@ Atualizar configuracao do PM2 para o stake:
 
 ```text
 ┌────────────────────────────────────────────────────────────────┐
-│                    FLUXO CORRIGIDO                             │
+│                    BETANO CORRIGIDO                            │
 ├────────────────────────────────────────────────────────────────┤
 │                                                                │
-│  1. PM2 envia SIGTERM (restart ou stop)                        │
-│     └── Handler define shutdown_requested = True               │
+│  run_scraper.py: await scraper.setup()                         │
+│     └── setup() verifica: self._page is None? Sim → continua   │
+│     └── Cria browser, context, page                            │
+│     └── Navega para homepage, captura cookies                  │
+│     └── Cria aiohttp session                                   │
 │                                                                │
-│  2. Loop principal detecta flag                                │
-│     └── Nao inicia novo ciclo                                  │
-│     └── Aguarda ciclo atual terminar (se em andamento)         │
+│  run_scraper.py: await scraper.scrape_all()                    │
+│     └── (Se scrape_league chamar setup internamente)           │
+│     └── setup() verifica: self._page is None? Nao → return     │
+│     └── Scraping continua normalmente                          │
 │                                                                │
-│  3. Cleanup graceful                                           │
-│     └── Fecha pool de paginas                                  │
-│     └── Fecha browser                                          │
-│     └── Libera recursos                                        │
+└────────────────────────────────────────────────────────────────┘
+```
+
+```text
+┌────────────────────────────────────────────────────────────────┐
+│                    MCGAMES CORRIGIDO                           │
+├────────────────────────────────────────────────────────────────┤
 │                                                                │
-│  4. Processo termina limpo                                     │
-│     └── PM2 aguarda 10s (restart_delay)                        │
-│     └── Inicia novo processo                                   │
+│  1. Mais URLs de warmup (4 em vez de 2)                        │
+│  2. Mais tempo de espera (3s em vez de 2s)                     │
+│  3. Multiplos scrolls para forcar chamadas API                 │
+│  4. Fallback: capturar token de response tambem                │
+│  5. PM2 com restart_delay maior (10s)                          │
 │                                                                │
 └────────────────────────────────────────────────────────────────┘
 ```
@@ -220,19 +213,17 @@ Atualizar configuracao do PM2 para o stake:
 
 | Arquivo | Mudanca |
 |---------|---------|
-| `run_scraper.py` | Adicionar signal handler para SIGTERM/SIGINT |
-| `run_scraper.py` | Usar flag `shutdown_requested` no loop |
-| `run_scraper.py` | Fazer teardown graceful antes de sair |
-| `ecosystem.config.js` | Adicionar `restart_delay: 10000` |
-| `ecosystem.config.js` | Adicionar `kill_timeout: 30000` |
-| `ecosystem.config.js` | Aumentar `max_memory_restart` para 400M |
+| `betano_scraper.py` | Guard `if self._page is not None: return` no setup() |
+| `mcgames_scraper.py` | Mais URLs warmup (4 URLs) |
+| `mcgames_scraper.py` | Scrolls multiplos para forcar API |
+| `mcgames_scraper.py` | Tempo de espera maior (3s) |
+| `ecosystem.config.js` | Betano: restart_delay=10s, kill_timeout=30s |
+| `ecosystem.config.js` | McGames: restart_delay=10s, kill_timeout=30s |
 
 ---
 
-## Beneficios
+## Notas Tecnicas
 
-1. **Sem conflito de processos**: Novo processo so inicia apos o antigo terminar
-2. **Shutdown graceful**: Browser fecha corretamente, sem erros de "Target closed"
-3. **Recursos liberados**: Memoria e processos chromium sao limpos
-4. **Logs claros**: Sabe exatamente quando e por que o processo parou
-
+1. **Guard Pattern**: Essencial para scrapers Playwright que sao chamados multiplas vezes
+2. **Token McGames**: O Altenar API exige um token JWT que e gerado pelo frontend. Se o token continuar falhando, pode ser necessario usar uma abordagem diferente (ex: autenticacao explicita)
+3. **Memoria**: Aumentar para 200M porque Playwright consome mais recursos
