@@ -29,7 +29,7 @@ class BetanoScraper(BaseScraper):
     """
     
     # League configurations with Betano IDs
-    LEAGUES = {
+     LEAGUES = {
         "premier_league": {
             "id": "1",
             "name": "Premier League",
@@ -83,6 +83,42 @@ class BetanoScraper(BaseScraper):
             "name": "Copa do Rei",
             "country": "Espanha",
             "url_path": "/sport/futebol/espanha/copa-do-rei/10067/"
+        },
+     "copa_do_rei": {
+            "id": "10067",
+            "name": "Copa do Rei",
+            "country": "Espanha",
+            "url_path": "/sport/futebol/espanha/copa-do-rei/10067/"
+        },
+     "champions_league": {
+            "id": "182748",
+            "name": "Champions League",
+            "country": "Europa",
+            "url_path": "/sport/futebol/competicoes/liga-dos-campeoes/188566/"
+        },
+    "liga_europa": {
+            "id": "182761",
+            "name": "Liga Europa",
+            "country": "Europa",
+            "url_path": "/sport/futebol/competicoes/liga-europa/188567/"
+        },
+    "liga_da_conferencia": {
+            "id": "196755",
+            "name": "Liga da Confeferencia",
+            "country": "Europa",
+            "url_path": "/sport/futebol/competicoes/liga-conferencia/189602/"
+        },
+    "eredivisie": {
+            "id": "17067",
+            "name": "Eredivisie",
+            "country": "Holanda",
+            "url_path": "/sport/futebol/paises-baixos/eredivisie/17067/"
+        },
+    "Brasileirao_serie_a": {
+            "id": "10016",
+            "name": "Brasileirao Serie A",
+            "country": "Brasil",
+            "url_path": "/sport/futebol/brasil/brasileirao-serie-a-betano/10016/"
         },
     }
     
