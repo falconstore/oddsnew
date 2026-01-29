@@ -41,6 +41,7 @@ class StakeScraper(BaseScraper):
         "liga_europa": {"tournament_id": "2000051195", "name": "Liga Europa", "country": "Europa"},
         "liga_da_conferencia": {"tournament_id": "2000130522", "name": "Liga da Conferencia", "country": "Europa"},
         "eredivisie": {"tournament_id": "1000094980", "name": "Eredivisie", "country": "Holanda"},
+        "brasileirao_serie_a": {"tournament_id": "1000094569", "name": "Brasileirão Série A", "country": "Brasil"},
     }
     
     # Basketball Leagues
