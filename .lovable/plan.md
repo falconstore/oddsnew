@@ -1,139 +1,77 @@
 
-# Plano de Emergência: Estabilizar VPS
+
+# Plano: Reverter Alterações Problemáticas
 
 ## Diagnóstico
 
-A imagem mostra uma situação crítica:
-- **8 scrapers em "waiting restart"** com 0 MB (crashando em loop)
-- **5 scrapers com CPU 25-31%** (possíveis processos travados)
-- Total: ~750 MB de memória e CPU muito alta
+Após análise do código, identifiquei que as mudanças que fiz no McGames estão causando a sobrecarga:
 
-### Causa Raiz
-Os scrapers Playwright (Stake, Betano, McGames) estão entrando em ciclos de crash/restart que:
-1. Iniciam um browser Chromium (~50-100MB cada)
-2. Crasham antes de completar o ciclo
-3. PM2 reinicia imediatamente
-4. Repete infinitamente, consumindo recursos
+### Problema no McGames
+
+**Antes (funcional):**
+- 2 URLs de warmup
+- 1 scroll por URL
+- ~3.5s por URL = **~7s total**
+
+**Depois da minha alteração (problemático):**
+- 4 URLs de warmup
+- 3 scrolls por URL com waits longos
+- ~7s+ por URL = **~28s+ total**
+
+O setup está demorando quase o mesmo tempo que o intervalo de 30s, causando overlap de processos.
+
+### Problema no Betano
+
+O guard que adicionei está OK, mas o scraper continua tendo problemas de "Target page closed" porque a sessão aiohttp não está sendo limpa corretamente quando há erros.
 
 ---
 
-## Solução Imediata (3 Partes)
+## Solução
 
-### Parte 1: Aumentar restart_delay para TODOS os scrapers problemáticos
+### Arquivo 1: `docs/scraper/scrapers/mcgames_scraper.py`
 
-Aumentar o tempo entre restarts para **30 segundos** em vez de 3-10s. Isso dá tempo para recursos serem liberados.
+Reverter para configuração mais leve (igual ao Br4bet funcional):
 
-**Arquivo: `docs/scraper/ecosystem.config.js`**
-
-Scrapers que precisam de ajuste:
-- scraper-betano: `restart_delay: 30000`
-- scraper-stake: `restart_delay: 30000`
-- scraper-mcgames: `restart_delay: 30000`
-- scraper-bet365: `restart_delay: 30000`
-- scraper-betbra: `restart_delay: 30000`
-- Todos os scrapers NBA: `restart_delay: 30000`
-
-### Parte 2: Adicionar exp_backoff_restart_delay
-
-PM2 suporta backoff exponencial - se o processo crashar várias vezes seguidas, o delay aumenta automaticamente.
-
-```javascript
-{
-  name: "scraper-stake",
-  // ...
-  exp_backoff_restart_delay: 1000,  // Começa em 1s, dobra a cada crash (até 15min)
-  restart_delay: 30000,             // Delay mínimo
-  max_restarts: 3,                  // Máximo 3 restarts por janela de tempo
-  min_uptime: 60000,                // Precisa rodar 60s para resetar contador
-}
-```
-
-### Parte 3: Reduzir pool de páginas do Stake
-
-O pool de 10 páginas está consumindo muita memória. Reduzir para 5.
-
-**Arquivo: `docs/scraper/scrapers/stake_scraper.py`**
+**Mudanças:**
+1. Reduzir WARMUP_URLS de 4 para 2
+2. Reduzir timeout de 20s para 15s
+3. Reduzir wait_for_timeout de 3s para 2s
+4. Manter apenas 1 scroll em vez de 3
+5. Remover handler de response (desnecessário)
 
 ```python
-def __init__(self):
-    # ...
-    self._pool_size = 5  # Reduzido de 10 para 5
+# WARMUP_URLS reduzido
+WARMUP_URLS = [
+    "https://mcgames.bet.br/sports/futebol/italia/serie-a/c-2942",
+    "https://mcgames.bet.br/sports/futebol",
+]
+
+# No loop de warmup (mais enxuto)
+await page.goto(target_url, wait_until="domcontentloaded", timeout=15000)
+await page.wait_for_timeout(2000)
+
+# Single scroll
+if not token_future.done():
+    await page.evaluate("window.scrollTo(0, 1000)")
+    await page.wait_for_timeout(1500)
 ```
 
----
+### Arquivo 2: `docs/scraper/scrapers/betano_scraper.py`
 
-## Mudanças nos Arquivos
-
-### 1. `docs/scraper/ecosystem.config.js`
-
-Aplicar configurações de estabilidade para TODOS os scrapers:
-
-```javascript
-// Configuração padrão para scrapers HTTPX (leves)
-{
-  restart_delay: 10000,
-  max_restarts: 10,
-  min_uptime: 30000,
-  exp_backoff_restart_delay: 1000,
-}
-
-// Configuração para scrapers Playwright (pesados)
-{
-  restart_delay: 30000,
-  max_restarts: 3,
-  min_uptime: 60000,
-  kill_timeout: 30000,
-  exp_backoff_restart_delay: 2000,
-}
-```
-
-Scrapers que usam Playwright:
-- scraper-betano
-- scraper-stake
-- scraper-mcgames
-- scraper-bet365
-- scraper-betbra
-- scraper-betano-nba
-- scraper-betbra-nba
-
-### 2. `docs/scraper/scrapers/stake_scraper.py`
-
-Reduzir pool de páginas:
+Manter o guard pattern (está correto), mas melhorar o tratamento de erro para limpar a sessão aiohttp:
 
 ```python
-self._pool_size = 5  # Reduzido de 10 para 5 (linha 64)
-```
-
----
-
-## Ação Imediata na VPS (Executar Manualmente)
-
-Antes de aplicar as mudanças no código, execute na VPS:
-
-```bash
-# 1. Parar TODOS os scrapers problemáticos
-pm2 stop scraper-stake scraper-betano scraper-mcgames scraper-bet365 scraper-betbra
-
-# 2. Parar scrapers NBA também
-pm2 stop scraper-betano-nba scraper-betbra-nba scraper-mcgames-nba
-
-# 3. Verificar se processos chromium órfãos existem
-pkill -f chromium || true
-
-# 4. Aguardar 30s para memória ser liberada
-sleep 30
-
-# 5. Verificar uso de memória
-free -m
-
-# 6. Reiniciar apenas scrapers HTTPX primeiro
-pm2 restart scraper-superbet scraper-novibet scraper-kto scraper-estrelabet
-
-# 7. Se memória estiver OK, reiniciar Playwright um por vez
-pm2 restart scraper-stake
-# Aguardar 1 minuto e verificar se estabilizou
-pm2 restart scraper-betano
-# Aguardar 1 minuto e verificar
+async def teardown(self):
+    """Close browser and aiohttp session."""
+    # Fechar aiohttp session primeiro (com proteção)
+    if self._session:
+        try:
+            await self._session.close()
+        except Exception:
+            pass
+        self._session = None
+    
+    # ... resto do código
 ```
 
 ---
@@ -142,17 +80,43 @@ pm2 restart scraper-betano
 
 | Arquivo | Mudança |
 |---------|---------|
-| ecosystem.config.js | restart_delay: 30s para scrapers Playwright |
-| ecosystem.config.js | exp_backoff_restart_delay: 2000 para todos |
-| ecosystem.config.js | max_restarts: 3 para scrapers Playwright |
-| ecosystem.config.js | min_uptime: 60s para scrapers Playwright |
-| stake_scraper.py | Pool reduzido de 10 para 5 páginas |
+| mcgames_scraper.py | Reduzir WARMUP_URLS de 4 para 2 |
+| mcgames_scraper.py | Reduzir timeout de 20s para 15s |
+| mcgames_scraper.py | Reduzir wait de 3s para 2s |
+| mcgames_scraper.py | Usar 1 scroll em vez de 3 |
+| mcgames_scraper.py | Remover handler de response |
+| betano_scraper.py | Adicionar try/except no close da session |
+
+---
+
+## Comandos para Executar na VPS
+
+Após as mudanças serem aplicadas:
+
+```bash
+# 1. Parar scrapers problemáticos
+pm2 stop scraper-mcgames scraper-betano
+
+# 2. Matar processos chromium órfãos
+pkill -f chromium || true
+
+# 3. Atualizar código
+cd ~/Desktop/scraper && git pull
+
+# 4. Aguardar 30s
+sleep 30
+
+# 5. Reiniciar um por vez
+pm2 restart scraper-mcgames
+sleep 60
+pm2 restart scraper-betano
+```
 
 ---
 
 ## Benefícios
 
-1. **Menos restarts em loop**: Delay de 30s + backoff exponencial
-2. **Menos memória**: Pool de 5 páginas em vez de 10
-3. **Recuperação automática**: PM2 para de reiniciar após 3 falhas
-4. **Limpeza de recursos**: kill_timeout de 30s garante cleanup
+1. **Setup mais rápido**: ~7s em vez de ~28s
+2. **Menos overlap**: Tempo entre ciclos respeitado
+3. **Menos carga na VPS**: Menos scrolls = menos chamadas API desnecessárias
+
