@@ -16,7 +16,7 @@ import asyncio
 import argparse
 import sys
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 
 # Adicionar parent directory ao path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -128,6 +128,7 @@ async def run_forever(scraper_name: str, interval: int, log: logger):
     """Loop infinito para um único scraper."""
     from shared_resources import get_shared_resources
     from normalizer import OddsNormalizer
+    from supabase_client import SupabaseClient
     
     log.info(f"Starting standalone scraper: {scraper_name}")
     log.info(f"Interval: {interval}s")
@@ -135,6 +136,11 @@ async def run_forever(scraper_name: str, interval: int, log: logger):
     # Inicializar recursos compartilhados
     resources = await get_shared_resources()
     normalizer = OddsNormalizer(resources)
+    supabase = SupabaseClient()
+    
+    # Obter bookmaker_id para o scraper (se disponível)
+    bookmaker_name = scraper_name.replace("_nba", "").replace("-nba", "")
+    bookmaker_id = await supabase.get_bookmaker_id(bookmaker_name)
     
     # Criar instância do scraper
     scraper_class = get_scraper_class(scraper_name)
@@ -147,7 +153,10 @@ async def run_forever(scraper_name: str, interval: int, log: logger):
     
     while True:
         cycle_count += 1
-        start_time = datetime.utcnow()
+        start_time = datetime.now(timezone.utc)
+        error_message = None
+        odds_collected = 0
+        odds_inserted = 0
         
         try:
             # Limpar cache de logs não matcheados
@@ -159,33 +168,54 @@ async def run_forever(scraper_name: str, interval: int, log: logger):
             
             # Executar scraping
             odds = await scraper.scrape_all()
+            odds_collected = len(odds) if odds else 0
             
             if odds:
                 # Normalizar e inserir
                 football, nba = await normalizer.normalize_and_insert(odds)
+                odds_inserted = football + nba
                 
                 log.info(
                     f"[Cycle {cycle_count}] "
-                    f"Collected: {len(odds)}, "
+                    f"Collected: {odds_collected}, "
                     f"Football: {football}, NBA: {nba}, "
-                    f"Duration: {(datetime.utcnow() - start_time).total_seconds():.1f}s"
+                    f"Duration: {(datetime.now(timezone.utc) - start_time).total_seconds():.1f}s"
                 )
             else:
                 log.warning(f"[Cycle {cycle_count}] No odds collected")
                 
         except Exception as e:
+            error_message = str(e)[:500]  # Limitar tamanho do erro
             log.error(f"[Cycle {cycle_count}] Error: {e}")
             
             # Se for erro crítico do browser, tentar reiniciar
-            if "Target page" in str(e) or "Connection closed" in str(e):
-                log.warning("Attempting to restart scraper...")
+            if any(x in str(e) for x in ["Target page", "Connection closed", "TargetClosedError", "CancelledError"]):
+                log.warning("Browser crashed, attempting to restart scraper...")
                 try:
-                    await scraper.teardown()
-                    await asyncio.sleep(3)
+                    # Teardown seguro
+                    try:
+                        await scraper.teardown()
+                    except Exception:
+                        pass
+                    await asyncio.sleep(5)
                     await scraper.setup()
                     log.info("Scraper restarted successfully")
                 except Exception as restart_error:
                     log.error(f"Failed to restart: {restart_error}")
+                    error_message = f"Restart failed: {restart_error}"
+        
+        # Enviar heartbeat independente do resultado
+        try:
+            await supabase.upsert_scraper_status(
+                scraper_name=scraper_name,
+                bookmaker_id=bookmaker_id,
+                odds_collected=odds_collected,
+                odds_inserted=odds_inserted,
+                cycle_count=cycle_count,
+                error=error_message
+            )
+        except Exception as hb_error:
+            log.warning(f"Failed to send heartbeat: {hb_error}")
         
         await asyncio.sleep(interval)
 
