@@ -61,7 +61,7 @@ class StakeScraper(BaseScraper):
         # Page pool for parallel requests
         self._page_pool: List[Page] = []
         self._pool_semaphore: Optional[asyncio.Semaphore] = None
-        self._pool_size = 10
+        self._pool_size = 5  # Reduzido de 10 para 5 (menos memoria)
         self.logger = logger.bind(component="stake")
     
     async def setup(self):
@@ -239,7 +239,9 @@ class StakeScraper(BaseScraper):
     async def scrape_all(self) -> List[ScrapedOdds]:
         """Scrape all leagues for both sports using Playwright page pool."""
         all_odds = []
-        # NOTE: setup() is called by run_scraper.py, guard pattern prevents double init
+        
+        # Setup controlado pelo proprio scraper (guard pattern no setup evita dupla inicializacao)
+        await self.setup()
         
         try:
             # Football (SO + PA)
@@ -261,8 +263,9 @@ class StakeScraper(BaseScraper):
         except Exception as e:
             self.logger.error(f"[Stake] Erro geral: {e}")
             raise
-        
-        # NOTE: teardown() is managed by run_scraper.py, browser stays open between cycles
+        finally:
+            # Teardown ao final de cada ciclo para liberar recursos
+            await self.teardown()
         
         self.logger.info(f"[Stake] Total: {len(all_odds)} odds coletadas")
         return all_odds
