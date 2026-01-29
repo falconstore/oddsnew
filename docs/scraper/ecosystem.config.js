@@ -27,9 +27,11 @@ module.exports = {
       interpreter: 'python3',
       args: '--scraper betano --interval 30',
       cwd: __dirname,
-      max_memory_restart: '100M',
-      restart_delay: 3000,
-      max_restarts: 50,
+      max_memory_restart: '200M',
+      restart_delay: 10000,
+      max_restarts: 5,
+      min_uptime: 30000,
+      kill_timeout: 30000,
       autorestart: true,
       env: {
         PYTHONUNBUFFERED: '1'
@@ -155,9 +157,11 @@ module.exports = {
       interpreter: 'python3',
       args: '--scraper mcgames --interval 30',
       cwd: __dirname,
-      max_memory_restart: '100M',
-      restart_delay: 3000,
-      max_restarts: 50,
+      max_memory_restart: '200M',
+      restart_delay: 10000,
+      max_restarts: 5,
+      min_uptime: 30000,
+      kill_timeout: 30000,
       autorestart: true,
       env: {
         PYTHONUNBUFFERED: '1'

@@ -100,9 +100,13 @@ class BetanoScraper(BaseScraper):
     
     async def setup(self):
         """Initialize Playwright browser and capture session cookies."""
+        # GUARD: Prevent duplicate initialization
+        if self._page is not None:
+            return
+        
         await super().setup()
         
-        self.logger.debug("Initializing Playwright browser...")
+        self.logger.info("Setting up betano scraper")
         
         # Start Playwright and browser
         self._playwright = await async_playwright().start()
