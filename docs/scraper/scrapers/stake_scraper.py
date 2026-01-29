@@ -1,10 +1,10 @@
 """
 Stake Unified Scraper - Football (SO + PA) and Basketball (Moneyline).
-Uses Playwright to capture cookies, then httpx for API requests.
+Uses Playwright for all requests (navigation mode bypasses API blocks).
 """
 
 import asyncio
-import httpx
+import json
 from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
 from loguru import logger
@@ -17,6 +17,8 @@ class StakeScraper(BaseScraper):
     Unified scraper for Stake.bet.br - Football and Basketball.
     Football: Super Odds (batch) + Pagamento Antecipado (individual requests)
     Basketball: Moneyline (individual requests)
+    
+    All API requests are made via Playwright page.goto() to bypass 403 blocks.
     """
     
     API_BASE = "https://sbweb.stake.bet.br/api/v1/br/pt-br"
@@ -56,13 +58,10 @@ class StakeScraper(BaseScraper):
         self._browser: Optional[Browser] = None
         self._context: Optional[BrowserContext] = None
         self._page: Optional[Page] = None
-        # HTTP client
-        self.client: Optional[httpx.AsyncClient] = None
-        self._cookies: Dict[str, str] = {}
         self.logger = logger.bind(component="stake")
     
     async def setup(self):
-        """Initialize Playwright browser and capture session cookies."""
+        """Initialize Playwright browser for API requests."""
         self.logger.info("[Stake] Iniciando browser Playwright...")
         
         # Start Playwright
@@ -76,9 +75,9 @@ class StakeScraper(BaseScraper):
             ]
         )
         
-        # Create browser context
+        # Create browser context with Firefox user-agent (works better)
         self._context = await self._browser.new_context(
-            user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+            user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:147.0) Gecko/20100101 Firefox/147.0",
             locale="pt-BR",
             timezone_id="America/Sao_Paulo",
             viewport={"width": 1920, "height": 1080},
@@ -86,41 +85,18 @@ class StakeScraper(BaseScraper):
         
         self._page = await self._context.new_page()
         
-        # Navigate to site to get valid cookies
-        self.logger.info("[Stake] Navegando para capturar cookies...")
+        # Navigate to site first to establish session
+        self.logger.info("[Stake] Estabelecendo sessao...")
         try:
             await self._page.goto("https://stake.bet.br/pt-br/sports/", wait_until="domcontentloaded", timeout=30000)
-            await self._page.wait_for_timeout(3000)  # Wait for anti-bot JS
+            await self._page.wait_for_timeout(2000)
         except Exception as e:
             self.logger.warning(f"[Stake] Aviso no carregamento inicial: {e}")
         
-        # Capture cookies
-        cookies = await self._context.cookies()
-        self._cookies = {c["name"]: c["value"] for c in cookies}
-        self.logger.info(f"[Stake] Capturados {len(self._cookies)} cookies")
-        
-        # Create httpx client with captured cookies
-        cookie_header = "; ".join([f"{k}={v}" for k, v in self._cookies.items()])
-        
-        self.client = httpx.AsyncClient(
-            timeout=30.0,
-            headers={
-                "Accept": "application/json",
-                "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
-                "Referer": "https://stake.bet.br/",
-                "Origin": "https://stake.bet.br",
-                "Cookie": cookie_header,
-                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-            }
-        )
+        self.logger.info("[Stake] Browser pronto")
     
     async def teardown(self):
-        """Close HTTP client and Playwright browser safely."""
-        # Close httpx
-        if self.client:
-            await self.client.aclose()
-        self.client = None
-        
+        """Close Playwright browser safely."""
         # Close Playwright components safely
         try:
             if self._page:
@@ -150,8 +126,38 @@ class StakeScraper(BaseScraper):
             pass
         self._playwright = None
         
-        self._cookies = {}
         self.logger.info("[Stake] Recursos liberados")
+
+    async def _fetch_json(self, url: str) -> Dict[str, Any]:
+        """Fetch JSON data by navigating to URL with Playwright."""
+        try:
+            # Navigate to API URL directly (navigation mode bypasses 403)
+            response = await self._page.goto(url, wait_until="domcontentloaded", timeout=15000)
+            
+            if not response:
+                return {}
+                
+            if response.status != 200:
+                self.logger.debug(f"[Stake] Status {response.status} para {url}")
+                return {}
+            
+            # Wait a bit for content to load
+            await self._page.wait_for_timeout(300)
+            
+            # Extract JSON from page body (API returns raw JSON)
+            content = await self._page.evaluate("() => document.body.innerText")
+            
+            if content:
+                return json.loads(content)
+            
+            return {}
+            
+        except json.JSONDecodeError:
+            self.logger.debug(f"[Stake] JSON invalido em {url}")
+            return {}
+        except Exception as e:
+            self.logger.debug(f"[Stake] Erro ao buscar {url}: {e}")
+            return {}
 
     async def get_available_leagues(self) -> List[LeagueConfig]:
         """Return list of configured leagues (football + basketball)."""
@@ -173,7 +179,7 @@ class StakeScraper(BaseScraper):
         return leagues
     
     async def scrape_all(self) -> List[ScrapedOdds]:
-        """Scrape all leagues for both sports using a single HTTP session."""
+        """Scrape all leagues for both sports using Playwright."""
         all_odds = []
         await self.setup()
         
@@ -202,7 +208,7 @@ class StakeScraper(BaseScraper):
     
     async def scrape_league(self, league: LeagueConfig) -> List[ScrapedOdds]:
         """Legacy method for compatibility with base scraper."""
-        if not self.client:
+        if not self._page:
             await self.setup()
         
         # Check if it's a basketball league
@@ -298,91 +304,66 @@ class StakeScraper(BaseScraper):
         return results
 
     async def _fetch_events(self, tournament_id: str) -> List[Dict[str, Any]]:
-        """Fetch upcoming events for a tournament."""
+        """Fetch upcoming events for a tournament via Playwright navigation."""
         url = f"{self.API_BASE}/tournament/{tournament_id}/live-upcoming"
+        data = await self._fetch_json(url)
         
-        try:
-            response = await self.client.get(url)
-            response.raise_for_status()
-            data = response.json()
-            events = data.get("events", [])
-            return [e for e in events if not e.get("isLive", False)]
-        except Exception as e:
-            self.logger.error(f"[Stake] Erro ao buscar eventos: {e}")
-            return []
+        events = data.get("events", [])
+        return [e for e in events if not e.get("isLive", False)]
     
     async def _fetch_so_odds(self, event_ids: List[str]) -> Dict[str, Any]:
         """Fetch Super Odds for multiple events (batch request)."""
         if not event_ids:
             return {}
         
-        try:
-            ids_param = ",".join(event_ids)
-            url = f"{self.API_BASE}/events/odds?events={ids_param}"
-            response = await self.client.get(url)
-            response.raise_for_status()
-            return response.json()
-        except Exception as e:
-            self.logger.debug(f"[Stake] Erro ao buscar SO odds: {e}")
-            return {}
+        ids_param = ",".join(event_ids)
+        url = f"{self.API_BASE}/events/odds?events={ids_param}"
+        return await self._fetch_json(url)
     
     async def _fetch_pa_odds(self, event_id: str) -> Dict[int, float]:
         """Fetch PA odds for a single event."""
-        try:
-            url = f"{self.API_BASE}/events/{event_id}/odds"
-            response = await self.client.get(url)
-            response.raise_for_status()
-            data = response.json()
-            
-            odds_map = {}
-            odds_list = data.get("odds", [])
-            
-            for odd in odds_list:
-                market_id = odd.get("marketId", "")
-                if market_id != self.MARKET_PA:
-                    continue
-                
-                column_id = odd.get("columnId")
-                odd_values = odd.get("oddValues") or {}
-                odd_value = odd_values.get("decimal") if isinstance(odd_values, dict) else None
-                
-                if column_id is not None and odd_value:
-                    odds_map[column_id] = float(odd_value)
-            
-            return odds_map
-        except Exception as e:
-            self.logger.debug(f"[Stake] Erro ao buscar PA odds para {event_id}: {e}")
+        url = f"{self.API_BASE}/events/{event_id}/odds"
+        data = await self._fetch_json(url)
+        
+        if not data:
             return {}
+        
+        odds_map = {}
+        odds_list = data.get("odds", [])
+        
+        for odd in odds_list:
+            market_id = odd.get("marketId", "")
+            if market_id != self.MARKET_PA:
+                continue
+            
+            column_id = odd.get("columnId")
+            odd_values = odd.get("oddValues") or {}
+            odd_value = odd_values.get("decimal") if isinstance(odd_values, dict) else None
+            
+            if column_id is not None and odd_value:
+                odds_map[column_id] = float(odd_value)
+        
+        return odds_map
     
     async def _fetch_all_pa_odds(self, event_ids: List[str]) -> Dict[str, Dict[int, float]]:
-        """Fetch PA odds for all events with rate limiting."""
+        """Fetch PA odds for all events sequentially (Playwright limitation)."""
         results = {}
-        batch_size = 10
         
-        for i in range(0, len(event_ids), batch_size):
-            batch = event_ids[i:i + batch_size]
-            tasks = [self._fetch_pa_odds(eid) for eid in batch]
-            batch_results = await asyncio.gather(*tasks, return_exceptions=True)
-            
-            for eid, result in zip(batch, batch_results):
-                if isinstance(result, dict) and result:
-                    results[eid] = result
-            
-            if i + batch_size < len(event_ids):
-                await asyncio.sleep(0.2)
+        for event_id in event_ids:
+            try:
+                pa_odds = await self._fetch_pa_odds(event_id)
+                if pa_odds:
+                    results[event_id] = pa_odds
+            except Exception as e:
+                self.logger.debug(f"[Stake] Erro PA odds {event_id}: {e}")
+                continue
         
         return results
     
     async def _fetch_event_odds(self, event_id: str) -> Dict[str, Any]:
-        """Fetch odds for a single event."""
-        try:
-            url = f"{self.API_BASE}/events/{event_id}/odds"
-            response = await self.client.get(url)
-            response.raise_for_status()
-            return response.json()
-        except Exception as e:
-            self.logger.debug(f"[Stake] Erro ao buscar odds para {event_id}: {e}")
-            return {}
+        """Fetch odds for a single event via Playwright navigation."""
+        url = f"{self.API_BASE}/events/{event_id}/odds"
+        return await self._fetch_json(url)
 
     def _parse_football_odds(self, events: List[Dict], so_odds_data: Dict, 
                               pa_odds_by_event: Dict[str, Dict[int, float]], 
