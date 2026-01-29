@@ -1,6 +1,6 @@
 """
 Stake Unified Scraper - Football (SO + PA) and Basketball (Moneyline).
-Uses Playwright for all requests (navigation mode bypasses API blocks).
+Uses Playwright with page pool for parallel requests (bypasses API blocks).
 """
 
 import asyncio
@@ -15,10 +15,10 @@ from base_scraper import BaseScraper, ScrapedOdds, LeagueConfig
 class StakeScraper(BaseScraper):
     """
     Unified scraper for Stake.bet.br - Football and Basketball.
-    Football: Super Odds (batch) + Pagamento Antecipado (individual requests)
-    Basketball: Moneyline (individual requests)
+    Football: Super Odds (batch) + Pagamento Antecipado (parallel requests)
+    Basketball: Moneyline (parallel requests)
     
-    All API requests are made via Playwright page.goto() to bypass 403 blocks.
+    Uses a pool of 10 pages for parallel API requests via Playwright navigation.
     """
     
     API_BASE = "https://sbweb.stake.bet.br/api/v1/br/pt-br"
@@ -58,10 +58,18 @@ class StakeScraper(BaseScraper):
         self._browser: Optional[Browser] = None
         self._context: Optional[BrowserContext] = None
         self._page: Optional[Page] = None
+        # Page pool for parallel requests
+        self._page_pool: List[Page] = []
+        self._pool_semaphore: Optional[asyncio.Semaphore] = None
+        self._pool_size = 10
         self.logger = logger.bind(component="stake")
     
     async def setup(self):
-        """Initialize Playwright browser for API requests."""
+        """Initialize Playwright browser with page pool for parallel requests."""
+        # Guard: avoid re-initialization if already set up
+        if self._page is not None:
+            return
+        
         self.logger.info("[Stake] Iniciando browser Playwright...")
         
         # Start Playwright
@@ -83,7 +91,17 @@ class StakeScraper(BaseScraper):
             viewport={"width": 1920, "height": 1080},
         )
         
+        # Main page for compatibility and session establishment
         self._page = await self._context.new_page()
+        
+        # Create page pool for parallel requests
+        self.logger.info(f"[Stake] Criando pool de {self._pool_size} paginas...")
+        self._page_pool = []
+        for _ in range(self._pool_size):
+            page = await self._context.new_page()
+            self._page_pool.append(page)
+        
+        self._pool_semaphore = asyncio.Semaphore(self._pool_size)
         
         # Navigate to site first to establish session
         self.logger.info("[Stake] Estabelecendo sessao...")
@@ -96,8 +114,17 @@ class StakeScraper(BaseScraper):
         self.logger.info("[Stake] Browser pronto")
     
     async def teardown(self):
-        """Close Playwright browser safely."""
-        # Close Playwright components safely
+        """Close Playwright browser and page pool safely."""
+        # Close page pool
+        for page in self._page_pool:
+            try:
+                await page.close()
+            except Exception:
+                pass
+        self._page_pool = []
+        self._pool_semaphore = None
+        
+        # Close main page
         try:
             if self._page:
                 await self._page.close()
@@ -105,6 +132,7 @@ class StakeScraper(BaseScraper):
             pass
         self._page = None
         
+        # Close context
         try:
             if self._context:
                 await self._context.close()
@@ -112,6 +140,7 @@ class StakeScraper(BaseScraper):
             pass
         self._context = None
         
+        # Close browser
         try:
             if self._browser:
                 await self._browser.close()
@@ -119,6 +148,7 @@ class StakeScraper(BaseScraper):
             pass
         self._browser = None
         
+        # Stop Playwright
         try:
             if self._playwright:
                 await self._playwright.stop()
@@ -129,9 +159,8 @@ class StakeScraper(BaseScraper):
         self.logger.info("[Stake] Recursos liberados")
 
     async def _fetch_json(self, url: str) -> Dict[str, Any]:
-        """Fetch JSON data by navigating to URL with Playwright."""
+        """Fetch JSON data by navigating to URL with main page."""
         try:
-            # Navigate to API URL directly (navigation mode bypasses 403)
             response = await self._page.goto(url, wait_until="domcontentloaded", timeout=15000)
             
             if not response:
@@ -141,10 +170,7 @@ class StakeScraper(BaseScraper):
                 self.logger.debug(f"[Stake] Status {response.status} para {url}")
                 return {}
             
-            # Wait a bit for content to load
-            await self._page.wait_for_timeout(300)
-            
-            # Extract JSON from page body (API returns raw JSON)
+            # Extract JSON from page body
             content = await self._page.evaluate("() => document.body.innerText")
             
             if content:
@@ -158,6 +184,38 @@ class StakeScraper(BaseScraper):
         except Exception as e:
             self.logger.debug(f"[Stake] Erro ao buscar {url}: {e}")
             return {}
+
+    async def _fetch_json_with_page(self, page: Page, url: str) -> Dict[str, Any]:
+        """Fetch JSON using a specific page from pool."""
+        try:
+            response = await page.goto(url, wait_until="domcontentloaded", timeout=15000)
+            
+            if not response or response.status != 200:
+                return {}
+            
+            content = await page.evaluate("() => document.body.innerText")
+            
+            if content:
+                return json.loads(content)
+            return {}
+            
+        except Exception:
+            return {}
+
+    async def _fetch_parallel(self, urls: List[str]) -> List[Dict[str, Any]]:
+        """Fetch multiple URLs in parallel using page pool."""
+        if not urls:
+            return []
+        
+        results = [{}] * len(urls)
+        
+        async def fetch_one(idx: int, url: str):
+            async with self._pool_semaphore:
+                page = self._page_pool[idx % self._pool_size]
+                results[idx] = await self._fetch_json_with_page(page, url)
+        
+        await asyncio.gather(*[fetch_one(i, url) for i, url in enumerate(urls)], return_exceptions=True)
+        return results
 
     async def get_available_leagues(self) -> List[LeagueConfig]:
         """Return list of configured leagues (football + basketball)."""
@@ -179,9 +237,9 @@ class StakeScraper(BaseScraper):
         return leagues
     
     async def scrape_all(self) -> List[ScrapedOdds]:
-        """Scrape all leagues for both sports using Playwright."""
+        """Scrape all leagues for both sports using Playwright page pool."""
         all_odds = []
-        await self.setup()
+        # NOTE: setup() is called by run_scraper.py, guard pattern prevents double init
         
         try:
             # Football (SO + PA)
@@ -200,8 +258,11 @@ class StakeScraper(BaseScraper):
                 except Exception as e:
                     self.logger.error(f"[Stake] Erro na liga {config['name']}: {e}")
                     
-        finally:
-            await self.teardown()
+        except Exception as e:
+            self.logger.error(f"[Stake] Erro geral: {e}")
+            raise
+        
+        # NOTE: teardown() is managed by run_scraper.py, browser stays open between cycles
         
         self.logger.info(f"[Stake] Total: {len(all_odds)} odds coletadas")
         return all_odds
@@ -238,14 +299,14 @@ class StakeScraper(BaseScraper):
         # Fetch SO odds (batch request)
         so_odds_data = await self._fetch_so_odds(event_ids)
         
-        # Fetch PA odds (individual requests)
+        # Fetch PA odds (parallel requests using page pool)
         pa_odds_by_event = await self._fetch_all_pa_odds(event_ids)
         
         # Parse all odds
         return self._parse_football_odds(events, so_odds_data, pa_odds_by_event, league_name, tournament_id)
     
     async def _scrape_basketball(self, config: dict) -> List[ScrapedOdds]:
-        """Scrape Moneyline odds for a basketball league."""
+        """Scrape Moneyline odds for a basketball league using parallel requests."""
         league_name = config["name"]
         tournament_id = config["tournament_id"]
         
@@ -254,17 +315,20 @@ class StakeScraper(BaseScraper):
         if not events:
             return []
         
+        # Build URLs for all events
+        event_ids = [str(e.get("id", "")) for e in events if e.get("id")]
+        urls = [f"{self.API_BASE}/events/{eid}/odds" for eid in event_ids]
+        
+        # Fetch all odds in parallel
+        responses = await self._fetch_parallel(urls)
+        
         results = []
-        for event in events:
+        for event, odds_data in zip(events, responses):
             try:
-                event_id = str(event.get("id", ""))
-                if not event_id:
-                    continue
-                
-                # Fetch odds for this event
-                odds_data = await self._fetch_event_odds(event_id)
                 if not odds_data:
                     continue
+                
+                event_id = str(event.get("id", ""))
                 
                 # Extract teams
                 teams = event.get("teams") or {}
@@ -320,50 +384,39 @@ class StakeScraper(BaseScraper):
         url = f"{self.API_BASE}/events/odds?events={ids_param}"
         return await self._fetch_json(url)
     
-    async def _fetch_pa_odds(self, event_id: str) -> Dict[int, float]:
-        """Fetch PA odds for a single event."""
-        url = f"{self.API_BASE}/events/{event_id}/odds"
-        data = await self._fetch_json(url)
-        
-        if not data:
+    async def _fetch_all_pa_odds(self, event_ids: List[str]) -> Dict[str, Dict[int, float]]:
+        """Fetch PA odds for all events in parallel using page pool."""
+        if not event_ids:
             return {}
         
-        odds_map = {}
-        odds_list = data.get("odds", [])
+        # Build URLs
+        urls = [f"{self.API_BASE}/events/{eid}/odds" for eid in event_ids]
         
-        for odd in odds_list:
-            market_id = odd.get("marketId", "")
-            if market_id != self.MARKET_PA:
-                continue
-            
-            column_id = odd.get("columnId")
-            odd_values = odd.get("oddValues") or {}
-            odd_value = odd_values.get("decimal") if isinstance(odd_values, dict) else None
-            
-            if column_id is not None and odd_value:
-                odds_map[column_id] = float(odd_value)
+        # Fetch in parallel
+        responses = await self._fetch_parallel(urls)
         
-        return odds_map
-    
-    async def _fetch_all_pa_odds(self, event_ids: List[str]) -> Dict[str, Dict[int, float]]:
-        """Fetch PA odds for all events sequentially (Playwright limitation)."""
+        # Process results
         results = {}
-        
-        for event_id in event_ids:
-            try:
-                pa_odds = await self._fetch_pa_odds(event_id)
-                if pa_odds:
-                    results[event_id] = pa_odds
-            except Exception as e:
-                self.logger.debug(f"[Stake] Erro PA odds {event_id}: {e}")
+        for event_id, data in zip(event_ids, responses):
+            if not data:
                 continue
+            
+            odds_map = {}
+            for odd in data.get("odds", []):
+                if odd.get("marketId") != self.MARKET_PA:
+                    continue
+                
+                column_id = odd.get("columnId")
+                odd_values = odd.get("oddValues") or {}
+                odd_value = odd_values.get("decimal") if isinstance(odd_values, dict) else None
+                
+                if column_id is not None and odd_value:
+                    odds_map[column_id] = float(odd_value)
+            
+            if odds_map:
+                results[event_id] = odds_map
         
         return results
-    
-    async def _fetch_event_odds(self, event_id: str) -> Dict[str, Any]:
-        """Fetch odds for a single event via Playwright navigation."""
-        url = f"{self.API_BASE}/events/{event_id}/odds"
-        return await self._fetch_json(url)
 
     def _parse_football_odds(self, events: List[Dict], so_odds_data: Dict, 
                               pa_odds_by_event: Dict[str, Dict[int, float]], 
@@ -484,22 +537,27 @@ class StakeScraper(BaseScraper):
 if __name__ == "__main__":
     async def run():
         s = StakeScraper()
-        odds = await s.scrape_all()
+        await s.setup()
         
-        print(f"\n--- Resultado ({len(odds)} odds) ---")
-        
-        # Football
-        football = [o for o in odds if o.sport == "football"]
-        print(f"\nFutebol: {len(football)} odds")
-        for o in football[:3]:
-            print(f"  {o.home_team_raw} x {o.away_team_raw} ({o.odds_type})")
-            print(f"    Odds: {o.home_odd:.2f} - {o.draw_odd:.2f} - {o.away_odd:.2f}")
-        
-        # Basketball
-        basketball = [o for o in odds if o.sport == "basketball"]
-        print(f"\nBasquete: {len(basketball)} odds")
-        for o in basketball[:3]:
-            print(f"  {o.home_team_raw} x {o.away_team_raw}")
-            print(f"    Odds: {o.home_odd:.2f} - {o.away_odd:.2f}")
+        try:
+            odds = await s.scrape_all()
+            
+            print(f"\n--- Resultado ({len(odds)} odds) ---")
+            
+            # Football
+            football = [o for o in odds if o.sport == "football"]
+            print(f"\nFutebol: {len(football)} odds")
+            for o in football[:3]:
+                print(f"  {o.home_team_raw} x {o.away_team_raw} ({o.odds_type})")
+                print(f"    Odds: {o.home_odd:.2f} - {o.draw_odd:.2f} - {o.away_odd:.2f}")
+            
+            # Basketball
+            basketball = [o for o in odds if o.sport == "basketball"]
+            print(f"\nBasquete: {len(basketball)} odds")
+            for o in basketball[:3]:
+                print(f"  {o.home_team_raw} x {o.away_team_raw}")
+                print(f"    Odds: {o.home_odd:.2f} - {o.away_odd:.2f}")
+        finally:
+            await s.teardown()
             
     asyncio.run(run())
