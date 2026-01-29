@@ -1,217 +1,177 @@
 
+# Correcao Urgente: Reverter Mudancas que Bugaram Todos os Scrapers
 
-# Plano: Resolver Conflito de Processos PM2 no Stake Scraper
+## Diagnostico
 
-## Problema Identificado
+Analisando o codigo atual e os screenshots, identifiquei que:
 
-O PM2 esta reiniciando o processo enquanto o ciclo anterior ainda esta em execucao:
+1. **O `ecosystem.config.js` esta CORRETO** - nao foi ele que causou o problema
+2. **O problema sao as mudancas no `run_scraper.py`** que afetaram TODOS os scrapers
+3. **O Stake scraper com 10 paginas paralelas** tambem esta consumindo recursos demais
 
-```text
-┌────────────────────────────────────────────────────────────────┐
-│                    CONFLITO DE PROCESSOS                       │
-├────────────────────────────────────────────────────────────────┤
-│                                                                │
-│  Processo 1 (antigo)        Processo 2 (PM2 restart)           │
-│  21:01:43 Sessao...         21:01:51 Starting...               │
-│  21:01:49 Browser pronto    21:02:00 Browser...                │
-│  21:02:12 Premier League    21:02:15 Sessao...                 │
-│  21:02:35 Serie A           21:02:31 Premier League            │
-│          ↓                           ↓                         │
-│    AMBOS RODANDO AO MESMO TEMPO = CONFLITO                     │
-│                                                                │
-└────────────────────────────────────────────────────────────────┘
+## O Que Mudamos Que Quebrou Tudo
+
+### Mudanca 1: `run_scraper.py` (linha 162)
+```python
+# ANTES: Nao tinha isso
+await scraper.setup()  # <-- ISSO FOI ADICIONADO
+
+# PROBLEMA: Muitos scrapers NAO TEM metodo setup() ou tem setup() diferente
 ```
 
-O guard `if self._page is not None` funciona dentro do mesmo processo, mas o PM2 cria um processo novo que nao compartilha memoria.
+**Por que quebrou?** O `run_scraper.py` agora chama `await scraper.setup()` na linha 162 ANTES do loop. Scrapers como:
+- `BetbraScraper` - pode nao ter setup() compativel
+- `TradeballScraper` - usa autenticacao diferente
+- `Bet365Scraper` - ja faz setup dentro de scrape_all()
+- `NovibetScraper` - usa curl_cffi, nao Playwright
 
----
+Isso faz com que alguns scrapers falhem imediatamente ao iniciar.
 
-## Causa Raiz
-
-O `ecosystem.config.js` do PM2 pode estar configurado com:
-- `autorestart: true` sem tempo minimo entre restarts
-- `restart_delay` muito baixo
-- Nenhum `max_restarts` limitando loops de restart
-
----
-
-## Solucao em Duas Partes
-
-### Parte 1: Ajustar PM2 (ecosystem.config.js)
-
-Adicionar configuracoes para evitar restarts em loop:
-
-```javascript
-{
-  name: 'scraper-stake',
-  script: 'standalone/run_scraper.py',
-  args: '--scraper stake --interval 30',
-  interpreter: '/root/Desktop/scraper/venv/bin/python',
-  
-  // NOVAS CONFIGURACOES
-  restart_delay: 10000,      // 10s entre restarts
-  max_restarts: 5,           // Max 5 restarts em 15 min
-  min_uptime: 30000,         // Processo precisa rodar 30s para ser "estavel"
-  kill_timeout: 30000,       // 30s para processo terminar gracefully
-  wait_ready: true,          // Aguardar sinal de ready (opcional)
-}
-```
-
-### Parte 2: Adicionar Signal Handler no run_scraper.py
-
-Tratar SIGTERM/SIGINT gracefully para evitar que o processo seja morto no meio de um ciclo:
-
+### Mudanca 2: Signal handlers (linhas 17, 30-37, 284-286)
 ```python
 import signal
-
-# Global flag para shutdown graceful
-shutdown_requested = False
-
-def handle_signal(signum, frame):
-    global shutdown_requested
-    log.warning(f"Recebido sinal {signum}, aguardando fim do ciclo atual...")
-    shutdown_requested = True
-
-async def run_forever(scraper_name, interval, log):
-    global shutdown_requested
-    
-    # Registrar handlers
-    signal.signal(signal.SIGTERM, handle_signal)
-    signal.signal(signal.SIGINT, handle_signal)
-    
-    # ... setup code ...
-    
-    while not shutdown_requested:
-        # ... ciclo de scraping ...
-        
-        if shutdown_requested:
-            log.info("Shutdown graceful solicitado, saindo...")
-            break
-        
-        await asyncio.sleep(interval)
-    
-    # Cleanup
-    await scraper.teardown()
-    log.info("Scraper finalizado gracefully")
-```
-
----
-
-## Mudancas no Arquivo
-
-### Arquivo: `docs/scraper/standalone/run_scraper.py`
-
-#### 1. Adicionar Import e Flag Global
-
-```python
-import signal
-
-# Global flag for graceful shutdown
 shutdown_requested = False
 
 def request_shutdown(signum, frame):
-    """Handle SIGTERM/SIGINT for graceful shutdown."""
     global shutdown_requested
     shutdown_requested = True
+
+# E no main():
+signal.signal(signal.SIGTERM, request_shutdown)
+signal.signal(signal.SIGINT, request_shutdown)
 ```
 
-#### 2. Registrar Signal Handlers em main()
+**Isso em si nao e problema**, mas o loop `while not shutdown_requested` pode estar causando comportamento inesperado.
+
+### Mudanca 3: `stake_scraper.py` com pool de 10 paginas
+O pool de 10 paginas do Playwright esta criando muitos processos Chromium e consumindo toda a RAM da VPS, causando OOM (Out of Memory) que afeta outros scrapers.
+
+---
+
+## Solucao: Reverter para Versao Estavel
+
+### Arquivo 1: `docs/scraper/standalone/run_scraper.py`
+
+Reverter para a versao que:
+1. NAO chama `scraper.setup()` antes do loop
+2. Chama setup/teardown DENTRO de cada ciclo (como era antes)
+3. Remove os signal handlers se estiverem causando problemas
 
 ```python
-async def main():
-    load_dotenv()
-    args = parse_args()
+async def run_forever(scraper_name: str, interval: int, log: logger):
+    """Loop infinito para um único scraper."""
+    from shared_resources import get_shared_resources
+    from normalizer import OddsNormalizer
+    from supabase_client import SupabaseClient
     
-    log = setup_logging(args.scraper, args.debug)
+    log.info(f"Starting standalone scraper: {scraper_name}")
+    log.info(f"Interval: {interval}s")
     
-    # Register signal handlers for graceful shutdown
-    signal.signal(signal.SIGTERM, request_shutdown)
-    signal.signal(signal.SIGINT, request_shutdown)
+    # Inicializar recursos compartilhados
+    resources = await get_shared_resources()
+    normalizer = OddsNormalizer(resources)
+    supabase = SupabaseClient()
     
-    # ... resto do codigo
-```
-
-#### 3. Modificar Loop Principal em run_forever()
-
-```python
-async def run_forever(scraper_name, interval, log):
-    global shutdown_requested
+    # Obter bookmaker_id para o scraper
+    bookmaker_name = scraper_name.replace("_nba", "").replace("-nba", "")
+    bookmaker_id = await supabase.get_bookmaker_id(bookmaker_name)
     
-    # ... setup code existente ...
+    # Criar instância do scraper
+    scraper_class = get_scraper_class(scraper_name)
+    scraper = scraper_class()
     
-    while not shutdown_requested:
-        # ... ciclo de scraping ...
+    # NAO chamar setup() aqui - deixar o scraper gerenciar
+    
+    cycle_count = 0
+    
+    while True:  # Loop simples, sem shutdown_requested
+        cycle_count += 1
+        start_time = datetime.now(timezone.utc)
+        error_message = None
+        odds_collected = 0
+        odds_inserted = 0
         
-        # Check shutdown before sleeping
-        if shutdown_requested:
-            log.info("Shutdown requested, exiting after current cycle...")
-            break
+        try:
+            # Limpar cache
+            resources.team_matcher.clear_log_cache()
+            
+            # Recarregar caches a cada 10 ciclos
+            if cycle_count % 10 == 0:
+                await resources.reload_caches()
+            
+            # Executar scraping (scraper gerencia seu proprio setup/teardown)
+            odds = await scraper.scrape_all()
+            odds_collected = len(odds) if odds else 0
+            
+            if odds:
+                football, nba = await normalizer.normalize_and_insert(odds)
+                odds_inserted = football + nba
+                log.info(f"[Cycle {cycle_count}] Collected: {odds_collected}, Inserted: {odds_inserted}")
+            else:
+                log.warning(f"[Cycle {cycle_count}] No odds collected")
+                
+        except Exception as e:
+            error_message = str(e)[:500]
+            log.error(f"[Cycle {cycle_count}] Error: {e}")
+        
+        # Enviar heartbeat
+        try:
+            await supabase.upsert_scraper_status(
+                scraper_name=scraper_name,
+                bookmaker_id=bookmaker_id,
+                odds_collected=odds_collected,
+                odds_inserted=odds_inserted,
+                cycle_count=cycle_count,
+                error=error_message
+            )
+        except Exception as hb_error:
+            log.warning(f"Failed to send heartbeat: {hb_error}")
         
         await asyncio.sleep(interval)
+```
+
+### Arquivo 2: `docs/scraper/scrapers/stake_scraper.py`
+
+Reverter para versao anterior COM pool de paginas, MAS:
+1. Reduzir pool de 10 para 5 paginas (menos memoria)
+2. Manter guard no setup() para evitar reinicializacao
+3. Garantir que scrape_all() faca seu proprio setup/teardown
+
+```python
+def __init__(self):
+    super().__init__(name="stake", base_url="https://stake.bet.br")
+    # ...
+    self._pool_size = 5  # Reduzido de 10 para 5
+
+async def scrape_all(self) -> List[ScrapedOdds]:
+    """Scrape all leagues for both sports."""
+    all_odds = []
     
-    # Graceful cleanup
-    log.info("Performing graceful shutdown...")
+    # Setup controlado pelo proprio scraper
+    await self.setup()
+    
     try:
-        await scraper.teardown()
-    except Exception as e:
-        log.warning(f"Error during teardown: {e}")
+        # Football
+        for league_id, config in self.FOOTBALL_LEAGUES.items():
+            try:
+                odds = await self._scrape_football(config)
+                all_odds.extend(odds)
+            except Exception as e:
+                self.logger.error(f"[Stake] Erro na liga {config['name']}: {e}")
+        
+        # Basketball
+        for league_id, config in self.BASKETBALL_LEAGUES.items():
+            try:
+                odds = await self._scrape_basketball(config)
+                all_odds.extend(odds)
+            except Exception as e:
+                self.logger.error(f"[Stake] Erro na liga {config['name']}: {e}")
     
-    log.info("Scraper stopped gracefully")
-```
-
----
-
-### Arquivo: `docs/scraper/ecosystem.config.js`
-
-Atualizar configuracao do PM2 para o stake:
-
-```javascript
-{
-  name: 'scraper-stake',
-  script: 'standalone/run_scraper.py',
-  args: '--scraper stake --interval 30',
-  interpreter: '/root/Desktop/scraper/venv/bin/python',
-  cwd: '/root/Desktop/scraper',
-  
-  // Prevenir restarts em loop
-  restart_delay: 10000,        // 10s entre restarts
-  max_restarts: 5,             // Max 5 restarts a cada 15 min
-  min_uptime: 30000,           // Precisa rodar 30s para ser estavel
-  
-  // Dar tempo para shutdown graceful
-  kill_timeout: 30000,         // 30s para terminar
-  
-  // Memoria
-  max_memory_restart: '400M',  // Aumentado para 10 paginas
-}
-```
-
----
-
-## Fluxo Apos Correcoes
-
-```text
-┌────────────────────────────────────────────────────────────────┐
-│                    FLUXO CORRIGIDO                             │
-├────────────────────────────────────────────────────────────────┤
-│                                                                │
-│  1. PM2 envia SIGTERM (restart ou stop)                        │
-│     └── Handler define shutdown_requested = True               │
-│                                                                │
-│  2. Loop principal detecta flag                                │
-│     └── Nao inicia novo ciclo                                  │
-│     └── Aguarda ciclo atual terminar (se em andamento)         │
-│                                                                │
-│  3. Cleanup graceful                                           │
-│     └── Fecha pool de paginas                                  │
-│     └── Fecha browser                                          │
-│     └── Libera recursos                                        │
-│                                                                │
-│  4. Processo termina limpo                                     │
-│     └── PM2 aguarda 10s (restart_delay)                        │
-│     └── Inicia novo processo                                   │
-│                                                                │
-└────────────────────────────────────────────────────────────────┘
+    finally:
+        # Teardown ao final de cada ciclo
+        await self.teardown()
+    
+    return all_odds
 ```
 
 ---
@@ -220,19 +180,29 @@ Atualizar configuracao do PM2 para o stake:
 
 | Arquivo | Mudanca |
 |---------|---------|
-| `run_scraper.py` | Adicionar signal handler para SIGTERM/SIGINT |
-| `run_scraper.py` | Usar flag `shutdown_requested` no loop |
-| `run_scraper.py` | Fazer teardown graceful antes de sair |
-| `ecosystem.config.js` | Adicionar `restart_delay: 10000` |
-| `ecosystem.config.js` | Adicionar `kill_timeout: 30000` |
-| `ecosystem.config.js` | Aumentar `max_memory_restart` para 400M |
+| `run_scraper.py` | REMOVER `await scraper.setup()` da linha 162 |
+| `run_scraper.py` | Mudar `while not shutdown_requested` para `while True` |
+| `run_scraper.py` | REMOVER signal handlers e graceful shutdown (opcional) |
+| `stake_scraper.py` | Reduzir `_pool_size` de 10 para 5 |
+| `stake_scraper.py` | Restaurar `await self.setup()` e `await self.teardown()` dentro de `scrape_all()` |
 
 ---
 
-## Beneficios
+## Apos as Correcoes
 
-1. **Sem conflito de processos**: Novo processo so inicia apos o antigo terminar
-2. **Shutdown graceful**: Browser fecha corretamente, sem erros de "Target closed"
-3. **Recursos liberados**: Memoria e processos chromium sao limpos
-4. **Logs claros**: Sabe exatamente quando e por que o processo parou
+Na VPS, execute:
+```bash
+# Parar todos os scrapers
+pm2 stop all
 
+# Atualizar codigo
+git pull  # ou copiar arquivos
+
+# Reiniciar todos
+pm2 restart all
+
+# Monitorar
+pm2 monit
+```
+
+Os scrapers devem voltar a funcionar como antes.
