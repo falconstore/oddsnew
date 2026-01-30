@@ -28,7 +28,15 @@ class EsportivabetScraper(BaseScraper):
         "la_liga": EsportivabetLeague(champ_id="2941", category_id="501", name="La Liga", country="espanha", league_slug="laliga"),
         "bundesliga": EsportivabetLeague(champ_id="2950", category_id="503", name="Bundesliga", country="alemanha", league_slug="bundesliga"),
         "ligue_1": EsportivabetLeague(champ_id="2943", category_id="504", name="Ligue 1", country="franca", league_slug="ligue-1"),
-     	"paulistao": EsportivabetLeague(champ_id="3436", category_id="504", name="Paulistao", country="brasil", league_slug="paulistao"),
+ 	    "paulistao": EsportivabetLeague(champ_id="3436", category_id="505", name="Paulistao", country="brasil", league_slug="paulistao"),
+	    "fa_cup": EsportivabetLeague(champ_id="2935", category_id="506", name="FA Cup", country="Inglaterra", league_slug="fa-cup"),
+	    "efl_cup": EsportivabetLeague(champ_id="2972", category_id="507", name="EFL Cup", country="Inglaterra", league_slug="efl-cup"),
+	    "copa_do_rei": EsportivabetLeague(champ_id="2973", category_id="508", name="Copa do Rei", country="Espanha", league_slug="copa-do-rei"),
+        "champions_league": EsportivabetLeague(champ_id="16808", category_id="509", name="Champions League", country="Europa", league_slug="champions-league"),
+        "liga_europa": EsportivabetLeague(champ_id="16809", category_id="510", name="Liga Europa", country="Europa", league_slug="liga-europa"),
+        "liga_da_conferencia": EsportivabetLeague(champ_id="31608", category_id="511", name="Liga da Conferencia", country="Europa", league_slug="liga-da-conferencia"),
+        "eredivisie": EsportivabetLeague(champ_id="3065", category_id="512", name="Eredivisie", country="Holanda", league_slug="eredivisie"),
+        "brasileirao_serie_a": EsportivabetLeague(champ_id="11318", category_id="513", name="Brasileirão Série A", country="Brasil", league_slug="brasileirao-serie-a"),
     }
     
     API_BASE = "https://sb2frontend-altenar2.biahosted.com/api/widget"

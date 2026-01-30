@@ -66,6 +66,10 @@ class Aposta1Scraper(BaseScraper):
 
         "liga_da_conferencia": Aposta1League(champ_id="31608", category_id="1133", name="Liga da Conferência", country="europa"),
 
+        "eredivisie": Aposta1League(champ_id="3065", category_id="569", name="Eredivisie", country="holanda"),
+
+        "brasileirao_serie_a": Aposta1League(champ_id="11318", category_id="593", name="Brasileirão Série A", country="brasil"),
+
     }
 
     
