@@ -57,7 +57,13 @@ SELECT
         WHEN EXTRACT(EPOCH FROM (NOW() - ss.last_heartbeat)) < 60 THEN 'ok'
         WHEN EXTRACT(EPOCH FROM (NOW() - ss.last_heartbeat)) < 180 THEN 'warning'
         ELSE 'error'
-    END AS computed_status
+    END AS computed_status,
+    CASE 
+        WHEN ss.cycle_count > 0 THEN 
+            EXTRACT(EPOCH FROM (NOW() - ss.created_at))::INTEGER / ss.cycle_count
+        ELSE 
+            NULL
+    END AS avg_cycle_seconds
 FROM public.scraper_status ss
 LEFT JOIN public.bookmakers b ON ss.bookmaker_id = b.id
 ORDER BY ss.scraper_name;

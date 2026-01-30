@@ -15,6 +15,19 @@ function formatTimeAgo(seconds: number): string {
   return `${Math.floor(seconds / 86400)}d atrás`;
 }
 
+function formatDuration(seconds: number | null): string {
+  if (seconds === null || seconds <= 0) return '-';
+  if (seconds < 60) return `${Math.floor(seconds)}s`;
+  if (seconds < 3600) {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
+  }
+  const hours = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+}
+
 function StatusBadge({ status }: { status: 'ok' | 'warning' | 'error' }) {
   const config = {
     ok: { label: 'OK', variant: 'default' as const, className: 'bg-green-500/10 text-green-500 border-green-500/20' },
@@ -147,6 +160,7 @@ function ScraperTable() {
                   <TableHead className="text-right">Odds Coletadas</TableHead>
                   <TableHead className="text-right">Odds Inseridas</TableHead>
                   <TableHead className="text-right">Ciclos</TableHead>
+                  <TableHead className="text-right">Tempo Médio</TableHead>
                   <TableHead>Último Erro</TableHead>
                 </TableRow>
               </TableHeader>
@@ -185,6 +199,9 @@ function ScraperTable() {
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
                       {scraper.cycle_count}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatDuration(scraper.avg_cycle_seconds)}
                     </TableCell>
                     <TableCell className="max-w-[200px]">
                       {scraper.last_error ? (
