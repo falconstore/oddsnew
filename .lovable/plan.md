@@ -1,63 +1,94 @@
-# Plano de Unificação: Aposta1 e Esportivabet Scrapers
 
-## ✅ IMPLEMENTADO
+# Plano de Correção: Erro asyncio.CancelledError no Aposta1 Unified
 
-Este plano foi executado com sucesso em 2026-01-30.
+## Diagnóstico do Problema
 
----
+O scraper Aposta1 está falhando com `asyncio.CancelledError` porque:
 
-## Resumo das Alterações
+1. **Tempo de execução > Intervalo configurado**
+   - Token Playwright: ~30s
+   - 14 ligas de futebol: ~40s  
+   - NBA: ~5s
+   - **Total: ~75s** vs **Intervalo PM2: 60s**
+   
+2. PM2 inicia novo ciclo enquanto o anterior não terminou, causando cancelamento
 
-### Arquivos Criados
-- `docs/scraper/scrapers/aposta1_unified_scraper.py` - Futebol + NBA em uma sessão
-- `docs/scraper/scrapers/esportivabet_unified_scraper.py` - Futebol + NBA em uma sessão
-
-### Arquivos Modificados
-- `docs/scraper/standalone/run_scraper.py` - SCRAPER_MAP atualizado
-- `docs/scraper/ecosystem.config.js` - Entradas -nba removidas, intervalos ajustados
-- `docs/scraper/scrapers/__init__.py` - Documentação atualizada
+3. Memória de 150M pode ser insuficiente durante picos de requisições paralelas
 
 ---
 
-## Comandos para Deploy na VPS
+## Correções Propostas
 
-```bash
-# 1. Parar scrapers antigos
-pm2 stop scraper-aposta1 scraper-aposta1-nba scraper-esportivabet scraper-esportivabet-nba
+### 1. Aumentar Intervalo PM2 (120s)
 
-# 2. Deletar entradas antigas do PM2
-pm2 delete scraper-aposta1-nba scraper-esportivabet-nba
-
-# 3. Atualizar arquivos (git pull ou scp)
-
-# 4. Reiniciar com novo config
-pm2 restart scraper-aposta1 scraper-esportivabet
-
-# 5. Verificar
-pm2 status
-pm2 logs scraper-aposta1 --lines 20
-pm2 logs scraper-esportivabet --lines 20
+Alterar `ecosystem.config.js`:
+```javascript
+// scraper-aposta1
+args: '--scraper aposta1 --interval 120',  // era 60
+max_memory_restart: '200M',  // era 150M
 ```
 
----
+### 2. Proteger Requisições Contra Cancelamento
 
-## Limpeza do Banco de Dados
+Adicionar tratamento de `asyncio.CancelledError` em pontos críticos do `aposta1_unified_scraper.py`:
 
-Execute no SQL Editor do Supabase para remover registros obsoletos:
-
-```sql
-DELETE FROM public.scraper_status 
-WHERE scraper_name IN ('aposta1_nba', 'esportivabet_nba');
+```python
+async def _fetch_all_event_details(self, event_ids: List[str]) -> Dict[str, Dict]:
+    results = {}
+    batch_size = 5
+    
+    for i in range(0, len(event_ids), batch_size):
+        batch = event_ids[i:i + batch_size]
+        
+        try:
+            tasks = [self._fetch_event_details(eid) for eid in batch]
+            responses = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            for eid, resp in zip(batch, responses):
+                if isinstance(resp, dict):
+                    results[eid] = resp
+            
+            if i + batch_size < len(event_ids):
+                await asyncio.sleep(0.2)
+                
+        except asyncio.CancelledError:
+            self.logger.warning(f"[Aposta1] Batch cancelado, retornando {len(results)} resultados parciais")
+            break  # Retorna o que temos até agora
+    
+    return results
 ```
 
+### 3. Aplicar Mesma Correção ao Esportivabet
+
+Por consistência, aplicar a mesma proteção ao `esportivabet_unified_scraper.py`.
+
 ---
 
-## Resultado
+## Arquivos a Modificar
+
+| Arquivo | Alteração |
+|---------|-----------|
+| `docs/scraper/ecosystem.config.js` | Aumentar intervalo para 120s, memória para 200M |
+| `docs/scraper/scrapers/aposta1_unified_scraper.py` | Adicionar proteção contra CancelledError |
+| `docs/scraper/scrapers/esportivabet_unified_scraper.py` | Adicionar proteção contra CancelledError |
+
+---
+
+## Resultado Esperado
 
 | Métrica | Antes | Depois |
 |---------|-------|--------|
-| Processos Aposta1 + Esportivabet | 4 | 2 |
-| Capturas de token Playwright | 4 | 2 |
-| Intervalo | 30s | 60s |
-| Memória máxima | 100M | 150M |
-| Erros de concorrência | Frequentes | Eliminados |
+| Tempo para completar ciclo | ~75s | ~75s |
+| Intervalo PM2 | 60s | 120s |
+| Folga para execução | -15s (negativo!) | +45s |
+| Erros CancelledError | Frequentes | Eliminados |
+
+---
+
+## Comandos Pós-Implementação
+
+```bash
+# Na VPS
+pm2 restart scraper-aposta1 scraper-esportivabet
+pm2 logs scraper-aposta1 --lines 50
+```
