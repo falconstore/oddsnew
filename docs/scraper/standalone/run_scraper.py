@@ -202,33 +202,33 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description="Standalone Scraper Runner - Roda um único scraper em loop infinito"
     )
-    
+
     parser.add_argument(
         "--scraper",
         required=True,
         help="Nome do scraper (ex: betano, superbet, bet365)"
     )
-    
+
     parser.add_argument(
         "--interval",
         type=int,
         default=30,
         help="Intervalo entre ciclos em segundos (default: 30)"
     )
-    
-parser.add_argument(
+
+    parser.add_argument(
         "--debug",
         action="store_true",
         help="Ativar logging de debug"
     )
-    
+
     parser.add_argument(
         "--initial-delay",
         type=int,
         default=0,
         help="Segundos para aguardar antes do primeiro ciclo (escalonamento)"
     )
-    
+
     return parser.parse_args()
 
 
