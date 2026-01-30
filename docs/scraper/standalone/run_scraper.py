@@ -71,7 +71,7 @@ def get_scraper_class(scraper_name: str):
     
     # Mapeamento: nome_do_scraper -> (módulo, classe)
     SCRAPER_MAP = {
-        # Unified scrapers (Football + NBA)
+        # Unified scrapers (Football + NBA) - Single browser session
         "superbet": ("scrapers.superbet_scraper", "SuperbetScraper"),
         "estrelabet": ("scrapers.estrelabet_scraper", "EstrelabetScraper"),
         "kto": ("scrapers.kto_scraper", "KtoScraper"),
@@ -80,9 +80,11 @@ def get_scraper_class(scraper_name: str):
         "betnacional": ("scrapers.betnacional_scraper", "BetnacionalScraper"),
         "stake": ("scrapers.stake_scraper", "StakeScraper"),
         
-        # Football-only scrapers
-        "betano": ("scrapers.betano_scraper", "BetanoScraper"),
-        "betbra": ("scrapers.betbra_scraper", "BetbraScraper"),
+        # Unified Playwright scrapers (Football + NBA) - Optimized
+        "betano": ("scrapers.betano_unified_scraper", "BetanoUnifiedScraper"),
+        "betbra": ("scrapers.betbra_unified_scraper", "BetbraUnifiedScraper"),
+        
+        # HTTPX-based scrapers (light)
         "br4bet": ("scrapers.br4bet_scraper", "Br4betScraper"),
         "mcgames": ("scrapers.mcgames_scraper", "McgamesScraper"),
         "aposta1": ("scrapers.aposta1_scraper", "Aposta1Scraper"),
@@ -91,9 +93,7 @@ def get_scraper_class(scraper_name: str):
         "bet365": ("scrapers.bet365_scraper", "Bet365Scraper"),
         "tradeball": ("scrapers.tradeball_scraper", "TradeballScraper"),
         
-        # NBA-only scrapers
-        "betano_nba": ("scrapers.betano_nba_scraper", "BetanoNBAScraper"),
-        "betbra_nba": ("scrapers.betbra_nba_scraper", "BetbraNBAScraper"),
+        # NBA-only scrapers (HTTPX-based, kept for compatibility)
         "br4bet_nba": ("scrapers.br4bet_nba_scraper", "Br4betNBAScraper"),
         "mcgames_nba": ("scrapers.mcgames_nba_scraper", "McgamesNBAScraper"),
         "aposta1_nba": ("scrapers.aposta1_nba_scraper", "Aposta1NBAScraper"),
