@@ -192,7 +192,11 @@ async def run_forever(scraper_name: str, interval: int, log: logger):
         except Exception as hb_error:
             log.warning(f"Failed to send heartbeat: {hb_error}")
         
-        await asyncio.sleep(interval)
+        try:
+            await asyncio.sleep(interval)
+        except asyncio.CancelledError:
+            log.info("Received shutdown signal, exiting gracefully...")
+            break
 
 
 def parse_args():
