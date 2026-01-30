@@ -302,7 +302,10 @@ class EsportivabetUnifiedScraper(BaseScraper):
     # ==================== FETCH E PARSE ====================
     
     async def _fetch_and_parse(self, config: EsportivabetLeague, league: LeagueConfig, sport: str, retry_on_auth_fail: bool = True) -> List[ScrapedOdds]:
-        """Busca e parseia eventos de uma liga."""
+        """
+        Busca e parseia eventos de uma liga.
+        Protegido contra asyncio.CancelledError para retornar resultados parciais.
+        """
         params = {
             "culture": "pt-BR",
             "timezoneOffset": "180",
@@ -358,6 +361,9 @@ class EsportivabetUnifiedScraper(BaseScraper):
                 
                 self.logger.warning(f"[Esportivabet] {league.name}: HTTP {response.status_code} em {endpoint.split('/')[-1]}")
                 
+            except asyncio.CancelledError:
+                self.logger.warning(f"[Esportivabet] {league.name}: Requisição cancelada, retornando resultados parciais")
+                return []
             except Exception as e:
                 self.logger.error(f"[Esportivabet] {league.name}: Erro em {endpoint.split('/')[-1]} - {e}")
                 continue
