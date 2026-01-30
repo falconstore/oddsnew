@@ -504,21 +504,30 @@ class Aposta1UnifiedScraper(BaseScraper):
             return None
 
     async def _fetch_all_event_details(self, event_ids: List[str]) -> Dict[str, Dict]:
-        """Busca detalhes de múltiplos eventos em paralelo."""
+        """
+        Busca detalhes de múltiplos eventos em paralelo.
+        Protegido contra asyncio.CancelledError para retornar resultados parciais.
+        """
         results = {}
         batch_size = 5
         
         for i in range(0, len(event_ids), batch_size):
             batch = event_ids[i:i + batch_size]
-            tasks = [self._fetch_event_details(eid) for eid in batch]
-            responses = await asyncio.gather(*tasks, return_exceptions=True)
             
-            for eid, resp in zip(batch, responses):
-                if isinstance(resp, dict):
-                    results[eid] = resp
-            
-            if i + batch_size < len(event_ids):
-                await asyncio.sleep(0.2)
+            try:
+                tasks = [self._fetch_event_details(eid) for eid in batch]
+                responses = await asyncio.gather(*tasks, return_exceptions=True)
+                
+                for eid, resp in zip(batch, responses):
+                    if isinstance(resp, dict):
+                        results[eid] = resp
+                
+                if i + batch_size < len(event_ids):
+                    await asyncio.sleep(0.2)
+                    
+            except asyncio.CancelledError:
+                self.logger.warning(f"[Aposta1] Batch cancelado, retornando {len(results)} resultados parciais")
+                break  # Retorna o que temos até agora
         
         return results
 
