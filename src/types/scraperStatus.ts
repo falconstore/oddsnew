@@ -17,4 +17,5 @@ export interface ScraperStatus {
   bookmaker_logo: string | null;
   seconds_since_heartbeat: number;
   computed_status: 'ok' | 'warning' | 'error';
+  avg_cycle_seconds: number | null;
 }
