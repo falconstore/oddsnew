@@ -107,7 +107,20 @@ class EsportivabetUnifiedScraper(BaseScraper):
             async with async_playwright() as p:
                 browser = await p.chromium.launch(
                     headless=True,
-                    args=['--no-sandbox', '--disable-blink-features=AutomationControlled']
+                    args=[
+                        '--no-sandbox',
+                        '--disable-blink-features=AutomationControlled',
+                        '--disable-dev-shm-usage',
+                        '--disable-gpu',
+                        '--disable-extensions',
+                        '--disable-background-networking',
+                        '--disable-sync',
+                        '--disable-translate',
+                        '--no-first-run',
+                        '--disable-default-apps',
+                        '--single-process',
+                        '--memory-pressure-off',
+                    ]
                 )
                 
                 ua_string = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"

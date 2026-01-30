@@ -44,11 +44,27 @@ class BetanoNBAScraper(BaseScraper):
         self.logger.info("Starting Betano NBA scraper setup")
         
         self._playwright = await async_playwright().start()
-        self._browser = await self._playwright.chromium.launch(headless=True)
+        self._browser = await self._playwright.chromium.launch(
+            headless=True,
+            args=[
+                '--no-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-gpu',
+                '--disable-extensions',
+                '--disable-background-networking',
+                '--disable-sync',
+                '--disable-translate',
+                '--no-first-run',
+                '--disable-default-apps',
+                '--single-process',
+                '--memory-pressure-off',
+            ]
+        )
         self._context = await self._browser.new_context(
             user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
             locale="pt-BR",
-            timezone_id="America/Sao_Paulo"
+            timezone_id="America/Sao_Paulo",
+            viewport={"width": 800, "height": 600},
         )
         self._page = await self._context.new_page()
         
