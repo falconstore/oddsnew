@@ -1,73 +1,84 @@
 
 
-# Adicionar Coluna "Tempo Médio" na Tabela de Status dos Scrapers
+# Ajustar Intervalo da Bet365 para 90s e Melhorar Tratamento de Shutdown
 
-## Objetivo
-Exibir uma nova coluna mostrando quanto tempo em média cada scraper demora entre atualizações (ciclos).
+## Problema 1: Intervalo Atual
 
-## Como Calcular
-
-A fórmula mais precisa com os dados disponíveis:
-
-```text
-Tempo Médio = (tempo desde criação) / (número de ciclos)
-            = (NOW - created_at) / cycle_count
+No `ecosystem.config.js`, a Bet365 está configurada com intervalo de 45 segundos:
+```javascript
+args: '--scraper bet365 --interval 45',
 ```
 
-Isso mostra o intervalo médio entre cada ciclo de coleta desde que o scraper começou a operar.
+Precisa mudar para **90 segundos** para respeitar os limites da API.
 
-## Implementação
+## Problema 2: Erro CancelledError/KeyboardInterrupt
 
-### 1. Atualizar a View SQL (migration)
-
-**Arquivo:** `docs/migration-scraper-status.sql` (nova migration para aplicar)
-
-Adicionar campo calculado na view:
-```sql
--- Tempo médio entre ciclos em segundos
-CASE 
-    WHEN ss.cycle_count > 0 THEN 
-        EXTRACT(EPOCH FROM (NOW() - ss.created_at))::INTEGER / ss.cycle_count
-    ELSE 
-        NULL
-END AS avg_cycle_seconds
+O erro que aparece:
+```
+asyncio.exceptions.CancelledError
+KeyboardInterrupt
 ```
 
-### 2. Atualizar o Tipo TypeScript
+Isso acontece quando o PM2 envia sinal de shutdown durante o `asyncio.sleep()`. Não é um erro grave - é o comportamento normal quando o PM2 reinicia o processo. Mas podemos melhorar o código para:
+1. Tratar o `CancelledError` de forma limpa
+2. Mostrar uma mensagem amigável ao invés de traceback
 
-**Arquivo:** `src/types/scraperStatus.ts`
+## Implementacao
 
-Adicionar:
-```typescript
-avg_cycle_seconds: number | null;
+### 1. Arquivo: `docs/scraper/ecosystem.config.js`
+
+**Linha 232**: Alterar intervalo de 45 para 90 segundos
+
+```javascript
+// Antes:
+args: '--scraper bet365 --interval 45',
+
+// Depois:
+args: '--scraper bet365 --interval 90',
 ```
 
-### 3. Atualizar a Tabela no Frontend
+### 2. Arquivo: `docs/scraper/standalone/run_scraper.py`
 
-**Arquivo:** `src/pages/admin/ScraperStatus.tsx`
+**Funcao `run_forever`**: Adicionar tratamento para `CancelledError`
 
-Mudancas:
-- Adicionar funcao `formatDuration()` para exibir o tempo medio de forma legível (ex: "32s", "1m 15s")
-- Adicionar coluna "Tempo Médio" na tabela entre "Ciclos" e "Último Erro"
-- Exibir o valor formatado ou "-" se nao houver ciclos ainda
+Envolver o loop principal em try/except para capturar:
+- `asyncio.CancelledError` - shutdown gracioso do PM2
+- `KeyboardInterrupt` - Ctrl+C manual
 
-### Exemplo Visual da Nova Coluna
+Isso evita o traceback feio e mostra apenas uma mensagem de log amigavel.
 
-| Scraper | Status | ... | Ciclos | **Tempo Médio** | Último Erro |
-|---------|--------|-----|--------|-----------------|-------------|
-| betano  | OK     | ... | 156    | **35s**         | -           |
-| bet365  | OK     | ... | 89     | **1m 02s**      | -           |
-| stake   | Alerta | ... | 12     | **2m 45s**      | timeout     |
+Mudancas especificas:
+1. Importar `asyncio.CancelledError` 
+2. No loop `while True`, envolver o `await asyncio.sleep(interval)` em try/except
+3. Ao capturar `CancelledError`, fazer break e log de shutdown
+
+### Codigo do tratamento de shutdown (conceito)
+
+```python
+while True:
+    # ... codigo do ciclo ...
+    
+    try:
+        await asyncio.sleep(interval)
+    except asyncio.CancelledError:
+        log.info("Received shutdown signal, exiting gracefully...")
+        break
+```
 
 ## Resumo das Mudancas
 
-| Arquivo | Mudanca |
-|---------|---------|
-| `docs/migration-scraper-status.sql` | Adicionar `avg_cycle_seconds` na view |
-| `src/types/scraperStatus.ts` | Adicionar campo `avg_cycle_seconds` |
-| `src/pages/admin/ScraperStatus.tsx` | Adicionar coluna "Tempo Médio" com formatacao |
+| Arquivo | Linha | Mudanca |
+|---------|-------|---------|
+| `ecosystem.config.js` | 232 | Intervalo 45 → 90 |
+| `run_scraper.py` | ~195 | Tratar `CancelledError` no sleep |
 
-## Nota para o VPS
+## Apos Aplicar no VPS
 
-Apos aprovar, sera necessario rodar a migration atualizada no Supabase para recriar a view com o novo campo calculado.
+```bash
+git pull
+pm2 restart scraper-bet365
+pm2 logs scraper-bet365 --lines 20
+```
+
+O log agora mostrara `Interval: 90s` e nao tera mais traceback de KeyboardInterrupt.
 
