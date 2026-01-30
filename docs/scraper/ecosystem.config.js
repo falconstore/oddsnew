@@ -25,11 +25,12 @@ module.exports = {
     // Unificados: Futebol + NBA em uma única sessão
     // ============================================
     
+    // ESCALONAMENTO: Delays de 0/25/50s para evitar 3+ Chrome simultâneos
     {
       name: 'scraper-betano',
       script: 'standalone/run_scraper.py',
       interpreter: 'python3',
-      args: '--scraper betano --interval 120',
+      args: '--scraper betano --interval 120 --initial-delay 0',
       cwd: __dirname,
       max_memory_restart: '300M',
       restart_delay: 10000,
@@ -45,7 +46,7 @@ module.exports = {
       name: 'scraper-betbra',
       script: 'standalone/run_scraper.py',
       interpreter: 'python3',
-      args: '--scraper betbra --interval 120',
+      args: '--scraper betbra --interval 120 --initial-delay 25',
       cwd: __dirname,
       max_memory_restart: '300M',
       restart_delay: 10000,
@@ -61,7 +62,7 @@ module.exports = {
       name: 'scraper-stake',
       script: 'standalone/run_scraper.py',
       interpreter: 'python3',
-      args: '--scraper stake --interval 120',
+      args: '--scraper stake --interval 120 --initial-delay 50',
       cwd: __dirname,
       max_memory_restart: '400M',
       restart_delay: 10000,
@@ -198,12 +199,12 @@ module.exports = {
       }
     },
     // Aposta1 e Esportivabet unificados (Futebol + NBA) - Playwright
-    // Intervalo 120s para acomodar ~75s de execução + margem de segurança
+    // ESCALONAMENTO: Delays de 75/100s para não coincidir com betano/betbra/stake
     {
       name: 'scraper-aposta1',
       script: 'standalone/run_scraper.py',
       interpreter: 'python3',
-      args: '--scraper aposta1 --interval 120',
+      args: '--scraper aposta1 --interval 120 --initial-delay 75',
       cwd: __dirname,
       max_memory_restart: '200M',
       restart_delay: 10000,
@@ -219,7 +220,7 @@ module.exports = {
       name: 'scraper-esportivabet',
       script: 'standalone/run_scraper.py',
       interpreter: 'python3',
-      args: '--scraper esportivabet --interval 120',
+      args: '--scraper esportivabet --interval 120 --initial-delay 100',
       cwd: __dirname,
       max_memory_restart: '200M',
       restart_delay: 10000,

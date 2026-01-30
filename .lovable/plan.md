@@ -1,93 +1,36 @@
 
-# Plano de Emergência: Resolver Sobrecarga de CPU por Playwright
+# ✅ IMPLEMENTADO: Escalonamento de Scrapers Playwright
 
-## Problema Identificado
+## Problema Resolvido
 
-O `htop` mostra **25+ processos chrome-headless** simultâneos, consumindo toda a CPU. Isso ocorre porque:
+**25+ processos chrome-headless simultâneos** causando 100% CPU.
 
-1. **5 scrapers Playwright** (betano, betbra, stake, aposta1, esportivabet) rodam ao mesmo tempo
-2. **Stake usa pool de 5 páginas**, multiplicando os processos
-3. Todos têm intervalo de 120s, então sincronizam e sobrecarregam juntos
+## Solução Aplicada
 
-## Solução: Escalonamento de Início + Redução do Pool
+### 1. Argumento `--initial-delay` no runner
+Adicionado em `docs/scraper/standalone/run_scraper.py`:
+- Aguarda N segundos antes do primeiro ciclo
+- Escalonamento controlado via PM2
 
-Implementar duas correções imediatas:
+### 2. Delays Escalonados no ecosystem.config.js
 
-### Correção 1: Adicionar Delay Inicial (Escalonar Scrapers)
+| Scraper       | Delay | Tempo de Início |
+|---------------|-------|-----------------|
+| betano        | 0s    | Imediato        |
+| betbra        | 25s   | +25s            |
+| stake         | 50s   | +50s            |
+| aposta1       | 75s   | +75s            |
+| esportivabet  | 100s  | +100s           |
 
-Modificar `run_scraper.py` para aceitar `--initial-delay`:
-
-```python
-parser.add_argument('--initial-delay', type=int, default=0,
-                    help='Segundos para aguardar antes do primeiro ciclo')
-
-async def main():
-    # ... existing code ...
-    if args.initial_delay > 0:
-        log.info(f"Aguardando {args.initial_delay}s antes de iniciar...")
-        await asyncio.sleep(args.initial_delay)
-    await run_forever(...)
-```
-
-### Correção 2: Atualizar ecosystem.config.js com Delays Escalonados
-
-```text
-Tempo 0s   -> betano inicia (120s ciclo)
-Tempo 25s  -> betbra inicia
-Tempo 50s  -> stake inicia  
-Tempo 75s  -> aposta1 inicia
-Tempo 100s -> esportivabet inicia
-Tempo 120s -> betano reinicia (apenas 1 outro rodando)
-```
-
-Configuração:
-
-| Scraper       | initial-delay | Resultado                    |
-|---------------|---------------|------------------------------|
-| betano        | 0             | Inicia imediatamente         |
-| betbra        | 25            | +25s do betano               |
-| stake         | 50            | +50s do betano               |
-| aposta1       | 75            | +75s do betano               |
-| esportivabet  | 100           | +100s do betano              |
-
-### Correção 3: Reduzir Pool do Stake (Opcional)
-
-Mudar de 5 para 3 páginas paralelas para reduzir processos renderer:
-
-```python
-self._pool_size = 3  # era 5
-```
-
-## Arquivos a Modificar
-
-| Arquivo | Mudança |
-|---------|---------|
-| `docs/scraper/standalone/run_scraper.py` | Adicionar argumento `--initial-delay` |
-| `docs/scraper/ecosystem.config.js` | Adicionar delays escalonados aos scrapers Playwright |
-| `docs/scraper/scrapers/stake_scraper.py` | Reduzir pool de 5 para 3 (opcional) |
-
-## Resultado Esperado
-
-| Métrica | Antes | Depois |
-|---------|-------|--------|
-| Chrome instances simultâneas | 5 | 1-2 |
-| Processos renderer simultâneos | ~25 | ~6-8 |
-| Pico de CPU | 100%+ | ~40-60% |
-| Conflito de ciclos | Alto | Mínimo |
-
-## Comandos para Deploy
+## Deploy na VPS
 
 ```bash
-# Na VPS
-cd /root/Desktop/scraper  # ou onde estiver o projeto
+# Atualizar arquivos
+cd /root/Desktop/scraper
+# (copiar run_scraper.py e ecosystem.config.js atualizados)
 
-# Parar tudo
+# Reiniciar PM2
 pm2 stop all
-
-# Atualizar arquivos (via git pull ou copia manual)
-# ... 
-
-# Reiniciar com nova config
 pm2 delete all
 pm2 start ecosystem.config.js
 pm2 save
@@ -97,21 +40,10 @@ htop
 pm2 monit
 ```
 
-## Seção Técnica: Por que 25 processos Chrome?
+## Resultado Esperado
 
-Cada instância Chromium headless cria múltiplos processos:
-- 1 processo principal (browser)
-- 1 processo GPU (mesmo headless)
-- 1 processo por page/tab aberta
-- Processos adicionais de renderer
-
-Com 5 scrapers rodando simultaneamente:
-- Betano: 2-3 processos (1 browser + 1-2 pages)
-- Betbra: 2-3 processos
-- Stake: 7-8 processos (1 browser + 5 pool pages + renderer)
-- Aposta1: 2-3 processos
-- Esportivabet: 2-3 processos
-
-Total: ~18-25 processos Chrome competindo por CPU
-
-O escalonamento garante que no máximo 2 scrapers Playwright rodem ao mesmo tempo, reduzindo para ~6-8 processos Chrome.
+| Métrica | Antes | Depois |
+|---------|-------|--------|
+| Chrome simultâneos | 5 | 1-2 |
+| Processos renderer | ~25 | ~6-8 |
+| Pico de CPU | 100%+ | ~40-60% |

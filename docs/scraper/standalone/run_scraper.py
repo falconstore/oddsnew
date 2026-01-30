@@ -216,10 +216,17 @@ def parse_args():
         help="Intervalo entre ciclos em segundos (default: 30)"
     )
     
-    parser.add_argument(
+parser.add_argument(
         "--debug",
         action="store_true",
         help="Ativar logging de debug"
+    )
+    
+    parser.add_argument(
+        "--initial-delay",
+        type=int,
+        default=0,
+        help="Segundos para aguardar antes do primeiro ciclo (escalonamento)"
     )
     
     return parser.parse_args()
@@ -235,7 +242,14 @@ async def main():
     log.info("=" * 50)
     log.info(f"Standalone Scraper: {args.scraper}")
     log.info(f"Supabase URL: {settings.supabase_url[:30]}...")
+    if args.initial_delay > 0:
+        log.info(f"Initial delay: {args.initial_delay}s")
     log.info("=" * 50)
+    
+    # Aguardar delay inicial para escalonamento de scrapers pesados
+    if args.initial_delay > 0:
+        log.info(f"Aguardando {args.initial_delay}s antes de iniciar...")
+        await asyncio.sleep(args.initial_delay)
     
     try:
         await run_forever(args.scraper, args.interval, log)
