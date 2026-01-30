@@ -197,15 +197,18 @@ module.exports = {
         PYTHONUNBUFFERED: '1'
       }
     },
+    // Aposta1 e Esportivabet unificados (Futebol + NBA) - Playwright
     {
       name: 'scraper-aposta1',
       script: 'standalone/run_scraper.py',
       interpreter: 'python3',
-      args: '--scraper aposta1 --interval 30',
+      args: '--scraper aposta1 --interval 60',
       cwd: __dirname,
-      max_memory_restart: '100M',
-      restart_delay: 3000,
-      max_restarts: 50,
+      max_memory_restart: '150M',
+      restart_delay: 5000,
+      max_restarts: 30,
+      min_uptime: 30000,
+      kill_timeout: 30000,
       autorestart: true,
       env: {
         PYTHONUNBUFFERED: '1'
@@ -215,11 +218,13 @@ module.exports = {
       name: 'scraper-esportivabet',
       script: 'standalone/run_scraper.py',
       interpreter: 'python3',
-      args: '--scraper esportivabet --interval 30',
+      args: '--scraper esportivabet --interval 60',
       cwd: __dirname,
-      max_memory_restart: '100M',
-      restart_delay: 3000,
-      max_restarts: 50,
+      max_memory_restart: '150M',
+      restart_delay: 5000,
+      max_restarts: 30,
+      min_uptime: 30000,
+      kill_timeout: 30000,
       autorestart: true,
       env: {
         PYTHONUNBUFFERED: '1'
@@ -300,34 +305,8 @@ module.exports = {
         PYTHONUNBUFFERED: '1'
       }
     },
-    {
-      name: 'scraper-aposta1-nba',
-      script: 'standalone/run_scraper.py',
-      interpreter: 'python3',
-      args: '--scraper aposta1_nba --interval 30',
-      cwd: __dirname,
-      max_memory_restart: '100M',
-      restart_delay: 3000,
-      max_restarts: 50,
-      autorestart: true,
-      env: {
-        PYTHONUNBUFFERED: '1'
-      }
-    },
-    {
-      name: 'scraper-esportivabet-nba',
-      script: 'standalone/run_scraper.py',
-      interpreter: 'python3',
-      args: '--scraper esportivabet_nba --interval 30',
-      cwd: __dirname,
-      max_memory_restart: '100M',
-      restart_delay: 3000,
-      max_restarts: 50,
-      autorestart: true,
-      env: {
-        PYTHONUNBUFFERED: '1'
-      }
-    },
+    // REMOVIDO: scraper-aposta1-nba (unificado em scraper-aposta1)
+    // REMOVIDO: scraper-esportivabet-nba (unificado em scraper-esportivabet)
     {
       name: 'scraper-jogodeouro-nba',
       script: 'standalone/run_scraper.py',

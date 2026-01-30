@@ -83,12 +83,12 @@ def get_scraper_class(scraper_name: str):
         # Unified Playwright scrapers (Football + NBA) - Optimized
         "betano": ("scrapers.betano_unified_scraper", "BetanoUnifiedScraper"),
         "betbra": ("scrapers.betbra_unified_scraper", "BetbraUnifiedScraper"),
+        "aposta1": ("scrapers.aposta1_unified_scraper", "Aposta1UnifiedScraper"),
+        "esportivabet": ("scrapers.esportivabet_unified_scraper", "EsportivabetUnifiedScraper"),
         
-        # HTTPX-based scrapers (light)
+        # HTTPX-based scrapers (light) - Football only
         "br4bet": ("scrapers.br4bet_scraper", "Br4betScraper"),
         "mcgames": ("scrapers.mcgames_scraper", "McgamesScraper"),
-        "aposta1": ("scrapers.aposta1_scraper", "Aposta1Scraper"),
-        "esportivabet": ("scrapers.esportivabet_scraper", "EsportivabetScraper"),
         "jogodeouro": ("scrapers.jogodeouro_scraper", "JogodeOuroScraper"),
         "bet365": ("scrapers.bet365_scraper", "Bet365Scraper"),
         "tradeball": ("scrapers.tradeball_scraper", "TradeballScraper"),
@@ -96,8 +96,6 @@ def get_scraper_class(scraper_name: str):
         # NBA-only scrapers (HTTPX-based, kept for compatibility)
         "br4bet_nba": ("scrapers.br4bet_nba_scraper", "Br4betNBAScraper"),
         "mcgames_nba": ("scrapers.mcgames_nba_scraper", "McgamesNBAScraper"),
-        "aposta1_nba": ("scrapers.aposta1_nba_scraper", "Aposta1NBAScraper"),
-        "esportivabet_nba": ("scrapers.esportivabet_nba_scraper", "EsportivabetNBAScraper"),
         "jogodeouro_nba": ("scrapers.jogodeouro_nba_scraper", "JogodeOuroNBAScraper"),
     }
     

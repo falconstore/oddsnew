@@ -1,210 +1,63 @@
-
 # Plano de Unificação: Aposta1 e Esportivabet Scrapers
 
-## Resumo do Problema
+## ✅ IMPLEMENTADO
 
-Atualmente existem 4 processos separados rodando:
-- `scraper-aposta1` (futebol)
-- `scraper-aposta1-nba` (basquete)
-- `scraper-esportivabet` (futebol)
-- `scraper-esportivabet-nba` (basquete)
-
-Cada processo abre sua própria sessão Playwright para capturar token, causando concorrência e erros de `asyncio.CancelledError`.
+Este plano foi executado com sucesso em 2026-01-30.
 
 ---
 
-## Arquitetura Proposta
+## Resumo das Alterações
 
-```text
-ATUAL (4 processos separados):
-┌─────────────────┬─────────────────┐
-│ aposta1         │ esportivabet    │
-│ (30s, Futebol)  │ (30s, Futebol)  │
-├─────────────────┼─────────────────┤
-│ aposta1-nba     │ esportivabet-nba│
-│ (30s, NBA)      │ (30s, NBA)      │
-└─────────────────┴─────────────────┘
-= 4 capturas de token separadas
+### Arquivos Criados
+- `docs/scraper/scrapers/aposta1_unified_scraper.py` - Futebol + NBA em uma sessão
+- `docs/scraper/scrapers/esportivabet_unified_scraper.py` - Futebol + NBA em uma sessão
 
-PROPOSTA (2 processos unificados):
-┌───────────────────────────────────┐
-│ aposta1 (unificado)               │
-│ 1 Playwright -> Futebol + NBA     │
-│ (60s, 150M)                       │
-├───────────────────────────────────┤
-│ esportivabet (unificado)          │
-│ 1 Playwright -> Futebol + NBA     │
-│ (60s, 150M)                       │
-└───────────────────────────────────┘
-= 2 capturas de token (50% menos processos)
-```
+### Arquivos Modificados
+- `docs/scraper/standalone/run_scraper.py` - SCRAPER_MAP atualizado
+- `docs/scraper/ecosystem.config.js` - Entradas -nba removidas, intervalos ajustados
+- `docs/scraper/scrapers/__init__.py` - Documentação atualizada
 
 ---
 
-## Etapas de Implementação
+## Comandos para Deploy na VPS
 
-### Etapa 1: Criar `aposta1_unified_scraper.py`
+```bash
+# 1. Parar scrapers antigos
+pm2 stop scraper-aposta1 scraper-aposta1-nba scraper-esportivabet scraper-esportivabet-nba
 
-Novo arquivo que combina a lógica de `aposta1_scraper.py` + `aposta1_nba_scraper.py`:
+# 2. Deletar entradas antigas do PM2
+pm2 delete scraper-aposta1-nba scraper-esportivabet-nba
 
-**Características:**
-- Única captura de token via Playwright
-- Mesma sessão curl_cffi para Futebol e NBA
-- Guard Pattern no `setup()` para evitar re-inicialização
-- Teardown robusto com try/except
+# 3. Atualizar arquivos (git pull ou scp)
 
-**Estrutura:**
-```python
-class Aposta1UnifiedScraper(BaseScraper):
-    FOOTBALL_LEAGUES = {...}  # Das configs atuais
-    BASKETBALL_LEAGUES = {"nba": {...}}
-    
-    async def scrape_all(self):
-        await self.setup()  # Guard pattern
-        try:
-            # 1. Scrape todas as ligas de futebol
-            for league in FOOTBALL_LEAGUES:
-                odds.extend(await self._scrape_football_league(league))
-            
-            # 2. Scrape NBA
-            odds.extend(await self._scrape_basketball())
-            
-            return odds
-        finally:
-            await self.teardown()
-```
+# 4. Reiniciar com novo config
+pm2 restart scraper-aposta1 scraper-esportivabet
 
-### Etapa 2: Criar `esportivabet_unified_scraper.py`
-
-Mesmo padrão do Aposta1 Unificado:
-- Combinar `esportivabet_scraper.py` + `esportivabet_nba_scraper.py`
-- Um único token/session para ambos os esportes
-- Guard Pattern no setup
-
-### Etapa 3: Atualizar `run_scraper.py`
-
-Modificar o `SCRAPER_MAP` para usar os novos scrapers unificados:
-
-```python
-SCRAPER_MAP = {
-    # ... outros
-    "aposta1": ("scrapers.aposta1_unified_scraper", "Aposta1UnifiedScraper"),
-    "esportivabet": ("scrapers.esportivabet_unified_scraper", "EsportivabetUnifiedScraper"),
-    # Remover entradas _nba separadas
-}
-```
-
-### Etapa 4: Atualizar `ecosystem.config.js`
-
-**Alterações:**
-- `scraper-aposta1`: intervalo 30s para 60s, memória 100M para 150M
-- `scraper-aposta1-nba`: remover ou comentar
-- `scraper-esportivabet`: intervalo 30s para 60s, memória 100M para 150M  
-- `scraper-esportivabet-nba`: remover ou comentar
-
----
-
-## Detalhes Técnicos
-
-### Guard Pattern (Setup)
-
-```python
-async def setup(self) -> None:
-    # Guard: evita re-inicialização
-    if self.auth_token and self.session:
-        return
-    
-    # Capturar token via Playwright
-    # ...
-```
-
-### Teardown Robusto
-
-```python
-async def teardown(self) -> None:
-    try:
-        if self.session:
-            await self.session.close()
-    except Exception:
-        pass
-    self.session = None
-    self.auth_token = None
-```
-
-### Scrape All com Tratamento de Erros
-
-```python
-async def scrape_all(self) -> List[ScrapedOdds]:
-    all_odds = []
-    await self.setup()
-    
-    try:
-        # Futebol
-        for key, config in self.FOOTBALL_LEAGUES.items():
-            try:
-                odds = await self._scrape_football_league(config)
-                all_odds.extend(odds)
-            except Exception as e:
-                self.logger.error(f"Erro {config.name}: {e}")
-        
-        # Basquete
-        try:
-            odds = await self._scrape_basketball()
-            all_odds.extend(odds)
-        except Exception as e:
-            self.logger.error(f"Erro NBA: {e}")
-            
-    finally:
-        await self.teardown()
-    
-    return all_odds
+# 5. Verificar
+pm2 status
+pm2 logs scraper-aposta1 --lines 20
+pm2 logs scraper-esportivabet --lines 20
 ```
 
 ---
 
-## Arquivos a Modificar/Criar
+## Limpeza do Banco de Dados
 
-| Arquivo | Ação |
-|---------|------|
-| `docs/scraper/scrapers/aposta1_unified_scraper.py` | Criar (novo) |
-| `docs/scraper/scrapers/esportivabet_unified_scraper.py` | Criar (novo) |
-| `docs/scraper/standalone/run_scraper.py` | Atualizar SCRAPER_MAP |
-| `docs/scraper/ecosystem.config.js` | Remover entradas -nba, ajustar intervalos |
+Execute no SQL Editor do Supabase para remover registros obsoletos:
+
+```sql
+DELETE FROM public.scraper_status 
+WHERE scraper_name IN ('aposta1_nba', 'esportivabet_nba');
+```
 
 ---
 
-## Resultado Esperado
+## Resultado
 
 | Métrica | Antes | Depois |
 |---------|-------|--------|
 | Processos Aposta1 + Esportivabet | 4 | 2 |
 | Capturas de token Playwright | 4 | 2 |
+| Intervalo | 30s | 60s |
+| Memória máxima | 100M | 150M |
 | Erros de concorrência | Frequentes | Eliminados |
-
----
-
-## Comandos para Deploy
-
-Após as alterações, executar na VPS:
-
-```bash
-# Parar scrapers antigos
-pm2 stop scraper-aposta1 scraper-aposta1-nba scraper-esportivabet scraper-esportivabet-nba
-
-# Deletar entradas antigas
-pm2 delete scraper-aposta1-nba scraper-esportivabet-nba
-
-# Atualizar arquivos (git pull ou scp)
-
-# Reiniciar com novo config
-pm2 restart scraper-aposta1 scraper-esportivabet
-
-# Verificar
-pm2 status
-pm2 logs scraper-aposta1 --lines 20
-
-# Limpar tabela scraper_status
-# No Supabase SQL Editor:
-DELETE FROM public.scraper_status 
-WHERE scraper_name IN ('aposta1_nba', 'esportivabet_nba');
-```
