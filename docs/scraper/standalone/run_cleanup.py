@@ -13,7 +13,7 @@ import asyncio
 import argparse
 import sys
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -95,12 +95,12 @@ async def run_forever(interval: int, log: logger):
     
     while True:
         cycle_count += 1
-        start_time = datetime.utcnow()
+        start_time = datetime.now(timezone.utc)
         
         try:
             football, nba = await cleanup_old_matches(supabase, log)
             
-            duration = (datetime.utcnow() - start_time).total_seconds()
+            duration = (datetime.now(timezone.utc) - start_time).total_seconds()
             
             if football > 0 or nba > 0:
                 log.info(
@@ -114,7 +114,11 @@ async def run_forever(interval: int, log: logger):
         except Exception as e:
             log.error(f"[Cycle {cycle_count}] Error: {e}")
         
-        await asyncio.sleep(interval)
+        try:
+            await asyncio.sleep(interval)
+        except asyncio.CancelledError:
+            log.info("Shutdown requested during sleep")
+            break
 
 
 def parse_args():
@@ -154,8 +158,8 @@ async def main():
     
     try:
         await run_forever(args.interval, log)
-    except KeyboardInterrupt:
-        log.info("Shutting down (Ctrl+C)...")
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        log.info("Shutting down gracefully...")
     except Exception as e:
         log.exception(f"Fatal error: {e}")
         raise
