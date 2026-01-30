@@ -88,6 +88,26 @@ ALL_SCRAPERS_INTERLEAVED = [
     "esportivabet",  # PESADO
 ]
 
+# Pares otimizados para modo híbrido: 1 leve + 1 pesado quando possível
+# Isso permite ~50% redução no tempo de ciclo mantendo load ~3-5
+HYBRID_PAIRS = [
+    # (leve, pesado) - rodam em paralelo
+    ("superbet", "betano"),
+    ("novibet", "betbra"),
+    ("kto", "stake"),
+    ("estrelabet", "aposta1"),
+    ("sportingbet", "esportivabet"),
+    
+    # Leves solo ou em grupo (baixo impacto)
+    ("betnacional",),
+    ("br4bet", "mcgames"),
+    ("jogodeouro", "tradeball"),
+    ("bet365",),
+    
+    # NBA (todos leves, podem rodar juntos)
+    ("br4bet_nba", "mcgames_nba", "jogodeouro_nba"),
+]
+
 # Timeout máximo por scraper (segundos)
 SCRAPER_TIMEOUT = 120
 
@@ -335,8 +355,115 @@ async def run_sequential(scrapers: List[str], log):
         # Sem sleep - próximo ciclo imediato
 
 
-def get_scrapers_for_mode(mode: str, custom_list: Optional[str] = None) -> List[str]:
-    """Retorna lista de scrapers baseado no modo selecionado."""
+async def run_hybrid(pairs: List[tuple], log):
+    """
+    Executa scrapers em pares paralelos.
+    Cada par executa simultaneamente via asyncio.gather().
+    
+    Benefícios:
+      - ~50% redução no tempo de ciclo vs sequencial
+      - Load esperado: 3-5 (vs 1.5 sequencial)
+      - Máximo 1 Chrome pesado + 1 HTTPX leve por vez
+    """
+    from shared_resources import get_shared_resources
+    from normalizer import OddsNormalizer
+    from supabase_client import SupabaseClient
+    
+    log.info(f"Initializing HYBRID runner with {len(pairs)} pairs")
+    for i, pair in enumerate(pairs, 1):
+        log.info(f"  Pair {i}: {' + '.join(pair)}")
+    
+    # Inicializar recursos compartilhados (1 vez)
+    resources = await get_shared_resources()
+    normalizer = OddsNormalizer(resources)
+    supabase = SupabaseClient()
+    
+    cycle = 0
+    
+    while True:
+        cycle += 1
+        cycle_start = time.time()
+        
+        log.info(f"{'='*50}")
+        log.info(f"CYCLE {cycle} - HYBRID MODE ({len(pairs)} pairs)")
+        log.info(f"{'='*50}")
+        
+        # Limpar cache de logs não matcheados
+        resources.team_matcher.clear_log_cache()
+        
+        # Recarregar caches a cada 10 ciclos
+        if cycle % 10 == 0:
+            log.info("Reloading caches...")
+            await resources.reload_caches()
+        
+        # Métricas do ciclo
+        total_collected = 0
+        total_inserted = 0
+        errors = []
+        
+        # Executar pares sequencialmente, mas scrapers do par em paralelo
+        for pair_idx, pair in enumerate(pairs, 1):
+            pair_start = time.time()
+            pair_names = " + ".join(pair)
+            
+            try:
+                # Criar tasks para todos scrapers do par
+                tasks = [
+                    run_single_scraper(
+                        scraper_name=s,
+                        normalizer=normalizer,
+                        supabase=supabase,
+                        cycle=cycle,
+                        log=log
+                    )
+                    for s in pair
+                ]
+                
+                # Executar par em paralelo
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+                
+                # Agregar métricas
+                for i, r in enumerate(results):
+                    if isinstance(r, Exception):
+                        errors.append(f"{pair[i]}: {str(r)[:50]}")
+                    elif isinstance(r, dict):
+                        total_collected += r.get("odds_collected", 0)
+                        total_inserted += r.get("odds_inserted", 0)
+                        if r.get("error"):
+                            errors.append(f"{pair[i]}: {r['error'][:50]}")
+                
+                pair_duration = time.time() - pair_start
+                log.debug(f"Pair {pair_idx} ({pair_names}) completed in {pair_duration:.1f}s")
+                
+                # Cooldown de 2s entre pares pesados para liberar recursos
+                if any(s in HEAVY_SCRAPERS for s in pair):
+                    await asyncio.sleep(2)
+                    
+            except asyncio.CancelledError:
+                log.info("Shutdown during cycle")
+                return
+        
+        cycle_duration = time.time() - cycle_start
+        
+        log.info(f"{'='*50}")
+        log.info(
+            f"CYCLE {cycle} COMPLETE in {cycle_duration:.1f}s | "
+            f"Collected: {total_collected} | Inserted: {total_inserted}"
+        )
+        if errors:
+            log.warning(f"Errors this cycle: {len(errors)}")
+        log.info(f"{'='*50}")
+        
+        # Sem sleep - próximo ciclo imediato
+
+
+def get_scrapers_for_mode(mode: str, custom_list: Optional[str] = None):
+    """Retorna lista de scrapers ou pares baseado no modo selecionado.
+    
+    Returns:
+        Para modos 'all', 'light', 'heavy': List[str] de nomes de scrapers
+        Para modo 'hybrid': List[tuple] de pares para execução paralela
+    """
     if custom_list:
         # Lista customizada via --scrapers
         scrapers = [s.strip() for s in custom_list.split(",") if s.strip()]
@@ -349,28 +476,31 @@ def get_scrapers_for_mode(mode: str, custom_list: Optional[str] = None) -> List[
         return LIGHT_SCRAPERS
     elif mode == "heavy":
         return HEAVY_SCRAPERS
+    elif mode == "hybrid":
+        # Retorna lista de tuplas para execução em pares
+        return HYBRID_PAIRS
     else:
-        raise ValueError(f"Modo inválido: {mode}. Use: all, light, heavy")
+        raise ValueError(f"Modo inválido: {mode}. Use: all, light, heavy, hybrid")
 
 
 def parse_args():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
-        description="Sequential Scraper Runner - Executa scrapers em sequência"
+        description="Sequential/Hybrid Scraper Runner - Executa scrapers em sequência ou pares"
     )
     
     parser.add_argument(
         "--mode",
-        choices=["all", "light", "heavy"],
+        choices=["all", "light", "heavy", "hybrid"],
         default="all",
-        help="Modo de execução: all (todos), light (HTTPX), heavy (Playwright)"
+        help="Modo de execução: all (sequencial), light (HTTPX), heavy (Playwright), hybrid (pares paralelos)"
     )
     
     parser.add_argument(
         "--scrapers",
         type=str,
         default=None,
-        help="Lista customizada de scrapers separados por vírgula"
+        help="Lista customizada de scrapers separados por vírgula (não funciona com hybrid)"
     )
     
     parser.add_argument(
@@ -387,27 +517,36 @@ async def main():
     load_dotenv()
     args = parse_args()
     
-    # Determinar scrapers a executar
-    scrapers = get_scrapers_for_mode(args.mode, args.scrapers)
+    # Determinar scrapers/pares a executar
+    scrapers_or_pairs = get_scrapers_for_mode(args.mode, args.scrapers)
     
-    if not scrapers:
+    if not scrapers_or_pairs:
         print("Nenhum scraper selecionado!")
         sys.exit(1)
     
     log = setup_logging(args.mode, args.debug)
     
     log.info("=" * 60)
-    log.info("SEQUENTIAL SCRAPER RUNNER")
+    if args.mode == "hybrid":
+        log.info("HYBRID SCRAPER RUNNER (pares paralelos)")
+        log.info(f"Pairs: {len(scrapers_or_pairs)}")
+    else:
+        log.info("SEQUENTIAL SCRAPER RUNNER")
+        log.info(f"Scrapers: {len(scrapers_or_pairs)}")
     log.info(f"Mode: {args.mode}")
-    log.info(f"Scrapers: {len(scrapers)}")
     log.info(f"Timeout per scraper: {SCRAPER_TIMEOUT}s")
     log.info(f"Supabase URL: {settings.supabase_url[:30]}...")
     log.info("=" * 60)
     
     try:
-        await run_sequential(scrapers, log)
+        if args.mode == "hybrid":
+            await run_hybrid(scrapers_or_pairs, log)
+        else:
+            await run_sequential(scrapers_or_pairs, log)
     except KeyboardInterrupt:
         log.info("Shutting down (Ctrl+C)...")
+    except asyncio.CancelledError:
+        log.info("Shutting down (cancelled)...")
     except Exception as e:
         log.exception(f"Fatal error: {e}")
         raise

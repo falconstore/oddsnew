@@ -35,17 +35,43 @@
 module.exports = {
   apps: [
     // ============================================
-    // RUNNER SEQUENCIAL UNIFICADO - TODOS OS SCRAPERS
+    // RUNNER HÍBRIDO - PARES PARALELOS (RECOMENDADO)
     // ============================================
-    // Executa todos os scrapers em ordem intercalada:
-    //   superbet -> novibet -> kto -> BETANO (pesado) ->
-    //   estrelabet -> sportingbet -> betnacional -> BETBRA (pesado) ->
-    //   br4bet -> mcgames -> jogodeouro -> STAKE (pesado) ->
-    //   tradeball -> bet365 -> APOSTA1 (pesado) ->
-    //   br4bet_nba -> mcgames_nba -> jogodeouro_nba -> ESPORTIVABET (pesado)
+    // Executa scrapers em pares: 1 leve + 1 pesado simultaneamente
     // 
-    // Tempo estimado por ciclo: ~8-10 minutos
-    // Apenas 1 Chrome por vez!
+    // Benefícios vs sequencial:
+    //   - Tempo de ciclo: ~120-150s (vs ~229s)
+    //   - Load esperado: 3-5 (seguro para 8 vCPUs)
+    //   - Máximo 1 Chrome pesado + 1 HTTPX leve por vez
+    //
+    // Pares:
+    //   superbet+betano, novibet+betbra, kto+stake,
+    //   estrelabet+aposta1, sportingbet+esportivabet,
+    //   betnacional, br4bet+mcgames, jogodeouro+tradeball,
+    //   bet365, br4bet_nba+mcgames_nba+jogodeouro_nba
+    {
+      name: 'scraper-hybrid',
+      script: 'standalone/run_sequential.py',
+      interpreter: 'python3',
+      args: '--mode hybrid',
+      cwd: __dirname,
+      max_memory_restart: '700M',  // 2 scrapers simultâneos
+      restart_delay: 10000,
+      max_restarts: 10,
+      min_uptime: 60000,
+      kill_timeout: 150000,  // 2.5 min para terminar par atual graciosamente
+      autorestart: true,
+      env: {
+        PYTHONUNBUFFERED: '1'
+      }
+    },
+
+    // ============================================
+    // RUNNER SEQUENCIAL (ALTERNATIVA CONSERVADORA)
+    // ============================================
+    // Descomente para usar em vez do híbrido se load ficar alto
+    // Tempo de ciclo: ~229s | Load: ~1.5
+    /*
     {
       name: 'scraper-sequential',
       script: 'standalone/run_sequential.py',
@@ -56,12 +82,13 @@ module.exports = {
       restart_delay: 10000,
       max_restarts: 10,
       min_uptime: 60000,
-      kill_timeout: 150000,  // 2.5 min para terminar scraper atual graciosamente
+      kill_timeout: 150000,
       autorestart: true,
       env: {
         PYTHONUNBUFFERED: '1'
       }
     },
+    */
 
     // ============================================
     // SERVIÇOS AUXILIARES
