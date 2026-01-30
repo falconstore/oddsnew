@@ -61,7 +61,7 @@ class StakeScraper(BaseScraper):
         # Page pool for parallel requests
         self._page_pool: List[Page] = []
         self._pool_semaphore: Optional[asyncio.Semaphore] = None
-        self._pool_size = 5  # Reduzido de 10 para 5 (menos memoria)
+        self._pool_size = 2  # Reduzido para 2 (modo sequencial)
         self.logger = logger.bind(component="stake")
     
     async def setup(self):

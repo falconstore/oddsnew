@@ -1,16 +1,16 @@
 /**
- * PM2 Ecosystem Configuration - MODO SEQUENCIAL
+ * PM2 Ecosystem Configuration - MODO SEQUENCIAL UNIFICADO
  * 
- * Executa scrapers em sequência (um após o outro) para reduzir carga no servidor.
+ * Executa TODOS os scrapers em 1 único processo, em sequência.
  * 
  * Benefícios:
  *   - Load máximo: ~2-4 (vs 11+ no modo paralelo)
  *   - Memória: ~400-600 MB (vs 2-3 GB)
- *   - Chrome simultâneos: 1 (vs 2-5)
- *   - Processos PM2: 4 (vs 18+)
+ *   - Chrome simultâneos: 1 (apenas Stake usa 2 páginas internas)
+ *   - Processos PM2: 3 (vs 18+)
  * 
  * Trade-off:
- *   - Freshness: ~5-8 min por ciclo completo (vs 30s-120s)
+ *   - Freshness: ~8-10 min por ciclo completo (vs 30s-120s)
  * 
  * COMO USAR:
  * 
@@ -27,50 +27,32 @@
  *   pm2 save
  * 
  * MONITORAMENTO:
- *   pm2 status                    # Ver processos
- *   pm2 logs scraper-seq-light    # Logs do runner leve
- *   pm2 logs scraper-seq-heavy    # Logs do runner pesado
- *   htop                          # Verificar CPU/memória
+ *   pm2 status                      # Ver processos
+ *   pm2 logs scraper-sequential     # Logs do runner unificado
+ *   htop                            # Verificar CPU/memória
  */
 
 module.exports = {
   apps: [
     // ============================================
-    // RUNNER SEQUENCIAL - SCRAPERS LEVES (HTTPX)
+    // RUNNER SEQUENCIAL UNIFICADO - TODOS OS SCRAPERS
     // ============================================
-    // Executa: superbet, novibet, kto, estrelabet, sportingbet,
-    //          betnacional, br4bet, mcgames, jogodeouro, tradeball,
-    //          bet365, br4bet_nba, mcgames_nba, jogodeouro_nba
-    // Tempo estimado por ciclo: ~2-3 minutos
-    {
-      name: 'scraper-seq-light',
-      script: 'standalone/run_sequential.py',
-      interpreter: 'python3',
-      args: '--mode light',
-      cwd: __dirname,
-      max_memory_restart: '200M',
-      restart_delay: 5000,
-      max_restarts: 50,
-      min_uptime: 30000,
-      autorestart: true,
-      env: {
-        PYTHONUNBUFFERED: '1'
-      }
-    },
-
-    // ============================================
-    // RUNNER SEQUENCIAL - SCRAPERS PESADOS (Playwright)
-    // ============================================
-    // Executa: betano, betbra, stake, aposta1, esportivabet
-    // Tempo estimado por ciclo: ~5-6 minutos
+    // Executa todos os scrapers em ordem intercalada:
+    //   superbet -> novibet -> kto -> BETANO (pesado) ->
+    //   estrelabet -> sportingbet -> betnacional -> BETBRA (pesado) ->
+    //   br4bet -> mcgames -> jogodeouro -> STAKE (pesado) ->
+    //   tradeball -> bet365 -> APOSTA1 (pesado) ->
+    //   br4bet_nba -> mcgames_nba -> jogodeouro_nba -> ESPORTIVABET (pesado)
+    // 
+    // Tempo estimado por ciclo: ~8-10 minutos
     // Apenas 1 Chrome por vez!
     {
-      name: 'scraper-seq-heavy',
+      name: 'scraper-sequential',
       script: 'standalone/run_sequential.py',
       interpreter: 'python3',
-      args: '--mode heavy',
+      args: '--mode all',
       cwd: __dirname,
-      max_memory_restart: '500M',
+      max_memory_restart: '600M',
       restart_delay: 10000,
       max_restarts: 10,
       min_uptime: 60000,
@@ -82,14 +64,14 @@ module.exports = {
     },
 
     // ============================================
-    // SERVIÇOS AUXILIARES (mantidos do modo paralelo)
+    // SERVIÇOS AUXILIARES
     // ============================================
     
     {
       name: 'json-generator',
       script: 'standalone/run_json_generator.py',
       interpreter: 'python3',
-      args: '--interval 30',  // Aumentado de 15s para 30s
+      args: '--interval 60',  // Aumentado para 60s (ciclo completo ~8-10 min)
       cwd: __dirname,
       max_memory_restart: '100M',
       restart_delay: 2000,
