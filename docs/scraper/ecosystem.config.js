@@ -229,7 +229,7 @@ module.exports = {
       name: 'scraper-bet365',
       script: 'standalone/run_scraper.py',
       interpreter: 'python3',
-      args: '--scraper bet365 --interval 45',
+      args: '--scraper bet365 --interval 90',
       cwd: __dirname,
       max_memory_restart: '200M',
       restart_delay: 5000,
