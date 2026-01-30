@@ -1,290 +1,144 @@
 
 
-# Orquestrador Sequencial com Rollback Fácil
+# Corrigir Modo Sequencial - Unificar em 1 Processo
 
-## Resumo
+## Problema Identificado
 
-Criar um novo sistema de execução sequencial mantendo o sistema paralelo atual intacto, permitindo trocar entre os dois modos com um único comando PM2.
+O modo sequencial atual ainda tem carga alta porque:
 
-## Arquivos a Criar
+1. **Dois processos PM2 rodam em paralelo** (`scraper-seq-light` + `scraper-seq-heavy`)
+2. **O Stake cria 5+ processos Chrome internamente** (pool de paginas)
+3. Resultado: multiplos Chrome + CPU de scrapers leves = load alto
 
-| Arquivo | Descrição |
-|---------|-----------|
-| `docs/scraper/standalone/run_sequential.py` | Orquestrador sequencial (NOVO) |
-| `docs/scraper/ecosystem.sequential.config.js` | Config PM2 modo sequencial (NOVO) |
+## Solucao
 
-## Arquivos Mantidos (para rollback)
+### Camada 1: Unificar em 1 Unico Processo
 
-| Arquivo | Função |
-|---------|--------|
-| `docs/scraper/ecosystem.config.js` | Config atual (paralelo) - NÃO MODIFICAR |
-| `docs/scraper/standalone/run_scraper.py` | Runner atual - NÃO MODIFICAR |
-
-## Como Trocar Entre Modos
+Mudar de 2 processos para **1 processo que roda TUDO em sequencia**:
 
 ```text
-# Modo SEQUENCIAL (novo, leve):
-pm2 stop all
-pm2 delete all  
-pm2 start ecosystem.sequential.config.js
-pm2 save
+ANTES (2 processos paralelos):
+  scraper-seq-light  →  [superbet, novibet, kto, ...]     (loop)
+  scraper-seq-heavy  →  [betano, betbra, stake, ...]      (loop)
+  (ambos rodam ao mesmo tempo!)
 
-# Modo PARALELO (original, voltar):
-pm2 stop all
-pm2 delete all
-pm2 start ecosystem.config.js
-pm2 save
+DEPOIS (1 processo sequencial):
+  scraper-sequential →  [superbet, novibet, ..., betano, betbra, stake, ...]
+  (1 scraper por vez, nunca 2 ao mesmo tempo)
 ```
 
-## Estrutura do Orquestrador Sequencial
+### Camada 2: Reduzir Pool do Stake
+
+Mudar de 5 para 2 paginas no pool:
+
+| Arquivo | Mudanca |
+|---------|---------|
+| `docs/scraper/scrapers/stake_scraper.py` | `_pool_size = 5` → `_pool_size = 2` |
+
+Isso reduz de 6 processos Chrome para 3.
+
+### Camada 3: Ordem Otimizada
+
+Intercalar scrapers leves entre os pesados para dar tempo de "respirar":
 
 ```text
-+-------------------------------------------+
-|           run_sequential.py               |
-|-------------------------------------------|
-| SharedResources (1 instancia)             |
-| OddsNormalizer (1 instancia)              |
-| SupabaseClient (1 instancia)              |
-|-------------------------------------------|
-|  Loop infinito:                           |
-|    for scraper in ORDEM:                  |
-|      1. Importar classe (lazy)            |
-|      2. Criar instancia                   |
-|      3. scrape_all() com timeout          |
-|      4. normalize_and_insert()            |
-|      5. Enviar heartbeat                  |
-|      6. Proximo scraper (sem sleep)       |
-+-------------------------------------------+
+superbet → novibet → kto → BETANO → estrelabet → sportingbet → BETBRA → 
+betnacional → br4bet → STAKE → mcgames → jogodeouro → APOSTA1 → 
+tradeball → bet365 → ESPORTIVABET → br4bet_nba → mcgames_nba → jogodeouro_nba
 ```
 
-## Ordem de Execução
+## Arquivos a Modificar
 
-O orquestrador vai rodar scrapers em sequência, alternando entre leves e pesados para distribuir carga:
+| Arquivo | Mudanca |
+|---------|---------|
+| `ecosystem.sequential.config.js` | Remover `scraper-seq-light`, manter apenas 1 processo `--mode all` |
+| `stake_scraper.py` | Reduzir `_pool_size` de 5 para 2 |
+| `run_sequential.py` | Mudar ordem para intercalar leves e pesados |
 
-```text
-Grupo LIGHT (HTTPX - ~10s cada):
-  superbet -> novibet -> kto -> estrelabet -> sportingbet -> 
-  betnacional -> br4bet -> mcgames -> jogodeouro -> tradeball -> 
-  bet365 -> br4bet_nba -> mcgames_nba -> jogodeouro_nba
-
-Grupo HEAVY (Playwright - ~60s cada):  
-  betano -> betbra -> stake -> aposta1 -> esportivabet
-```
-
-## Modos de Operação
-
-```text
---mode all    : Todos os scrapers em 1 processo (mais simples)
---mode light  : Apenas HTTPX scrapers (ciclo ~2-3 min)
---mode heavy  : Apenas Playwright scrapers (ciclo ~5 min)
-```
-
-## Configuração PM2 Sequencial
-
-A nova config terá apenas 4 processos:
-
-```text
-1. scraper-seq-light   : Scrapers HTTPX em loop
-2. scraper-seq-heavy   : Scrapers Playwright em loop  
-3. json-generator      : Gerar JSON (mantido)
-4. cleanup-service     : Limpeza (mantido)
-```
-
-## Comparativo de Carga
-
-| Aspecto | Paralelo (atual) | Sequencial (novo) |
-|---------|------------------|-------------------|
-| Processos PM2 | 18+ | 4 |
-| Chrome simultaneos | 2-5 | 1 |
-| Load maximo | 11+ | 2-4 (estimado) |
-| Memoria total | 2-3 GB | 400-600 MB |
-| Freshness | 30-120s | 5-8 min (ciclo completo) |
-
-## Segurança: Timeout por Scraper
-
-Cada scraper terá timeout de 120s para evitar travamento:
-
-```python
-try:
-    odds = await asyncio.wait_for(
-        scraper.scrape_all(), 
-        timeout=120.0
-    )
-except asyncio.TimeoutError:
-    log.error(f"{scraper_name} timeout após 120s")
-    # Continua pro próximo
-```
-
-## Sequência de Implementação
-
-1. Criar `run_sequential.py` com toda a lógica
-2. Criar `ecosystem.sequential.config.js` 
-3. Copiar ambos arquivos para VPS
-4. Validar sintaxe: `python3 -m py_compile standalone/run_sequential.py`
-5. Testar manualmente: `python3 standalone/run_sequential.py --mode light`
-6. Se funcionar: `pm2 start ecosystem.sequential.config.js`
-7. Monitorar `htop` e `pm2 logs`
-
-## Rollback (voltar ao paralelo)
-
-Se o modo sequencial não funcionar bem:
-
-```bash
-pm2 stop all
-pm2 delete all
-pm2 start ecosystem.config.js   # Original
-pm2 save
-```
-
-Nenhum arquivo original é modificado, então o rollback é instantâneo.
-
----
-
-## Detalhes Técnicos
-
-### run_sequential.py
-
-```python
-#!/usr/bin/env python3
-"""
-Sequential Scraper Runner - Executa scrapers em sequência.
-
-Uso:
-    python run_sequential.py --mode all
-    python run_sequential.py --mode light
-    python run_sequential.py --mode heavy
-"""
-
-LIGHT_SCRAPERS = [
-    "superbet", "novibet", "kto", "estrelabet", "sportingbet",
-    "betnacional", "br4bet", "mcgames", "jogodeouro", "tradeball",
-    "bet365", "br4bet_nba", "mcgames_nba", "jogodeouro_nba"
-]
-
-HEAVY_SCRAPERS = [
-    "betano", "betbra", "stake", "aposta1", "esportivabet"
-]
-
-# Importar get_scraper_class do run_scraper.py existente
-# Reutilizar SharedResources e OddsNormalizer
-
-async def run_sequential(scrapers: list, log):
-    resources = await get_shared_resources()
-    normalizer = OddsNormalizer(resources)
-    supabase = SupabaseClient()
-    
-    cycle = 0
-    while True:
-        cycle += 1
-        log.info(f"=== Cycle {cycle} ===")
-        
-        for scraper_name in scrapers:
-            start = time.time()
-            try:
-                # Lazy import (mesmo pattern do run_scraper.py)
-                scraper_class = get_scraper_class(scraper_name)
-                scraper = scraper_class()
-                
-                # Timeout de 120s por scraper
-                odds = await asyncio.wait_for(
-                    scraper.scrape_all(),
-                    timeout=120.0
-                )
-                
-                odds_inserted = 0
-                if odds:
-                    football, nba = await normalizer.normalize_and_insert(odds)
-                    odds_inserted = football + nba
-                
-                duration = time.time() - start
-                log.info(f"{scraper_name}: {len(odds) if odds else 0} -> {odds_inserted} em {duration:.1f}s")
-                
-                # Heartbeat individual
-                await supabase.upsert_scraper_status(
-                    scraper_name=scraper_name,
-                    odds_collected=len(odds) if odds else 0,
-                    odds_inserted=odds_inserted,
-                    cycle_count=cycle
-                )
-                
-            except asyncio.TimeoutError:
-                log.error(f"{scraper_name} TIMEOUT (120s)")
-                await supabase.upsert_scraper_status(
-                    scraper_name=scraper_name,
-                    error="Timeout após 120s",
-                    cycle_count=cycle
-                )
-            except Exception as e:
-                log.error(f"{scraper_name} ERROR: {e}")
-                await supabase.upsert_scraper_status(
-                    scraper_name=scraper_name,
-                    error=str(e)[:500],
-                    cycle_count=cycle
-                )
-        
-        # Recarregar caches a cada 10 ciclos
-        if cycle % 10 == 0:
-            await resources.reload_caches()
-        
-        log.info(f"=== Cycle {cycle} complete ===")
-        # Sem sleep - próximo ciclo imediato
-```
-
-### ecosystem.sequential.config.js
+## Nova Config PM2 (apenas 3 processos)
 
 ```javascript
 module.exports = {
   apps: [
     {
-      name: 'scraper-seq-light',
+      name: 'scraper-sequential',
       script: 'standalone/run_sequential.py',
       interpreter: 'python3',
-      args: '--mode light',
+      args: '--mode all',  // TUDO em 1 processo
       cwd: __dirname,
-      max_memory_restart: '200M',
-      restart_delay: 5000,
-      max_restarts: 50,
-      autorestart: true,
-      env: { PYTHONUNBUFFERED: '1' }
-    },
-    {
-      name: 'scraper-seq-heavy',
-      script: 'standalone/run_sequential.py',
-      interpreter: 'python3',
-      args: '--mode heavy',
-      cwd: __dirname,
-      max_memory_restart: '500M',
+      max_memory_restart: '600M',
       restart_delay: 10000,
       max_restarts: 10,
-      kill_timeout: 150000,  // 2.5 min para terminar scraper atual
+      min_uptime: 60000,
+      kill_timeout: 150000,
       autorestart: true,
       env: { PYTHONUNBUFFERED: '1' }
     },
     {
       name: 'json-generator',
       script: 'standalone/run_json_generator.py',
-      interpreter: 'python3',
-      args: '--interval 30',  // Aumentado de 15s
-      cwd: __dirname,
-      max_memory_restart: '100M',
-      restart_delay: 2000,
-      max_restarts: 100,
-      autorestart: true,
-      env: { PYTHONUNBUFFERED: '1' }
+      args: '--interval 60',  // Aumentar para 60s
+      // ...
     },
     {
       name: 'cleanup-service',
-      script: 'standalone/run_cleanup.py',
-      interpreter: 'python3',
-      args: '--interval 300',
-      cwd: __dirname,
-      max_memory_restart: '50M',
-      restart_delay: 5000,
-      max_restarts: 100,
-      autorestart: true,
-      env: { PYTHONUNBUFFERED: '1' }
+      // mantido
     }
   ]
 };
+```
+
+## Nova Ordem no run_sequential.py
+
+```python
+# Ordem intercalada: leves + pesados distribuidos
+ALL_SCRAPERS_INTERLEAVED = [
+    # Bloco 1: 3 leves + 1 pesado
+    "superbet", "novibet", "kto", 
+    "betano",  # PESADO
+    
+    # Bloco 2: 3 leves + 1 pesado
+    "estrelabet", "sportingbet", "betnacional",
+    "betbra",  # PESADO
+    
+    # Bloco 3: 3 leves + 1 pesado
+    "br4bet", "mcgames", "jogodeouro",
+    "stake",  # PESADO (com pool reduzido)
+    
+    # Bloco 4: 2 leves + 1 pesado
+    "tradeball", "bet365",
+    "aposta1",  # PESADO
+    
+    # Bloco 5: 3 leves + 1 pesado
+    "br4bet_nba", "mcgames_nba", "jogodeouro_nba",
+    "esportivabet",  # PESADO
+]
+```
+
+## Estimativa de Carga
+
+| Aspecto | Antes (2 processos) | Depois (1 processo) |
+|---------|---------------------|---------------------|
+| Processos PM2 | 4 | 3 |
+| Chrome maximo simultaneo | 6+ (Stake pool) | 3 (Stake reduzido) |
+| Load estimado | 11-19 | 2-4 |
+| Ciclo completo | ~3-5 min | ~8-10 min |
+
+## Passos de Implementacao
+
+1. Modificar `ecosystem.sequential.config.js` para usar `--mode all`
+2. Modificar `run_sequential.py` para ordem intercalada
+3. Modificar `stake_scraper.py` para `_pool_size = 2`
+4. Na VPS: parar PM2, copiar arquivos, reiniciar
+5. Monitorar `htop` - load deve ficar entre 2-4
+
+## Rollback
+
+Se ainda nao funcionar, voltar ao modo paralelo original:
+
+```bash
+pm2 stop all && pm2 delete all
+pm2 start ecosystem.config.js
+pm2 save
 ```
 
