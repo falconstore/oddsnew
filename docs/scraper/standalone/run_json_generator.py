@@ -170,7 +170,7 @@ async def run_forever(interval: int, log: logger):
     
     while True:
         cycle_count += 1
-        start_time = datetime.utcnow()
+        start_time = datetime.now(timezone.utc)
         
         try:
             # Buscar odds de futebol e NBA
@@ -189,7 +189,7 @@ async def run_forever(interval: int, log: logger):
             
             # Gerar JSON
             json_data = {
-                "generated_at": datetime.utcnow().isoformat(),
+                "generated_at": datetime.now(timezone.utc).isoformat(),
                 "matches_count": len(matches),
                 "matches": matches
             }
@@ -201,7 +201,7 @@ async def run_forever(interval: int, log: logger):
                 football_count = len([m for m in matches if m.get("sport_type") != "basketball"])
                 nba_count = len([m for m in matches if m.get("sport_type") == "basketball"])
                 
-                duration = (datetime.utcnow() - start_time).total_seconds()
+                duration = (datetime.now(timezone.utc) - start_time).total_seconds()
                 log.info(
                     f"[Cycle {cycle_count}] "
                     f"Football: {football_count}, NBA: {nba_count}, "
@@ -213,7 +213,11 @@ async def run_forever(interval: int, log: logger):
         except Exception as e:
             log.error(f"[Cycle {cycle_count}] Error: {e}")
         
-        await asyncio.sleep(interval)
+        try:
+            await asyncio.sleep(interval)
+        except asyncio.CancelledError:
+            log.info("Shutdown requested during sleep")
+            break
 
 
 def parse_args():
@@ -252,8 +256,8 @@ async def main():
     
     try:
         await run_forever(args.interval, log)
-    except KeyboardInterrupt:
-        log.info("Shutting down (Ctrl+C)...")
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        log.info("Shutting down gracefully...")
     except Exception as e:
         log.exception(f"Fatal error: {e}")
         raise

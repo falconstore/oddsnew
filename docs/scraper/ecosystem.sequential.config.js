@@ -87,7 +87,7 @@ module.exports = {
       interpreter: 'python3',
       args: '--interval 300',
       cwd: __dirname,
-      max_memory_restart: '50M',
+      max_memory_restart: '100M',
       restart_delay: 5000,
       max_restarts: 100,
       autorestart: true,
