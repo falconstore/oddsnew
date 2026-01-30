@@ -3,6 +3,9 @@
  * 
  * Gerencia todos os processos de scraping de forma distribuída.
  * 
+ * OTIMIZADO: Scrapers Playwright unificados (betano, betbra) com intervalos maiores
+ * para reduzir consumo de CPU/RAM na VPS.
+ * 
  * Comandos úteis:
  *   pm2 start ecosystem.config.js     # Iniciar todos
  *   pm2 status                         # Ver status
@@ -17,24 +20,66 @@
 module.exports = {
   apps: [
     // ============================================
-    // SCRAPERS HTTPX (Leves - 30s interval)
-    // Usam requests HTTP diretos, baixo consumo de memória
+    // UNIFIED PLAYWRIGHT SCRAPERS (Pesados - 120s interval)
+    // Usam browser automatizado, maior consumo de memória
+    // Unificados: Futebol + NBA em uma única sessão
     // ============================================
     
     {
       name: 'scraper-betano',
       script: 'standalone/run_scraper.py',
       interpreter: 'python3',
-      args: '--scraper betano --interval 30',
+      args: '--scraper betano --interval 120',
       cwd: __dirname,
-      max_memory_restart: '100M',
-      restart_delay: 3000,
-      max_restarts: 50,
+      max_memory_restart: '300M',
+      restart_delay: 10000,
+      max_restarts: 5,
+      min_uptime: 30000,
+      kill_timeout: 30000,
       autorestart: true,
       env: {
         PYTHONUNBUFFERED: '1'
       }
     },
+    {
+      name: 'scraper-betbra',
+      script: 'standalone/run_scraper.py',
+      interpreter: 'python3',
+      args: '--scraper betbra --interval 120',
+      cwd: __dirname,
+      max_memory_restart: '300M',
+      restart_delay: 10000,
+      max_restarts: 5,
+      min_uptime: 30000,
+      kill_timeout: 30000,
+      autorestart: true,
+      env: {
+        PYTHONUNBUFFERED: '1'
+      }
+    },
+    {
+      name: 'scraper-stake',
+      script: 'standalone/run_scraper.py',
+      interpreter: 'python3',
+      args: '--scraper stake --interval 120',
+      cwd: __dirname,
+      max_memory_restart: '400M',
+      restart_delay: 10000,
+      max_restarts: 5,
+      min_uptime: 30000,
+      kill_timeout: 30000,
+      autorestart: true,
+      env: {
+        PYTHONUNBUFFERED: '1'
+      }
+    },
+    
+    // ============================================
+    // UNIFIED HTTPX SCRAPERS (Leves - 30s interval)
+    // Usam requests HTTP diretos, baixo consumo de memória
+    // Futebol + NBA em uma única sessão
+    // ============================================
+    
     {
       name: 'scraper-superbet',
       script: 'standalone/run_scraper.py',
@@ -119,22 +164,11 @@ module.exports = {
         PYTHONUNBUFFERED: '1'
       }
     },
-    {
-      name: 'scraper-stake',
-      script: 'standalone/run_scraper.py',
-      interpreter: 'python3',
-      args: '--scraper stake --interval 30',
-      cwd: __dirname,
-      max_memory_restart: '400M',
-      restart_delay: 10000,
-      max_restarts: 5,
-      min_uptime: 30000,
-      kill_timeout: 30000,
-      autorestart: true,
-      env: {
-        PYTHONUNBUFFERED: '1'
-      }
-    },
+    
+    // ============================================
+    // HTTPX SCRAPERS - FOOTBALL ONLY (30s interval)
+    // ============================================
+    
     {
       name: 'scraper-br4bet',
       script: 'standalone/run_scraper.py',
@@ -219,12 +253,6 @@ module.exports = {
         PYTHONUNBUFFERED: '1'
       }
     },
-    
-    // ============================================
-    // SCRAPERS PLAYWRIGHT (Pesados - 45s interval)
-    // Usam browser automatizado, maior consumo de memória
-    // ============================================
-    
     {
       name: 'scraper-bet365',
       script: 'standalone/run_scraper.py',
@@ -239,54 +267,11 @@ module.exports = {
         PYTHONUNBUFFERED: '1'
       }
     },
-    {
-      name: 'scraper-betbra',
-      script: 'standalone/run_scraper.py',
-      interpreter: 'python3',
-      args: '--scraper betbra --interval 45',
-      cwd: __dirname,
-      max_memory_restart: '200M',
-      restart_delay: 5000,
-      max_restarts: 30,
-      autorestart: true,
-      env: {
-        PYTHONUNBUFFERED: '1'
-      }
-    },
     
     // ============================================
-    // NBA-ONLY SCRAPERS (30s interval)
-    // Scrapers de basquete separados
+    // HTTPX SCRAPERS - NBA ONLY (30s interval)
     // ============================================
     
-    {
-      name: 'scraper-betano-nba',
-      script: 'standalone/run_scraper.py',
-      interpreter: 'python3',
-      args: '--scraper betano_nba --interval 30',
-      cwd: __dirname,
-      max_memory_restart: '100M',
-      restart_delay: 3000,
-      max_restarts: 50,
-      autorestart: true,
-      env: {
-        PYTHONUNBUFFERED: '1'
-      }
-    },
-    {
-      name: 'scraper-betbra-nba',
-      script: 'standalone/run_scraper.py',
-      interpreter: 'python3',
-      args: '--scraper betbra_nba --interval 45',
-      cwd: __dirname,
-      max_memory_restart: '200M',
-      restart_delay: 5000,
-      max_restarts: 30,
-      autorestart: true,
-      env: {
-        PYTHONUNBUFFERED: '1'
-      }
-    },
     {
       name: 'scraper-br4bet-nba',
       script: 'standalone/run_scraper.py',
