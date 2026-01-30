@@ -1,157 +1,175 @@
 
-
-# Plano de Otimização dos Scrapers Playwright
+# Plano de Unificação: Aposta1 e Esportivabet Scrapers
 
 ## Resumo do Problema
 
-Os scrapers Playwright (Betano, Betbra, Stake) estavam causando sobrecarga crítica no servidor (Load Average 27+ em 4 vCPUs) devido a:
+Atualmente existem 4 processos separados rodando:
+- `scraper-aposta1` (futebol)
+- `scraper-aposta1-nba` (basquete)
+- `scraper-esportivabet` (futebol)
+- `scraper-esportivabet-nba` (basquete)
 
-1. **Intervalos muito curtos** (30-45s) para scrapers que usam browser
-2. **Processos separados** para Futebol e NBA, duplicando instâncias Chrome
-3. **Falta de Guard Pattern** nos scrapers Betano/Betbra (apenas Stake tem)
-4. **Limits de memória inadequados** para scrapers Playwright
+Cada processo abre sua própria sessão Playwright para capturar token, causando concorrência e erros de `asyncio.CancelledError`.
 
 ---
 
-## Arquitetura Atual vs Proposta
+## Arquitetura Proposta
 
 ```text
-ATUAL (5 processos Playwright):
-┌─────────────────┬─────────────────┬─────────────────┐
-│ betano          │ betbra          │ stake           │
-│ (30s, 100M)     │ (45s, 200M)     │ (30s, 400M)     │
-├─────────────────┼─────────────────┼─────────────────┤
-│ betano-nba      │ betbra-nba      │                 │
-│ (30s, 100M)     │ (45s, 200M)     │                 │
-└─────────────────┴─────────────────┴─────────────────┘
-= 5 Chrome browsers simultâneos = Sobrecarga
+ATUAL (4 processos separados):
+┌─────────────────┬─────────────────┐
+│ aposta1         │ esportivabet    │
+│ (30s, Futebol)  │ (30s, Futebol)  │
+├─────────────────┼─────────────────┤
+│ aposta1-nba     │ esportivabet-nba│
+│ (30s, NBA)      │ (30s, NBA)      │
+└─────────────────┴─────────────────┘
+= 4 capturas de token separadas
 
-PROPOSTA (2 processos Playwright):
-┌─────────────────────────────────┬───────────────────┐
-│ betano (unificado)              │ stake (já ok)     │
-│ Futebol + NBA em 1 browser      │ Futebol + NBA     │
-│ (120s, 300M)                    │ (120s, 400M)      │
-└─────────────────────────────────┴───────────────────┘
-= 2 Chrome browsers = Estável
+PROPOSTA (2 processos unificados):
+┌───────────────────────────────────┐
+│ aposta1 (unificado)               │
+│ 1 Playwright -> Futebol + NBA     │
+│ (60s, 150M)                       │
+├───────────────────────────────────┤
+│ esportivabet (unificado)          │
+│ 1 Playwright -> Futebol + NBA     │
+│ (60s, 150M)                       │
+└───────────────────────────────────┘
+= 2 capturas de token (50% menos processos)
 ```
 
 ---
 
 ## Etapas de Implementação
 
-### Etapa 1: Ajustar Intervalos e Limites (Imediato)
+### Etapa 1: Criar `aposta1_unified_scraper.py`
 
-Atualizar `ecosystem.config.js` com intervalos maiores para os scrapers Playwright:
+Novo arquivo que combina a lógica de `aposta1_scraper.py` + `aposta1_nba_scraper.py`:
 
-**Alterações:**
-- `betano`: intervalo 30s para 120s, memória 100M para 300M
-- `betano-nba`: desabilitar (será unificado)
-- `betbra`: intervalo 45s para 120s, memória 200M para 300M
-- `betbra-nba`: desabilitar (será unificado)
-- `stake`: intervalo 30s para 120s (já tem 400M)
+**Características:**
+- Única captura de token via Playwright
+- Mesma sessão curl_cffi para Futebol e NBA
+- Guard Pattern no `setup()` para evitar re-inicialização
+- Teardown robusto com try/except
 
-### Etapa 2: Criar Scraper Betano Unificado
-
-Criar novo arquivo `betano_unified_scraper.py` que:
-- Coleta Futebol + NBA em uma única sessão Playwright
-- Implementa Guard Pattern (como o Stake)
-- Gerencia setup/teardown internamente no `scrape_all()`
-
-**Estrutura do código:**
+**Estrutura:**
 ```python
-class BetanoUnifiedScraper(BaseScraper):
-    # Combina LEAGUES de futebol e NBA
+class Aposta1UnifiedScraper(BaseScraper):
     FOOTBALL_LEAGUES = {...}  # Das configs atuais
     BASKETBALL_LEAGUES = {"nba": {...}}
     
     async def scrape_all(self):
         await self.setup()  # Guard pattern
         try:
-            # Scrape futebol
+            # 1. Scrape todas as ligas de futebol
             for league in FOOTBALL_LEAGUES:
                 odds.extend(await self._scrape_football_league(league))
-            # Scrape NBA
-            odds.extend(await self._scrape_nba())
+            
+            # 2. Scrape NBA
+            odds.extend(await self._scrape_basketball())
+            
             return odds
         finally:
             await self.teardown()
 ```
 
-### Etapa 3: Criar Scraper Betbra Unificado
+### Etapa 2: Criar `esportivabet_unified_scraper.py`
 
-Mesmo padrão do Betano Unificado:
-- Combinar `betbra_scraper.py` + `betbra_nba_scraper.py`
-- Um único browser para ambos os esportes
+Mesmo padrão do Aposta1 Unificado:
+- Combinar `esportivabet_scraper.py` + `esportivabet_nba_scraper.py`
+- Um único token/session para ambos os esportes
 - Guard Pattern no setup
 
-### Etapa 4: Atualizar Mapeamento no Runner
+### Etapa 3: Atualizar `run_scraper.py`
 
-Atualizar `run_scraper.py` para usar os novos scrapers unificados:
+Modificar o `SCRAPER_MAP` para usar os novos scrapers unificados:
+
 ```python
 SCRAPER_MAP = {
-    "betano": ("scrapers.betano_unified_scraper", "BetanoUnifiedScraper"),
-    "betbra": ("scrapers.betbra_unified_scraper", "BetbraUnifiedScraper"),
     # ... outros
+    "aposta1": ("scrapers.aposta1_unified_scraper", "Aposta1UnifiedScraper"),
+    "esportivabet": ("scrapers.esportivabet_unified_scraper", "EsportivabetUnifiedScraper"),
+    # Remover entradas _nba separadas
 }
 ```
 
-### Etapa 5: Remover Entradas Obsoletas
+### Etapa 4: Atualizar `ecosystem.config.js`
 
-No `ecosystem.config.js`:
-- Remover ou comentar `scraper-betano-nba`
-- Remover ou comentar `scraper-betbra-nba`
+**Alterações:**
+- `scraper-aposta1`: intervalo 30s para 60s, memória 100M para 150M
+- `scraper-aposta1-nba`: remover ou comentar
+- `scraper-esportivabet`: intervalo 30s para 60s, memória 100M para 150M  
+- `scraper-esportivabet-nba`: remover ou comentar
 
 ---
 
 ## Detalhes Técnicos
 
-### Guard Pattern (Já implementado no Stake)
+### Guard Pattern (Setup)
 
 ```python
-async def setup(self):
+async def setup(self) -> None:
     # Guard: evita re-inicialização
-    if self._page is not None:
+    if self.auth_token and self.session:
         return
     
-    # ... criar browser
+    # Capturar token via Playwright
+    # ...
 ```
 
 ### Teardown Robusto
 
 ```python
-async def teardown(self):
-    # Fechar aiohttp session (se usar)
+async def teardown(self) -> None:
     try:
-        if self._session:
-            await self._session.close()
+        if self.session:
+            await self.session.close()
     except Exception:
         pass
-    self._session = None
+    self.session = None
+    self.auth_token = None
+```
+
+### Scrape All com Tratamento de Erros
+
+```python
+async def scrape_all(self) -> List[ScrapedOdds]:
+    all_odds = []
+    await self.setup()
     
-    # Fechar page
     try:
-        if self._page:
-            await self._page.close()
-    except Exception:
-        pass
-    self._page = None
+        # Futebol
+        for key, config in self.FOOTBALL_LEAGUES.items():
+            try:
+                odds = await self._scrape_football_league(config)
+                all_odds.extend(odds)
+            except Exception as e:
+                self.logger.error(f"Erro {config.name}: {e}")
+        
+        # Basquete
+        try:
+            odds = await self._scrape_basketball()
+            all_odds.extend(odds)
+        except Exception as e:
+            self.logger.error(f"Erro NBA: {e}")
+            
+    finally:
+        await self.teardown()
     
-    # ... context e browser
+    return all_odds
 ```
 
-### Configurações PM2 Otimizadas
+---
 
-```javascript
-{
-    name: 'scraper-betano',
-    args: '--scraper betano --interval 120',
-    max_memory_restart: '300M',
-    restart_delay: 10000,
-    max_restarts: 5,
-    min_uptime: 30000,
-    kill_timeout: 30000,
-}
-```
+## Arquivos a Modificar/Criar
+
+| Arquivo | Ação |
+|---------|------|
+| `docs/scraper/scrapers/aposta1_unified_scraper.py` | Criar (novo) |
+| `docs/scraper/scrapers/esportivabet_unified_scraper.py` | Criar (novo) |
+| `docs/scraper/standalone/run_scraper.py` | Atualizar SCRAPER_MAP |
+| `docs/scraper/ecosystem.config.js` | Remover entradas -nba, ajustar intervalos |
 
 ---
 
@@ -159,30 +177,34 @@ async def teardown(self):
 
 | Métrica | Antes | Depois |
 |---------|-------|--------|
-| Processos Chrome simultâneos | 5 | 2 |
-| Ciclos por minuto (Playwright) | ~10 | ~1 |
-| RAM estimada (Playwright) | ~2GB | ~700MB |
-| Load Average esperado | 4-8 | 1-2 |
+| Processos Aposta1 + Esportivabet | 4 | 2 |
+| Capturas de token Playwright | 4 | 2 |
+| Erros de concorrência | Frequentes | Eliminados |
 
 ---
 
-## Ordem de Execução Recomendada
+## Comandos para Deploy
 
-1. **Manter scrapers Playwright parados** por enquanto
-2. **Criar scrapers unificados** (Betano + Betbra)
-3. **Atualizar ecosystem.config.js** com novos intervalos
-4. **Testar um scraper por vez** (iniciar apenas stake com 120s)
-5. **Monitorar load** por 5-10 minutos
-6. **Adicionar próximo scraper** se estável
+Após as alterações, executar na VPS:
 
----
+```bash
+# Parar scrapers antigos
+pm2 stop scraper-aposta1 scraper-aposta1-nba scraper-esportivabet scraper-esportivabet-nba
 
-## Arquivos a Modificar
+# Deletar entradas antigas
+pm2 delete scraper-aposta1-nba scraper-esportivabet-nba
 
-| Arquivo | Ação |
-|---------|------|
-| `docs/scraper/scrapers/betano_unified_scraper.py` | Criar (novo) |
-| `docs/scraper/scrapers/betbra_unified_scraper.py` | Criar (novo) |
-| `docs/scraper/standalone/run_scraper.py` | Atualizar SCRAPER_MAP |
-| `docs/scraper/ecosystem.config.js` | Atualizar intervalos e remover -nba |
+# Atualizar arquivos (git pull ou scp)
 
+# Reiniciar com novo config
+pm2 restart scraper-aposta1 scraper-esportivabet
+
+# Verificar
+pm2 status
+pm2 logs scraper-aposta1 --lines 20
+
+# Limpar tabela scraper_status
+# No Supabase SQL Editor:
+DELETE FROM public.scraper_status 
+WHERE scraper_name IN ('aposta1_nba', 'esportivabet_nba');
+```
