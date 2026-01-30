@@ -1,84 +1,188 @@
 
 
-# Ajustar Intervalo da Bet365 para 90s e Melhorar Tratamento de Shutdown
+# Plano de Otimização dos Scrapers Playwright
 
-## Problema 1: Intervalo Atual
+## Resumo do Problema
 
-No `ecosystem.config.js`, a Bet365 está configurada com intervalo de 45 segundos:
-```javascript
-args: '--scraper bet365 --interval 45',
+Os scrapers Playwright (Betano, Betbra, Stake) estavam causando sobrecarga crítica no servidor (Load Average 27+ em 4 vCPUs) devido a:
+
+1. **Intervalos muito curtos** (30-45s) para scrapers que usam browser
+2. **Processos separados** para Futebol e NBA, duplicando instâncias Chrome
+3. **Falta de Guard Pattern** nos scrapers Betano/Betbra (apenas Stake tem)
+4. **Limits de memória inadequados** para scrapers Playwright
+
+---
+
+## Arquitetura Atual vs Proposta
+
+```text
+ATUAL (5 processos Playwright):
+┌─────────────────┬─────────────────┬─────────────────┐
+│ betano          │ betbra          │ stake           │
+│ (30s, 100M)     │ (45s, 200M)     │ (30s, 400M)     │
+├─────────────────┼─────────────────┼─────────────────┤
+│ betano-nba      │ betbra-nba      │                 │
+│ (30s, 100M)     │ (45s, 200M)     │                 │
+└─────────────────┴─────────────────┴─────────────────┘
+= 5 Chrome browsers simultâneos = Sobrecarga
+
+PROPOSTA (2 processos Playwright):
+┌─────────────────────────────────┬───────────────────┐
+│ betano (unificado)              │ stake (já ok)     │
+│ Futebol + NBA em 1 browser      │ Futebol + NBA     │
+│ (120s, 300M)                    │ (120s, 400M)      │
+└─────────────────────────────────┴───────────────────┘
+= 2 Chrome browsers = Estável
 ```
 
-Precisa mudar para **90 segundos** para respeitar os limites da API.
+---
 
-## Problema 2: Erro CancelledError/KeyboardInterrupt
+## Etapas de Implementação
 
-O erro que aparece:
+### Etapa 1: Ajustar Intervalos e Limites (Imediato)
+
+Atualizar `ecosystem.config.js` com intervalos maiores para os scrapers Playwright:
+
+**Alterações:**
+- `betano`: intervalo 30s para 120s, memória 100M para 300M
+- `betano-nba`: desabilitar (será unificado)
+- `betbra`: intervalo 45s para 120s, memória 200M para 300M
+- `betbra-nba`: desabilitar (será unificado)
+- `stake`: intervalo 30s para 120s (já tem 400M)
+
+### Etapa 2: Criar Scraper Betano Unificado
+
+Criar novo arquivo `betano_unified_scraper.py` que:
+- Coleta Futebol + NBA em uma única sessão Playwright
+- Implementa Guard Pattern (como o Stake)
+- Gerencia setup/teardown internamente no `scrape_all()`
+
+**Estrutura do código:**
+```python
+class BetanoUnifiedScraper(BaseScraper):
+    # Combina LEAGUES de futebol e NBA
+    FOOTBALL_LEAGUES = {...}  # Das configs atuais
+    BASKETBALL_LEAGUES = {"nba": {...}}
+    
+    async def scrape_all(self):
+        await self.setup()  # Guard pattern
+        try:
+            # Scrape futebol
+            for league in FOOTBALL_LEAGUES:
+                odds.extend(await self._scrape_football_league(league))
+            # Scrape NBA
+            odds.extend(await self._scrape_nba())
+            return odds
+        finally:
+            await self.teardown()
 ```
-asyncio.exceptions.CancelledError
-KeyboardInterrupt
+
+### Etapa 3: Criar Scraper Betbra Unificado
+
+Mesmo padrão do Betano Unificado:
+- Combinar `betbra_scraper.py` + `betbra_nba_scraper.py`
+- Um único browser para ambos os esportes
+- Guard Pattern no setup
+
+### Etapa 4: Atualizar Mapeamento no Runner
+
+Atualizar `run_scraper.py` para usar os novos scrapers unificados:
+```python
+SCRAPER_MAP = {
+    "betano": ("scrapers.betano_unified_scraper", "BetanoUnifiedScraper"),
+    "betbra": ("scrapers.betbra_unified_scraper", "BetbraUnifiedScraper"),
+    # ... outros
+}
 ```
 
-Isso acontece quando o PM2 envia sinal de shutdown durante o `asyncio.sleep()`. Não é um erro grave - é o comportamento normal quando o PM2 reinicia o processo. Mas podemos melhorar o código para:
-1. Tratar o `CancelledError` de forma limpa
-2. Mostrar uma mensagem amigável ao invés de traceback
+### Etapa 5: Remover Entradas Obsoletas
 
-## Implementacao
+No `ecosystem.config.js`:
+- Remover ou comentar `scraper-betano-nba`
+- Remover ou comentar `scraper-betbra-nba`
 
-### 1. Arquivo: `docs/scraper/ecosystem.config.js`
+---
 
-**Linha 232**: Alterar intervalo de 45 para 90 segundos
+## Detalhes Técnicos
 
-```javascript
-// Antes:
-args: '--scraper bet365 --interval 45',
-
-// Depois:
-args: '--scraper bet365 --interval 90',
-```
-
-### 2. Arquivo: `docs/scraper/standalone/run_scraper.py`
-
-**Funcao `run_forever`**: Adicionar tratamento para `CancelledError`
-
-Envolver o loop principal em try/except para capturar:
-- `asyncio.CancelledError` - shutdown gracioso do PM2
-- `KeyboardInterrupt` - Ctrl+C manual
-
-Isso evita o traceback feio e mostra apenas uma mensagem de log amigavel.
-
-Mudancas especificas:
-1. Importar `asyncio.CancelledError` 
-2. No loop `while True`, envolver o `await asyncio.sleep(interval)` em try/except
-3. Ao capturar `CancelledError`, fazer break e log de shutdown
-
-### Codigo do tratamento de shutdown (conceito)
+### Guard Pattern (Já implementado no Stake)
 
 ```python
-while True:
-    # ... codigo do ciclo ...
+async def setup(self):
+    # Guard: evita re-inicialização
+    if self._page is not None:
+        return
     
+    # ... criar browser
+```
+
+### Teardown Robusto
+
+```python
+async def teardown(self):
+    # Fechar aiohttp session (se usar)
     try:
-        await asyncio.sleep(interval)
-    except asyncio.CancelledError:
-        log.info("Received shutdown signal, exiting gracefully...")
-        break
+        if self._session:
+            await self._session.close()
+    except Exception:
+        pass
+    self._session = None
+    
+    # Fechar page
+    try:
+        if self._page:
+            await self._page.close()
+    except Exception:
+        pass
+    self._page = None
+    
+    # ... context e browser
 ```
 
-## Resumo das Mudancas
+### Configurações PM2 Otimizadas
 
-| Arquivo | Linha | Mudanca |
-|---------|-------|---------|
-| `ecosystem.config.js` | 232 | Intervalo 45 → 90 |
-| `run_scraper.py` | ~195 | Tratar `CancelledError` no sleep |
-
-## Apos Aplicar no VPS
-
-```bash
-git pull
-pm2 restart scraper-bet365
-pm2 logs scraper-bet365 --lines 20
+```javascript
+{
+    name: 'scraper-betano',
+    args: '--scraper betano --interval 120',
+    max_memory_restart: '300M',
+    restart_delay: 10000,
+    max_restarts: 5,
+    min_uptime: 30000,
+    kill_timeout: 30000,
+}
 ```
 
-O log agora mostrara `Interval: 90s` e nao tera mais traceback de KeyboardInterrupt.
+---
+
+## Resultado Esperado
+
+| Métrica | Antes | Depois |
+|---------|-------|--------|
+| Processos Chrome simultâneos | 5 | 2 |
+| Ciclos por minuto (Playwright) | ~10 | ~1 |
+| RAM estimada (Playwright) | ~2GB | ~700MB |
+| Load Average esperado | 4-8 | 1-2 |
+
+---
+
+## Ordem de Execução Recomendada
+
+1. **Manter scrapers Playwright parados** por enquanto
+2. **Criar scrapers unificados** (Betano + Betbra)
+3. **Atualizar ecosystem.config.js** com novos intervalos
+4. **Testar um scraper por vez** (iniciar apenas stake com 120s)
+5. **Monitorar load** por 5-10 minutos
+6. **Adicionar próximo scraper** se estável
+
+---
+
+## Arquivos a Modificar
+
+| Arquivo | Ação |
+|---------|------|
+| `docs/scraper/scrapers/betano_unified_scraper.py` | Criar (novo) |
+| `docs/scraper/scrapers/betbra_unified_scraper.py` | Criar (novo) |
+| `docs/scraper/standalone/run_scraper.py` | Atualizar SCRAPER_MAP |
+| `docs/scraper/ecosystem.config.js` | Atualizar intervalos e remover -nba |
 
