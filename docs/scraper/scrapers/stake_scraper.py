@@ -72,7 +72,7 @@ class StakeScraper(BaseScraper):
         
         self.logger.info("[Stake] Iniciando browser Playwright...")
         
-        # Start Playwright
+        # Start Playwright with optimized args
         self._playwright = await async_playwright().start()
         self._browser = await self._playwright.chromium.launch(
             headless=True,
@@ -80,15 +80,24 @@ class StakeScraper(BaseScraper):
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
                 '--disable-dev-shm-usage',
+                '--disable-gpu',
+                '--disable-extensions',
+                '--disable-background-networking',
+                '--disable-sync',
+                '--disable-translate',
+                '--no-first-run',
+                '--disable-default-apps',
+                '--single-process',
+                '--memory-pressure-off',
             ]
         )
         
-        # Create browser context with Firefox user-agent (works better)
+        # Create browser context with smaller viewport (reduce memory)
         self._context = await self._browser.new_context(
             user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:147.0) Gecko/20100101 Firefox/147.0",
             locale="pt-BR",
             timezone_id="America/Sao_Paulo",
-            viewport={"width": 1920, "height": 1080},
+            viewport={"width": 800, "height": 600},
         )
         
         # Main page for compatibility and session establishment

@@ -104,7 +104,7 @@ class BetbraUnifiedScraper(BaseScraper):
         
         self.logger.info("[Betbra] Iniciando browser Playwright...")
         
-        # Start Playwright and browser
+        # Start Playwright and browser with optimized args
         self._playwright = await async_playwright().start()
         self._browser = await self._playwright.chromium.launch(
             headless=True,
@@ -112,15 +112,24 @@ class BetbraUnifiedScraper(BaseScraper):
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
                 '--disable-dev-shm-usage',
+                '--disable-gpu',
+                '--disable-extensions',
+                '--disable-background-networking',
+                '--disable-sync',
+                '--disable-translate',
+                '--no-first-run',
+                '--disable-default-apps',
+                '--single-process',
+                '--memory-pressure-off',
             ]
         )
         
-        # Create browser context with realistic settings
+        # Create browser context with smaller viewport (reduce memory)
         self._context = await self._browser.new_context(
             user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:133.0) Gecko/20100101 Firefox/133.0",
             locale="pt-BR",
             timezone_id="America/Sao_Paulo",
-            viewport={"width": 1920, "height": 1080},
+            viewport={"width": 800, "height": 600},
         )
         
         self._page = await self._context.new_page()
