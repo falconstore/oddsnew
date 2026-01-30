@@ -64,6 +64,30 @@ HEAVY_SCRAPERS = [
     "esportivabet",
 ]
 
+# Ordem intercalada para distribuir carga (modo "all")
+# 3 leves -> 1 pesado -> 3 leves -> 1 pesado ...
+ALL_SCRAPERS_INTERLEAVED = [
+    # Bloco 1: 3 leves + 1 pesado
+    "superbet", "novibet", "kto", 
+    "betano",  # PESADO
+    
+    # Bloco 2: 3 leves + 1 pesado
+    "estrelabet", "sportingbet", "betnacional",
+    "betbra",  # PESADO
+    
+    # Bloco 3: 3 leves + 1 pesado
+    "br4bet", "mcgames", "jogodeouro",
+    "stake",  # PESADO (com pool reduzido)
+    
+    # Bloco 4: 2 leves + 1 pesado
+    "tradeball", "bet365",
+    "aposta1",  # PESADO
+    
+    # Bloco 5: 3 leves + 1 pesado
+    "br4bet_nba", "mcgames_nba", "jogodeouro_nba",
+    "esportivabet",  # PESADO
+]
+
 # Timeout máximo por scraper (segundos)
 SCRAPER_TIMEOUT = 120
 
@@ -319,7 +343,8 @@ def get_scrapers_for_mode(mode: str, custom_list: Optional[str] = None) -> List[
         return scrapers
     
     if mode == "all":
-        return LIGHT_SCRAPERS + HEAVY_SCRAPERS
+        # Ordem intercalada para distribuir carga
+        return ALL_SCRAPERS_INTERLEAVED
     elif mode == "light":
         return LIGHT_SCRAPERS
     elif mode == "heavy":
