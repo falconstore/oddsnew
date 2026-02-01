@@ -116,7 +116,7 @@ function OddRow({
 }
 
 export function FreebetCard({ opportunity }: FreebetCardProps) {
-  const { match, roi, totalToInvest, guaranteedProfit } = opportunity;
+  const { match, extraction, totalToInvest, guaranteedProfit } = opportunity;
   
   const matchDate = new Date(match.match_date);
   const formattedDate = format(matchDate, "HH:mm - dd/MM", { locale: ptBR });
@@ -161,16 +161,16 @@ export function FreebetCard({ opportunity }: FreebetCardProps) {
           )}
         </div>
         
-        {/* ROI Badge */}
+        {/* Extraction Badge */}
         <div className="flex items-center gap-2">
           <Badge 
             className={cn(
               "text-sm font-bold px-2 py-0.5",
-              roi >= 100 ? "bg-purple-600" : roi >= 50 ? "bg-emerald-600" : "bg-blue-600"
+              extraction >= 100 ? "bg-purple-600" : extraction >= 50 ? "bg-emerald-600" : "bg-blue-600"
             )}
           >
             <TrendingUp className="h-3.5 w-3.5 mr-1" />
-            {roi.toFixed(1)}% ROI
+            {extraction.toFixed(1)}% Extração
           </Badge>
         </div>
       </CardHeader>
