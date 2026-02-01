@@ -15,6 +15,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { SurebetCalculator } from '@/components/SurebetCalculator';
 import { cn } from '@/lib/utils';
+import { getBestOddsByType, calculateROI, getBestPAOdds } from '@/lib/oddsTypeUtils';
 import type { MatchOddsGroup, BookmakerOdds } from '@/types/database';
 
 // Sort bookmakers: Betbra first, then PA alphabetically, then SO alphabetically
@@ -532,6 +533,20 @@ const MatchDetails = () => {
   const bestDrawBookmaker = !isBasketball ? match.odds.find(o => o.draw_odd === match.best_draw)?.bookmaker_name : undefined;
   const bestAwayBookmaker = match.odds.find(o => o.away_odd === match.best_away)?.bookmaker_name;
   
+  // Separar odds por tipo (SO vs PA)
+  const { bestSO, hasSOData, hasPAData, paOdds } = getBestOddsByType(match.odds, isBasketball);
+  
+  // Calcular ROI separado para SO
+  const roiSO = hasSOData 
+    ? calculateROI(bestSO.home, bestSO.draw, bestSO.away, isBasketball) 
+    : -100;
+  
+  // Calcular ROI para PA (usando melhores PA)
+  const bestPA = getBestPAOdds(paOdds, isBasketball);
+  const roiPA = hasPAData 
+    ? calculateROI(bestPA.home, bestPA.draw, bestPA.away, isBasketball) 
+    : -100;
+  
   return (
     <Layout>
       <div className="space-y-6">
@@ -576,46 +591,113 @@ const MatchDetails = () => {
           </div>
         </div>
         
-        {/* Best Odds Summary */}
+        {/* Best Odds Summary - Separated by Type */}
         <Card>
           <CardHeader className="pb-2 px-3 sm:px-6">
             <CardTitle className="text-sm sm:text-base">Melhores Odds</CardTitle>
           </CardHeader>
-          <CardContent className="px-3 sm:px-6">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-              <div className="text-center">
-                <div className="text-[10px] sm:text-xs text-muted-foreground mb-1 truncate">{bestHomeBookmaker}</div>
-                <div className={cn("font-bold text-xl sm:text-2xl", hasArbitrage ? "text-green-500" : "text-primary")}>
-                  {match.best_home.toFixed(2)}
+          <CardContent className="px-3 sm:px-6 space-y-4">
+            
+            {/* SO / Betbra Section - Laranja */}
+            {hasSOData && (
+              <div className="space-y-1">
+                <div className="text-xs font-medium text-amber-500 flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                  SO / Betbra
                 </div>
-                <div className="text-[10px] sm:text-xs text-muted-foreground">{isBasketball ? 'Time 1' : 'Casa'}</div>
-              </div>
-              {!isBasketball && match.best_draw !== null && match.best_draw > 0 && (
-                <div className="text-center">
-                  <div className="text-xs text-muted-foreground mb-1">{bestDrawBookmaker}</div>
-                  <div className={cn("font-bold text-2xl", hasArbitrage ? "text-green-500" : "text-primary")}>
-                    {match.best_draw.toFixed(2)}
-                  </div>
-                  <div className="text-xs text-muted-foreground">Empate</div>
-                </div>
-              )}
-              <div className="text-center">
-                <div className="text-xs text-muted-foreground mb-1">{bestAwayBookmaker}</div>
-                <div className={cn("font-bold text-2xl", hasArbitrage ? "text-green-500" : "text-primary")}>
-                  {match.best_away.toFixed(2)}
-                </div>
-                <div className="text-xs text-muted-foreground">{isBasketball ? 'Time 2' : 'Fora'}</div>
-              </div>
-              <div className="text-center border-l">
-                <div className="text-xs text-muted-foreground mb-1">ROI</div>
                 <div className={cn(
-                  "font-bold text-2xl",
-                  hasArbitrage ? "text-green-500" : "text-muted-foreground"
+                  "grid gap-3 bg-amber-500/5 rounded-lg p-3 border border-amber-500/20",
+                  isBasketball ? "grid-cols-3" : "grid-cols-4"
                 )}>
-                  {Number(roiPercentage) > 0 ? `+${roiPercentage}%` : `${roiPercentage}%`}
+                  <div className="text-center">
+                    <div className="text-[10px] sm:text-xs text-muted-foreground mb-1 truncate">{bestSO.homeBookmaker || '-'}</div>
+                    <div className="font-bold text-xl sm:text-2xl text-amber-500">
+                      {bestSO.home > 0 ? bestSO.home.toFixed(2) : '-'}
+                    </div>
+                    <div className="text-[10px] sm:text-xs text-muted-foreground">{isBasketball ? 'Time 1' : 'Casa'}</div>
+                  </div>
+                  {!isBasketball && (
+                    <div className="text-center">
+                      <div className="text-[10px] sm:text-xs text-muted-foreground mb-1 truncate">{bestSO.drawBookmaker || '-'}</div>
+                      <div className="font-bold text-xl sm:text-2xl text-amber-500">
+                        {bestSO.draw && bestSO.draw > 0 ? bestSO.draw.toFixed(2) : '-'}
+                      </div>
+                      <div className="text-[10px] sm:text-xs text-muted-foreground">Empate</div>
+                    </div>
+                  )}
+                  <div className="text-center">
+                    <div className="text-[10px] sm:text-xs text-muted-foreground mb-1 truncate">{bestSO.awayBookmaker || '-'}</div>
+                    <div className="font-bold text-xl sm:text-2xl text-amber-500">
+                      {bestSO.away > 0 ? bestSO.away.toFixed(2) : '-'}
+                    </div>
+                    <div className="text-[10px] sm:text-xs text-muted-foreground">{isBasketball ? 'Time 2' : 'Fora'}</div>
+                  </div>
+                  <div className="text-center border-l border-amber-500/20">
+                    <div className="text-[10px] sm:text-xs text-muted-foreground mb-1">ROI</div>
+                    <div className={cn(
+                      "font-bold text-xl sm:text-2xl",
+                      roiSO > 0 ? "text-amber-500" : "text-muted-foreground"
+                    )}>
+                      {roiSO > 0 ? `+${roiSO.toFixed(2)}%` : `${roiSO.toFixed(2)}%`}
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
+            
+            {/* PA Section - Verde */}
+            {hasPAData && (
+              <div className="space-y-1">
+                <div className="text-xs font-medium text-emerald-500 flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                  PA
+                </div>
+                <div className={cn(
+                  "grid gap-3 bg-emerald-500/5 rounded-lg p-3 border border-emerald-500/20",
+                  isBasketball ? "grid-cols-3" : "grid-cols-4"
+                )}>
+                  <div className="text-center">
+                    <div className="text-[10px] sm:text-xs text-muted-foreground mb-1 truncate">
+                      {paOdds.find(o => o.home_odd === bestPA.home)?.bookmaker_name || '-'}
+                    </div>
+                    <div className="font-bold text-xl sm:text-2xl text-emerald-500">
+                      {bestPA.home > 0 ? bestPA.home.toFixed(2) : '-'}
+                    </div>
+                    <div className="text-[10px] sm:text-xs text-muted-foreground">{isBasketball ? 'Time 1' : 'Casa'}</div>
+                  </div>
+                  {!isBasketball && (
+                    <div className="text-center">
+                      <div className="text-[10px] sm:text-xs text-muted-foreground mb-1 truncate">
+                        {paOdds.find(o => o.draw_odd === bestPA.draw)?.bookmaker_name || '-'}
+                      </div>
+                      <div className="font-bold text-xl sm:text-2xl text-emerald-500">
+                        {bestPA.draw && bestPA.draw > 0 ? bestPA.draw.toFixed(2) : '-'}
+                      </div>
+                      <div className="text-[10px] sm:text-xs text-muted-foreground">Empate</div>
+                    </div>
+                  )}
+                  <div className="text-center">
+                    <div className="text-[10px] sm:text-xs text-muted-foreground mb-1 truncate">
+                      {paOdds.find(o => o.away_odd === bestPA.away)?.bookmaker_name || '-'}
+                    </div>
+                    <div className="font-bold text-xl sm:text-2xl text-emerald-500">
+                      {bestPA.away > 0 ? bestPA.away.toFixed(2) : '-'}
+                    </div>
+                    <div className="text-[10px] sm:text-xs text-muted-foreground">{isBasketball ? 'Time 2' : 'Fora'}</div>
+                  </div>
+                  <div className="text-center border-l border-emerald-500/20">
+                    <div className="text-[10px] sm:text-xs text-muted-foreground mb-1">ROI</div>
+                    <div className={cn(
+                      "font-bold text-xl sm:text-2xl",
+                      roiPA > 0 ? "text-emerald-500" : "text-muted-foreground"
+                    )}>
+                      {roiPA > 0 ? `+${roiPA.toFixed(2)}%` : `${roiPA.toFixed(2)}%`}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
           </CardContent>
         </Card>
         
