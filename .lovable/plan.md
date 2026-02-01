@@ -1,171 +1,120 @@
 
+# Adicionar Cores por Tipo de Odds na Tabela
 
-# Reverter Monitor Principal - Mostrar Apenas Melhores Odds
+## Problema Identificado
 
-## Problema
+Na tabela "Todas as Casas de Apostas", as melhores odds são destacadas apenas em verde, independentemente do tipo (SO ou PA). O usuário quer:
 
-A modificação anterior aplicou incorretamente a separação SO/PA na página principal do monitor. O usuário quer:
-- **Página principal** (OddsMonitor/OddsComparisonTable): Mostrar apenas as melhores odds de ambos (como era antes)
-- **Página de detalhes** (MatchDetails): Manter a separação SO/PA (laranja e verde)
+- **SO/Betbra** → Destacar melhores odds em **laranja/amber**
+- **PA** → Destacar melhores odds em **verde/emerald** (como já está)
 
-## O que será revertido
-
-| Arquivo | Mudança |
-|---------|---------|
-| `src/components/OddsMonitor.tsx` | Remover seções SO/PA, voltar ao grid único com melhores odds |
-| `src/components/OddsComparisonTable.tsx` | Remover seções SO/PA, voltar ao grid único com melhores odds |
-
-## Layout Atual (errado)
+## Layout Atual vs Desejado
 
 ```text
-┌──────────────────────────────────────────┐
-│ ● SO / Betbra                   (laranja)│
-│   1.87 | 3.75 | 5.10 | ROI +0.25%        │
-├──────────────────────────────────────────┤
-│ ● PA - Top 3                     (verde) │
-│   1.87 Estrelab | 3.67 Estrelab | ...    │
-└──────────────────────────────────────────┘
+Atual:                              Desejado:
+┌────────┬───────┬───────┬───────┐  ┌────────┬───────┬───────┬───────┐
+│ Betbra │ 1.84  │ 3.75  │ 5.00  │  │ Betbra │ 1.84  │ 3.75  │ 5.00  │
+│   SO   │       │ verde │ verde │  │   SO   │       │laranja│laranja│
+├────────┼───────┼───────┼───────┤  ├────────┼───────┼───────┼───────┤
+│Estrela │ 1.87  │ 3.67  │ 4.50  │  │Estrela │ 1.87  │ 3.67  │ 4.50  │
+│   PA   │ verde │ verde │       │  │   PA   │ verde │ verde │       │
+└────────┴───────┴───────┴───────┘  └────────┴───────┴───────┴───────┘
 ```
 
-## Layout Desejado (como era antes)
+## Arquivo a Modificar
 
-```text
-┌──────────────────────────────────────────┐
-│  Betano    │  Betbra   │  Betbra   │ ROI │
-│   1.87     │   3.75    │   5.10    │+0.25│
-│   Casa     │  Empate   │   Fora    │     │
-└──────────────────────────────────────────┘
-```
-
-Apenas um grid com as melhores odds gerais (combinando SO e PA), com destaque verde nas melhores.
+`src/pages/MatchDetails.tsx`
 
 ## Mudanças Técnicas
 
-### 1. OddsMonitor.tsx - MatchCard (linhas 324-531)
+### 1. Atualizar componente OddCell (linha 400)
 
-**Remover:**
-- Import de `getBestOddsByType`, `calculateROI`, `getBestPAOdds`
-- Lógica de separação SO/PA (linhas 331-339)
-- Seção SO/Betbra (linhas 395-447)
-- Seção PA - Top 3 (linhas 449-519)
-- Fallback sem odds (linhas 521-526)
+Adicionar parâmetro `oddsType` para determinar a cor:
 
-**Restaurar:**
-- Grid único mostrando `match.best_home`, `match.best_draw`, `match.best_away`
-- Destacar melhores odds com cor verde
-- Mostrar nome da casa com melhor odd
-- ROI geral calculado com todas as odds
-
-### 2. OddsComparisonTable.tsx - MatchCard (linhas 322-528)
-
-**Mesmas mudanças** que o OddsMonitor.tsx para manter consistência.
-
-## Código a Restaurar (OddsMonitor MatchCard)
-
-```tsx
-function MatchCard({ match }: { match: MatchOddsGroup }) {
-  const navigate = useNavigate();
-  const matchDate = new Date(match.match_date);
-  const isLive = match.match_status === 'live';
-  const isBasketball = (match.sport_type || 'football') === 'basketball';
-  const sportIcon = isBasketball ? '🏀' : '⚽';
+```typescript
+function OddCell({ 
+  value, 
+  isBest, 
+  isWorst, 
+  oddsType 
+}: { 
+  value: number | null; 
+  isBest: boolean; 
+  isWorst: boolean;
+  oddsType?: 'SO' | 'PA';
+}) {
+  if (value === null || value === undefined) {
+    return <span className="text-muted-foreground">-</span>;
+  }
   
-  // Calculate best bookmakers for each outcome
-  const bestHomeBookmaker = match.odds.reduce((best, o) => 
-    o.home_odd > (best?.home_odd || 0) ? o : best, match.odds[0])?.bookmaker_name;
-  const bestDrawBookmaker = match.odds.reduce((best, o) => 
-    (o.draw_odd || 0) > (best?.draw_odd || 0) ? o : best, match.odds[0])?.bookmaker_name;
-  const bestAwayBookmaker = match.odds.reduce((best, o) => 
-    o.away_odd > (best?.away_odd || 0) ? o : best, match.odds[0])?.bookmaker_name;
-  
-  // Calculate arbitrage (overall)
-  const arbitrageValue = isBasketball || match.best_draw === null || match.best_draw === 0
-    ? (1/match.best_home + 1/match.best_away)
-    : (1/match.best_home + 1/match.best_draw + 1/match.best_away);
-  const hasArbitrage = arbitrageValue < 1 && match.odds.length > 0;
-  const roiPercentage = ((1 - arbitrageValue) * 100).toFixed(2);
+  // Escolher cor baseado no tipo de odd
+  const bestColorClass = oddsType === 'SO' 
+    ? "bg-amber-500/10 text-amber-500 font-bold"
+    : "bg-emerald-500/10 text-emerald-500 font-bold";
   
   return (
-    <Card ...>
-      {/* ... header com times, liga, data ... */}
-      
-      {/* Best Odds Grid - único, cor verde */}
-      <div className="pt-2 sm:pt-3 border-t">
-        <div className={cn(
-          "grid gap-2 sm:gap-4",
-          isBasketball ? "grid-cols-3" : "grid-cols-4"
-        )}>
-          {/* Casa */}
-          <div className="text-center group">
-            <div className="text-[10px] sm:text-xs text-muted-foreground truncate">
-              {bestHomeBookmaker}
-            </div>
-            <div className={cn(
-              "font-bold text-lg sm:text-xl font-mono",
-              hasArbitrage ? "text-success" : "text-primary"
-            )}>
-              {match.best_home.toFixed(2)}
-            </div>
-            <div className="text-[10px] sm:text-xs text-muted-foreground">
-              {isBasketball ? 'Time 1' : 'Casa'}
-            </div>
-          </div>
-          
-          {/* Empate (futebol) */}
-          {!isBasketball && (
-            <div className="text-center group">
-              <div className="text-[10px] sm:text-xs text-muted-foreground truncate">
-                {bestDrawBookmaker}
-              </div>
-              <div className={cn(
-                "font-bold text-lg sm:text-xl font-mono",
-                hasArbitrage ? "text-success" : "text-primary"
-              )}>
-                {match.best_draw !== null ? match.best_draw.toFixed(2) : '-'}
-              </div>
-              <div className="text-[10px] sm:text-xs text-muted-foreground">Empate</div>
-            </div>
-          )}
-          
-          {/* Fora */}
-          <div className="text-center group">
-            <div className="text-[10px] sm:text-xs text-muted-foreground truncate">
-              {bestAwayBookmaker}
-            </div>
-            <div className={cn(
-              "font-bold text-lg sm:text-xl font-mono",
-              hasArbitrage ? "text-success" : "text-primary"
-            )}>
-              {match.best_away.toFixed(2)}
-            </div>
-            <div className="text-[10px] sm:text-xs text-muted-foreground">
-              {isBasketball ? 'Time 2' : 'Fora'}
-            </div>
-          </div>
-          
-          {/* ROI */}
-          <div className="text-center">
-            <div className="text-[10px] sm:text-xs text-muted-foreground">ROI</div>
-            <div className={cn(
-              "font-bold text-lg sm:text-xl font-mono",
-              hasArbitrage ? "text-success" : "text-muted-foreground"
-            )}>
-              {Number(roiPercentage) > 0 ? `+${roiPercentage}%` : `${roiPercentage}%`}
-            </div>
-          </div>
-        </div>
-      </div>
-    </Card>
+    <div className={cn(
+      "inline-flex items-center gap-1 px-2 py-1 rounded font-mono",
+      isBest && bestColorClass
+    )}>
+      {value.toFixed(2)}
+    </div>
   );
 }
 ```
 
-## Resumo
+### 2. Atualizar chamadas de OddCell em OddsRow (linhas 343-352)
 
-| Arquivo | Ação |
-|---------|------|
-| `OddsMonitor.tsx` | Remover import oddsTypeUtils, reverter MatchCard para grid único verde |
-| `OddsComparisonTable.tsx` | Remover import oddsTypeUtils, reverter MatchCard para grid único verde |
-| `MatchDetails.tsx` | **Manter como está** (separação SO/PA) |
-| `oddsTypeUtils.ts` | **Manter** (usado pelo MatchDetails) |
+Passar o `oddsType` determinado para cada célula:
 
+```typescript
+<TableCell className="text-center">
+  <OddCell 
+    value={odds.home_odd} 
+    isBest={odds.home_odd === bestHome} 
+    isWorst={odds.home_odd === worstHome}
+    oddsType={oddsType}  // Adicionar
+  />
+</TableCell>
+{!isBasketball && (
+  <TableCell className="text-center">
+    <OddCell 
+      value={odds.draw_odd} 
+      isBest={odds.draw_odd === bestDraw} 
+      isWorst={odds.draw_odd === worstDraw}
+      oddsType={oddsType}  // Adicionar
+    />
+  </TableCell>
+)}
+<TableCell className="text-center">
+  <OddCell 
+    value={odds.away_odd} 
+    isBest={odds.away_odd === bestAway} 
+    isWorst={odds.away_odd === worstAway}
+    oddsType={oddsType}  // Adicionar
+  />
+</TableCell>
+```
+
+## Comportamento Final
+
+| Tipo Odd | Badge | Cor Destaque Melhor Odd |
+|----------|-------|-------------------------|
+| SO | Laranja | `bg-amber-500/10 text-amber-500` |
+| PA | Verde | `bg-emerald-500/10 text-emerald-500` |
+
+## Exemplo Visual Esperado
+
+Na imagem enviada:
+- **Betbra SO**: 3.75 (Empate) e 5.00 (Fora) → destaque **laranja**
+- **Estrelabet PA**: 1.87 (Casa) → destaque **verde**
+- **kto SO**: 1.89 (Casa) → destaque **laranja** (é a melhor odd de Casa)
+
+## Resumo das Mudanças
+
+| Linha | Mudança |
+|-------|---------|
+| 400-413 | Atualizar `OddCell` para receber `oddsType` e usar cor correspondente |
+| 343-352 | Passar `oddsType` nas 3 chamadas de `OddCell` dentro de `OddsRow` |
+
+A lógica de detecção do tipo já existe na linha 325 (`const oddsType = odds.odds_type || getOddsType(odds.bookmaker_name)`), apenas precisamos propagar para o `OddCell`.
