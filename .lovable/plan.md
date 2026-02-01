@@ -1,118 +1,171 @@
 
-# Separar Melhores Odds por Tipo (SO vs PA) - MatchDetails
 
-## Entendimento
+# Reverter Monitor Principal - Mostrar Apenas Melhores Odds
 
-Na seção "Melhores Odds" da página de detalhes da partida:
-- Atualmente: mostra as melhores odds gerais com destaque verde
-- Desejado: separar em duas seções distintas com cores diferentes
+## Problema
 
-## Tipos de Odds
+A modificação anterior aplicou incorretamente a separação SO/PA na página principal do monitor. O usuário quer:
+- **Página principal** (OddsMonitor/OddsComparisonTable): Mostrar apenas as melhores odds de ambos (como era antes)
+- **Página de detalhes** (MatchDetails): Manter a separação SO/PA (laranja e verde)
 
-| Tipo | Casas | Cor |
-|------|-------|-----|
-| **SO** | Betbra + Novibet + Betnacional + qualquer casa com `odds_type === 'SO'` (Betano SO, KTO SO, Tradeball SO, Stake SO) | **Laranja/Amber** |
-| **PA** | Todas as outras (Estrelabet, Superbet, Br4bet, McGames, etc.) | **Verde** (mantém) |
+## O que será revertido
 
-## Exemplo da Imagem (Betis x Valencia)
+| Arquivo | Mudança |
+|---------|---------|
+| `src/components/OddsMonitor.tsx` | Remover seções SO/PA, voltar ao grid único com melhores odds |
+| `src/components/OddsComparisonTable.tsx` | Remover seções SO/PA, voltar ao grid único com melhores odds |
 
-**Melhores SO (laranja):**
-- Casa: 1.86 (Betbra) ou 1.85 (Betano/KTO/Tradeball)
-- Empate: 3.75 (Betbra)
-- Fora: 5.00 (Betbra)
-
-**Melhores PA (verde):**
-- Casa: 1.87 (Estrelabet)
-- Empate: 3.67 (Estrelabet)
-- Fora: 4.60 (Superbet/Betano)
-
-## Layout Proposto
+## Layout Atual (errado)
 
 ```text
-┌────────────────────────────────────────────────────────────┐
-│                     Melhores Odds                          │
-├────────────────────────────────────────────────────────────┤
-│ ● SO / Betbra                                              │
-│ ┌──────────┬──────────┬──────────┬──────────┐             │
-│ │  Betbra  │  Betbra  │  Betbra  │   ROI    │ (laranja)   │
-│ │   1.86   │   3.75   │   5.00   │  +0.XX%  │             │
-│ │   Casa   │  Empate  │   Fora   │          │             │
-│ └──────────┴──────────┴──────────┴──────────┘             │
-│                                                            │
-│ ● PA                                                       │
-│ ┌──────────┬──────────┬──────────┬──────────┐             │
-│ │ Estrela  │ Estrela  │ Superbet │   ROI    │ (verde)     │
-│ │   1.87   │   3.67   │   4.60   │  -X.XX%  │             │
-│ │   Casa   │  Empate  │   Fora   │          │             │
-│ └──────────┴──────────┴──────────┴──────────┘             │
-└────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────┐
+│ ● SO / Betbra                   (laranja)│
+│   1.87 | 3.75 | 5.10 | ROI +0.25%        │
+├──────────────────────────────────────────┤
+│ ● PA - Top 3                     (verde) │
+│   1.87 Estrelab | 3.67 Estrelab | ...    │
+└──────────────────────────────────────────┘
 ```
 
-## Arquivo a Modificar
+## Layout Desejado (como era antes)
 
-`src/pages/MatchDetails.tsx`
-
-## Implementação
-
-### 1. Importar utilitários existentes
-
-```typescript
-import { getBestOddsByType, calculateROI, getBestPAOdds } from '@/lib/oddsTypeUtils';
+```text
+┌──────────────────────────────────────────┐
+│  Betano    │  Betbra   │  Betbra   │ ROI │
+│   1.87     │   3.75    │   5.10    │+0.25│
+│   Casa     │  Empate   │   Fora    │     │
+└──────────────────────────────────────────┘
 ```
 
-### 2. Adicionar lógica para separar odds (após linha 533)
+Apenas um grid com as melhores odds gerais (combinando SO e PA), com destaque verde nas melhores.
 
-```typescript
-// Separar odds por tipo (SO vs PA)
-const { bestSO, topPAHome, topPADraw, topPAAway, hasSOData, hasPAData, paOdds } = 
-  getBestOddsByType(match.odds, isBasketball);
+## Mudanças Técnicas
 
-// Calcular ROI separado para SO
-const roiSO = hasSOData 
-  ? calculateROI(bestSO.home, bestSO.draw, bestSO.away, isBasketball) 
-  : -100;
+### 1. OddsMonitor.tsx - MatchCard (linhas 324-531)
 
-// Calcular ROI para PA (usando melhores PA)
-const bestPA = getBestPAOdds(paOdds, isBasketball);
-const roiPA = hasPAData 
-  ? calculateROI(bestPA.home, bestPA.draw, bestPA.away, isBasketball) 
-  : -100;
+**Remover:**
+- Import de `getBestOddsByType`, `calculateROI`, `getBestPAOdds`
+- Lógica de separação SO/PA (linhas 331-339)
+- Seção SO/Betbra (linhas 395-447)
+- Seção PA - Top 3 (linhas 449-519)
+- Fallback sem odds (linhas 521-526)
+
+**Restaurar:**
+- Grid único mostrando `match.best_home`, `match.best_draw`, `match.best_away`
+- Destacar melhores odds com cor verde
+- Mostrar nome da casa com melhor odd
+- ROI geral calculado com todas as odds
+
+### 2. OddsComparisonTable.tsx - MatchCard (linhas 322-528)
+
+**Mesmas mudanças** que o OddsMonitor.tsx para manter consistência.
+
+## Código a Restaurar (OddsMonitor MatchCard)
+
+```tsx
+function MatchCard({ match }: { match: MatchOddsGroup }) {
+  const navigate = useNavigate();
+  const matchDate = new Date(match.match_date);
+  const isLive = match.match_status === 'live';
+  const isBasketball = (match.sport_type || 'football') === 'basketball';
+  const sportIcon = isBasketball ? '🏀' : '⚽';
+  
+  // Calculate best bookmakers for each outcome
+  const bestHomeBookmaker = match.odds.reduce((best, o) => 
+    o.home_odd > (best?.home_odd || 0) ? o : best, match.odds[0])?.bookmaker_name;
+  const bestDrawBookmaker = match.odds.reduce((best, o) => 
+    (o.draw_odd || 0) > (best?.draw_odd || 0) ? o : best, match.odds[0])?.bookmaker_name;
+  const bestAwayBookmaker = match.odds.reduce((best, o) => 
+    o.away_odd > (best?.away_odd || 0) ? o : best, match.odds[0])?.bookmaker_name;
+  
+  // Calculate arbitrage (overall)
+  const arbitrageValue = isBasketball || match.best_draw === null || match.best_draw === 0
+    ? (1/match.best_home + 1/match.best_away)
+    : (1/match.best_home + 1/match.best_draw + 1/match.best_away);
+  const hasArbitrage = arbitrageValue < 1 && match.odds.length > 0;
+  const roiPercentage = ((1 - arbitrageValue) * 100).toFixed(2);
+  
+  return (
+    <Card ...>
+      {/* ... header com times, liga, data ... */}
+      
+      {/* Best Odds Grid - único, cor verde */}
+      <div className="pt-2 sm:pt-3 border-t">
+        <div className={cn(
+          "grid gap-2 sm:gap-4",
+          isBasketball ? "grid-cols-3" : "grid-cols-4"
+        )}>
+          {/* Casa */}
+          <div className="text-center group">
+            <div className="text-[10px] sm:text-xs text-muted-foreground truncate">
+              {bestHomeBookmaker}
+            </div>
+            <div className={cn(
+              "font-bold text-lg sm:text-xl font-mono",
+              hasArbitrage ? "text-success" : "text-primary"
+            )}>
+              {match.best_home.toFixed(2)}
+            </div>
+            <div className="text-[10px] sm:text-xs text-muted-foreground">
+              {isBasketball ? 'Time 1' : 'Casa'}
+            </div>
+          </div>
+          
+          {/* Empate (futebol) */}
+          {!isBasketball && (
+            <div className="text-center group">
+              <div className="text-[10px] sm:text-xs text-muted-foreground truncate">
+                {bestDrawBookmaker}
+              </div>
+              <div className={cn(
+                "font-bold text-lg sm:text-xl font-mono",
+                hasArbitrage ? "text-success" : "text-primary"
+              )}>
+                {match.best_draw !== null ? match.best_draw.toFixed(2) : '-'}
+              </div>
+              <div className="text-[10px] sm:text-xs text-muted-foreground">Empate</div>
+            </div>
+          )}
+          
+          {/* Fora */}
+          <div className="text-center group">
+            <div className="text-[10px] sm:text-xs text-muted-foreground truncate">
+              {bestAwayBookmaker}
+            </div>
+            <div className={cn(
+              "font-bold text-lg sm:text-xl font-mono",
+              hasArbitrage ? "text-success" : "text-primary"
+            )}>
+              {match.best_away.toFixed(2)}
+            </div>
+            <div className="text-[10px] sm:text-xs text-muted-foreground">
+              {isBasketball ? 'Time 2' : 'Fora'}
+            </div>
+          </div>
+          
+          {/* ROI */}
+          <div className="text-center">
+            <div className="text-[10px] sm:text-xs text-muted-foreground">ROI</div>
+            <div className={cn(
+              "font-bold text-lg sm:text-xl font-mono",
+              hasArbitrage ? "text-success" : "text-muted-foreground"
+            )}>
+              {Number(roiPercentage) > 0 ? `+${roiPercentage}%` : `${roiPercentage}%`}
+            </div>
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+}
 ```
 
-### 3. Substituir seção "Melhores Odds" (linhas 579-620)
+## Resumo
 
-Trocar o Card único por duas seções condicionais dentro do mesmo Card:
+| Arquivo | Ação |
+|---------|------|
+| `OddsMonitor.tsx` | Remover import oddsTypeUtils, reverter MatchCard para grid único verde |
+| `OddsComparisonTable.tsx` | Remover import oddsTypeUtils, reverter MatchCard para grid único verde |
+| `MatchDetails.tsx` | **Manter como está** (separação SO/PA) |
+| `oddsTypeUtils.ts` | **Manter** (usado pelo MatchDetails) |
 
-**Seção SO (laranja):**
-- Header: `● SO / Betbra` com bolinha laranja
-- Background: `bg-amber-500/5`
-- Border: `border border-amber-500/20`
-- Texto de odds: `text-amber-500`
-- Mostra: bestSO.home, bestSO.draw, bestSO.away, roiSO
-
-**Seção PA (verde):**
-- Header: `● PA` com bolinha verde
-- Background: `bg-emerald-500/5`
-- Border: `border border-emerald-500/20`
-- Texto de odds: `text-emerald-500`
-- Mostra: bestPA.home, bestPA.draw, bestPA.away, roiPA
-
-### 4. Comportamento
-
-- Se não houver odds SO: mostra apenas seção PA
-- Se não houver odds PA: mostra apenas seção SO
-- Basquete: oculta coluna Empate automaticamente
-- Cada seção tem seu próprio ROI calculado
-- Ambas seções ficam dentro do mesmo Card "Melhores Odds"
-
-## Resumo das Mudanças
-
-| Linha | Mudança |
-|-------|---------|
-| ~3 | Adicionar import de `getBestOddsByType`, `calculateROI`, `getBestPAOdds` |
-| ~534 | Adicionar lógica para separar odds e calcular ROIs |
-| 579-620 | Substituir grid único por duas seções (SO laranja + PA verde) |
-
-## Nota
-
-A tabela "Todas as Casas de Apostas" continua igual - ela já mostra os badges SO/PA em cada linha. A mudança é apenas na seção resumo "Melhores Odds" no topo.
