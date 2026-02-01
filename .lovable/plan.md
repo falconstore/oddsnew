@@ -1,184 +1,202 @@
 
-# Nova Aba: Extração Freebet
+# Corrigir Lógica de Extração de Freebet
 
-## Visao Geral da Funcionalidade
+## Problema Atual
 
-A "Extracao Freebet" e uma estrategia de arbitragem especifica que utiliza:
-- **Casa (Home)**: Sempre aposta PA (Pagamento Antecipado)
-- **Empate (Draw)**: Sempre aposta SO (preferencialmente Betbra)
-- **Visitante (Away)**: Sempre aposta PA (Pagamento Antecipado)
+A lógica atual coloca a **freebet sempre no Empate** (SO/Betbra), o que está errado.
 
-A ideia e extrair o valor de freebets apostando em todos os resultados possiveis com casas diferentes.
+## Lógica Correta
 
-## Arquivos a Criar
+Para extrair o máximo valor de uma freebet, devemos:
 
-| Arquivo | Descricao |
-|---------|-----------|
-| `src/pages/FreebetExtraction.tsx` | Pagina principal do monitor |
-| `src/components/freebet/FreebetCard.tsx` | Card individual de cada partida |
-| `src/components/freebet/FreebetFilters.tsx` | Modal/popover de filtros |
-| `src/components/freebet/FreebetConfig.tsx` | Barra de configuracao (casa selecionada, valor) |
+1. **Encontrar a maior odd PA** entre Casa e Fora → Usar a FREEBET aqui
+2. **Empate**: Sempre usar **SO/Betbra** para cobrir
+3. **Outro resultado**: Usar **PA** para cobrir
+
+### Exemplo da Imagem
+
+| Resultado | Odd | Casa | Stake | Observação |
+|-----------|-----|------|-------|------------|
+| Fora (2) | **3.80** | esportivabet PA | R$ 10,30 | **FREEBET** (maior odd PA) |
+| Empate (X) | 3.20 | Betbra SO | R$ 8,75 | Cobrir empate |
+| Casa (1) | 2.29 | esportivabet PA | R$ 9,52 | Cobrir casa |
+
+**Total investido real**: R$ 8,75 + R$ 9,52 = **R$ 18,27** (a freebet não conta)
+**Lucro garantido**: R$ 6,59
+**ROI**: 6,59 / 18,27 × 100 = **36%** (aproximado)
 
 ## Arquivos a Modificar
 
-| Arquivo | Mudanca |
+| Arquivo | Mudança |
 |---------|---------|
-| `src/types/auth.ts` | Adicionar `FREEBET_EXTRACTION` ao `PAGE_KEYS` |
-| `src/components/Sidebar.tsx` | Adicionar link para nova pagina |
-| `src/components/AnimatedRoutes.tsx` | Adicionar rota `/freebet-extraction` |
+| `src/types/freebet.ts` | Adicionar campo `freebetPosition` para indicar onde a freebet está |
+| `src/lib/freebetUtils.ts` | Alterar lógica para usar maior odd PA como freebet |
+| `src/components/freebet/FreebetCard.tsx` | Ajustar para mostrar FREEBET no resultado correto |
 
-## Layout da Pagina Principal
+## Mudanças Técnicas
+
+### 1. Atualizar Interface FreebetOpportunity
+
+Adicionar campo para indicar onde a freebet está:
+
+```typescript
+export interface FreebetOpportunity {
+  // ... campos existentes
+  freebetPosition: 'home' | 'away';  // NOVO: onde a freebet está
+}
+```
+
+### 2. Nova Lógica em freebetUtils.ts
+
+```typescript
+export function generateFreebetOpportunities(...) {
+  for (const match of matches) {
+    // Skip basketball (no draw)
+    if (match.sport_type === 'basketball') continue;
+    
+    // Pegar melhor SO para empate (sempre Betbra prioritário)
+    const bestSODraw = getBestSODrawOdd(match.odds);
+    if (!bestSODraw?.draw_odd) continue;
+    
+    // Pegar melhores PA para Casa e Fora
+    const bestPAHome = getBestPAHomeOdd(match.odds);
+    const bestPAAway = getBestPAAwayOdd(match.odds);
+    if (!bestPAHome || !bestPAAway) continue;
+    
+    // NOVO: Determinar qual odd PA é maior → essa é a FREEBET
+    const homeOdd = bestPAHome.home_odd;
+    const awayOdd = bestPAAway.away_odd;
+    const freebetPosition = awayOdd >= homeOdd ? 'away' : 'home';
+    
+    // Calcular extração
+    const calc = calculateFreebetExtraction(
+      homeOdd,
+      bestSODraw.draw_odd,
+      awayOdd,
+      freebetValue,
+      freebetPosition  // Passar onde a freebet está
+    );
+    
+    // Criar oportunidade com freebetPosition
+    opportunities.push({
+      ...
+      freebetPosition,
+    });
+  }
+}
+```
+
+### 3. Atualizar FreebetCard para mostrar FREEBET no lugar certo
+
+```typescript
+<OddRow
+  label="Casa (1)"
+  ...
+  variant={opportunity.freebetPosition === 'home' ? 'freebet' : 'pa'}
+  isFreebet={opportunity.freebetPosition === 'home'}
+/>
+
+<OddRow
+  label="Empate (X)"
+  ...
+  variant="so"
+  isFreebet={false}  // Empate nunca é freebet nesta lógica
+/>
+
+<OddRow
+  label="Fora (2)"
+  ...
+  variant={opportunity.freebetPosition === 'away' ? 'freebet' : 'pa'}
+  isFreebet={opportunity.freebetPosition === 'away'}
+/>
+```
+
+### 4. Atualizar calculateFreebetExtraction
+
+A função já suporta `freebetOutcome: 'home' | 'away'`, então só precisamos usar corretamente.
+
+## Fórmula de Cálculo Corrigida
+
+Para uma freebet de R$ 10 no Fora (odd 3.80):
 
 ```text
-+----------------------------------------------------------+
-|  Configuracao da Freebet                    28 casas     |
-+----------------------------------------------------------+
-|  [Dropdown Casa]     [Valor R$]  [Filtros]  [Pesquisar]  |
-+----------------------------------------------------------+
+Retorno potencial da freebet = 10 × (3.80 - 1) = R$ 28,00
+(Só lucro, porque a freebet não devolve o stake)
 
-+----------------------+  +----------------------+  +-----...
-|  Team A vs Team B    |  |  Team C vs Team D    |  |
-|  Premier League      |  |  La Liga             |
-|  15:30 - 01/02/2026  |  |  18:00 - 01/02/2026  |
-|  [1926.1% ROI]       |  |  [796.2% ROI]        |
-|                      |  |                      |
-|  Total: R$ 87.39     |  |  Total: R$ 15.38     |
-|  Lucro: R$ 192.61    |  |  Lucro: R$ 79.62     |
-|                      |  |                      |
-|  Novibet (Casa PA)   |  |  Novibet (Casa PA)   |
-|  29.00  R$ 74.67     |  |  10.50  R$ 15.00     |
-|                      |  |                      |
-|  Betbra SO (Empate)  |  |  Betbra SO (Empate)  |
-|  3.75   R$ 10.00     |  |  6.33   R$ 10.00     |
-|                      |  |                      |
-|  Novibet (Fora PA)   |  |  Betano (Fora PA)    |
-|  22.00  R$ 12.73     |  |  250.00 R$ 0.38      |
-|                      |  |                      |
-|  [Link Casa] [Link]  |  |  [Link Casa] [...]   |
-+----------------------+  +----------------------+
+Para garantir R$ 28 em qualquer resultado:
+- Stake Empate = 28 / 3.20 = R$ 8,75
+- Stake Casa = 28 / 2.29 = R$ 12,23
+
+Wait - na imagem mostra Casa R$ 9,52, não R$ 12,23...
 ```
 
-## Logica de Calculo Freebet
+Hmm, deixe-me recalcular com a fórmula correta:
 
-### 1. Selecao de Odds
+```text
+Freebet = R$ 10,30 (valor riscado na imagem)
+Odd Freebet (Fora) = 3.80
+Retorno se Fora ganhar = 10,30 × (3.80 - 1) = R$ 28,84
 
-Para cada partida, o sistema seleciona:
-- **Casa**: Melhor odd PA para Casa (ex: Novibet 29.00)
-- **Empate**: Melhor odd SO (priorizando Betbra)
-- **Fora**: Melhor odd PA para Fora (ex: Novibet 22.00)
+Para cobrir outros resultados com lucro igual:
+Lucro desejado = X
 
-### 2. Calculo de Arbitragem
+Se Empate ganhar: Stake_Empate × 3.20 = Lucro_Total
+Se Casa ganhar: Stake_Casa × 2.29 = Lucro_Total
+Se Fora ganhar: 28,84 = Lucro_Total
 
-```typescript
-// Calculo do valor de arbitragem para freebet
-function calculateFreebetArbitrage(
-  homeOdd: number, 
-  drawOdd: number, 
-  awayOdd: number,
-  freebetValue: number
-): FreebetResult {
-  // Valor base da aposta no empate (freebet)
-  const drawStake = freebetValue;
-  
-  // Calcular valor total necessario para cobrir todos os resultados
-  const arbitrageValue = 1/homeOdd + 1/drawOdd + 1/awayOdd;
-  
-  // ROI (quanto maior, melhor)
-  const roi = ((1 / arbitrageValue) - 1) * 100;
-  
-  // Stakes otimas
-  const totalToInvest = drawStake * drawOdd / (1 / arbitrageValue);
-  const homeStake = (1/homeOdd) / arbitrageValue * totalToInvest;
-  const awayStake = (1/awayOdd) / arbitrageValue * totalToInvest;
-  
-  // Lucro garantido
-  const guaranteedProfit = (totalToInvest / arbitrageValue) - totalToInvest;
-  
-  return {
-    roi,
-    totalToInvest,
-    guaranteedProfit,
-    homeStake,
-    drawStake,
-    awayStake,
-  };
-}
+Então Lucro_Total = R$ 28,84? Não...
 ```
 
-### 3. Filtros Disponiveis
+Na verdade, o cálculo é diferente. A freebet dá retorno de:
+- Se ganhar: `stake × (odd - 1)` = lucro
+- Se perder: perdemos nada (é freebet)
 
-| Filtro | Tipo | Descricao |
-|--------|------|-----------|
-| Casa da Freebet | Dropdown | Qual casa tem a freebet (Betbra, Novibet, etc) |
-| Valor Freebet | Input | Valor em R$ da freebet (ex: 10) |
-| Casas de Apostas PA | Checkbox | Quais casas PA considerar |
-| Campeonatos | Checkbox | Filtrar por liga |
-| Datas | Checkbox | Filtrar por data |
-| Odd Min/Max | Input | Range de odds da freebet |
+Então o cálculo correto para extração:
 
-## Componentes Detalhados
+```text
+Freebet R$ 10 @ 3.80 (Fora)
+Retorno freebet = 10 × (3.80 - 1) = R$ 28
 
-### FreebetCard
+Para garantir lucro X independente do resultado:
+- Se Fora ganha: Lucro = 28 - (StakeEmpate + StakeCasa) = X
+- Se Empate ganha: Lucro = StakeEmpate × 3.20 - (StakeEmpate + StakeCasa) = X
+- Se Casa ganha: Lucro = StakeCasa × 2.29 - (StakeEmpate + StakeCasa) = X
 
-```typescript
-interface FreebetOpportunity {
-  match: MatchOddsGroup;
-  homeBookmaker: string;
-  homeOdd: number;
-  homeStake: number;
-  homeLink: string | null;
-  drawBookmaker: string;  // Sempre SO, preferencia Betbra
-  drawOdd: number;
-  drawStake: number;      // Valor da freebet
-  drawLink: string | null;
-  awayBookmaker: string;
-  awayOdd: number;
-  awayStake: number;
-  awayLink: string | null;
-  totalToInvest: number;
-  guaranteedProfit: number;
-  roi: number;
-}
+Resolvendo o sistema para igualar lucros...
 ```
 
-### FreebetConfig (barra superior)
+A fórmula já está correta no código atual, só precisamos passar o `freebetOutcome` correto.
 
-```typescript
-interface FreebetConfigState {
-  selectedBookmaker: string;  // Casa onde tem a freebet
-  freebetValue: number;       // Valor da freebet em R$
-}
+## Visual do Card Corrigido
+
+```text
+┌────────────────────────────────────────┐
+│ 🏆 La Liga            ⏰ 17:00 - 01/02 │
+│                                        │
+│ Athletic Bilbao vs Real Sociedad       │
+│ [📈 42.7% ROI]                         │
+│                                        │
+│ Total investido: R$ 15,41  Lucro: R$ 6,59 │
+├────────────────────────────────────────┤
+│ Casa (1)  PA                           │
+│ esportivabet     2.29     R$ 9,52  [🔗]│
+│ [fundo verde]                          │
+├────────────────────────────────────────┤
+│ Empate (X)  SO                         │
+│ Betbra           3.20     R$ 8,75  [🔗]│
+│ [fundo laranja]                        │
+├────────────────────────────────────────┤
+│ Fora (2)  PA  [FREEBET]                │
+│ esportivabet     3.80   ̶R̶$̶ ̶1̶0̶,̶3̶0̶  [🔗]│
+│ [fundo verde com badge FREEBET]        │
+│ [stake riscado porque é freebet]       │
+└────────────────────────────────────────┘
 ```
 
-## Integracao com Dados Existentes
+## Resumo das Mudanças
 
-O hook `useOddsComparison` ja retorna os dados agrupados por partida com:
-- `match.odds[]` - Todas as odds de todas as casas
-- `odds.odds_type` - 'SO' ou 'PA'
-- `odds.bookmaker_name` - Nome da casa
-- `odds.extra_data` - Dados para gerar links
-
-Utilizaremos `getBestOddsByType` de `oddsTypeUtils.ts` para separar odds SO e PA.
-
-## Fluxo de Uso
-
-1. Usuario seleciona qual casa tem a freebet (ex: "Betbra")
-2. Usuario informa o valor da freebet (ex: R$ 10)
-3. Sistema calcula automaticamente todas as oportunidades
-4. Cards mostram ROI, valores a apostar e lucro garantido
-5. Botoes com links abrem a pagina da aposta em cada casa
-
-## Ordenacao
-
-Os cards serao ordenados por ROI (maior para menor), mostrando as melhores oportunidades primeiro.
-
-## Elementos Visuais
-
-| Elemento | Estilo |
-|----------|--------|
-| Badge ROI | Verde/roxo com % |
-| Casa PA | Cor verde |
-| Empate SO | Cor laranja/amber |
-| Links | Botoes com icone ExternalLink |
-| Horario | Formato HH:mm DD/MM |
-| Liga | Badge ou texto pequeno |
+| Arquivo | Linhas | Mudança |
+|---------|--------|---------|
+| `src/types/freebet.ts` | ~3-23 | Adicionar `freebetPosition: 'home' \| 'away'` |
+| `src/lib/freebetUtils.ts` | ~69-125 | Determinar maior odd PA, passar `freebetPosition` |
+| `src/components/freebet/FreebetCard.tsx` | ~190-217 | Mostrar badge FREEBET e stake riscado no resultado correto |
