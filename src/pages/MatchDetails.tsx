@@ -341,15 +341,15 @@ function OddsRow({
         </div>
       </TableCell>
       <TableCell className="text-center">
-        <OddCell value={odds.home_odd} isBest={odds.home_odd === bestHome} isWorst={odds.home_odd === worstHome} />
+        <OddCell value={odds.home_odd} isBest={odds.home_odd === bestHome} isWorst={odds.home_odd === worstHome} oddsType={oddsType} />
       </TableCell>
       {!isBasketball && (
         <TableCell className="text-center">
-          <OddCell value={odds.draw_odd} isBest={odds.draw_odd === bestDraw} isWorst={odds.draw_odd === worstDraw} />
+          <OddCell value={odds.draw_odd} isBest={odds.draw_odd === bestDraw} isWorst={odds.draw_odd === worstDraw} oddsType={oddsType} />
         </TableCell>
       )}
       <TableCell className="text-center">
-        <OddCell value={odds.away_odd} isBest={odds.away_odd === bestAway} isWorst={odds.away_odd === worstAway} />
+        <OddCell value={odds.away_odd} isBest={odds.away_odd === bestAway} isWorst={odds.away_odd === worstAway} oddsType={oddsType} />
       </TableCell>
       <TableCell className="text-center">
         <div className="flex items-center justify-center gap-1">
@@ -397,15 +397,20 @@ function OddsRow({
   );
 }
 
-function OddCell({ value, isBest, isWorst }: { value: number | null; isBest: boolean; isWorst: boolean }) {
+function OddCell({ value, isBest, isWorst, oddsType }: { value: number | null; isBest: boolean; isWorst: boolean; oddsType?: 'SO' | 'PA' }) {
   if (value === null || value === undefined) {
     return <span className="text-muted-foreground">-</span>;
   }
   
+  // Escolher cor baseado no tipo de odd: SO = laranja, PA = verde
+  const bestColorClass = oddsType === 'SO' 
+    ? "bg-amber-500/10 text-amber-500 font-bold"
+    : "bg-emerald-500/10 text-emerald-500 font-bold";
+  
   return (
     <div className={cn(
       "inline-flex items-center gap-1 px-2 py-1 rounded font-mono",
-      isBest && "bg-emerald-500/10 text-emerald-500 font-bold"
+      isBest && bestColorClass
     )}>
       {value.toFixed(2)}
     </div>
