@@ -55,7 +55,7 @@ module.exports = {
       interpreter: 'python3',
       args: '--mode hybrid',
       cwd: __dirname,
-      max_memory_restart: '700M',  // 2 scrapers simultâneos
+      max_memory_restart: '800M',  // 3 scrapers simultâneos (triplets)
       restart_delay: 10000,
       max_restarts: 10,
       min_uptime: 60000,
