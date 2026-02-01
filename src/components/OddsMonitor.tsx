@@ -15,7 +15,6 @@ import { useFiltersFromUrl } from '@/hooks/useFiltersFromUrl';
 import { useSurebetDetection } from '@/hooks/useSurebetDetection';
 import { listContainer, listItem } from '@/lib/animations';
 import { MatchCardSkeleton } from './MatchCardSkeleton';
-import { getBestOddsByType, calculateROI, getBestPAOdds } from '@/lib/oddsTypeUtils';
 import type { MatchOddsGroup } from '@/types/database';
 
 interface OddsMonitorProps {
@@ -328,17 +327,15 @@ function MatchCard({ match }: { match: MatchOddsGroup }) {
   const isBasketball = (match.sport_type || 'football') === 'basketball';
   const sportIcon = isBasketball ? '🏀' : '⚽';
   
-  // Separate odds by type (SO vs PA)
-  const { bestSO, topPAHome, topPADraw, topPAAway, hasSOData, hasPAData, paOdds } = getBestOddsByType(match.odds, isBasketball);
+  // Calculate best bookmakers for each outcome
+  const bestHomeBookmaker = match.odds.reduce((best, o) => 
+    o.home_odd > (best?.home_odd || 0) ? o : best, match.odds[0])?.bookmaker_name;
+  const bestDrawBookmaker = match.odds.reduce((best, o) => 
+    (o.draw_odd || 0) > (best?.draw_odd || 0) ? o : best, match.odds[0])?.bookmaker_name;
+  const bestAwayBookmaker = match.odds.reduce((best, o) => 
+    o.away_odd > (best?.away_odd || 0) ? o : best, match.odds[0])?.bookmaker_name;
   
-  // Calculate ROI for SO
-  const roiSO = hasSOData ? calculateROI(bestSO.home, bestSO.draw, bestSO.away, isBasketball) : -100;
-  
-  // Calculate ROI for PA (using best PA odds)
-  const bestPA = getBestPAOdds(paOdds, isBasketball);
-  const roiPA = hasPAData ? calculateROI(bestPA.home, bestPA.draw, bestPA.away, isBasketball) : -100;
-  
-  // Overall surebet detection (using any combination)
+  // Calculate arbitrage (overall)
   const arbitrageValue = isBasketball || match.best_draw === null || match.best_draw === 0
     ? (1/match.best_home + 1/match.best_away)
     : (1/match.best_home + 1/match.best_draw + 1/match.best_away);
@@ -392,138 +389,72 @@ function MatchCard({ match }: { match: MatchOddsGroup }) {
             {format(matchDate, "dd/MM/yyyy HH:mm", { locale: ptBR })}
           </div>
           
-          {/* SO / Betbra Section - Laranja/Amber */}
-          {hasSOData && (
-            <div className="space-y-1 pt-2 border-t">
-              <div className="text-xs font-medium text-amber-500 flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                SO / Betbra
+          {/* Best Odds Grid - Single unified view */}
+          <div className="pt-2 sm:pt-3 border-t">
+            <div className={cn(
+              "grid gap-2 sm:gap-4",
+              isBasketball ? "grid-cols-3" : "grid-cols-4"
+            )}>
+              {/* Casa */}
+              <div className="text-center group">
+                <div className="text-[10px] sm:text-xs text-muted-foreground truncate">
+                  {bestHomeBookmaker}
+                </div>
+                <div className={cn(
+                  "font-bold text-lg sm:text-xl font-mono transition-transform duration-200 group-hover:scale-110",
+                  hasArbitrage ? "text-success" : "text-primary"
+                )}>
+                  {match.best_home.toFixed(2)}
+                </div>
+                <div className="text-[10px] sm:text-xs text-muted-foreground">
+                  {isBasketball ? 'Time 1' : 'Casa'}
+                </div>
               </div>
-              <div className={cn(
-                "grid gap-2 sm:gap-4 bg-amber-500/5 rounded-lg p-2 border border-amber-500/20",
-                isBasketball ? "grid-cols-3" : "grid-cols-4"
-              )}>
-                {/* Casa */}
+              
+              {/* Empate (futebol only) */}
+              {!isBasketball && (
                 <div className="text-center group">
-                  <div className="text-[10px] sm:text-xs text-muted-foreground truncate">{bestSO.homeBookmaker || '-'}</div>
-                  <div className="font-bold text-lg sm:text-xl font-mono text-amber-500 transition-transform duration-200 group-hover:scale-110">
-                    {bestSO.home > 0 ? bestSO.home.toFixed(2) : '-'}
+                  <div className="text-[10px] sm:text-xs text-muted-foreground truncate">
+                    {bestDrawBookmaker}
                   </div>
-                  <div className="text-[10px] sm:text-xs text-muted-foreground">{isBasketball ? 'Time 1' : 'Casa'}</div>
-                </div>
-                
-                {/* Empate (futebol only) */}
-                {!isBasketball && (
-                  <div className="text-center group">
-                    <div className="text-[10px] sm:text-xs text-muted-foreground truncate">{bestSO.drawBookmaker || '-'}</div>
-                    <div className="font-bold text-lg sm:text-xl font-mono text-amber-500 transition-transform duration-200 group-hover:scale-110">
-                      {bestSO.draw && bestSO.draw > 0 ? bestSO.draw.toFixed(2) : '-'}
-                    </div>
-                    <div className="text-[10px] sm:text-xs text-muted-foreground">Empate</div>
-                  </div>
-                )}
-                
-                {/* Fora */}
-                <div className="text-center group">
-                  <div className="text-[10px] sm:text-xs text-muted-foreground truncate">{bestSO.awayBookmaker || '-'}</div>
-                  <div className="font-bold text-lg sm:text-xl font-mono text-amber-500 transition-transform duration-200 group-hover:scale-110">
-                    {bestSO.away > 0 ? bestSO.away.toFixed(2) : '-'}
-                  </div>
-                  <div className="text-[10px] sm:text-xs text-muted-foreground">{isBasketball ? 'Time 2' : 'Fora'}</div>
-                </div>
-                
-                {/* ROI SO */}
-                <div className="text-center">
-                  <div className="text-[10px] sm:text-xs text-muted-foreground">ROI</div>
                   <div className={cn(
-                    "font-bold text-lg sm:text-xl font-mono",
-                    roiSO > 0 ? "text-amber-500" : "text-muted-foreground"
+                    "font-bold text-lg sm:text-xl font-mono transition-transform duration-200 group-hover:scale-110",
+                    hasArbitrage ? "text-success" : "text-primary"
                   )}>
-                    {roiSO > 0 ? `+${roiSO.toFixed(2)}%` : `${roiSO.toFixed(2)}%`}
+                    {match.best_draw !== null ? match.best_draw.toFixed(2) : '-'}
                   </div>
+                  <div className="text-[10px] sm:text-xs text-muted-foreground">Empate</div>
+                </div>
+              )}
+              
+              {/* Fora */}
+              <div className="text-center group">
+                <div className="text-[10px] sm:text-xs text-muted-foreground truncate">
+                  {bestAwayBookmaker}
+                </div>
+                <div className={cn(
+                  "font-bold text-lg sm:text-xl font-mono transition-transform duration-200 group-hover:scale-110",
+                  hasArbitrage ? "text-success" : "text-primary"
+                )}>
+                  {match.best_away.toFixed(2)}
+                </div>
+                <div className="text-[10px] sm:text-xs text-muted-foreground">
+                  {isBasketball ? 'Time 2' : 'Fora'}
+                </div>
+              </div>
+              
+              {/* ROI */}
+              <div className="text-center">
+                <div className="text-[10px] sm:text-xs text-muted-foreground">ROI</div>
+                <div className={cn(
+                  "font-bold text-lg sm:text-xl font-mono",
+                  hasArbitrage ? "text-success" : "text-muted-foreground"
+                )}>
+                  {Number(roiPercentage) > 0 ? `+${roiPercentage}%` : `${roiPercentage}%`}
                 </div>
               </div>
             </div>
-          )}
-          
-          {/* PA Section - Verde/Emerald - Top 3 */}
-          {hasPAData && (
-            <div className="space-y-1">
-              <div className="text-xs font-medium text-emerald-500 flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                PA - Top 3
-              </div>
-              <div className={cn(
-                "grid gap-2 sm:gap-4 bg-emerald-500/5 rounded-lg p-2 border border-emerald-500/20",
-                isBasketball ? "grid-cols-3" : "grid-cols-4"
-              )}>
-                {/* Casa - Top 3 */}
-                <div className="text-center">
-                  <div className="space-y-0.5">
-                    {topPAHome.length > 0 ? topPAHome.map((o, i) => (
-                      <div key={i} className="text-xs flex items-center justify-center gap-1">
-                        <span className="font-mono font-bold text-emerald-500">{o.home_odd.toFixed(2)}</span>
-                        <span className="text-muted-foreground text-[10px] truncate max-w-[50px]">{o.bookmaker_name.slice(0, 8)}</span>
-                      </div>
-                    )) : (
-                      <div className="text-xs text-muted-foreground">-</div>
-                    )}
-                  </div>
-                  <div className="text-[10px] text-muted-foreground mt-1">{isBasketball ? 'Time 1' : 'Casa'}</div>
-                </div>
-                
-                {/* Empate - Top 3 (futebol only) */}
-                {!isBasketball && (
-                  <div className="text-center">
-                    <div className="space-y-0.5">
-                      {topPADraw.length > 0 ? topPADraw.map((o, i) => (
-                        <div key={i} className="text-xs flex items-center justify-center gap-1">
-                          <span className="font-mono font-bold text-emerald-500">{o.draw_odd?.toFixed(2)}</span>
-                          <span className="text-muted-foreground text-[10px] truncate max-w-[50px]">{o.bookmaker_name.slice(0, 8)}</span>
-                        </div>
-                      )) : (
-                        <div className="text-xs text-muted-foreground">-</div>
-                      )}
-                    </div>
-                    <div className="text-[10px] text-muted-foreground mt-1">Empate</div>
-                  </div>
-                )}
-                
-                {/* Fora - Top 3 */}
-                <div className="text-center">
-                  <div className="space-y-0.5">
-                    {topPAAway.length > 0 ? topPAAway.map((o, i) => (
-                      <div key={i} className="text-xs flex items-center justify-center gap-1">
-                        <span className="font-mono font-bold text-emerald-500">{o.away_odd.toFixed(2)}</span>
-                        <span className="text-muted-foreground text-[10px] truncate max-w-[50px]">{o.bookmaker_name.slice(0, 8)}</span>
-                      </div>
-                    )) : (
-                      <div className="text-xs text-muted-foreground">-</div>
-                    )}
-                  </div>
-                  <div className="text-[10px] text-muted-foreground mt-1">{isBasketball ? 'Time 2' : 'Fora'}</div>
-                </div>
-                
-                {/* ROI PA */}
-                <div className="text-center flex flex-col justify-center">
-                  <div className="text-[10px] text-muted-foreground">ROI</div>
-                  <div className={cn(
-                    "font-bold text-lg sm:text-xl font-mono",
-                    roiPA > 0 ? "text-emerald-500" : "text-muted-foreground"
-                  )}>
-                    {roiPA > 0 ? `+${roiPA.toFixed(2)}%` : `${roiPA.toFixed(2)}%`}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-          
-          {/* Fallback if no odds available */}
-          {!hasSOData && !hasPAData && (
-            <div className="pt-2 border-t text-center text-sm text-muted-foreground">
-              Sem odds disponíveis
-            </div>
-          )}
+          </div>
         </div>
       </CardContent>
     </Card>
