@@ -1,146 +1,250 @@
 
-# Modo Triplet - 3 Scrapers em Paralelo
 
-## Situação Atual
+# Separar Melhores Odds por Tipo (SO vs PA)
 
-| Métrica | Valor Atual | Capacidade |
-|---------|-------------|------------|
-| CPU | 13% | 100% |
-| Memória | 10% (~3GB) | 32GB |
-| Load Average | ~1.0 | 8.0 (8 cores) |
-| Ciclo | ~183s | - |
+## Objetivo
 
-Você está usando apenas **~12% da capacidade** do servidor. Há margem confortável para triplicar o paralelismo.
+Exibir as melhores odds separadamente por tipo:
+- **SO/Betbra** (tom laranja): Melhores odds de Super Odds e Betbra
+- **PA** (tom verde): Top 3 melhores odds de Pagamento Antecipado
 
-## Proposta: Triplets (2 Leves + 1 Pesado)
-
-Agrupar scrapers em **triplets** que executam simultaneamente:
+## Mudanças Visuais
 
 ```text
-Triplet 1: superbet + novibet + betano        (2 HTTPX + 1 Playwright)
-Triplet 2: kto + estrelabet + betbra          (2 HTTPX + 1 Playwright)  
-Triplet 3: sportingbet + betnacional + stake  (2 HTTPX + 1 Playwright)
-Triplet 4: br4bet + mcgames + aposta1         (2 HTTPX + 1 Playwright)
-Triplet 5: jogodeouro + tradeball + esportivabet (2 HTTPX + 1 Playwright)
-Triplet 6: bet365 (solo)                      (API externa com rate limit)
-Triplet 7: br4bet_nba + mcgames_nba + jogodeouro_nba (3 HTTPX)
+Antes (grid único):
+┌─────────────┬─────────────┬─────────────┬─────────────┐
+│   Casa      │   Empate    │    Fora     │    ROI      │
+│   2.10      │    3.50     │    2.80     │   -2.5%     │
+│  Superbet   │   Betano    │   Novibet   │             │
+└─────────────┴─────────────┴─────────────┴─────────────┘
+
+Depois (2 seções):
+┌─────────────────────────────────────────────────────────┐
+│ SO / Betbra                                    (laranja)│
+├─────────────┬─────────────┬─────────────┬─────────────┤
+│   Casa      │   Empate    │    Fora     │    ROI      │
+│   2.10      │    3.50     │    2.80     │   -2.5%     │
+│  Betbra     │   Novibet   │   Betbra    │             │
+└─────────────┴─────────────┴─────────────┴─────────────┘
+┌─────────────────────────────────────────────────────────┐
+│ PA - Top 3                                      (verde) │
+├─────────────┬─────────────┬─────────────┬─────────────┤
+│   Casa      │   Empate    │    Fora     │    ROI      │
+│   2.05      │    3.40     │    2.75     │   -3.1%     │
+│  Superbet   │   Betano    │   KTO       │             │
+└─────────────┴─────────────┴─────────────┴─────────────┘
 ```
-
-## Estimativa de Performance
-
-| Modo | Scrapers Paralelos | Tempo Ciclo | Load Esperado |
-|------|-------------------|-------------|---------------|
-| Sequencial | 1 | ~229s | 1.5 |
-| Híbrido atual | 2 | ~183s | 3-5 |
-| **Triplet** | **3** | **~120-140s** | **4-6** |
-
-**Redução adicional de ~25-35%** no tempo de ciclo!
 
 ## Arquivos a Modificar
 
 | Arquivo | Mudança |
 |---------|---------|
-| `run_sequential.py` | Substituir `HYBRID_PAIRS` por `HYBRID_TRIPLETS` |
-| `ecosystem.sequential.config.js` | Aumentar `max_memory_restart` para 800M (3 scrapers simultâneos) |
+| `src/components/OddsMonitor.tsx` | Atualizar `MatchCard` para exibir 2 seções de odds |
+| `src/components/OddsComparisonTable.tsx` | Mesma atualização para o componente alternativo |
+| `src/index.css` | Adicionar variáveis CSS para cores SO/PA |
 
-## Implementação Detalhada
+## Implementação Técnica
 
-### 1. Nova estrutura HYBRID_TRIPLETS em run_sequential.py
+### 1. Adicionar variáveis de cor no CSS (index.css)
 
-```python
-# Triplets otimizados: 2 leves + 1 pesado quando possível
-HYBRID_TRIPLETS = [
-    # (leve, leve, pesado) - rodam em paralelo
-    ("superbet", "novibet", "betano"),
-    ("kto", "estrelabet", "betbra"),
-    ("sportingbet", "betnacional", "stake"),
-    ("br4bet", "mcgames", "aposta1"),
-    ("jogodeouro", "tradeball", "esportivabet"),
-    
-    # API externa (solo para respeitar rate limit)
-    ("bet365",),
-    
-    # NBA (todos leves, podem rodar juntos)
-    ("br4bet_nba", "mcgames_nba", "jogodeouro_nba"),
-]
-```
+Novas variáveis semânticas:
 
-### 2. Renomear HYBRID_PAIRS para HYBRID_TRIPLETS
+```css
+:root {
+  /* Odds Type Colors */
+  --odds-so: 38 92% 50%;          /* Laranja/amber */
+  --odds-so-foreground: 0 0% 100%;
+  --odds-pa: 142 76% 36%;         /* Verde */
+  --odds-pa-foreground: 0 0% 100%;
+}
 
-A função `run_hybrid()` já suporta tuplas de qualquer tamanho, então só precisa trocar a constante.
-
-### 3. Atualizar get_scrapers_for_mode()
-
-```python
-elif mode == "hybrid":
-    return HYBRID_TRIPLETS  # Antes era HYBRID_PAIRS
-```
-
-### 4. Ajustar ecosystem.sequential.config.js
-
-```javascript
-{
-  name: 'scraper-hybrid',
-  // ...
-  max_memory_restart: '800M',  // Antes: 700M (para 3 scrapers)
+.dark {
+  --odds-so: 38 80% 55%;
+  --odds-so-foreground: 0 0% 0%;
+  --odds-pa: 142 70% 45%;
+  --odds-pa-foreground: 0 0% 100%;
 }
 ```
 
-## Comparação Visual
+### 2. Função utilitária para separar odds por tipo
 
-```text
-ANTES (Híbrido - Pares):
-  Par 1: [superbet] + [betano]     → 60s
-  Par 2: [novibet]  + [betbra]     → 55s
-  Par 3: [kto]      + [stake]      → 50s
-  ...
-  Total: ~183s
-
-DEPOIS (Triplets):
-  Triplet 1: [superbet + novibet] + [betano]     → 60s
-  Triplet 2: [kto + estrelabet]   + [betbra]     → 55s
-  Triplet 3: [sportingbet + betnacional] + [stake] → 50s
-  ...
-  Total: ~120-140s
+```typescript
+function getBestOddsByType(odds: BookmakerOdds[], isBasketball: boolean) {
+  const knownSOBookmakers = ['novibet', 'betbra', 'betnacional'];
+  
+  const soOdds = odds.filter(o => {
+    const name = o.bookmaker_name.toLowerCase();
+    return o.odds_type === 'SO' || knownSOBookmakers.some(b => name.includes(b));
+  });
+  
+  const paOdds = odds.filter(o => {
+    const name = o.bookmaker_name.toLowerCase();
+    return o.odds_type !== 'SO' && !knownSOBookmakers.some(b => name.includes(b));
+  });
+  
+  // Melhores SO
+  const bestSO = {
+    home: Math.max(...soOdds.map(o => o.home_odd), 0),
+    draw: isBasketball ? null : Math.max(...soOdds.map(o => o.draw_odd || 0), 0),
+    away: Math.max(...soOdds.map(o => o.away_odd), 0),
+    homeBookmaker: soOdds.find(o => o.home_odd === Math.max(...soOdds.map(x => x.home_odd)))?.bookmaker_name,
+    drawBookmaker: soOdds.find(o => o.draw_odd === Math.max(...soOdds.map(x => x.draw_odd || 0)))?.bookmaker_name,
+    awayBookmaker: soOdds.find(o => o.away_odd === Math.max(...soOdds.map(x => x.away_odd)))?.bookmaker_name,
+  };
+  
+  // Top 3 PA por outcome
+  const getTopN = (arr: BookmakerOdds[], key: 'home_odd' | 'draw_odd' | 'away_odd', n: number) => {
+    return [...arr]
+      .filter(o => key === 'draw_odd' ? o[key] !== null : true)
+      .sort((a, b) => (b[key] || 0) - (a[key] || 0))
+      .slice(0, n);
+  };
+  
+  const topPAHome = getTopN(paOdds, 'home_odd', 3);
+  const topPADraw = isBasketball ? [] : getTopN(paOdds, 'draw_odd', 3);
+  const topPAAway = getTopN(paOdds, 'away_odd', 3);
+  
+  return { bestSO, topPAHome, topPADraw, topPAAway, hasSOData: soOdds.length > 0, hasPAData: paOdds.length > 0 };
+}
 ```
 
-## Segurança
+### 3. Atualizar MatchCard no OddsMonitor.tsx
 
-- Load esperado: 4-6 (ainda abaixo do limite de 8 cores)
-- Se o load ultrapassar 6 consistentemente, basta voltar para `HYBRID_PAIRS`
-- O cooldown de 2s entre triplets pesados continua ativo
+Substituir o grid único por duas seções condicionais:
 
-## Rollback Rápido
+```tsx
+{/* SO / Betbra Section - Laranja */}
+{hasSOData && (
+  <div className="space-y-1">
+    <div className="text-xs font-medium text-amber-500 flex items-center gap-1">
+      <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+      SO / Betbra
+    </div>
+    <div className="grid grid-cols-4 gap-2 bg-amber-500/5 rounded-lg p-2 border border-amber-500/20">
+      {/* Casa */}
+      <OddsCell 
+        value={bestSO.home} 
+        label="Casa" 
+        bookmaker={bestSO.homeBookmaker}
+        colorClass="text-amber-500"
+      />
+      {/* Empate (se futebol) */}
+      {!isBasketball && (
+        <OddsCell 
+          value={bestSO.draw} 
+          label="Empate" 
+          bookmaker={bestSO.drawBookmaker}
+          colorClass="text-amber-500"
+        />
+      )}
+      {/* Fora */}
+      <OddsCell 
+        value={bestSO.away} 
+        label="Fora" 
+        bookmaker={bestSO.awayBookmaker}
+        colorClass="text-amber-500"
+      />
+      {/* ROI SO */}
+      <ROICell value={roiSO} colorClass="text-amber-500" />
+    </div>
+  </div>
+)}
 
-Se precisar voltar ao modo de pares:
+{/* PA Section - Verde */}
+{hasPAData && (
+  <div className="space-y-1">
+    <div className="text-xs font-medium text-emerald-500 flex items-center gap-1">
+      <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+      PA - Top 3
+    </div>
+    <div className="grid grid-cols-4 gap-2 bg-emerald-500/5 rounded-lg p-2 border border-emerald-500/20">
+      {/* Casa - mostra até 3 valores */}
+      <div className="text-center">
+        {topPAHome.slice(0, 3).map((o, i) => (
+          <div key={i} className="text-xs">
+            <span className="font-mono font-bold text-emerald-500">{o.home_odd.toFixed(2)}</span>
+            <span className="text-muted-foreground ml-1">{o.bookmaker_name.slice(0, 8)}</span>
+          </div>
+        ))}
+        <div className="text-[10px] text-muted-foreground">Casa</div>
+      </div>
+      {/* Empate */}
+      {!isBasketball && (
+        <div className="text-center">
+          {topPADraw.slice(0, 3).map((o, i) => (
+            <div key={i} className="text-xs">
+              <span className="font-mono font-bold text-emerald-500">{o.draw_odd?.toFixed(2)}</span>
+              <span className="text-muted-foreground ml-1">{o.bookmaker_name.slice(0, 8)}</span>
+            </div>
+          ))}
+          <div className="text-[10px] text-muted-foreground">Empate</div>
+        </div>
+      )}
+      {/* Fora */}
+      <div className="text-center">
+        {topPAAway.slice(0, 3).map((o, i) => (
+          <div key={i} className="text-xs">
+            <span className="font-mono font-bold text-emerald-500">{o.away_odd.toFixed(2)}</span>
+            <span className="text-muted-foreground ml-1">{o.bookmaker_name.slice(0, 8)}</span>
+          </div>
+        ))}
+        <div className="text-[10px] text-muted-foreground">Fora</div>
+      </div>
+      {/* ROI PA (melhor combinação) */}
+      <ROICell value={roiPA} colorClass="text-emerald-500" />
+    </div>
+  </div>
+)}
+```
 
-```python
-# Em run_sequential.py, linha ~481:
-elif mode == "hybrid":
-    return HYBRID_PAIRS  # Volta para pares
+### 4. Cores utilizadas
+
+| Tipo | Cor Principal | Background | Border |
+|------|---------------|------------|--------|
+| SO/Betbra | `text-amber-500` | `bg-amber-500/5` | `border-amber-500/20` |
+| PA | `text-emerald-500` | `bg-emerald-500/5` | `border-emerald-500/20` |
+
+## Layout Final Esperado
+
+Para cada card de partida:
+
+```text
+┌────────────────────────────────────────────────────────────┐
+│ Flamengo ⚽ x ⚽ Palmeiras                    🎯 SUREBET    │
+│ Brasileirão Série A                      AO VIVO          │
+│ 15/02/2025 16:00                                          │
+├────────────────────────────────────────────────────────────┤
+│ ● SO / Betbra                                              │
+│ ┌──────────┬──────────┬──────────┬──────────┐             │
+│ │  2.10    │   3.50   │   2.80   │  -2.5%   │  (laranja)  │
+│ │  Betbra  │  Novibet │  Betbra  │   ROI    │             │
+│ │  Casa    │  Empate  │   Fora   │          │             │
+│ └──────────┴──────────┴──────────┴──────────┘             │
+│                                                            │
+│ ● PA - Top 3                                               │
+│ ┌──────────┬──────────┬──────────┬──────────┐             │
+│ │  2.05    │   3.40   │   2.75   │  -3.1%   │  (verde)    │
+│ │ Superbet │  Betano  │   KTO    │   ROI    │             │
+│ │  2.03    │   3.38   │   2.72   │          │             │
+│ │  Betano  │   KTO    │  Betano  │          │             │
+│ │  2.00    │   3.35   │   2.70   │          │             │
+│ │ Estrel.. │ Sportng  │ Estrel.. │          │             │
+│ │  Casa    │  Empate  │   Fora   │          │             │
+│ └──────────┴──────────┴──────────┴──────────┘             │
+└────────────────────────────────────────────────────────────┘
 ```
 
 ## Resumo das Mudanças
 
-| Arquivo | Linha | Mudança |
-|---------|-------|---------|
-| run_sequential.py | ~93-109 | Substituir `HYBRID_PAIRS` por `HYBRID_TRIPLETS` |
-| run_sequential.py | ~481 | Retornar `HYBRID_TRIPLETS` no modo hybrid |
-| ecosystem.sequential.config.js | ~28 | `max_memory_restart: '800M'` |
+| Arquivo | Linhas Afetadas | Tipo |
+|---------|-----------------|------|
+| `src/index.css` | +8 linhas | Novas variáveis CSS |
+| `src/components/OddsMonitor.tsx` | ~80 linhas modificadas | Nova estrutura MatchCard |
+| `src/components/OddsComparisonTable.tsx` | ~60 linhas modificadas | Consistência visual |
 
-## Comandos para Ativar
+## Comportamento
 
-```bash
-# Na VPS:
-pm2 stop all && pm2 delete all
-pm2 start ecosystem.sequential.config.js
-pm2 save
-pm2 logs scraper-hybrid
-htop  # Monitorar load
-```
-
-## Resultado Esperado
-
-- Ciclo: **~120-140s** (vs ~183s atual)
-- Load: **4-6** (seguro para 8 cores)
-- Freshness: dados atualizados a cada **~2 minutos**
+- Se não houver odds SO disponíveis, só mostra a seção PA
+- Se não houver odds PA disponíveis, só mostra a seção SO
+- ROI calculado separadamente para cada tipo
+- Basquete oculta coluna de empate automaticamente
