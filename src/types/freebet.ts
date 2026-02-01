@@ -29,6 +29,20 @@ export interface FreebetConfigState {
   freebetOutcome: 'draw' | 'home' | 'away';
 }
 
+export interface FreebetFiltersState {
+  freebetBookmaker: string | null;  // Casa onde a freebet está
+  leagues: string[];                // Ligas selecionadas
+  dates: string[];                  // Datas selecionadas (yyyy-MM-dd)
+  minExtraction: number;            // Extração mínima (0-100)
+}
+
+export const defaultFreebetFilters: FreebetFiltersState = {
+  freebetBookmaker: null,
+  leagues: [],
+  dates: [],
+  minExtraction: 0,
+};
+
 export interface FreebetCalculationResult {
   extraction: number;
   totalToInvest: number;
