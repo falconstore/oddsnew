@@ -20,6 +20,7 @@ import {
   TrendingUp,
   Cpu,
   CreditCard,
+  Gift,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -75,6 +76,7 @@ const navigation: NavigationItem[] = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard, pageKey: PAGE_KEYS.DASHBOARD },
   { name: 'Monitor Futebol', href: '/monitor-futebol', icon: FootballIcon, pageKey: PAGE_KEYS.MONITOR_FUTEBOL },
   { name: 'Monitor Basquete', href: '/monitor-basquete', icon: BasketballIcon, pageKey: PAGE_KEYS.MONITOR_BASQUETE },
+  { name: 'Extração Freebet', href: '/freebet', icon: Gift, pageKey: PAGE_KEYS.FREEBET_EXTRACTION },
   { name: 'Controle Procedimentos', href: '/procedures', icon: FileText, pageKey: PAGE_KEYS.PROCEDURE_CONTROL },
   { name: 'Betbra Affiliate', href: '/betbra', icon: TrendingUp, pageKey: PAGE_KEYS.BETBRA_AFFILIATE },
   { name: 'Assinaturas', href: '/subscriptions', icon: CreditCard, pageKey: PAGE_KEYS.SUBSCRIPTIONS },
