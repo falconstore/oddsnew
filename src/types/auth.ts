@@ -34,6 +34,7 @@ export const PAGE_KEYS = {
   DASHBOARD: 'dashboard',
   MONITOR_FUTEBOL: 'monitor_futebol',
   MONITOR_BASQUETE: 'monitor_basquete',
+  FREEBET_EXTRACTION: 'freebet_extraction',
   LEAGUES: 'leagues',
   TEAMS: 'teams',
   BOOKMAKERS: 'bookmakers',
@@ -61,6 +62,10 @@ export const PAGE_CONFIG: Record<PageKey, { label: string; description: string }
   [PAGE_KEYS.MONITOR_BASQUETE]: { 
     label: 'Monitor Basquete', 
     description: 'Monitor de odds de basquete'
+  },
+  [PAGE_KEYS.FREEBET_EXTRACTION]: { 
+    label: 'Extração Freebet', 
+    description: 'Monitor de arbitragem para extração de freebets'
   },
   [PAGE_KEYS.LEAGUES]: { 
     label: 'Ligas', 

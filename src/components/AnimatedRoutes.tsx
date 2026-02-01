@@ -20,6 +20,7 @@ import ScraperStatus from '@/pages/admin/ScraperStatus';
 import ProcedureControl from '@/pages/ProcedureControl';
 import BetbraAffiliate from '@/pages/BetbraAffiliate';
 import Subscriptions from '@/pages/Subscriptions';
+import FreebetExtraction from '@/pages/FreebetExtraction';
 import NotFound from '@/pages/NotFound';
 
 export function AnimatedRoutes() {
@@ -53,6 +54,13 @@ export function AnimatedRoutes() {
           <RequireAuth pageKey={PAGE_KEYS.MONITOR_BASQUETE}>
             <PageTransition>
               <MonitorBasquete />
+            </PageTransition>
+          </RequireAuth>
+        } />
+        <Route path="/freebet" element={
+          <RequireAuth pageKey={PAGE_KEYS.FREEBET_EXTRACTION}>
+            <PageTransition>
+              <FreebetExtraction />
             </PageTransition>
           </RequireAuth>
         } />
