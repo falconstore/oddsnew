@@ -114,6 +114,12 @@ All colors MUST be HSL.
     --odds-good: 38 92% 50%;
     --odds-neutral: 0 0% 50%;
     
+    /* === ODDS TYPE COLORS (SO vs PA) === */
+    --odds-so: 38 92% 50%;
+    --odds-so-foreground: 0 0% 100%;
+    --odds-pa: 142 76% 36%;
+    --odds-pa-foreground: 0 0% 100%;
+    
     /* === GLOW EFFECTS === */
     --glow-primary: 0 0 20px hsl(142 76% 36% / 0.2);
   }
@@ -194,6 +200,12 @@ All colors MUST be HSL.
     --odds-best: 142 70% 45%;
     --odds-good: 38 92% 50%;
     --odds-neutral: 0 0% 50%;
+    
+    /* === ODDS TYPE COLORS (SO vs PA) - DARK === */
+    --odds-so: 38 80% 55%;
+    --odds-so-foreground: 0 0% 0%;
+    --odds-pa: 142 70% 45%;
+    --odds-pa-foreground: 0 0% 100%;
     
     /* === GLOW EFFECTS (Enhanced in dark mode) === */
     --glow-primary: 0 0 30px hsl(142 70% 45% / 0.35);
