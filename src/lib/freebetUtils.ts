@@ -2,8 +2,8 @@ import type { MatchOddsGroup, BookmakerOdds } from '@/types/database';
 import type { FreebetOpportunity, FreebetFiltersState } from '@/types/freebet';
 import { calculateFreebetExtraction } from '@/types/freebet';
 
-// Known SO bookmakers
-const KNOWN_SO_BOOKMAKERS = ['novibet', 'betbra', 'betnacional'];
+// Casas que são EXCLUSIVAMENTE SO (nunca têm PA)
+const KNOWN_SO_BOOKMAKERS = ['betbra', 'betnacional', 'tradeball'];
 
 /**
  * Check if a bookmaker is SO type

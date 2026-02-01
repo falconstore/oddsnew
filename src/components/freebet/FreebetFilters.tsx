@@ -71,11 +71,11 @@ export function FreebetFilters({
     return `${selectedDates.length} datas`;
   };
 
-  // Filter only PA bookmakers (not SO) for freebet placement
+  // Filtrar apenas casas exclusivamente SO (Novibet tem PA, então aparece)
   const paBookmakers = bookmakers.filter(b => {
     const name = b.name.toLowerCase();
-    // Exclude SO bookmakers
-    return !['novibet', 'betbra', 'betnacional'].some(so => name.includes(so));
+    // Excluir apenas casas que são exclusivamente SO
+    return !['betbra', 'betnacional', 'tradeball'].some(so => name.includes(so));
   });
 
   const leagueOptions = leagues.map(l => ({ value: l.name, label: l.name }));
