@@ -88,20 +88,17 @@ ALL_SCRAPERS_INTERLEAVED = [
     "esportivabet",  # PESADO
 ]
 
-# Pares otimizados para modo híbrido: 1 leve + 1 pesado quando possível
-# Isso permite ~50% redução no tempo de ciclo mantendo load ~3-5
-HYBRID_PAIRS = [
-    # (leve, pesado) - rodam em paralelo
-    ("superbet", "betano"),
-    ("novibet", "betbra"),
-    ("kto", "stake"),
-    ("estrelabet", "aposta1"),
-    ("sportingbet", "esportivabet"),
+# Triplets otimizados: 2 leves + 1 pesado quando possível
+# Reduz tempo de ciclo em ~35% mantendo load ~4-6
+HYBRID_TRIPLETS = [
+    # (leve, leve, pesado) - rodam em paralelo
+    ("superbet", "novibet", "betano"),
+    ("kto", "estrelabet", "betbra"),
+    ("sportingbet", "betnacional", "stake"),
+    ("br4bet", "mcgames", "aposta1"),
+    ("jogodeouro", "tradeball", "esportivabet"),
     
-    # Leves solo ou em grupo (baixo impacto)
-    ("betnacional",),
-    ("br4bet", "mcgames"),
-    ("jogodeouro", "tradeball"),
+    # API externa (solo para respeitar rate limit)
     ("bet365",),
     
     # NBA (todos leves, podem rodar juntos)
@@ -477,8 +474,8 @@ def get_scrapers_for_mode(mode: str, custom_list: Optional[str] = None):
     elif mode == "heavy":
         return HEAVY_SCRAPERS
     elif mode == "hybrid":
-        # Retorna lista de tuplas para execução em pares
-        return HYBRID_PAIRS
+        # Retorna lista de tuplas para execução em triplets
+        return HYBRID_TRIPLETS
     else:
         raise ValueError(f"Modo inválido: {mode}. Use: all, light, heavy, hybrid")
 
