@@ -1,120 +1,108 @@
 
-# Adicionar Cores por Tipo de Odds na Tabela
+# Corrigir Destaque de Melhores Odds por Grupo (SO vs PA)
 
-## Problema Identificado
+## Problema Atual
 
-Na tabela "Todas as Casas de Apostas", as melhores odds são destacadas apenas em verde, independentemente do tipo (SO ou PA). O usuário quer:
+O código está passando `match.best_home`, `match.best_draw`, `match.best_away` para TODAS as linhas da tabela. Isso significa que está comparando odds globais, não por grupo.
 
-- **SO/Betbra** → Destacar melhores odds em **laranja/amber**
-- **PA** → Destacar melhores odds em **verde/emerald** (como já está)
+**Exemplo da imagem:**
+- Betbra SO tem Casa 1.85 → está destacado em laranja (correto!)
+- Betano SO tem Empate 3.65 e Fora 5.20 → destacados em laranja (correto!)
+- Sportingbet PA tem Casa 1.78 → deveria ser verde (melhor PA Casa)
+- Mas 1.85 > 1.78, então 1.78 não é "isBest" usando comparação global
 
-## Layout Atual vs Desejado
+## Solução
 
-```text
-Atual:                              Desejado:
-┌────────┬───────┬───────┬───────┐  ┌────────┬───────┬───────┬───────┐
-│ Betbra │ 1.84  │ 3.75  │ 5.00  │  │ Betbra │ 1.84  │ 3.75  │ 5.00  │
-│   SO   │       │ verde │ verde │  │   SO   │       │laranja│laranja│
-├────────┼───────┼───────┼───────┤  ├────────┼───────┼───────┼───────┤
-│Estrela │ 1.87  │ 3.67  │ 4.50  │  │Estrela │ 1.87  │ 3.67  │ 4.50  │
-│   PA   │ verde │ verde │       │  │   PA   │ verde │ verde │       │
-└────────┴───────┴───────┴───────┘  └────────┴───────┴───────┴───────┘
-```
+Calcular as melhores odds **separadas por grupo**:
 
-## Arquivo a Modificar
-
-`src/pages/MatchDetails.tsx`
+| Grupo | Odds a Comparar | Cor |
+|-------|-----------------|-----|
+| SO + Betbra | Apenas SO e Betbra | Laranja |
+| PA | Apenas PA | Verde |
 
 ## Mudanças Técnicas
 
-### 1. Atualizar componente OddCell (linha 400)
+### 1. Calcular melhores odds por grupo (antes da tabela)
 
-Adicionar parâmetro `oddsType` para determinar a cor:
+Usar `getBestOddsByType` para obter:
+- `bestSO.home`, `bestSO.draw`, `bestSO.away` → melhores dentro do grupo SO
+- `bestPAValues.home`, `bestPAValues.draw`, `bestPAValues.away` → melhores dentro do grupo PA
 
-```typescript
-function OddCell({ 
-  value, 
-  isBest, 
-  isWorst, 
-  oddsType 
-}: { 
-  value: number | null; 
-  isBest: boolean; 
-  isWorst: boolean;
-  oddsType?: 'SO' | 'PA';
-}) {
-  if (value === null || value === undefined) {
-    return <span className="text-muted-foreground">-</span>;
-  }
-  
-  // Escolher cor baseado no tipo de odd
-  const bestColorClass = oddsType === 'SO' 
-    ? "bg-amber-500/10 text-amber-500 font-bold"
-    : "bg-emerald-500/10 text-emerald-500 font-bold";
-  
-  return (
-    <div className={cn(
-      "inline-flex items-center gap-1 px-2 py-1 rounded font-mono",
-      isBest && bestColorClass
-    )}>
-      {value.toFixed(2)}
-    </div>
-  );
-}
-```
+### 2. Atualizar props do OddsRow
 
-### 2. Atualizar chamadas de OddCell em OddsRow (linhas 343-352)
-
-Passar o `oddsType` determinado para cada célula:
+Ao invés de passar apenas `bestHome`, `bestDraw`, `bestAway` globais, passar os valores específicos do grupo:
 
 ```typescript
-<TableCell className="text-center">
-  <OddCell 
-    value={odds.home_odd} 
-    isBest={odds.home_odd === bestHome} 
-    isWorst={odds.home_odd === worstHome}
-    oddsType={oddsType}  // Adicionar
-  />
-</TableCell>
-{!isBasketball && (
-  <TableCell className="text-center">
-    <OddCell 
-      value={odds.draw_odd} 
-      isBest={odds.draw_odd === bestDraw} 
-      isWorst={odds.draw_odd === worstDraw}
-      oddsType={oddsType}  // Adicionar
-    />
-  </TableCell>
-)}
-<TableCell className="text-center">
-  <OddCell 
-    value={odds.away_odd} 
-    isBest={odds.away_odd === bestAway} 
-    isWorst={odds.away_odd === worstAway}
-    oddsType={oddsType}  // Adicionar
-  />
-</TableCell>
+<OddsRow 
+  odds={odds} 
+  bestHome={isSOType ? bestSO.home : bestPA.home}
+  bestDraw={isSOType ? bestSO.draw : bestPA.draw}
+  bestAway={isSOType ? bestSO.away : bestPA.away}
+  // ... resto igual
+/>
 ```
 
-## Comportamento Final
+### 3. Arquivo: `src/pages/MatchDetails.tsx`
 
-| Tipo Odd | Badge | Cor Destaque Melhor Odd |
-|----------|-------|-------------------------|
-| SO | Laranja | `bg-amber-500/10 text-amber-500` |
-| PA | Verde | `bg-emerald-500/10 text-emerald-500` |
+**Linha ~812-851** - Onde o mapeamento das odds acontece:
 
-## Exemplo Visual Esperado
+Adicionar lógica para determinar o tipo de cada odd e passar os valores corretos de comparação:
 
-Na imagem enviada:
-- **Betbra SO**: 3.75 (Empate) e 5.00 (Fora) → destaque **laranja**
-- **Estrelabet PA**: 1.87 (Casa) → destaque **verde**
-- **kto SO**: 1.89 (Casa) → destaque **laranja** (é a melhor odd de Casa)
+```typescript
+{(() => {
+  const { sorted, betbraEnd, paEnd } = sortBookmakerOdds(match.odds);
+  
+  // Calcular melhores por tipo
+  const { bestSO, paOdds } = getBestOddsByType(match.odds, isBasketball);
+  const bestPA = getBestPAOdds(paOdds, isBasketball);
+  
+  // Também precisamos do bookmaker para best PA
+  const bestPAHomeBookmaker = paOdds.find(o => o.home_odd === bestPA.home)?.bookmaker_name;
+  const bestPADrawBookmaker = paOdds.find(o => o.draw_odd === bestPA.draw)?.bookmaker_name;
+  const bestPAAwayBookmaker = paOdds.find(o => o.away_odd === bestPA.away)?.bookmaker_name;
+  
+  const colSpan = isBasketball ? 4 : 5;
+  
+  return sorted.map((odds, index) => {
+    // Determinar tipo da odd atual
+    const name = odds.bookmaker_name.toLowerCase();
+    const isSOType = odds.odds_type === 'SO' || 
+      ['novibet', 'betbra', 'betnacional'].some(b => name.includes(b));
+    
+    // Passar melhores do grupo correspondente
+    elements.push(
+      <OddsRow 
+        key={...}
+        odds={odds} 
+        bestHome={isSOType ? bestSO.home : bestPA.home}
+        bestDraw={isSOType ? bestSO.draw : bestPA.draw}
+        bestAway={isSOType ? bestSO.away : bestPA.away}
+        worstHome={match.worst_home}
+        worstDraw={match.worst_draw}
+        worstAway={match.worst_away}
+        homeTeam={match.home_team}
+        awayTeam={match.away_team}
+        isBasketball={isBasketball}
+      />
+    );
+  });
+})()}
+```
+
+## Resultado Esperado
+
+| Casa | Tipo | Casa (1) | Empate (X) | Fora (2) |
+|------|------|----------|------------|----------|
+| Betbra | SO | **1.85** (laranja) | 3.60 | **5.20** (laranja) |
+| Betano | SO | 1.80 | **3.65** (laranja) | **5.20** (laranja) |
+| sportingbet | PA | **1.78** (verde) | 3.50 | 4.75 |
+| jogodeouro | PA | 1.75 | **3.60** (verde) | 4.75 |
+| esportivabet | PA | 1.76 | 3.60 | **5.00** (verde) |
+
+Cada grupo terá suas próprias melhores odds destacadas na cor correspondente.
 
 ## Resumo das Mudanças
 
-| Linha | Mudança |
-|-------|---------|
-| 400-413 | Atualizar `OddCell` para receber `oddsType` e usar cor correspondente |
-| 343-352 | Passar `oddsType` nas 3 chamadas de `OddCell` dentro de `OddsRow` |
-
-A lógica de detecção do tipo já existe na linha 325 (`const oddsType = odds.odds_type || getOddsType(odds.bookmaker_name)`), apenas precisamos propagar para o `OddCell`.
+| Arquivo | Linhas | Mudança |
+|---------|--------|---------|
+| `src/pages/MatchDetails.tsx` | ~812-851 | Calcular `bestSO` e `bestPA` separados, passar valores corretos para cada `OddsRow` baseado no tipo |
