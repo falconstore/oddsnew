@@ -20,7 +20,7 @@ export interface FreebetOpportunity {
   awayExtraData?: Record<string, unknown>;
   totalToInvest: number;
   guaranteedProfit: number;
-  roi: number;
+  extraction: number;
 }
 
 export interface FreebetConfigState {
@@ -30,7 +30,7 @@ export interface FreebetConfigState {
 }
 
 export interface FreebetCalculationResult {
-  roi: number;
+  extraction: number;
   totalToInvest: number;
   guaranteedProfit: number;
   homeStake: number;
@@ -82,9 +82,9 @@ export function calculateFreebetExtraction(
   // Lucro garantido = freebetReturn - totalOtherStakes
   const guaranteedProfit = freebetReturn - totalOtherStakes;
   
-  // ROI = (lucro / total investido) * 100
-  // Investimento real = totalOtherStakes (a freebet não é dinheiro real)
-  const roi = totalOtherStakes > 0 ? (guaranteedProfit / totalOtherStakes) * 100 : 0;
+  // Extração = (lucro / valor freebet) * 100
+  // Representa quanto % do valor da freebet estamos extraindo como lucro real
+  const extraction = freebetValue > 0 ? (guaranteedProfit / freebetValue) * 100 : 0;
   
   // Calcular stakes individuais
   const stakes = { home: 0, draw: 0, away: 0 };
@@ -95,7 +95,7 @@ export function calculateFreebetExtraction(
   });
   
   return {
-    roi,
+    extraction,
     totalToInvest: totalOtherStakes,
     guaranteedProfit,
     homeStake: stakes.home,

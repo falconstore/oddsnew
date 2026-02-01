@@ -98,7 +98,7 @@ export function generateFreebetOpportunities(
       freebetPosition  // Passar onde a freebet está
     );
     
-    // Only include positive ROI opportunities
+    // Only include positive extraction opportunities
     if (calc.guaranteedProfit <= 0) continue;
     
     opportunities.push({
@@ -121,12 +121,12 @@ export function generateFreebetOpportunities(
       awayExtraData: bestPAAway.extra_data,
       totalToInvest: calc.totalToInvest,
       guaranteedProfit: calc.guaranteedProfit,
-      roi: calc.roi,
+      extraction: calc.extraction,
     });
   }
   
-  // Sort by ROI descending
-  opportunities.sort((a, b) => b.roi - a.roi);
+  // Sort by extraction descending
+  opportunities.sort((a, b) => b.extraction - a.extraction);
   
   return opportunities;
 }
