@@ -2,6 +2,7 @@ import type { MatchOddsGroup, BookmakerOdds } from './database';
 
 export interface FreebetOpportunity {
   match: MatchOddsGroup;
+  freebetPosition: 'home' | 'away';  // Onde a freebet está (maior odd PA)
   homeBookmaker: string;
   homeOdd: number;
   homeStake: number;

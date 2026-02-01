@@ -76,7 +76,10 @@ function OddRow({
           )}>
             {odd.toFixed(2)}
           </div>
-          <div className="text-xs text-muted-foreground">
+          <div className={cn(
+            "text-xs text-muted-foreground",
+            isFreebet && "line-through opacity-60"
+          )}>
             {formatBRL(stake)}
           </div>
         </div>
@@ -194,6 +197,7 @@ export function FreebetCard({ opportunity }: FreebetCardProps) {
             stake={opportunity.homeStake}
             link={opportunity.homeLink}
             variant="pa"
+            isFreebet={opportunity.freebetPosition === 'home'}
           />
           
           <OddRow
@@ -203,7 +207,6 @@ export function FreebetCard({ opportunity }: FreebetCardProps) {
             stake={opportunity.drawStake}
             link={opportunity.drawLink}
             variant="so"
-            isFreebet
           />
           
           <OddRow
@@ -213,6 +216,7 @@ export function FreebetCard({ opportunity }: FreebetCardProps) {
             stake={opportunity.awayStake}
             link={opportunity.awayLink}
             variant="pa"
+            isFreebet={opportunity.freebetPosition === 'away'}
           />
         </div>
       </CardContent>

@@ -85,11 +85,17 @@ export function generateFreebetOpportunities(
     if (!bestSODraw || !bestPAHome || !bestPAAway) continue;
     if (!bestSODraw.draw_odd) continue;
     
+    // NOVO: Determinar qual odd PA é maior → essa é a FREEBET
+    const homeOdd = bestPAHome.home_odd;
+    const awayOdd = bestPAAway.away_odd;
+    const freebetPosition: 'home' | 'away' = awayOdd >= homeOdd ? 'away' : 'home';
+    
     const calc = calculateFreebetExtraction(
-      bestPAHome.home_odd,
+      homeOdd,
       bestSODraw.draw_odd,
-      bestPAAway.away_odd,
-      freebetValue
+      awayOdd,
+      freebetValue,
+      freebetPosition  // Passar onde a freebet está
     );
     
     // Only include positive ROI opportunities
@@ -97,6 +103,7 @@ export function generateFreebetOpportunities(
     
     opportunities.push({
       match,
+      freebetPosition,
       homeBookmaker: bestPAHome.bookmaker_name,
       homeOdd: bestPAHome.home_odd,
       homeStake: calc.homeStake,
