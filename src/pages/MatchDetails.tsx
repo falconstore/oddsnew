@@ -815,6 +815,12 @@ const MatchDetails = () => {
                   const hasPAOdds = paEnd > betbraEnd;
                   const hasSOOdds = sorted.length > paEnd + 1;
                   
+                  // Calculate best odds per group
+                  const { bestSO, paOdds: paOddsList } = getBestOddsByType(match.odds, isBasketball);
+                  const bestPA = getBestPAOdds(paOddsList, isBasketball);
+                  
+                  const knownSOBookmakers = ['novibet', 'betbra', 'betnacional'];
+                  
                   return sorted.map((odds, index) => {
                     const elements: React.ReactNode[] = [];
                     
@@ -830,13 +836,18 @@ const MatchDetails = () => {
                       );
                     }
                     
+                    // Determine if this is SO type
+                    const name = odds.bookmaker_name.toLowerCase();
+                    const isSOType = odds.odds_type === 'SO' || knownSOBookmakers.some(b => name.includes(b));
+                    
+                    // Pass best values from the corresponding group
                     elements.push(
                       <OddsRow 
                         key={`${odds.bookmaker_id}-${odds.odds_type ?? 'PA'}`}
                         odds={odds} 
-                        bestHome={match.best_home}
-                        bestDraw={match.best_draw}
-                        bestAway={match.best_away}
+                        bestHome={isSOType ? bestSO.home : bestPA.home}
+                        bestDraw={isSOType ? bestSO.draw : bestPA.draw}
+                        bestAway={isSOType ? bestSO.away : bestPA.away}
                         worstHome={match.worst_home}
                         worstDraw={match.worst_draw}
                         worstAway={match.worst_away}
