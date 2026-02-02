@@ -92,6 +92,36 @@ class BetanoUnifiedScraper(BaseScraper):
             "country": "Brasil",
             "url_path": "/sport/futebol/brasil/brasileirao-serie-a-betano/10016/"
         },
+        "eredivisie": {
+            "id": "17067",
+            "name": "Eredivisie",
+            "country": "Países Baixos",
+            "url_path": "/sport/futebol/paises-baixos/eredivisie/17067/"
+        },
+        "Liga Portuguesa": {
+            "id": "17083",
+            "name": "Liga Portuguesa",
+            "country": "Portugal",
+            "url_path": "/sport/futebol/portugal/primeira-liga/17083/"
+        },
+        "libertadores_da_america": {
+            "id": "189817",
+            "name": "Copa Libertadores da América",
+            "country": "América do Sul",
+            "url_path": "/sport/futebol/competicoes/copa-libertadores/189817/"
+        }
+        "champions_league": {
+            "id": "188566",
+            "name": "Champions League",
+            "country": "Europa",
+            "url_path": "/sport/futebol/competicoes/liga-dos-campeoes/188566/"
+        }
+        "carioca": {
+            "id": "16880",
+            "name": "Carioca",
+            "country": "Brasil",
+            "url_path": "/sport/futebol/brasil/campeonato-carioca-serie-a/16880/"
+        }
     }
     
     # Basketball League configurations
