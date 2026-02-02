@@ -104,24 +104,24 @@ class BetanoUnifiedScraper(BaseScraper):
             "country": "Portugal",
             "url_path": "/sport/futebol/portugal/primeira-liga/17083/"
         },
-        "libertadores_da_america": {
-            "id": "189817",
-            "name": "Copa Libertadores da América",
-            "country": "América do Sul",
-            "url_path": "/sport/futebol/competicoes/copa-libertadores/189817/"
-        }
+        "libertadores": {
+            "id": "200263",
+            "name": "Libertadores",
+            "country": "America do Sul",
+            "url_path": "/sport/futebol/competicoes/copa-libertadores/200263/"
+        },
         "champions_league": {
-            "id": "188566",
+            "id": "182748",
             "name": "Champions League",
             "country": "Europa",
-            "url_path": "/sport/futebol/competicoes/liga-dos-campeoes/188566/"
-        }
+            "url_path": "/sport/futebol/competicoes/liga-dos-campeoes/182748/"
+        },
         "carioca": {
             "id": "16880",
             "name": "Carioca",
             "country": "Brasil",
             "url_path": "/sport/futebol/brasil/campeonato-carioca-serie-a/16880/"
-        }
+        },
     }
     
     # Basketball League configurations
