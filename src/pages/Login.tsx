@@ -176,7 +176,7 @@ const Login = () => {
                 <TrendingUp className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
               </div>
             </div>
-            <CardTitle className="text-xl sm:text-2xl text-foreground">Odds Tracker</CardTitle>
+            <CardTitle className="text-xl sm:text-2xl text-foreground">Shark Tracker</CardTitle>
             <CardDescription className="text-sm text-muted-foreground">
               Faça login para acessar o sistema
             </CardDescription>
