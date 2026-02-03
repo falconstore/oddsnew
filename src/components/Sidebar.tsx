@@ -5,8 +5,6 @@ import { PAGE_KEYS, PageKey } from '@/types/auth';
 import { useSwipeGesture } from '@/hooks/useSwipeGesture';
 import { 
   LayoutDashboard, 
-  Trophy, 
-  Users, 
   Building2, 
   Settings,
   Menu,
@@ -80,9 +78,7 @@ const navigation: NavigationItem[] = [
   { name: 'Controle Procedimentos', href: '/procedures', icon: FileText, pageKey: PAGE_KEYS.PROCEDURE_CONTROL },
   { name: 'Betbra Affiliate', href: '/betbra', icon: TrendingUp, pageKey: PAGE_KEYS.BETBRA_AFFILIATE },
   { name: 'Assinaturas', href: '/subscriptions', icon: CreditCard, pageKey: PAGE_KEYS.SUBSCRIPTIONS },
-  { name: 'Ligas', href: '/leagues', icon: Trophy, pageKey: PAGE_KEYS.LEAGUES },
-  { name: 'Times', href: '/teams', icon: Users, pageKey: PAGE_KEYS.TEAMS },
-  { name: 'Casas de Apostas', href: '/bookmakers', icon: Building2, pageKey: PAGE_KEYS.BOOKMAKERS },
+  { name: 'Cadastros', href: '/cadastros', icon: Building2, pageKey: PAGE_KEYS.LEAGUES },
   { name: 'Configurações', href: '/settings', icon: Settings, pageKey: PAGE_KEYS.SETTINGS },
   { name: 'Gerenciar Usuários', href: '/admin/users', icon: UserCog, pageKey: PAGE_KEYS.ADMIN_USERS },
   { name: 'Logs / Diagnóstico', href: '/admin/logs', icon: FileWarning, pageKey: PAGE_KEYS.ADMIN_LOGS },
