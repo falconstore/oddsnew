@@ -9,9 +9,7 @@ import Dashboard from '@/pages/Dashboard';
 import MonitorFutebol from '@/pages/MonitorFutebol';
 import MonitorBasquete from '@/pages/MonitorBasquete';
 import MatchDetails from '@/pages/MatchDetails';
-import Leagues from '@/pages/Leagues';
-import Teams from '@/pages/Teams';
-import Bookmakers from '@/pages/Bookmakers';
+import EntityManagement from '@/pages/EntityManagement';
 import Settings from '@/pages/Settings';
 import Login from '@/pages/Login';
 import AdminUsers from '@/pages/admin/Users';
@@ -79,25 +77,11 @@ export function AnimatedRoutes() {
           </RequireAuth>
         } />
         
-        {/* All pages now use granular permissions instead of requireAdmin */}
-        <Route path="/leagues" element={
+        {/* Unified entity management page with tabs */}
+        <Route path="/cadastros" element={
           <RequireAuth pageKey={PAGE_KEYS.LEAGUES}>
             <PageTransition>
-              <Leagues />
-            </PageTransition>
-          </RequireAuth>
-        } />
-        <Route path="/teams" element={
-          <RequireAuth pageKey={PAGE_KEYS.TEAMS}>
-            <PageTransition>
-              <Teams />
-            </PageTransition>
-          </RequireAuth>
-        } />
-        <Route path="/bookmakers" element={
-          <RequireAuth pageKey={PAGE_KEYS.BOOKMAKERS}>
-            <PageTransition>
-              <Bookmakers />
+              <EntityManagement />
             </PageTransition>
           </RequireAuth>
         } />
