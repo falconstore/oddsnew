@@ -149,7 +149,7 @@ export function Sidebar() {
           <div className="p-2 rounded-lg bg-primary/10 animate-float">
             <BarChart3 className="h-5 w-5 text-sidebar-primary" />
           </div>
-          <span className="text-lg font-semibold text-sidebar-foreground tracking-tight">OddsCompare</span>
+          <span className="text-lg font-semibold text-sidebar-foreground tracking-tight">BetShark Pro</span>
         </div>
         
         {/* Navigation with animated indicators */}
