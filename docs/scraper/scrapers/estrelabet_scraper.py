@@ -37,6 +37,10 @@ class EstrelabetScraper(BaseScraper):
         "liga_europa": {"champ_id": "16809", "name": "Liga Europa", "country": "Europa"},
         "liga_da_conferencia": {"champ_id": "31608", "name": "Liga da Conferencia", "country": "Europa"},
         "eredivisie": {"champ_id": "3065", "name": "Eredivisie", "country": "Holanda"},
+        "brasileirao_serie_a": {"champ_id": "11318", "name": "Brasileirão Série A", "country": "Brasil"},
+        "libertadores": {"champ_id": "3709", "name": "Libertadores", "country": "America"},
+        "liga_portuguesa": {"champ_id": "3152", "name": "Liga Portuguesa", "country": "Portugal"},
+        "carioca": {"champ_id": "3357", "name": "Carioca", "country": "Brasil"},
     }
     
     # Basketball leagues (sportId=67, market typeId=219 for Moneyline)
@@ -106,7 +110,7 @@ class EstrelabetScraper(BaseScraper):
         finally:
             await self.teardown()
         
-        self.logger.info(f"✅ EstrelaBet unificado: {len(all_odds)} odds totais")
+        self.logger.info(f"EstrelaBet unificado: {len(all_odds)} odds totais")
         return all_odds
     
     async def scrape_league(self, league: LeagueConfig) -> List[ScrapedOdds]:
