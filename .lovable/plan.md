@@ -1,112 +1,55 @@
 
 
-# Plano: Corrigir Fundo 3D da Pagina de Login
+# Plano: Atualizar Nome do App para "BetShark Pro"
 
-## Problema Identificado
+## Objetivo
 
-A pagina de login mostra apenas fundo preto porque ha varios erros nos componentes 3D:
-
-| Erro | Causa | Impacto |
-|------|-------|---------|
-| "Function components cannot be given refs" | Lazy loading com Suspense dentro do Canvas | Componentes nao renderizam |
-| Fonte nao encontrada | `/fonts/inter-medium.woff` nao existe | FloatingOdds falha silenciosamente |
-| "Context Lost" | WebGL perdeu contexto (provavelmente por erro anterior) | Cena inteira falha |
+Atualizar todas as referencias do nome do aplicativo para **"BetShark Pro"** em todo o projeto, garantindo consistencia da marca.
 
 ---
 
-## Solucao
+## Locais Encontrados para Atualizar
 
-### 1. Remover Lazy Loading dos Componentes 3D
-
-O problema principal e que estamos usando `lazy()` para importar componentes dentro do Canvas. O React Three Fiber nao funciona bem com lazy loading dessa forma.
-
-**Arquivo:** `src/components/login/LoginBackground3D.tsx`
-
-Mudar de:
-```typescript
-const FloatingBars = lazy(() => import('./FloatingBars'));
-const TrendLines = lazy(() => import('./TrendLines'));
-// etc...
-```
-
-Para:
-```typescript
-import FloatingBars from './FloatingBars';
-import TrendLines from './TrendLines';
-import FloatingOdds from './FloatingOdds';
-import GlowingParticles from './GlowingParticles';
-import GridFloor from './GridFloor';
-```
-
-E remover o `<Suspense>` dentro do Canvas (manter apenas o externo no Login.tsx).
-
-### 2. Corrigir FloatingOdds - Remover Fonte Customizada
-
-**Arquivo:** `src/components/login/FloatingOdds.tsx`
-
-Remover a propriedade `font` que referencia arquivo inexistente:
-
-```typescript
-// ANTES
-<Text
-  font="/fonts/inter-medium.woff"
-  ...
->
-
-// DEPOIS
-<Text
-  ...  // Usar fonte padrao do drei
->
-```
-
-### 3. Adicionar ErrorBoundary para Resiliencia
-
-Envolver o Canvas com tratamento de erro para que se algo falhar, a pagina ainda funcione:
-
-**Arquivo:** `src/pages/Login.tsx`
-
-```typescript
-<Suspense fallback={<div className="absolute inset-0 bg-[#0a0a0f]" />}>
-  <ErrorBoundary fallback={<div className="absolute inset-0 bg-[#0a0a0f]" />}>
-    <LoginBackground3D />
-  </ErrorBoundary>
-</Suspense>
-```
-
-### 4. Simplificar FloatingOdds para Evitar Problemas com Text
-
-O componente `Text` do drei pode ser problematico. Vamos simplificar removendo-o inicialmente:
-
-**Arquivo:** `src/components/login/FloatingOdds.tsx`
-
-Em vez de texto 3D, usar esferas simples com numeros como alternativa mais confiavel, ou desabilitar temporariamente no mobile e desktop ate confirmar que o resto funciona.
+| Arquivo | Local | Texto Atual | Novo Texto |
+|---------|-------|-------------|------------|
+| `index.html` | Linha 7 | `<title>Shark odds</title>` | `<title>BetShark Pro</title>` |
+| `index.html` | Linha 8 | `content="Shark Odds New"` | `content="BetShark Pro - Monitoramento de Odds"` |
+| `index.html` | Linha 25 | `og:title - Shark odds` | `BetShark Pro` |
+| `index.html` | Linha 26 | `twitter:title - Shark odds` | `BetShark Pro` |
+| `index.html` | Linha 27 | `og:description` | `BetShark Pro - Monitoramento de Odds` |
+| `index.html` | Linha 28 | `twitter:description` | `BetShark Pro - Monitoramento de Odds` |
+| `src/pages/Login.tsx` | Linha 179 | `Shark Tracker` | `BetShark Pro` |
+| `src/pages/Dashboard.tsx` | Linha 18 | `OddsCompare` | `BetShark Pro` |
+| `src/components/Sidebar.tsx` | Linha 152 | `OddsCompare` | `BetShark Pro` |
 
 ---
 
-## Arquivos a Modificar
+## Mudancas por Arquivo
 
-| Arquivo | Mudanca |
-|---------|---------|
-| `src/components/login/LoginBackground3D.tsx` | Remover lazy loading, importar diretamente |
-| `src/components/login/FloatingOdds.tsx` | Remover propriedade `font`, simplificar componente |
-| `src/pages/Login.tsx` | Verificar Suspense wrapper |
+### 1. index.html (Meta tags SEO)
+- Titulo da pagina: `BetShark Pro`
+- Descricao: `BetShark Pro - Monitoramento de Odds em Tempo Real`
+- Open Graph tags para compartilhamento social
+- Twitter cards
+
+### 2. src/pages/Login.tsx
+- CardTitle do card de login: `BetShark Pro`
+
+### 3. src/pages/Dashboard.tsx
+- Titulo principal do dashboard: `BetShark Pro`
+
+### 4. src/components/Sidebar.tsx
+- Nome no header da sidebar: `BetShark Pro`
 
 ---
 
-## Ordem de Execucao
+## Resultado
 
-1. Corrigir `LoginBackground3D.tsx` - remover lazy imports
-2. Corrigir `FloatingOdds.tsx` - remover fonte customizada
-3. Testar a pagina
+Apos as mudancas, o nome **"BetShark Pro"** aparecera em:
 
----
-
-## Resultado Esperado
-
-Apos as correcoes:
-- Barras 3D verdes animando (subindo/descendo)
-- Linhas de tendencia flutuando
-- Particulas verdes brilhantes
-- Grid de fundo com profundidade
-- Card de login com glassmorphism sobre o fundo animado
+- Aba do navegador
+- Compartilhamento em redes sociais
+- Pagina de login
+- Dashboard principal
+- Menu lateral (sidebar)
 
