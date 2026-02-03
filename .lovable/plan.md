@@ -1,266 +1,112 @@
 
 
-# Plano: Rebranding da Pagina de Login com Fundo 3D Animado
+# Plano: Corrigir Fundo 3D da Pagina de Login
 
-## Objetivo
+## Problema Identificado
 
-Criar uma experiencia visual impressionante na pagina de login com graficos 3D animados flutuando no fundo, transmitindo profissionalismo e modernidade para atrair vendas.
+A pagina de login mostra apenas fundo preto porque ha varios erros nos componentes 3D:
 
----
-
-## Conceito Visual
-
-```text
-+--------------------------------------------------+
-|                                                  |
-|   [Graficos 3D flutuando]    +----------------+  |
-|                              |                |  |
-|   [Linhas de odds subindo]   |   CARD LOGIN   |  |
-|                              |                |  |
-|   [Barras animadas]          +----------------+  |
-|                                                  |
-|   [Particulas brilhantes verdes]                |
-|                                                  |
-+--------------------------------------------------+
-```
-
-**Elementos 3D no fundo:**
-- Graficos de barras 3D subindo/descendo (representando odds)
-- Linhas de tendencia flutuando (representando lucros)
-- Particulas verdes brilhantes (cor primaria do sistema)
-- Esferas com numeros de odds girando suavemente
-- Grid geometrico com efeito de profundidade
+| Erro | Causa | Impacto |
+|------|-------|---------|
+| "Function components cannot be given refs" | Lazy loading com Suspense dentro do Canvas | Componentes nao renderizam |
+| Fonte nao encontrada | `/fonts/inter-medium.woff` nao existe | FloatingOdds falha silenciosamente |
+| "Context Lost" | WebGL perdeu contexto (provavelmente por erro anterior) | Cena inteira falha |
 
 ---
 
-## Tecnologia
+## Solucao
 
-**Biblioteca:** `@react-three/fiber` v8.18 + `@react-three/drei` v9.122.0
+### 1. Remover Lazy Loading dos Componentes 3D
 
-Essas bibliotecas permitem criar cenas 3D complexas com React de forma performatica.
+O problema principal e que estamos usando `lazy()` para importar componentes dentro do Canvas. O React Three Fiber nao funciona bem com lazy loading dessa forma.
 
----
+**Arquivo:** `src/components/login/LoginBackground3D.tsx`
 
-## Arquitetura de Arquivos
-
-```text
-src/
-  components/
-    login/
-      LoginBackground3D.tsx    <- Cena 3D principal
-      FloatingBars.tsx         <- Graficos de barras 3D animados
-      TrendLines.tsx           <- Linhas de tendencia flutuantes
-      FloatingOdds.tsx         <- Numeros de odds girando
-      GlowingParticles.tsx     <- Particulas brilhantes
-      GridFloor.tsx            <- Grid geometrico com profundidade
-  pages/
-    Login.tsx                  <- Atualizado com novo layout
-```
-
----
-
-## Componentes 3D
-
-### 1. FloatingBars - Graficos de Barras 3D
-```text
-Barras verticais que sobem e descem em tempos diferentes,
-simulando graficos de odds em tempo real.
-
-- 8-12 barras em posicoes aleatorias
-- Altura oscila entre 0.5 e 3 unidades
-- Cores: verde primario com gradiente
-- Efeito glow nas bordas superiores
-```
-
-### 2. TrendLines - Linhas de Tendencia
-```text
-Linhas 3D que flutuam representando crescimento.
-
-- Curvas suaves tipo grafico de linha
-- Movimento ondulatorio lento
-- Cor verde com transparencia
-- Trilha de luz seguindo a linha
-```
-
-### 3. FloatingOdds - Numeros de Odds
-```text
-Textos 3D com valores de odds (1.85, 2.10, 3.50, etc)
-
-- Posicoes aleatorias no espaco 3D
-- Rotacao lenta no eixo Y
-- Fade in/out ciclico
-- Tamanhos variados para profundidade
-```
-
-### 4. GlowingParticles - Particulas
-```text
-Pontos de luz espalhados pela cena.
-
-- 50-100 particulas pequenas
-- Movimento browniano lento
-- Cor verde com bloom/glow
-- Opacidade variavel
-```
-
-### 5. GridFloor - Grid de Fundo
-```text
-Grid geometrico inclinado criando profundidade.
-
-- Linhas horizontais e verticais
-- Perspectiva 3D
-- Cor escura com linhas sutis
-- Efeito de movimento infinito
-```
-
----
-
-## Estrutura do Login Atualizado
-
-```text
-<div className="relative min-h-screen overflow-hidden">
-  
-  <!-- Camada 1: Fundo 3D (ocupa tela toda) -->
-  <div className="absolute inset-0 z-0">
-    <Canvas>
-      <ambientLight intensity={0.3} />
-      <pointLight position={[10, 10, 10]} />
-      
-      <FloatingBars />
-      <TrendLines />
-      <FloatingOdds />
-      <GlowingParticles />
-      <GridFloor />
-      
-      <OrbitControls enabled={false} />
-    </Canvas>
-  </div>
-  
-  <!-- Camada 2: Overlay escuro para legibilidade -->
-  <div className="absolute inset-0 z-10 bg-background/70 backdrop-blur-sm" />
-  
-  <!-- Camada 3: Card de Login centralizado -->
-  <div className="relative z-20 flex items-center justify-center min-h-screen">
-    <Card className="glassmorphism border-primary/20">
-      <!-- Conteudo do login existente -->
-    </Card>
-  </div>
-  
-</div>
-```
-
----
-
-## Efeitos Visuais Especiais
-
-### Glassmorphism no Card
-```css
-.glassmorphism {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-}
-```
-
-### Bloom/Glow Effect
-```text
-Usar EffectComposer do @react-three/postprocessing para:
-- Bloom nas particulas verdes
-- Glow suave em elementos destacados
-```
-
-### Responsividade
-```text
-- Mobile: Menos particulas, menos barras
-- Tablet: Configuracao media
-- Desktop: Experiencia completa
-```
-
----
-
-## Paleta de Cores 3D
-
-| Elemento | Cor | HSL |
-|----------|-----|-----|
-| Barras principais | Verde primario | hsl(142, 70%, 45%) |
-| Barras secundarias | Verde escuro | hsl(142, 60%, 25%) |
-| Particulas | Verde brilhante | hsl(142, 80%, 60%) |
-| Grid | Cinza escuro | hsl(240, 5%, 15%) |
-| Fundo | Preto grafite | hsl(240, 10%, 6%) |
-
----
-
-## Animacoes
-
-### Barras
+Mudar de:
 ```typescript
-useFrame((state) => {
-  mesh.position.y = Math.sin(state.clock.elapsedTime + offset) * 0.5 + baseHeight;
-});
+const FloatingBars = lazy(() => import('./FloatingBars'));
+const TrendLines = lazy(() => import('./TrendLines'));
+// etc...
 ```
 
-### Particulas
+Para:
 ```typescript
-useFrame(() => {
-  points.rotation.y += 0.001;
-  // Movimento browniano suave
-});
+import FloatingBars from './FloatingBars';
+import TrendLines from './TrendLines';
+import FloatingOdds from './FloatingOdds';
+import GlowingParticles from './GlowingParticles';
+import GridFloor from './GridFloor';
 ```
 
-### Camera
+E remover o `<Suspense>` dentro do Canvas (manter apenas o externo no Login.tsx).
+
+### 2. Corrigir FloatingOdds - Remover Fonte Customizada
+
+**Arquivo:** `src/components/login/FloatingOdds.tsx`
+
+Remover a propriedade `font` que referencia arquivo inexistente:
+
 ```typescript
-// Camera leve movimento automatico
-useFrame((state) => {
-  state.camera.position.x = Math.sin(state.clock.elapsedTime * 0.1) * 0.5;
-});
+// ANTES
+<Text
+  font="/fonts/inter-medium.woff"
+  ...
+>
+
+// DEPOIS
+<Text
+  ...  // Usar fonte padrao do drei
+>
 ```
 
----
+### 3. Adicionar ErrorBoundary para Resiliencia
 
-## Dependencias Necessarias
+Envolver o Canvas com tratamento de erro para que se algo falhar, a pagina ainda funcione:
 
-```json
-{
-  "@react-three/fiber": "^8.18.0",
-  "@react-three/drei": "^9.122.0",
-  "three": "^0.170.0"
-}
+**Arquivo:** `src/pages/Login.tsx`
+
+```typescript
+<Suspense fallback={<div className="absolute inset-0 bg-[#0a0a0f]" />}>
+  <ErrorBoundary fallback={<div className="absolute inset-0 bg-[#0a0a0f]" />}>
+    <LoginBackground3D />
+  </ErrorBoundary>
+</Suspense>
 ```
 
----
+### 4. Simplificar FloatingOdds para Evitar Problemas com Text
 
-## Performance
+O componente `Text` do drei pode ser problematico. Vamos simplificar removendo-o inicialmente:
 
-| Otimizacao | Implementacao |
-|------------|---------------|
-| Instancing | Usar InstancedMesh para multiplas barras |
-| LOD | Reduzir complexidade em mobile |
-| Lazy loading | Carregar cena 3D apos mount |
-| Suspense | Mostrar fallback enquanto carrega |
+**Arquivo:** `src/components/login/FloatingOdds.tsx`
+
+Em vez de texto 3D, usar esferas simples com numeros como alternativa mais confiavel, ou desabilitar temporariamente no mobile e desktop ate confirmar que o resto funciona.
 
 ---
 
-## Arquivos a Criar/Modificar
+## Arquivos a Modificar
 
-| Acao | Arquivo |
-|------|---------|
-| Criar | `src/components/login/LoginBackground3D.tsx` |
-| Criar | `src/components/login/FloatingBars.tsx` |
-| Criar | `src/components/login/TrendLines.tsx` |
-| Criar | `src/components/login/FloatingOdds.tsx` |
-| Criar | `src/components/login/GlowingParticles.tsx` |
-| Modificar | `src/pages/Login.tsx` |
-| Modificar | `src/index.css` (adicionar glassmorphism) |
+| Arquivo | Mudanca |
+|---------|---------|
+| `src/components/login/LoginBackground3D.tsx` | Remover lazy loading, importar diretamente |
+| `src/components/login/FloatingOdds.tsx` | Remover propriedade `font`, simplificar componente |
+| `src/pages/Login.tsx` | Verificar Suspense wrapper |
+
+---
+
+## Ordem de Execucao
+
+1. Corrigir `LoginBackground3D.tsx` - remover lazy imports
+2. Corrigir `FloatingOdds.tsx` - remover fonte customizada
+3. Testar a pagina
 
 ---
 
 ## Resultado Esperado
 
-Uma pagina de login que:
-
-1. **Impressiona visualmente** - Graficos 3D animados transmitem profissionalismo
-2. **Comunica o produto** - Barras e odds mostram que e uma ferramenta de apostas
-3. **Performatica** - Animacoes suaves sem travar o dispositivo
-4. **Responsiva** - Funciona bem em mobile, tablet e desktop
-5. **Acessivel** - Card de login permanece legivel e facil de usar
+Apos as correcoes:
+- Barras 3D verdes animando (subindo/descendo)
+- Linhas de tendencia flutuando
+- Particulas verdes brilhantes
+- Grid de fundo com profundidade
+- Card de login com glassmorphism sobre o fundo animado
 
