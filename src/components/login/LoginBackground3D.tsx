@@ -1,13 +1,10 @@
-import { Suspense, lazy } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { useIsMobile } from '@/hooks/use-mobile';
-
-// Lazy load 3D components for better performance
-const FloatingBars = lazy(() => import('./FloatingBars'));
-const TrendLines = lazy(() => import('./TrendLines'));
-const FloatingOdds = lazy(() => import('./FloatingOdds'));
-const GlowingParticles = lazy(() => import('./GlowingParticles'));
-const GridFloor = lazy(() => import('./GridFloor'));
+import FloatingBars from './FloatingBars';
+import TrendLines from './TrendLines';
+import FloatingOdds from './FloatingOdds';
+import GlowingParticles from './GlowingParticles';
+import GridFloor from './GridFloor';
 
 const CameraController = () => {
   return null; // Using default camera with slight adjustments
@@ -27,13 +24,11 @@ const Scene = ({ isMobile }: { isMobile: boolean }) => {
         color="#22c55e"
       />
       
-      <Suspense fallback={null}>
-        <FloatingBars />
-        <TrendLines />
-        {!isMobile && <FloatingOdds />}
-        <GlowingParticles />
-        <GridFloor />
-      </Suspense>
+      <FloatingBars />
+      <TrendLines />
+      {!isMobile && <FloatingOdds />}
+      <GlowingParticles />
+      <GridFloor />
       
       <CameraController />
       

@@ -27,7 +27,6 @@ const FloatingOdd = ({ value, position, scale, rotationSpeed }: OddData) => {
         color="#22c55e"
         anchorX="center"
         anchorY="middle"
-        font="/fonts/inter-medium.woff"
         outlineWidth={0.02}
         outlineColor="#000000"
       >
