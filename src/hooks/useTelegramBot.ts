@@ -43,9 +43,10 @@ export function useUpdateTelegramConfig() {
         })
         .eq('id', existing.id)
         .select()
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
+      if (!data) throw new Error('Falha ao atualizar configuração - verifique se a policy de UPDATE existe');
       return data;
     },
     onSuccess: () => {

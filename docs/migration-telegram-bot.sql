@@ -70,8 +70,10 @@ CREATE POLICY "Allow authenticated read enviados"
 ON public.telegram_dg_enviados FOR SELECT 
 TO authenticated USING (true);
 
--- Permitir atualização da config para admins (via função)
--- O update será feito via service role no backend Python
+-- Permitir UPDATE para usuários autenticados
+CREATE POLICY "Allow authenticated update config" 
+ON public.telegram_bot_config FOR UPDATE 
+TO authenticated USING (true) WITH CHECK (true);
 
 -- =====================================================
 -- Comentários para documentação
