@@ -45,6 +45,7 @@ export const PAGE_KEYS = {
   BETBRA_AFFILIATE: 'betbra_affiliate',
   SUBSCRIPTIONS: 'subscriptions',
   SCRAPER_STATUS: 'scraper_status',
+  TELEGRAM_BOT: 'telegram_bot',
 } as const;
 
 export type PageKey = typeof PAGE_KEYS[keyof typeof PAGE_KEYS];
@@ -106,6 +107,10 @@ export const PAGE_CONFIG: Record<PageKey, { label: string; description: string }
   [PAGE_KEYS.SCRAPER_STATUS]: { 
     label: 'Status Scrapers', 
     description: 'Monitoramento em tempo real dos scrapers'
+  },
+  [PAGE_KEYS.TELEGRAM_BOT]: { 
+    label: 'Bot Telegram', 
+    description: 'Configurar bot de Duplo Green'
   },
 };
 

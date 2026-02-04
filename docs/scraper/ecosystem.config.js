@@ -356,5 +356,24 @@ module.exports = {
         PYTHONUNBUFFERED: '1'
       }
     },
+    
+    // ============================================
+    // TELEGRAM BOT - Duplo Green Alerts
+    // ============================================
+    
+    {
+      name: 'telegram-dg-bot',
+      script: 'standalone/run_telegram.py',
+      interpreter: 'python3',
+      args: '--interval 60',
+      cwd: __dirname,
+      max_memory_restart: '100M',
+      restart_delay: 5000,
+      max_restarts: 50,
+      autorestart: true,
+      env: {
+        PYTHONUNBUFFERED: '1'
+      }
+    },
   ],
 };
