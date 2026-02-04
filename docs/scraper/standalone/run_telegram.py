@@ -170,25 +170,32 @@ class TelegramDGBot:
         if not home_odd or not away_odd or not draw_odd:
             return None
         
-        # Calcular ROI do Duplo Green
-        arb = (1/home_odd) + (1/away_odd)
-        roi = (1 - arb) * 100
+        # Calcular stakes com nova lógica
+        stake_base = float(self.config['stake_base'])
+        stake_casa = stake_base
+        
+        # Stake fora proporcional
+        stake_fora = stake_base * (home_odd / away_odd)
+        
+        # Retorno se ganhar Casa ou Fora
+        retorno_casa = stake_casa * home_odd
+        retorno_fora = stake_fora * away_odd
+        
+        # Retorno médio (média dos dois cenários de green)
+        retorno_green = (retorno_casa + retorno_fora) / 2
+        
+        # Risco no empate = investimento casa+fora - retorno
+        risco_empate = (stake_casa + stake_fora) - retorno_green
+        stake_empate = abs(risco_empate) / (draw_odd - 1) if draw_odd > 1 else 0
+        
+        # Investimento total inclui empate
+        total_stake = stake_casa + stake_fora + stake_empate
+        
+        # ROI baseado no investimento total
+        roi = ((retorno_green - total_stake) / total_stake) * 100
         
         if roi < self.config['roi_minimo']:
             return None
-        
-        # Calcular stakes
-        stake_base = float(self.config['stake_base'])
-        total_stake = stake_base
-        stake_casa = total_stake * (1/home_odd) / arb
-        stake_fora = total_stake * (1/away_odd) / arb
-        
-        # Retorno green = ganho se Casa ou Fora
-        retorno_green = stake_casa * home_odd
-        
-        # Stake do empate (risco)
-        risco_empate = total_stake - retorno_green
-        stake_empate = abs(risco_empate) / (draw_odd - 1) if draw_odd > 1 else 0
         
         # Parse da data
         match_date_str = match['match_date'][:10] if match['match_date'] else ''
@@ -218,11 +225,11 @@ class TelegramDGBot:
         
         roi_sign = '+' if dg['roi'] >= 0 else ''
         
-        message = f"""🦈 <b>DG ENCONTRADO</b> 🦈
+        message = f"""🦈 <b>DUPLO GREEN ENCONTRADO</b> 🦈
 
 ⚽ <b>{dg['team1']} x {dg['team2']}</b>
 🏆 {dg['competition']}
-📅 {dg['match_date']} às {dg['kickoff']}
+📅 {dg['match_date']}
 
 🏠 <b>CASA (PA):</b> {dg['casa']['bookmaker']}
    └ ODD: {dg['casa']['odd']:.2f} | Stake: R$ {dg['casa']['stake']:.2f}
@@ -235,7 +242,7 @@ class TelegramDGBot:
 
 💰 <b>Investimento:</b> R$ {dg['total_stake']:.2f}
 📊 <b>ROI:</b> {roi_sign}{dg['roi']:.2f}%
-✅ <b>Retorno Green:</b> R$ {dg['retorno_green']:.2f}
+✅ <b>Retorno possível duplo Green:</b> R$ {dg['retorno_green']:.2f}
 
 🦈 #BetSharkPro #DuploGreen"""
 
