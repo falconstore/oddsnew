@@ -19,6 +19,7 @@ import ProcedureControl from '@/pages/ProcedureControl';
 import BetbraAffiliate from '@/pages/BetbraAffiliate';
 import Subscriptions from '@/pages/Subscriptions';
 import FreebetExtraction from '@/pages/FreebetExtraction';
+import TelegramBot from '@/pages/TelegramBot';
 import NotFound from '@/pages/NotFound';
 
 export function AnimatedRoutes() {
@@ -124,6 +125,13 @@ export function AnimatedRoutes() {
           <RequireAuth pageKey={PAGE_KEYS.SUBSCRIPTIONS}>
             <PageTransition>
               <Subscriptions />
+            </PageTransition>
+          </RequireAuth>
+        } />
+        <Route path="/telegram-bot" element={
+          <RequireAuth pageKey={PAGE_KEYS.TELEGRAM_BOT}>
+            <PageTransition>
+              <TelegramBot />
             </PageTransition>
           </RequireAuth>
         } />

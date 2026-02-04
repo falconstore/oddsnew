@@ -19,6 +19,7 @@ import {
   Cpu,
   CreditCard,
   Gift,
+  Bot,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -78,6 +79,7 @@ const navigation: NavigationItem[] = [
   { name: 'Controle Procedimentos', href: '/procedures', icon: FileText, pageKey: PAGE_KEYS.PROCEDURE_CONTROL },
   { name: 'Betbra Affiliate', href: '/betbra', icon: TrendingUp, pageKey: PAGE_KEYS.BETBRA_AFFILIATE },
   { name: 'Assinaturas', href: '/subscriptions', icon: CreditCard, pageKey: PAGE_KEYS.SUBSCRIPTIONS },
+  { name: 'Bot Telegram', href: '/telegram-bot', icon: Bot, pageKey: PAGE_KEYS.TELEGRAM_BOT },
   { name: 'Cadastros', href: '/cadastros', icon: Building2, pageKey: PAGE_KEYS.LEAGUES },
   { name: 'Configurações', href: '/settings', icon: Settings, pageKey: PAGE_KEYS.SETTINGS },
   { name: 'Gerenciar Usuários', href: '/admin/users', icon: UserCog, pageKey: PAGE_KEYS.ADMIN_USERS },
