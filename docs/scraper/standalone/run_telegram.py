@@ -335,11 +335,15 @@ class TelegramDGBot:
         # Investimento TOTAL inclui os 3 resultados
         total_stake = stake_casa + stake_fora + stake_empate
         
-        # Lucro = retorno - investimento
-        lucro = retorno_green - total_stake
+        # Lucro Duplo Green = (retorno × 2) - investimento
+        # Representa o lucro se Casa E Fora ganharem (cenário ideal)
+        lucro_duplo_green = (retorno_green * 2) - total_stake
+        
+        # Lucro simples para cálculo do ROI
+        lucro_simples = retorno_green - total_stake
         
         # ROI baseado no investimento total
-        roi = (lucro / total_stake) * 100
+        roi = (lucro_simples / total_stake) * 100
         
         if roi < self.config['roi_minimo']:
             return None
@@ -364,7 +368,7 @@ class TelegramDGBot:
             'fora_extra_data': best_away.get('extra_data', {}),
             'total_stake': total_stake,
             'retorno_green': retorno_green,
-            'lucro': lucro,
+            'lucro': lucro_duplo_green,
         }
     
     async def send_telegram(self, dg: dict) -> int | None:
