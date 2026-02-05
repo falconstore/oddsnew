@@ -59,7 +59,7 @@ const EntityManagement = () => {
           <p className="text-muted-foreground">Gerencie ligas, times e casas de apostas</p>
         </div>
 
-        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full" activationMode="manual">
           <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-flex">
             {availableTabs.map((tab) => (
               <TabsTrigger key={tab.id} value={tab.id} className="gap-2">
