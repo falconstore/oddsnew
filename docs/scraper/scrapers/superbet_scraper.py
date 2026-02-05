@@ -221,12 +221,14 @@ class SuperbetScraper(BaseScraper):
                 home_team = parts[0].strip()
                 away_team = parts[1].strip()
                 
-                # Parse match date
+                # Parse match date and convert UTC to Brazil time (UTC-3)
                 utc_date = event.get("utcDate", "")
                 try:
-                    match_date = datetime.fromisoformat(utc_date.replace("Z", "+00:00"))
+                    match_date_utc = datetime.fromisoformat(utc_date.replace("Z", "+00:00"))
+                    # Convert to Brazil time (UTC-3) - Superbet returns UTC
+                    match_date = match_date_utc - timedelta(hours=3)
                 except:
-                    match_date = datetime.now(timezone.utc)
+                    match_date = datetime.now(timezone.utc) - timedelta(hours=3)
                 
                 # Extract odds from the correct market
                 event_odds = event.get("odds") or []
@@ -264,7 +266,10 @@ class SuperbetScraper(BaseScraper):
                             market_type="1x2",
                             extra_data={
                                 "event_id": str(event.get("eventId", "")),
-                                "match_id": str(event.get("matchId", ""))
+                                "match_id": str(event.get("matchId", "")),
+                                "superbet_event_id": str(event.get("eventId", "")),
+                                "tournament_id": str(event.get("tournamentId", "")),
+                                "betradar_id": str(event.get("betradarId", ""))
                             }
                         ))
                 
@@ -297,7 +302,10 @@ class SuperbetScraper(BaseScraper):
                             market_type="moneyline",
                             extra_data={
                                 "event_id": str(event.get("eventId", "")),
-                                "match_id": str(event.get("matchId", ""))
+                                "match_id": str(event.get("matchId", "")),
+                                "superbet_event_id": str(event.get("eventId", "")),
+                                "tournament_id": str(event.get("tournamentId", "")),
+                                "betradar_id": str(event.get("betradarId", ""))
                             }
                         ))
                         

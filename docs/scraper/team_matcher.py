@@ -52,7 +52,7 @@ class TeamMatcher:
         self.min_score_partial = 92  # Higher threshold for partial matches (avoid false positives)
         self.auto_create_alias = True  # Auto-create aliases for fuzzy matches
         self.auto_create_team = True  # Auto-create teams from primary bookmaker
-        self.primary_bookmaker = "betano"  # Bookmaker that defines standard names
+        self.primary_bookmaker = "superbet"  # Bookmaker that defines standard names
         
         # Competições que permitem busca cross-league (copas e europeias)
         # Times de ligas domésticas serão encontrados nessas competições
