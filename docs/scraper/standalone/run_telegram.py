@@ -177,29 +177,27 @@ class TelegramDGBot:
         if not home_odd or not away_odd or not draw_odd:
             return None
         
-        # Calcular stakes com nova lógica
+        # Calcular stakes com lógica correta (equaliza retorno em todos os cenários)
         stake_base = float(self.config['stake_base'])
         stake_casa = stake_base
         
-        # Stake fora proporcional
+        # Stake fora proporcional para equalizar retorno
         stake_fora = stake_base * (home_odd / away_odd)
         
-        # Retorno se ganhar Casa ou Fora
-        retorno_casa = stake_casa * home_odd
-        retorno_fora = stake_fora * away_odd
+        # Retorno garantido (igual em Casa e Fora)
+        retorno_green = stake_casa * home_odd  # = stake_fora * away_odd
         
-        # Retorno médio (média dos dois cenários de green)
-        retorno_green = (retorno_casa + retorno_fora) / 2
+        # Stake empate para equalizar retorno do empate
+        stake_empate = retorno_green / draw_odd
         
-        # Risco no empate = investimento casa+fora - retorno
-        risco_empate = (stake_casa + stake_fora) - retorno_green
-        stake_empate = abs(risco_empate) / (draw_odd - 1) if draw_odd > 1 else 0
-        
-        # Investimento total inclui empate
+        # Investimento TOTAL inclui os 3 resultados
         total_stake = stake_casa + stake_fora + stake_empate
         
+        # Lucro = retorno - investimento
+        lucro = retorno_green - total_stake
+        
         # ROI baseado no investimento total
-        roi = ((retorno_green - total_stake) / total_stake) * 100
+        roi = (lucro / total_stake) * 100
         
         if roi < self.config['roi_minimo']:
             return None
@@ -219,9 +217,9 @@ class TelegramDGBot:
             'casa': {'bookmaker': best_home['bookmaker_name'], 'odd': home_odd, 'stake': stake_casa},
             'empate': {'bookmaker': best_draw['bookmaker_name'], 'odd': draw_odd, 'stake': stake_empate},
             'fora': {'bookmaker': best_away['bookmaker_name'], 'odd': away_odd, 'stake': stake_fora},
-            'total_stake': stake_casa + stake_fora,
+            'total_stake': total_stake,
             'retorno_green': retorno_green,
-            'risco_empate': risco_empate,
+            'lucro': lucro,
         }
     
     async def send_telegram(self, dg: dict) -> int | None:
@@ -242,7 +240,7 @@ class TelegramDGBot:
    └ ODD: {dg['casa']['odd']:.2f} | Stake: R$ {dg['casa']['stake']:.2f}
 
 ⚖️ <b>EMPATE (SO):</b> {dg['empate']['bookmaker']}
-   └ ODD: {dg['empate']['odd']:.2f} | Risco: R$ {abs(dg['risco_empate']):.2f}
+   └ ODD: {dg['empate']['odd']:.2f} | Stake: R$ {dg['empate']['stake']:.2f}
 
 🚀 <b>FORA (PA):</b> {dg['fora']['bookmaker']}
    └ ODD: {dg['fora']['odd']:.2f} | Stake: R$ {dg['fora']['stake']:.2f}
