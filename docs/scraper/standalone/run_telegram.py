@@ -25,6 +25,7 @@ from loguru import logger
 import httpx
 
 from supabase_client import SupabaseClient
+import unicodedata
 
 # Casas exclusivamente SO (não usadas para Duplo Green Casa/Fora)
 SO_BOOKMAKERS = ['betbra', 'betnacional', 'tradeball']
@@ -48,6 +49,147 @@ class TelegramDGBot:
         
         if not self.bot_token or not self.channel_id:
             self.logger.warning("TELEGRAM_BOT_TOKEN ou TELEGRAM_CHANNEL_ID não configurados")
+    
+    def slugify(self, text: str) -> str:
+        """Normaliza texto para URL slug."""
+        text = text.lower().replace(' ', '-')
+        text = unicodedata.normalize('NFD', text)
+        return ''.join(c for c in text if not unicodedata.combining(c))
+    
+    def generate_bookmaker_link(
+        self, 
+        bookmaker_name: str, 
+        extra_data: dict, 
+        home_team: str, 
+        away_team: str
+    ) -> str | None:
+        """Gera link profundo para casa de apostas."""
+        if not extra_data:
+            extra_data = {}
+        
+        name = bookmaker_name.lower()
+        
+        if 'betbra' in name and 'tradeball' not in name:
+            event_id = extra_data.get('betbra_event_id')
+            market_id = extra_data.get('betbra_market_id')
+            if event_id and market_id:
+                return f"https://betbra.bet.br/b/exchange/sport/soccer/event/{event_id}/market/{market_id}"
+        
+        if 'tradeball' in name:
+            return 'https://betbra.bet.br/tradeball/dballTradingFeed'
+        
+        if 'betano' in name:
+            event_id = extra_data.get('betano_event_id')
+            if event_id and home_team and away_team:
+                slug = f"{self.slugify(home_team)}-{self.slugify(away_team)}"
+                return f"https://www.betano.bet.br/odds/{slug}/{event_id}/"
+        
+        if 'superbet' in name:
+            event_id = extra_data.get('superbet_event_id') or extra_data.get('event_id')
+            if event_id and home_team and away_team:
+                home_slug = self.slugify(home_team)
+                away_slug = self.slugify(away_team)
+                return f"https://superbet.bet.br/odds/futebol/{home_slug}-x-{away_slug}-{event_id}/"
+        
+        if 'sportingbet' in name:
+            fixture_id = extra_data.get('fixture_id')
+            home_raw = extra_data.get('home_team_raw', home_team)
+            away_raw = extra_data.get('away_team_raw', away_team)
+            if fixture_id:
+                home_slug = self.slugify(home_raw)
+                away_slug = self.slugify(away_raw)
+                return f"https://www.sportingbet.bet.br/pt-br/sports/eventos/{home_slug}-{away_slug}-2:{fixture_id}?tab=score"
+        
+        if 'bet365' in name:
+            url = extra_data.get('bet365_url')
+            if url:
+                return url
+            event_id = extra_data.get('event_id')
+            if event_id:
+                return f"https://www.bet365.com/#/AC/B1/C1/D8/E{event_id}/F3/"
+            return 'https://www.bet365.com/'
+        
+        if 'novibet' in name:
+            event_id = extra_data.get('event_id')
+            path = extra_data.get('path')
+            if path and event_id:
+                return f"https://www.novibet.bet.br/apostas-esportivas/{path}/e{event_id}"
+            if event_id and home_team and away_team:
+                home_slug = self.slugify(home_team)
+                away_slug = self.slugify(away_team)
+                return f"https://www.novibet.bet.br/apostas-esportivas/matches/{home_slug}-{away_slug}/e{event_id}"
+        
+        if 'betnacional' in name:
+            event_id = extra_data.get('event_id')
+            if event_id:
+                return f"https://betnacional.bet.br/event/1/0/{event_id}"
+        
+        if 'stake' in name:
+            event_id = extra_data.get('event_id')
+            if event_id:
+                return f"https://stake.bet.br/esportes/{event_id}"
+        
+        if 'aposta1' in name:
+            event_id = extra_data.get('aposta1_event_id')
+            champ_id = extra_data.get('aposta1_champ_id')
+            category_id = extra_data.get('aposta1_category_id')
+            if event_id and champ_id and category_id:
+                return f"https://www.aposta1.bet.br/esportes#/sport/66/category/{category_id}/championship/{champ_id}/event/{event_id}"
+            if event_id:
+                return f"https://www.aposta1.bet.br/esportes#/sport/66/event/{event_id}"
+        
+        if 'esportivabet' in name or 'esportiva' in name:
+            event_id = extra_data.get('esportivabet_event_id')
+            country = extra_data.get('country', 'italia')
+            league_slug = extra_data.get('league_slug', 'serie-a')
+            if event_id and home_team and away_team:
+                home_slug = self.slugify(home_team)
+                away_slug = self.slugify(away_team)
+                return f"https://esportiva.bet.br/sports/futebol/{country}/{league_slug}/{home_slug}-vs-{away_slug}/ev-{event_id}"
+        
+        if 'jogodeouro' in name:
+            event_id = extra_data.get('jogodeouro_event_id')
+            if event_id:
+                return f"https://jogodeouro.bet.br/pt/sports?page=event&eventId={event_id}&sportId=66"
+        
+        if 'kto' in name:
+            event_id = extra_data.get('event_id')
+            league_path = extra_data.get('league_path', '')
+            home_slug_raw = extra_data.get('home_team_slug', home_team)
+            away_slug_raw = extra_data.get('away_team_slug', away_team)
+            if event_id and home_slug_raw and away_slug_raw:
+                home_slug = self.slugify(home_slug_raw)
+                away_slug = self.slugify(away_slug_raw)
+                if league_path:
+                    parts = league_path.split('/')
+                    sport = 'futebol' if parts[0] == 'football' else parts[0]
+                    country_map = {'italy': 'italia', 'england': 'inglaterra', 'spain': 'espanha', 'brazil': 'brasil', 'germany': 'alemanha', 'france': 'franca'}
+                    country = country_map.get(parts[1], parts[1]) if len(parts) > 1 else ''
+                    league = parts[2].replace('_', '-') if len(parts) > 2 else ''
+                    return f"https://www.kto.bet.br/esportes/{sport}/{country}/{league}/{home_slug}---{away_slug}/{event_id}"
+        
+        if 'br4bet' in name:
+            event_id = extra_data.get('br4bet_event_id')
+            country = extra_data.get('br4bet_country', 'italia')
+            if event_id and home_team and away_team:
+                home_slug = self.slugify(home_team)
+                away_slug = self.slugify(away_team)
+                return f"https://br4.bet.br/sports/futebol/{country}/{home_slug}-vs-{away_slug}/e-{event_id}"
+        
+        if 'mcgames' in name:
+            event_id = extra_data.get('event_id')
+            country = extra_data.get('country', 'italia')
+            if event_id and home_team and away_team:
+                home_slug = self.slugify(home_team)
+                away_slug = self.slugify(away_team)
+                return f"https://mcgames.bet.br/sports/futebol/{country}/{home_slug}-vs-{away_slug}/e-{event_id}"
+        
+        if 'estrelabet' in name:
+            event_id = extra_data.get('event_id') or extra_data.get('estrelabet_event_id')
+            if event_id:
+                return f"https://www.estrelabet.bet.br/aposta-esportiva?page=event&eventId={event_id}&sportId=66"
+        
+        return None
     
     async def load_config(self):
         """Carrega configuração do banco."""
@@ -217,6 +359,9 @@ class TelegramDGBot:
             'casa': {'bookmaker': best_home['bookmaker_name'], 'odd': home_odd, 'stake': stake_casa},
             'empate': {'bookmaker': best_draw['bookmaker_name'], 'odd': draw_odd, 'stake': stake_empate},
             'fora': {'bookmaker': best_away['bookmaker_name'], 'odd': away_odd, 'stake': stake_fora},
+            'casa_extra_data': best_home.get('extra_data', {}),
+            'empate_extra_data': best_draw.get('extra_data', {}),
+            'fora_extra_data': best_away.get('extra_data', {}),
             'total_stake': total_stake,
             'retorno_green': retorno_green,
             'lucro': lucro,
@@ -228,13 +373,24 @@ class TelegramDGBot:
             self.logger.warning("Telegram não configurado, pulando envio")
             return None
         
+        # Formatar data no padrão brasileiro
+        date_parts = dg['match_date'].split('-') if dg['match_date'] else []
+        if len(date_parts) == 3:
+            formatted_date = f"{date_parts[2]}/{date_parts[1]}/{date_parts[0]}"
+        else:
+            formatted_date = dg['match_date']
+        
+        kickoff = dg.get('kickoff', '')
+        date_display = f"{formatted_date} às {kickoff}" if kickoff else formatted_date
+        
         roi_sign = '+' if dg['roi'] >= 0 else ''
+        lucro_sign = '+' if dg['lucro'] >= 0 else ''
         
         message = f"""🦈 <b>DUPLO GREEN ENCONTRADO</b> 🦈
 
 ⚽ <b>{dg['team1']} x {dg['team2']}</b>
 🏆 {dg['competition']}
-📅 {dg['match_date']}
+📅 {date_display}
 
 🏠 <b>CASA (PA):</b> {dg['casa']['bookmaker']}
    └ ODD: {dg['casa']['odd']:.2f} | Stake: R$ {dg['casa']['stake']:.2f}
@@ -247,19 +403,48 @@ class TelegramDGBot:
 
 💰 <b>Investimento:</b> R$ {dg['total_stake']:.2f}
 📊 <b>ROI:</b> {roi_sign}{dg['roi']:.2f}%
-✅ <b>Retorno possível duplo Green:</b> R$ {dg['retorno_green']:.2f}
+✅ <b>Lucro Duplo Green:</b> {lucro_sign}R$ {dg['lucro']:.2f}
 
 🦈 #BetSharkPro #DuploGreen"""
 
         try:
             async with httpx.AsyncClient(timeout=30) as client:
+                # Gerar links para botões
+                link_casa = self.generate_bookmaker_link(
+                    dg['casa']['bookmaker'], 
+                    dg.get('casa_extra_data', {}),
+                    dg['team1'], dg['team2']
+                )
+                link_empate = self.generate_bookmaker_link(
+                    dg['empate']['bookmaker'], 
+                    dg.get('empate_extra_data', {}),
+                    dg['team1'], dg['team2']
+                )
+                link_fora = self.generate_bookmaker_link(
+                    dg['fora']['bookmaker'], 
+                    dg.get('fora_extra_data', {}),
+                    dg['team1'], dg['team2']
+                )
+                url_calculadora = self.config.get('url_site', 'https://sharkoddsnew.lovable.app')
+                
+                # Construir botões inline
+                buttons = []
+                if link_casa:
+                    buttons.append([{'text': f'🏠 CASA: {dg["casa"]["bookmaker"].upper()}', 'url': link_casa}])
+                if link_empate:
+                    buttons.append([{'text': f'🤝 EMPATE: {dg["empate"]["bookmaker"].upper()}', 'url': link_empate}])
+                if link_fora:
+                    buttons.append([{'text': f'🚀 FORA: {dg["fora"]["bookmaker"].upper()}', 'url': link_fora}])
+                buttons.append([{'text': '🧮 CALCULADORA', 'url': url_calculadora}])
+                
                 response = await client.post(
                     f"https://api.telegram.org/bot{self.bot_token}/sendMessage",
                     json={
                         'chat_id': self.channel_id,
                         'text': message,
                         'parse_mode': 'HTML',
-                        'disable_web_page_preview': True
+                        'disable_web_page_preview': True,
+                        'reply_markup': {'inline_keyboard': buttons}
                     }
                 )
                 result = response.json()
