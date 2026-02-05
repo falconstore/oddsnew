@@ -13,6 +13,7 @@ Uso:
 import asyncio
 import argparse
 import os
+import signal
 import sys
 from pathlib import Path
 from datetime import datetime, timezone
@@ -335,12 +336,18 @@ class TelegramDGBot:
             if not dg:
                 continue
             
-            dgs_encontrados += 1
             self.logger.info(f"DG encontrado: {dg['team1']} x {dg['team2']} (ROI: {dg['roi']:.2f}%)")
             
             # Enviar ao Telegram
             msg_id = await self.send_telegram(dg)
-            await self.save_enviado(dg, msg_id)
+            
+            # SÓ salva e conta se enviou com sucesso
+            if msg_id is not None:
+                await self.save_enviado(dg, msg_id)
+                dgs_encontrados += 1
+                self.logger.info(f"✅ Enviado ao Telegram (msg_id: {msg_id})")
+            else:
+                self.logger.error(f"❌ Falha ao enviar {dg['team1']} x {dg['team2']}")
             
             # Pequeno intervalo entre envios para não sobrecarregar
             await asyncio.sleep(2)
@@ -371,21 +378,42 @@ async def main():
     
     log.info(f"Starting Telegram DG Bot (interval: {args.interval}s)")
     
+    # Handler de sinal para PM2
+    loop = asyncio.get_running_loop()
+    shutdown_event = asyncio.Event()
+    
+    def shutdown_handler():
+        log.info("Recebido sinal de shutdown")
+        shutdown_event.set()
+    
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(sig, shutdown_handler)
+    
     while True:
         try:
             count = await bot.run_cycle()
             if count:
-                log.info(f"Ciclo completo: {count} DGs enviados")
+                log.info(f"✅ Ciclo completo: {count} DGs enviados com sucesso")
             else:
                 log.debug("Ciclo completo: 0 DGs")
         except Exception as e:
             log.error(f"Erro no ciclo: {e}")
         
+        # Aguardar intervalo ou shutdown
         try:
-            await asyncio.sleep(args.interval)
+            await asyncio.wait_for(
+                shutdown_event.wait(),
+                timeout=args.interval
+            )
+            # Se chegou aqui, shutdown_event foi setado
+            log.info("Shutting down...")
+            break
         except asyncio.CancelledError:
             log.info("Shutting down...")
             break
+        except asyncio.TimeoutError:
+            # Timeout normal, próximo ciclo
+            pass
 
 
 if __name__ == "__main__":
