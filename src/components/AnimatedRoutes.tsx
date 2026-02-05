@@ -1,4 +1,4 @@
-import { Routes, Route, useLocation } from 'react-router-dom';
+import { Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import { PageTransition } from './PageTransition';
 import { RequireAuth } from './RequireAuth';
@@ -135,6 +135,11 @@ export function AnimatedRoutes() {
             </PageTransition>
           </RequireAuth>
         } />
+        
+        {/* Legacy route redirects for backward compatibility */}
+        <Route path="/teams" element={<Navigate to="/cadastros?tab=teams" replace />} />
+        <Route path="/leagues" element={<Navigate to="/cadastros?tab=leagues" replace />} />
+        <Route path="/bookmakers" element={<Navigate to="/cadastros?tab=bookmakers" replace />} />
         
         <Route path="*" element={
           <PageTransition>
