@@ -66,8 +66,8 @@ class TelegramDGBot:
         now = datetime.now().time()
         
         # Parse horário (pode vir como HH:MM:SS ou HH:MM)
-        inicio_str = self.config['horario_inicio']
-        fim_str = self.config['horario_fim']
+        inicio_str = str(self.config['horario_inicio'])
+        fim_str = str(self.config['horario_fim'])
         
         try:
             if len(inicio_str) == 5:
@@ -81,7 +81,13 @@ class TelegramDGBot:
             self.logger.error(f"Formato de horário inválido: {inicio_str} / {fim_str}")
             return True  # Em caso de erro, permite execução
         
-        return inicio <= now <= fim
+        # Se fim < inicio, significa que cruza meia-noite (ex: 06:00 até 00:00)
+        if fim < inicio:
+            # Está no horário se: now >= inicio OU now <= fim
+            return now >= inicio or now <= fim
+        else:
+            # Horário normal: inicio <= now <= fim
+            return inicio <= now <= fim
     
     async def fetch_odds(self) -> list:
         """Busca odds da view de comparação."""
@@ -308,14 +314,14 @@ class TelegramDGBot:
             return 0
         
         if not self.is_within_schedule():
-            self.logger.debug("Fora do horário")
+            self.logger.debug(f"Fora do horário ({self.config['horario_inicio']} - {self.config['horario_fim']})")
             return 0
         
         # Buscar dados
         odds = await self.fetch_odds()
         enviados = await self.get_enviados_ids()
         
-        self.logger.debug(f"Odds: {len(odds)}, Já enviados: {len(enviados)}")
+        self.logger.info(f"Buscando DGs: {len(odds)} odds, {len(enviados)} já enviados hoje")
         
         # Agrupar e processar
         matches = self.group_odds_by_match(odds)
