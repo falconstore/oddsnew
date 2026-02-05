@@ -1,60 +1,85 @@
 
-# Plano: Corrigir Bot Telegram que Não Está Enviando
+
+# Plano: Corrigir Bot Telegram - Problemas de Envio e Restart
 
 ## Problemas Identificados
 
-| Problema | Causa | Impacto |
-|----------|-------|---------|
-| Horário 00:00 | Comparação `06:00 <= now <= 00:00` sempre falsa | Bot retorna "Fora do horário" |
-| PM2 matando processo | Falta `min_uptime` e `kill_timeout` | Bot reinicia antes de completar ciclo |
-| Sem logs de debug | Args sem `--debug` | Não vemos mensagens de "Fora do horário" |
+| Problema | Causa | Evidência |
+|----------|-------|-----------|
+| **Bot reinicia a cada 4-5 min** | `watch_delay` ou sinal de cron externo | Logs mostram "Shutting down" regularmente |
+| **"2 DGs enviados" mas Telegram falha** | Código salva no banco mesmo com erro 404 | Histórico mostra dados, mas Telegram vazio |
+| **Contador mentiroso** | Log conta DGs encontrados, não enviados com sucesso | `count` incrementa antes de verificar envio |
 
 ---
 
-## Solução 1: Corrigir Lógica de Horário
+## Correções Necessárias
 
-A verificação de horário precisa tratar o caso de cruzar meia-noite (ex: 06:00 até 00:00).
+### 1. Só Salvar no Banco se Telegram Enviou com Sucesso
 
 **Arquivo**: `docs/scraper/standalone/run_telegram.py`
 
 ```python
-def is_within_schedule(self) -> bool:
-    """Verifica se está dentro do horário permitido."""
-    if not self.config:
-        return False
+# Linha 340-347: Modificar para só salvar se enviou
+for match_id, match in matches.items():
+    if match_id in enviados:
+        continue
     
-    now = datetime.now().time()
+    dg = self.calculate_dg(match)
+    if not dg:
+        continue
     
-    # Parse horário (pode vir como HH:MM:SS ou HH:MM)
-    inicio_str = self.config['horario_inicio']
-    fim_str = self.config['horario_fim']
+    self.logger.info(f"DG encontrado: {dg['team1']} x {dg['team2']} (ROI: {dg['roi']:.2f}%)")
     
-    try:
-        if len(inicio_str) == 5:
-            inicio_str += ':00'
-        if len(fim_str) == 5:
-            fim_str += ':00'
-        
-        inicio = datetime.strptime(inicio_str, '%H:%M:%S').time()
-        fim = datetime.strptime(fim_str, '%H:%M:%S').time()
-    except ValueError:
-        self.logger.error(f"Formato de horário inválido: {inicio_str} / {fim_str}")
-        return True  # Em caso de erro, permite execução
+    # Enviar ao Telegram
+    msg_id = await self.send_telegram(dg)
     
-    # Se fim < inicio, significa que cruza meia-noite (ex: 06:00 até 00:00)
-    if fim < inicio:
-        # Está no horário se: now >= inicio OU now <= fim
-        return now >= inicio or now <= fim
+    # SÓ salva e conta se enviou com sucesso
+    if msg_id is not None:
+        await self.save_enviado(dg, msg_id)
+        dgs_encontrados += 1
+        self.logger.info(f"✅ Enviado ao Telegram (msg_id: {msg_id})")
     else:
-        # Horário normal: inicio <= now <= fim
-        return inicio <= now <= fim
+        self.logger.error(f"❌ Falha ao enviar {dg['team1']} x {dg['team2']}")
+    
+    await asyncio.sleep(2)
 ```
 
----
+### 2. Melhorar Log do Ciclo
 
-## Solução 2: Melhorar Config PM2
+```python
+# Linha 376-380: Log mais preciso
+count = await bot.run_cycle()
+if count > 0:
+    log.info(f"✅ Ciclo completo: {count} DGs enviados com sucesso")
+else:
+    log.debug("Ciclo completo: nenhum DG enviado")
+```
 
-Adicionar `min_uptime` e `kill_timeout` para evitar reinícios prematuros.
+### 3. Adicionar Handler de Sinal para PM2
+
+O PM2 envia SIGINT para parar o processo. O código atual captura `asyncio.CancelledError` no sleep, mas precisamos também capturar sinais.
+
+```python
+import signal
+
+async def main():
+    # ... código existente ...
+    
+    # Handler de sinal
+    loop = asyncio.get_running_loop()
+    
+    def shutdown_handler():
+        log.info("Recebido sinal de shutdown")
+        for task in asyncio.all_tasks(loop):
+            task.cancel()
+    
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(sig, shutdown_handler)
+    
+    # ... resto do código ...
+```
+
+### 4. Aumentar Timeout do PM2
 
 **Arquivo**: `docs/scraper/ecosystem.config.js`
 
@@ -63,14 +88,15 @@ Adicionar `min_uptime` e `kill_timeout` para evitar reinícios prematuros.
   name: 'telegram-dg-bot',
   script: 'standalone/run_telegram.py',
   interpreter: 'python3',
-  args: '--interval 60 --debug',  // Adicionar --debug
+  args: '--interval 60 --debug',
   cwd: __dirname,
   max_memory_restart: '100M',
-  restart_delay: 5000,
+  restart_delay: 10000,      // 10s entre restarts
   max_restarts: 50,
-  min_uptime: 30000,      // NOVO: Mínimo 30s para considerar "estável"
-  kill_timeout: 30000,    // NOVO: Aguarda 30s antes de matar
+  min_uptime: 60000,         // AUMENTAR: 60s para considerar estável
+  kill_timeout: 60000,       // AUMENTAR: 60s para aguardar shutdown
   autorestart: true,
+  watch: false,              // ADICIONAR: Desabilitar watch (pode causar restarts)
   env: {
     PYTHONUNBUFFERED: '1'
   }
@@ -79,40 +105,24 @@ Adicionar `min_uptime` e `kill_timeout` para evitar reinícios prematuros.
 
 ---
 
-## Solução 3: Adicionar Logs de Debug no Ciclo
+## Diagnóstico do Erro 404
 
-Para facilitar diagnóstico, logar motivos de não envio.
+O erro 404 no Telegram indica que o bot token ou channel_id está errado. Precisamos verificar:
 
-**Arquivo**: `docs/scraper/standalone/run_telegram.py`
+```bash
+# Na VPS, testar se o token é válido
+curl "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/getMe"
 
-Na função `run_cycle`, adicionar logs mais detalhados:
-
-```python
-async def run_cycle(self) -> int:
-    """Executa um ciclo de detecção."""
-    # Recarregar config
-    await self.load_config()
-    
-    if not self.config:
-        self.logger.warning("Config não encontrada")
-        return 0
-    
-    if not self.config.get('enabled'):
-        self.logger.debug("Bot desativado na config")
-        return 0
-    
-    if not self.is_within_schedule():
-        self.logger.debug(f"Fora do horário ({self.config['horario_inicio']} - {self.config['horario_fim']})")
-        return 0
-    
-    # Buscar dados
-    odds = await self.fetch_odds()
-    enviados = await self.get_enviados_ids()
-    
-    self.logger.info(f"Buscando DGs: {len(odds)} odds, {len(enviados)} já enviados hoje")
-    
-    # ... resto do código
+# Testar se o channel_id está correto
+curl -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
+  -H "Content-Type: application/json" \
+  -d '{"chat_id": "$TELEGRAM_CHANNEL_ID", "text": "Teste"}'
 ```
+
+**Possíveis causas do 404:**
+- Token inválido ou expirado
+- Bot não foi adicionado ao canal/grupo
+- Channel ID em formato errado (deve ser `-100XXXXXXXXXX` para grupos)
 
 ---
 
@@ -120,28 +130,29 @@ async def run_cycle(self) -> int:
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `run_telegram.py` | Corrigir lógica de horário para cruzar meia-noite |
-| `run_telegram.py` | Adicionar logs mais detalhados |
-| `ecosystem.config.js` | Adicionar `min_uptime`, `kill_timeout`, `--debug` |
+| `run_telegram.py` | Só salvar no banco se `msg_id` não for `None` |
+| `run_telegram.py` | Corrigir contador para contar apenas envios bem-sucedidos |
+| `run_telegram.py` | Adicionar handler de sinal para shutdown gracioso |
+| `ecosystem.config.js` | Aumentar `min_uptime` e `kill_timeout` para 60s |
+| `ecosystem.config.js` | Adicionar `watch: false` |
 
 ---
 
 ## Após as Alterações
 
-Executar na VPS:
-
 ```bash
-# Reiniciar o bot com nova config
-pm2 restart telegram-dg-bot
+# Verificar variáveis de ambiente
+pm2 env telegram-dg-bot | grep TELEGRAM
 
-# Ver logs em tempo real
-pm2 logs telegram-dg-bot --lines 50
+# Se não aparecerem, adicionar ao .env e recarregar
+echo "TELEGRAM_BOT_TOKEN=seu_token" >> .env
+echo "TELEGRAM_CHANNEL_ID=-100xxxxxxxx" >> .env
+
+# Reiniciar com nova config
+pm2 delete telegram-dg-bot
+pm2 start ecosystem.config.js --only telegram-dg-bot
+
+# Ver logs
+pm2 logs telegram-dg-bot --lines 30
 ```
 
-Agora você verá logs como:
-- `Buscando DGs: 150 odds, 2 já enviados hoje`
-- `DG encontrado: Flamengo x Internacional (ROI: 20.92%)`
-
-Ou mensagens de erro que ajudam a diagnosticar:
-- `Fora do horário (06:00 - 00:00)`
-- `Bot desativado na config`
