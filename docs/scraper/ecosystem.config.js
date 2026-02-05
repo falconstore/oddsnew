@@ -381,7 +381,7 @@ module.exports = {
       interpreter: 'python3',
       args: '--interval 60 --debug',
       cwd: __dirname,
-      max_memory_restart: '100M',
+      max_memory_restart: '150M',
       restart_delay: 10000,
       max_restarts: 50,
       min_uptime: 60000,
