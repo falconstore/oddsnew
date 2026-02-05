@@ -64,7 +64,7 @@ class AliasGenerator:
         Retorna lista de dicts com informações do time pendente.
         """
         try:
-            response = await self.supabase.client.table("unmatched_teams_log") \
+            response = self.supabase.client.table("unmatched_teams_log") \
                 .select("*") \
                 .eq("resolved", False) \
                 .order("scraped_at", desc=True) \
@@ -163,7 +163,7 @@ class AliasGenerator:
     ):
         """Marca um time como resolvido na tabela de logs."""
         try:
-            await self.supabase.client.table("unmatched_teams_log") \
+            self.supabase.client.table("unmatched_teams_log") \
                 .update({
                     "resolved": True,
                     "resolved_at": datetime.now(timezone.utc).isoformat(),
