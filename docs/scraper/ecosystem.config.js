@@ -329,6 +329,20 @@ module.exports = {
     // ============================================
     
     {
+      name: 'alias-generator',
+      script: 'standalone/run_alias_generator.py',
+      interpreter: 'python3',
+      args: '--interval 300 --auto-create',
+      cwd: __dirname,
+      max_memory_restart: '100M',
+      restart_delay: 5000,
+      max_restarts: 100,
+      autorestart: true,
+      env: {
+        PYTHONUNBUFFERED: '1'
+      }
+    },
+    {
       name: 'json-generator',
       script: 'standalone/run_json_generator.py',
       interpreter: 'python3',
