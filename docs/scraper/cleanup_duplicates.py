@@ -64,6 +64,7 @@ def print_duplicates_report(duplicates: Dict[str, List[dict]]):
 def generate_merge_sql(duplicates: Dict[str, List[dict]]) -> str:
     """
     Gera SQL para consolidar times duplicados.
+    Inclui lógica para remover partidas duplicadas antes do UPDATE.
     
     O primeiro registro encontrado é considerado o "canônico".
     Todos os outros são migrados e deletados.
@@ -77,6 +78,9 @@ def generate_merge_sql(duplicates: Dict[str, List[dict]]) -> str:
         "-- REVISE CUIDADOSAMENTE antes de executar!",
         "-- =====================================================",
         "",
+        "-- IMPORTANTE: Execute em uma transação!",
+        "BEGIN;",
+        "",
     ]
     
     for name, entries in sorted(duplicates.items()):
@@ -84,7 +88,7 @@ def generate_merge_sql(duplicates: Dict[str, List[dict]]) -> str:
         canonical = entries[0]
         duplicates_to_remove = entries[1:]
         
-        sql_lines.append(f"-- Consolidar: {name}")
+        sql_lines.append(f"-- ========== Consolidar: {name} ==========")
         sql_lines.append(f"-- Canônico: {canonical['id']} ({canonical['league_name']})")
         sql_lines.append("")
         
@@ -94,16 +98,49 @@ def generate_merge_sql(duplicates: Dict[str, List[dict]]) -> str:
             
             sql_lines.extend([
                 f"-- Migrar {dup_id} ({dup['league_name']}) -> {canonical_id}",
+                "",
+                "-- 1. Deletar partidas que causariam conflito (home_team)",
+                f"""DELETE FROM matches WHERE id IN (
+  SELECT m_dup.id FROM matches m_dup
+  JOIN matches m_canonical ON 
+    m_dup.league_id = m_canonical.league_id AND
+    m_canonical.home_team_id = '{canonical_id}' AND
+    m_dup.away_team_id = m_canonical.away_team_id AND
+    DATE_TRUNC('day', m_dup.match_date) = DATE_TRUNC('day', m_canonical.match_date)
+  WHERE m_dup.home_team_id = '{dup_id}'
+);""",
+                "",
+                "-- 2. Deletar partidas que causariam conflito (away_team)",
+                f"""DELETE FROM matches WHERE id IN (
+  SELECT m_dup.id FROM matches m_dup
+  JOIN matches m_canonical ON 
+    m_dup.league_id = m_canonical.league_id AND
+    m_dup.home_team_id = m_canonical.home_team_id AND
+    m_canonical.away_team_id = '{canonical_id}' AND
+    DATE_TRUNC('day', m_dup.match_date) = DATE_TRUNC('day', m_canonical.match_date)
+  WHERE m_dup.away_team_id = '{dup_id}'
+);""",
+                "",
+                "-- 3. Agora fazer os UPDATEs sem conflito",
                 f"UPDATE team_aliases SET team_id = '{canonical_id}' WHERE team_id = '{dup_id}';",
                 f"UPDATE matches SET home_team_id = '{canonical_id}' WHERE home_team_id = '{dup_id}';",
                 f"UPDATE matches SET away_team_id = '{canonical_id}' WHERE away_team_id = '{dup_id}';",
                 f"UPDATE nba_matches SET home_team_id = '{canonical_id}' WHERE home_team_id = '{dup_id}';",
                 f"UPDATE nba_matches SET away_team_id = '{canonical_id}' WHERE away_team_id = '{dup_id}';",
+                "",
+                "-- 4. Deletar time duplicado",
                 f"DELETE FROM teams WHERE id = '{dup_id}';",
                 "",
             ])
         
         sql_lines.append("")
+    
+    sql_lines.extend([
+        "-- Se tudo estiver correto, confirme a transação:",
+        "COMMIT;",
+        "",
+        "-- Se algo deu errado, use: ROLLBACK;",
+    ])
     
     return "\n".join(sql_lines)
 
