@@ -365,11 +365,13 @@ module.exports = {
       name: 'telegram-dg-bot',
       script: 'standalone/run_telegram.py',
       interpreter: 'python3',
-      args: '--interval 60',
+      args: '--interval 60 --debug',
       cwd: __dirname,
       max_memory_restart: '100M',
       restart_delay: 5000,
       max_restarts: 50,
+      min_uptime: 30000,
+      kill_timeout: 30000,
       autorestart: true,
       env: {
         PYTHONUNBUFFERED: '1'
