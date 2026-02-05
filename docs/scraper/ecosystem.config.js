@@ -368,11 +368,12 @@ module.exports = {
       args: '--interval 60 --debug',
       cwd: __dirname,
       max_memory_restart: '100M',
-      restart_delay: 5000,
+      restart_delay: 10000,
       max_restarts: 50,
-      min_uptime: 30000,
-      kill_timeout: 30000,
+      min_uptime: 60000,
+      kill_timeout: 60000,
       autorestart: true,
+      watch: false,
       env: {
         PYTHONUNBUFFERED: '1'
       }
