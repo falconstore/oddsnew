@@ -119,6 +119,26 @@ class TeamMatcher:
         """Clear the unmatched log cache. Call at the start of each cycle."""
         self._unmatched_logged.clear()
     
+    async def log_unmatched_to_db(
+        self, 
+        raw_name: str, 
+        bookmaker: str, 
+        league_name: str = None
+    ):
+        """
+        Persiste time não matcheado no banco para análise posterior.
+        Usado pelo alias-generator para processar pendências.
+        """
+        try:
+            await self.supabase.client.table("unmatched_teams_log").upsert({
+                "raw_name": raw_name,
+                "bookmaker": bookmaker.lower(),
+                "league_name": league_name,
+                "resolved": False,
+            }, on_conflict="raw_name,bookmaker").execute()
+        except Exception as e:
+            self.logger.debug(f"Failed to log unmatched to DB: {e}")
+    
     async def load_cache(self):
         """
         Load teams and aliases from the database into memory.
@@ -650,6 +670,29 @@ class TeamMatcher:
             
             context = f" ({', '.join(context_parts)})" if context_parts else ""
             self.logger.warning(f"No match found for: '{raw_name}'{context}")
+            
+            # Persistir no banco para processamento pelo alias-generator
+            if bookmaker:
+                self._log_unmatched_async(raw_name, bookmaker, league_name)
+    
+    def _log_unmatched_async(self, raw_name: str, bookmaker: str, league_name: str = None):
+        """
+        Persiste time não matcheado no banco de forma assíncrona.
+        Fire-and-forget - erros são ignorados para não bloquear o scraping.
+        """
+        import asyncio
+        
+        async def _persist():
+            try:
+                await self.log_unmatched_to_db(raw_name, bookmaker, league_name)
+            except Exception as e:
+                self.logger.debug(f"Failed to persist unmatched: {e}")
+        
+        try:
+            loop = asyncio.get_event_loop()
+            loop.create_task(_persist())
+        except RuntimeError:
+            pass  # No event loop, skip persistence
     
     def _create_alias_async(self, team_id: str, alias_name: str, bookmaker: str):
         """
