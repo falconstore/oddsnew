@@ -1,144 +1,147 @@
 
+# Plano: Corrigir Bot Telegram que Não Está Enviando
 
-# Plano: Melhorar Formato da Mensagem Telegram DG
+## Problemas Identificados
 
-## Mudanças Solicitadas
-
-| Item | Atual | Novo |
-|------|-------|------|
-| Título | `DG ENCONTRADO` | `DUPLO GREEN ENCONTRADO` (negrito) |
-| Data/Hora | `2026-02-04 às 22:00` (com fuso) | `2026-02-04` (sem horário/fuso) |
-| Stake Casa | Calculado por arbitragem | Usar valor direto da stake_base |
-| Stake Fora | Calculado por arbitragem | Proporcional ao investimento |
-| Investimento | Soma de Casa+Fora | Soma de Casa+Fora+Empate |
-| Retorno | `Retorno Green` | `Retorno possível duplo Green` com fórmula média |
+| Problema | Causa | Impacto |
+|----------|-------|---------|
+| Horário 00:00 | Comparação `06:00 <= now <= 00:00` sempre falsa | Bot retorna "Fora do horário" |
+| PM2 matando processo | Falta `min_uptime` e `kill_timeout` | Bot reinicia antes de completar ciclo |
+| Sem logs de debug | Args sem `--debug` | Não vemos mensagens de "Fora do horário" |
 
 ---
 
-## Lógica de Cálculo Corrigida
+## Solução 1: Corrigir Lógica de Horário
 
-A fórmula atual calcula stakes para arbitragem perfeita. Você quer uma abordagem diferente:
+A verificação de horário precisa tratar o caso de cruzar meia-noite (ex: 06:00 até 00:00).
 
-```text
-Novo Cálculo:
-- stake_casa = stake_base (configurado, ex: R$ 500)
-- stake_fora = stake_base / odd_fora * odd_casa (proporcional)
-- stake_empate = risco / (odd_empate - 1)
-- investimento = stake_casa + stake_fora + stake_empate
-- retorno_green = (stake_casa * odd_casa + stake_fora * odd_fora) / 2
-```
-
----
-
-## Novo Formato da Mensagem
-
-```text
-🦈 DUPLO GREEN ENCONTRADO 🦈
-
-⚽ Flamengo x Internacional
-🏆 Brasileirão Série A
-📅 2026-02-04
-
-🏠 CASA (PA): sportingbet
-   └ ODD: 1.57 | Stake: R$ 500.00
-
-⚖️ EMPATE (SO): betnacional
-   └ ODD: 3.65 | Risco: R$ 215.00
-
-🚀 FORA (PA): sportingbet
-   └ ODD: 6.50 | Stake: R$ 121.00
-
-💰 Investimento: R$ 836.00
-📊 ROI: -6.13%
-✅ Retorno possível duplo Green: R$ 1570.00
-
-🦈 #BetSharkPro #DuploGreen
-```
-
----
-
-## Alterações no Código
-
-### Arquivo: `docs/scraper/standalone/run_telegram.py`
-
-#### 1. Título da mensagem (linha 221)
+**Arquivo**: `docs/scraper/standalone/run_telegram.py`
 
 ```python
-# De:
-message = f"""🦈 <b>DG ENCONTRADO</b> 🦈
-
-# Para:
-message = f"""🦈 <b>DUPLO GREEN ENCONTRADO</b> 🦈
-```
-
-#### 2. Remover horário da data (linha 225)
-
-```python
-# De:
-📅 {dg['match_date']} às {dg['kickoff']}
-
-# Para:
-📅 {dg['match_date']}
-```
-
-#### 3. Novo cálculo de stakes (função calculate_dg, linhas 180-211)
-
-```python
-# Calcular stakes com nova lógica
-stake_base = float(self.config['stake_base'])
-stake_casa = stake_base
-
-# Stake fora proporcional
-stake_fora = stake_base * (home_odd / away_odd)
-
-# Retorno se ganhar Casa ou Fora
-retorno_casa = stake_casa * home_odd
-retorno_fora = stake_fora * away_odd
-
-# Retorno médio (média dos dois cenários de green)
-retorno_green = (retorno_casa + retorno_fora) / 2
-
-# Risco no empate = investimento casa+fora - retorno
-risco_empate = (stake_casa + stake_fora) - retorno_green
-stake_empate = abs(risco_empate) / (draw_odd - 1) if draw_odd > 1 else 0
-
-# Investimento total inclui empate
-total_stake = stake_casa + stake_fora + stake_empate
-
-# ROI baseado no investimento total
-roi = ((retorno_green - total_stake) / total_stake) * 100
-```
-
-#### 4. Atualizar texto do retorno (linha 238)
-
-```python
-# De:
-✅ <b>Retorno Green:</b> R$ {dg['retorno_green']:.2f}
-
-# Para:
-✅ <b>Retorno possível duplo Green:</b> R$ {dg['retorno_green']:.2f}
+def is_within_schedule(self) -> bool:
+    """Verifica se está dentro do horário permitido."""
+    if not self.config:
+        return False
+    
+    now = datetime.now().time()
+    
+    # Parse horário (pode vir como HH:MM:SS ou HH:MM)
+    inicio_str = self.config['horario_inicio']
+    fim_str = self.config['horario_fim']
+    
+    try:
+        if len(inicio_str) == 5:
+            inicio_str += ':00'
+        if len(fim_str) == 5:
+            fim_str += ':00'
+        
+        inicio = datetime.strptime(inicio_str, '%H:%M:%S').time()
+        fim = datetime.strptime(fim_str, '%H:%M:%S').time()
+    except ValueError:
+        self.logger.error(f"Formato de horário inválido: {inicio_str} / {fim_str}")
+        return True  # Em caso de erro, permite execução
+    
+    # Se fim < inicio, significa que cruza meia-noite (ex: 06:00 até 00:00)
+    if fim < inicio:
+        # Está no horário se: now >= inicio OU now <= fim
+        return now >= inicio or now <= fim
+    else:
+        # Horário normal: inicio <= now <= fim
+        return inicio <= now <= fim
 ```
 
 ---
 
-## Resumo das Mudanças
+## Solução 2: Melhorar Config PM2
 
-| Arquivo | Linha(s) | Alteração |
-|---------|----------|-----------|
-| `run_telegram.py` | 221 | Título: `DUPLO GREEN ENCONTRADO` |
-| `run_telegram.py` | 225 | Remover `às {kickoff}` |
-| `run_telegram.py` | 180-211 | Nova lógica de cálculo de stakes |
-| `run_telegram.py` | 238 | Texto: `Retorno possível duplo Green` |
+Adicionar `min_uptime` e `kill_timeout` para evitar reinícios prematuros.
+
+**Arquivo**: `docs/scraper/ecosystem.config.js`
+
+```javascript
+{
+  name: 'telegram-dg-bot',
+  script: 'standalone/run_telegram.py',
+  interpreter: 'python3',
+  args: '--interval 60 --debug',  // Adicionar --debug
+  cwd: __dirname,
+  max_memory_restart: '100M',
+  restart_delay: 5000,
+  max_restarts: 50,
+  min_uptime: 30000,      // NOVO: Mínimo 30s para considerar "estável"
+  kill_timeout: 30000,    // NOVO: Aguarda 30s antes de matar
+  autorestart: true,
+  env: {
+    PYTHONUNBUFFERED: '1'
+  }
+}
+```
 
 ---
 
-## Observação sobre a Lógica
+## Solução 3: Adicionar Logs de Debug no Ciclo
 
-Entendi que você quer:
-1. **Stake Casa** = valor fixo (stake_base da config)
-2. **Stake Fora** = proporcional para equilibrar ganhos
-3. **Stake Empate** = cobertura do risco
-4. **Retorno** = média dos cenários de vitória (Casa ou Fora)
+Para facilitar diagnóstico, logar motivos de não envio.
 
-Isso é diferente da arbitragem tradicional onde as stakes são calculadas para garantir lucro igual em qualquer resultado.
+**Arquivo**: `docs/scraper/standalone/run_telegram.py`
 
+Na função `run_cycle`, adicionar logs mais detalhados:
+
+```python
+async def run_cycle(self) -> int:
+    """Executa um ciclo de detecção."""
+    # Recarregar config
+    await self.load_config()
+    
+    if not self.config:
+        self.logger.warning("Config não encontrada")
+        return 0
+    
+    if not self.config.get('enabled'):
+        self.logger.debug("Bot desativado na config")
+        return 0
+    
+    if not self.is_within_schedule():
+        self.logger.debug(f"Fora do horário ({self.config['horario_inicio']} - {self.config['horario_fim']})")
+        return 0
+    
+    # Buscar dados
+    odds = await self.fetch_odds()
+    enviados = await self.get_enviados_ids()
+    
+    self.logger.info(f"Buscando DGs: {len(odds)} odds, {len(enviados)} já enviados hoje")
+    
+    # ... resto do código
+```
+
+---
+
+## Resumo das Alterações
+
+| Arquivo | Alteração |
+|---------|-----------|
+| `run_telegram.py` | Corrigir lógica de horário para cruzar meia-noite |
+| `run_telegram.py` | Adicionar logs mais detalhados |
+| `ecosystem.config.js` | Adicionar `min_uptime`, `kill_timeout`, `--debug` |
+
+---
+
+## Após as Alterações
+
+Executar na VPS:
+
+```bash
+# Reiniciar o bot com nova config
+pm2 restart telegram-dg-bot
+
+# Ver logs em tempo real
+pm2 logs telegram-dg-bot --lines 50
+```
+
+Agora você verá logs como:
+- `Buscando DGs: 150 odds, 2 já enviados hoje`
+- `DG encontrado: Flamengo x Internacional (ROI: 20.92%)`
+
+Ou mensagens de erro que ajudam a diagnosticar:
+- `Fora do horário (06:00 - 00:00)`
+- `Bot desativado na config`
