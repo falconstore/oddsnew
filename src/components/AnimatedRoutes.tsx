@@ -22,6 +22,26 @@ import FreebetExtraction from '@/pages/FreebetExtraction';
 import TelegramBot from '@/pages/TelegramBot';
 import NotFound from '@/pages/NotFound';
 
+// Componente para redirect que preserva query params
+function RedirectWithParams({ 
+  to, 
+  params = {} 
+}: { 
+  to: string; 
+  params?: Record<string, string> 
+}) {
+  const location = useLocation();
+  const currentParams = new URLSearchParams(location.search);
+  
+  // Merge current params with new params
+  Object.entries(params).forEach(([key, value]) => {
+    currentParams.set(key, value);
+  });
+  
+  const search = currentParams.toString();
+  return <Navigate to={`${to}${search ? `?${search}` : ''}`} replace />;
+}
+
 export function AnimatedRoutes() {
   const location = useLocation();
 
@@ -136,10 +156,10 @@ export function AnimatedRoutes() {
           </RequireAuth>
         } />
         
-        {/* Legacy route redirects for backward compatibility */}
-        <Route path="/teams" element={<Navigate to="/cadastros?tab=teams" replace />} />
-        <Route path="/leagues" element={<Navigate to="/cadastros?tab=leagues" replace />} />
-        <Route path="/bookmakers" element={<Navigate to="/cadastros?tab=bookmakers" replace />} />
+        {/* Legacy route redirects for backward compatibility - preserves query params */}
+        <Route path="/teams" element={<RedirectWithParams to="/cadastros" params={{ tab: 'teams' }} />} />
+        <Route path="/leagues" element={<RedirectWithParams to="/cadastros" params={{ tab: 'leagues' }} />} />
+        <Route path="/bookmakers" element={<RedirectWithParams to="/cadastros" params={{ tab: 'bookmakers' }} />} />
         
         <Route path="*" element={
           <PageTransition>
