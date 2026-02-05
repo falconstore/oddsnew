@@ -1,223 +1,509 @@
 
-# Plano: Migração da Casa Mãe de Betano para Superbet
+# Plano: Serviço de Auto-Geração de Aliases para Times Pendentes
 
-## Resumo Executivo
+## Resumo
 
-A Superbet será a nova "casa mãe" do sistema, responsável por:
-- Criar times novos no banco de dados
-- Definir os nomes canônicos dos times
-- Estabelecer as datas/horários das partidas (com correção de fuso)
-- Outras casas farão matching com os times criados pela Superbet
+Criar um novo serviço PM2 (`alias-generator`) que:
+1. Detecta times não matcheados periodicamente
+2. Encontra o melhor match via fuzzy matching
+3. Gera SQL pronto para criar aliases
+4. Opcionalmente, cria aliases automaticamente acima de um threshold
 
 ---
 
-## 1. Correção do Fuso Horário
-
-### Problema Identificado
-
-A API da Superbet retorna horários em **UTC** (20:00Z), mas o jogo real é às **17:00 no Brasil** (UTC-3).
-
-**Causa**: O scraper atual salva o horário como está, sem conversão.
-
-### Solução
-
-Converter o horário de UTC para o fuso horário de Brasília (UTC-3) antes de salvar:
+## Arquitetura
 
 ```text
-Arquivo: docs/scraper/scrapers/superbet_scraper.py
-
-Antes (linha ~227):
-  match_date = datetime.fromisoformat(utc_date.replace("Z", "+00:00"))
-
-Depois:
-  from datetime import timedelta
-  match_date_utc = datetime.fromisoformat(utc_date.replace("Z", "+00:00"))
-  # Converter para horário de Brasília (UTC-3)
-  match_date = match_date_utc - timedelta(hours=3)
+┌─────────────────────────────────────────────────────────────────┐
+│                    alias-generator (PM2)                        │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  1. Busca odds recentes sem team_id (odds com NULL)             │
+│                                                                 │
+│  2. Para cada time não encontrado:                              │
+│     └─ Fuzzy match contra todos os teams existentes             │
+│     └─ Se score >= 95%: cria alias automaticamente              │
+│     └─ Se score >= 80%: gera SQL para revisão manual            │
+│                                                                 │
+│  3. Salva relatório em logs/pending_aliases.sql                 │
+│                                                                 │
+│  4. Opcional: publica no Telegram para admin                    │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
 ```
-
-**Nota**: Manter o datetime como UTC-aware para consistência no banco, apenas ajustando a hora exibida.
 
 ---
 
-## 2. Alterar a Casa Mãe no Team Matcher
-
-### Arquivo: `docs/scraper/team_matcher.py`
-
-```text
-Linha 55:
-Antes:
-  self.primary_bookmaker = "betano"
-
-Depois:
-  self.primary_bookmaker = "superbet"
-```
-
-### Impacto
-
-| Antes | Depois |
-|-------|--------|
-| Betano cria times novos | Superbet cria times novos |
-| Betano define nomes canônicos | Superbet define nomes canônicos |
-| Betano usa método async `find_team_id` | Superbet usa método async `find_team_id` |
-| Outras casas usam cache | Outras casas usam cache (sem mudança) |
-
----
-
-## 3. Garantir que Superbet Execute Primeiro
-
-### Arquivo: `docs/scraper/standalone/run_sequential.py`
-
-O Superbet já está posicionado como primeiro scraper nas configurações atuais:
+## Novo Arquivo: `docs/scraper/standalone/run_alias_generator.py`
 
 ```python
-# Linha 40-41
-LIGHT_SCRAPERS = [
-    "superbet",  # ← JÁ É O PRIMEIRO
-    "novibet", 
-    ...
-]
+#!/usr/bin/env python3
+"""
+Alias Generator Service - Detecta times pendentes e gera SQL para aliases.
 
-# Linha 69-71
-ALL_SCRAPERS_INTERLEAVED = [
-    "superbet", "novibet", "kto",  # ← JÁ É O PRIMEIRO
-    "betano",
-    ...
-]
+Serviço de manutenção que:
+1. Busca times não matcheados nos logs recentes
+2. Faz fuzzy matching contra times existentes
+3. Gera SQL para criar aliases manualmente
+4. Auto-cria aliases acima de 95% de confiança
 
-# Linha 93-95
-HYBRID_TRIPLETS = [
-    ("superbet", "novibet", "betano"),  # ← SUPERBET NO PRIMEIRO TRIPLET
-    ...
-]
+Uso:
+    python run_alias_generator.py --interval 300
+    python run_alias_generator.py --interval 300 --auto-create
+    python run_alias_generator.py --interval 300 --debug
+"""
+
+import asyncio
+import argparse
+import sys
+from pathlib import Path
+from datetime import datetime, timezone
+from typing import List, Dict, Tuple, Optional
+from collections import defaultdict
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from dotenv import load_dotenv
+from loguru import logger
+from rapidfuzz import fuzz, process
+
+from config import settings
+from supabase_client import SupabaseClient
+from team_matcher import TeamMatcher
+
+
+# Thresholds
+AUTO_CREATE_THRESHOLD = 95   # Auto-criar alias se score >= 95%
+SUGGEST_THRESHOLD = 80       # Sugerir SQL se score >= 80%
+
+
+class AliasGenerator:
+    """Detecta times pendentes e gera aliases."""
+    
+    def __init__(self, supabase: SupabaseClient):
+        self.supabase = supabase
+        self.team_matcher = TeamMatcher(supabase)
+        self.logger = logger.bind(component="alias-gen")
+        self.pending_aliases: Dict[str, List[Dict]] = defaultdict(list)
+    
+    async def initialize(self):
+        """Carrega caches de times e aliases."""
+        await self.team_matcher.load_cache()
+        self.logger.info(
+            f"Loaded {len(self.team_matcher.teams_cache)} teams, "
+            f"{len(self.team_matcher.aliases_cache)} aliases"
+        )
+    
+    async def find_unmatched_teams(self) -> List[Dict]:
+        """
+        Busca times que aparecem em odds mas não têm match.
+        Retorna lista de dicts com informações do time pendente.
+        """
+        # Buscar odds recentes onde o time pode não estar matcheado
+        # Isso é feito comparando nomes vindos dos scrapers vs aliases existentes
+        
+        unmatched = []
+        bookmakers = await self.supabase.fetch_bookmakers()
+        
+        for bookmaker in bookmakers:
+            bookmaker_name = bookmaker["name"].lower()
+            
+            # Buscar aliases existentes para este bookmaker
+            existing_aliases = {
+                key[0] for key, val in self.team_matcher.aliases_cache.items()
+                if key[1] == bookmaker_name
+            }
+            
+            # TODO: Implementar busca em tabela de logs de unmatched
+            # Por enquanto, usamos o set _unmatched_logged do team_matcher
+            # que é preenchido durante os ciclos de scraping
+        
+        return unmatched
+    
+    def find_best_match(
+        self, 
+        raw_name: str, 
+        league_id: Optional[str] = None
+    ) -> Tuple[Optional[str], Optional[str], float]:
+        """
+        Encontra o melhor match para um nome de time.
+        
+        Returns:
+            Tuple (team_id, standard_name, score)
+        """
+        normalized = self._normalize_name(raw_name)
+        
+        # Primeiro: buscar na liga específica se fornecida
+        if league_id and league_id in self.team_matcher.teams_by_league:
+            league_teams = self.team_matcher.teams_by_league[league_id]
+            all_names = list(league_teams.keys())
+            
+            result = process.extractOne(
+                normalized.lower(),
+                all_names,
+                scorer=fuzz.token_sort_ratio,
+                score_cutoff=SUGGEST_THRESHOLD
+            )
+            
+            if result:
+                team_id = league_teams.get(result[0])
+                standard_name = self.team_matcher.teams_cache.get(team_id, result[0])
+                return (team_id, standard_name, result[1])
+        
+        # Segundo: busca global
+        all_names = list(self.team_matcher.teams_cache.values())
+        
+        result = process.extractOne(
+            normalized,
+            all_names,
+            scorer=fuzz.token_sort_ratio,
+            score_cutoff=SUGGEST_THRESHOLD
+        )
+        
+        if result:
+            team_id = self.team_matcher.reverse_cache.get(result[0].lower())
+            return (team_id, result[0], result[1])
+        
+        return (None, None, 0.0)
+    
+    def _normalize_name(self, name: str) -> str:
+        """Normaliza nome para comparação."""
+        import unicodedata
+        name = " ".join(name.split())
+        name = unicodedata.normalize('NFD', name)
+        name = ''.join(c for c in name if unicodedata.category(c) != 'Mn')
+        return name.strip()
+    
+    def generate_sql(self, pending: List[Dict]) -> str:
+        """Gera SQL para criar aliases."""
+        if not pending:
+            return "-- Nenhum alias pendente\n"
+        
+        lines = [
+            "-- =====================================================",
+            f"-- Aliases Pendentes - Gerado em {datetime.now().isoformat()}",
+            f"-- Total: {len(pending)} aliases",
+            "-- =====================================================",
+            "",
+        ]
+        
+        for item in pending:
+            lines.extend([
+                f"-- {item['raw_name']} ({item['bookmaker']}) -> {item['standard_name']} [{item['score']:.0f}%]",
+                f"INSERT INTO team_aliases (team_id, alias_name, bookmaker_source)",
+                f"VALUES ('{item['team_id']}', '{item['raw_name']}', '{item['bookmaker'].lower()}');",
+                "",
+            ])
+        
+        return "\n".join(lines)
+    
+    async def process_pending(
+        self, 
+        auto_create: bool = False
+    ) -> Tuple[int, int, str]:
+        """
+        Processa times pendentes.
+        
+        Returns:
+            Tuple (auto_created, pending_manual, sql_output)
+        """
+        auto_created = 0
+        pending_manual = []
+        
+        # Coletar times unmatched do team_matcher
+        unmatched_names = list(self.team_matcher._unmatched_logged)
+        
+        for raw_name in unmatched_names:
+            team_id, standard_name, score = self.find_best_match(raw_name)
+            
+            if not team_id:
+                continue
+            
+            # Determinar bookmaker (TODO: melhorar detecção)
+            # Por enquanto, assumir superbet como padrão
+            bookmaker = "superbet"
+            
+            if score >= AUTO_CREATE_THRESHOLD and auto_create:
+                # Auto-criar alias
+                try:
+                    await self.supabase.create_team_alias(
+                        team_id=team_id,
+                        alias_name=raw_name,
+                        bookmaker_source=bookmaker
+                    )
+                    auto_created += 1
+                    self.logger.info(
+                        f"[Auto-create] '{raw_name}' -> '{standard_name}' ({score:.0f}%)"
+                    )
+                except Exception as e:
+                    if "duplicate" not in str(e).lower():
+                        self.logger.error(f"Failed to create alias: {e}")
+            else:
+                pending_manual.append({
+                    "raw_name": raw_name,
+                    "team_id": team_id,
+                    "standard_name": standard_name,
+                    "score": score,
+                    "bookmaker": bookmaker,
+                })
+        
+        sql_output = self.generate_sql(pending_manual)
+        
+        return auto_created, len(pending_manual), sql_output
+
+
+async def run_forever(interval: int, auto_create: bool, log: logger):
+    """Loop infinito para geração de aliases."""
+    supabase = SupabaseClient()
+    generator = AliasGenerator(supabase)
+    
+    await generator.initialize()
+    
+    cycle_count = 0
+    output_path = Path("logs/pending_aliases.sql")
+    
+    log.info(f"Starting alias generator with interval: {interval}s")
+    log.info(f"Auto-create enabled: {auto_create}")
+    log.info(f"SQL output: {output_path}")
+    
+    while True:
+        cycle_count += 1
+        start_time = datetime.now(timezone.utc)
+        
+        try:
+            # Recarregar caches para pegar novos times
+            await generator.initialize()
+            
+            # Processar pendentes
+            auto_created, pending, sql = await generator.process_pending(auto_create)
+            
+            duration = (datetime.now(timezone.utc) - start_time).total_seconds()
+            
+            if auto_created > 0 or pending > 0:
+                log.info(
+                    f"[Cycle {cycle_count}] "
+                    f"Auto-created: {auto_created}, Pending: {pending}, "
+                    f"Duration: {duration:.1f}s"
+                )
+                
+                # Salvar SQL
+                with open(output_path, "w") as f:
+                    f.write(sql)
+                log.info(f"SQL saved to {output_path}")
+            else:
+                log.debug(f"[Cycle {cycle_count}] No pending aliases")
+                
+        except Exception as e:
+            log.error(f"[Cycle {cycle_count}] Error: {e}")
+        
+        try:
+            await asyncio.sleep(interval)
+        except asyncio.CancelledError:
+            log.info("Shutdown requested")
+            break
+
+
+def parse_args():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(
+        description="Alias Generator - Gera SQL para times pendentes"
+    )
+    
+    parser.add_argument(
+        "--interval",
+        type=int,
+        default=300,
+        help="Intervalo entre ciclos em segundos (default: 300 = 5 min)"
+    )
+    
+    parser.add_argument(
+        "--auto-create",
+        action="store_true",
+        help="Auto-criar aliases com score >= 95%%"
+    )
+    
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Ativar logging de debug"
+    )
+    
+    return parser.parse_args()
 ```
 
-**Nenhuma alteração necessária** - a ordem já está correta.
-
 ---
 
-## 4. Revisar Ligas Configuradas na Superbet
+## Atualização: `docs/scraper/ecosystem.config.js`
 
-### Arquivo: `docs/scraper/scrapers/superbet_scraper.py`
+Adicionar novo serviço:
 
-As ligas atuais são:
+```javascript
+// ============================================
+// ALIAS GENERATOR SERVICE
+// ============================================
 
-| Liga | ID | Status |
-|------|-----|--------|
-| Premier League | 106 | ✓ OK |
-| Serie A | 104 | ✓ OK |
-| La Liga | 98 | ✓ OK |
-| Bundesliga | 245 | ✓ OK |
-| Ligue 1 | 100 | ✓ OK |
-| Paulistão | 20934 | ✓ OK |
-| FA Cup | 107 | ✓ OK |
-| EFL Cup | 90 | ✓ OK |
-| Copa do Rei | 26 | ✓ OK |
-| Champions League | 80794 | ✓ OK |
-| Liga Europa | 688 | ✓ OK |
-| Liga da Conferência | 56652 | ✓ OK |
-| Eredivisie | 256 | ✓ OK |
-| Brasileirão A | 1698 | ✓ OK |
-| Libertadores | 389 | ✓ OK |
-| Carioca | 21132 | ✓ OK |
-| Liga Portuguesa | 142 | ✓ OK |
-| NBA | 164 | ✓ OK |
-
-**Verificar**: Se precisar adicionar mais ligas, basta incluir no dicionário `FOOTBALL_LEAGUES`.
-
----
-
-## 5. Criar Aliases para Times com Nomes Diferentes
-
-### Problema Potencial
-
-Algumas casas podem usar nomes diferentes da Superbet. Por exemplo:
-
-| Superbet | Betano | Bet365 |
-|----------|--------|--------|
-| Celta Vigo | Celta de Vigo | RC Celta |
-| Inter Milan | Internazionale | Inter |
-
-### Solução
-
-Após a migração, monitorar logs de `[DIAG] UNMATCHED` e usar o script de diagnóstico:
-
-```bash
-# Na VPS, após alguns ciclos:
-python docs/scraper/diagnose_team.py "Celta de Vigo" --bookmaker betano --league "La Liga"
+{
+  name: 'alias-generator',
+  script: 'standalone/run_alias_generator.py',
+  interpreter: 'python3',
+  args: '--interval 300 --auto-create',
+  cwd: __dirname,
+  max_memory_restart: '100M',
+  restart_delay: 5000,
+  max_restarts: 100,
+  autorestart: true,
+  env: {
+    PYTHONUNBUFFERED: '1'
+  }
+},
 ```
 
-O script gera automaticamente o SQL para criar o alias.
+---
+
+## Melhoria: Tabela de Logs de Unmatched
+
+Para persistir times não matcheados entre ciclos, criar uma tabela:
+
+```sql
+-- Migration: Tabela de logs de times não matcheados
+CREATE TABLE IF NOT EXISTS unmatched_teams_log (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    raw_name text NOT NULL,
+    bookmaker text NOT NULL,
+    league_name text,
+    scraped_at timestamptz DEFAULT now(),
+    resolved boolean DEFAULT false,
+    resolved_at timestamptz,
+    resolved_team_id uuid REFERENCES teams(id),
+    UNIQUE(raw_name, bookmaker)
+);
+
+-- Index para busca
+CREATE INDEX idx_unmatched_pending ON unmatched_teams_log(resolved) 
+WHERE resolved = false;
+
+-- Auto-cleanup de logs antigos resolvidos
+CREATE OR REPLACE FUNCTION cleanup_old_unmatched_logs()
+RETURNS integer AS $$
+DECLARE
+    deleted_count integer;
+BEGIN
+    DELETE FROM unmatched_teams_log 
+    WHERE resolved = true 
+    AND resolved_at < NOW() - INTERVAL '7 days';
+    GET DIAGNOSTICS deleted_count = ROW_COUNT;
+    RETURN deleted_count;
+END;
+$$ LANGUAGE plpgsql;
+```
 
 ---
 
-## 6. Adicionar Campos Extras ao extra_data (Opcional)
+## Atualização: `docs/scraper/team_matcher.py`
 
-Para suportar deep links no frontend, adicionar mais campos do Superbet:
+Adicionar método para persistir unmatched:
+
+```python
+async def log_unmatched_to_db(
+    self, 
+    raw_name: str, 
+    bookmaker: str, 
+    league_name: str = None
+):
+    """Persiste time não matcheado no banco para análise posterior."""
+    try:
+        await self.supabase.client.table("unmatched_teams_log").upsert({
+            "raw_name": raw_name,
+            "bookmaker": bookmaker.lower(),
+            "league_name": league_name,
+            "resolved": False,
+        }, on_conflict="raw_name,bookmaker").execute()
+    except Exception as e:
+        self.logger.debug(f"Failed to log unmatched: {e}")
+```
+
+---
+
+## Fluxo Completo
 
 ```text
-Arquivo: docs/scraper/scrapers/superbet_scraper.py
+CICLO DE SCRAPING
+┌─────────────────────────────────────────────────────────────────┐
+│  Scraper coleta odds                                            │
+│      ↓                                                          │
+│  TeamMatcher tenta encontrar team_id                            │
+│      ↓                                                          │
+│  Se não encontrar:                                              │
+│      └─ Loga em _unmatched_logged (memória)                     │
+│      └─ Persiste em unmatched_teams_log (banco)                 │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│  alias-generator (a cada 5 min)                                 │
+│      ↓                                                          │
+│  Busca times em unmatched_teams_log WHERE resolved = false      │
+│      ↓                                                          │
+│  Para cada time:                                                │
+│      └─ Fuzzy match contra teams existentes                     │
+│      └─ Score >= 95%: cria alias automaticamente                │
+│      └─ Score >= 80%: gera SQL em logs/pending_aliases.sql      │
+│      ↓                                                          │
+│  Marca como resolved no banco                                   │
+└─────────────────────────────────────────────────────────────────┘
+```
 
-Linha ~265-268:
-extra_data={
-    "event_id": str(event.get("eventId", "")),
-    "match_id": str(event.get("matchId", "")),
-    # NOVO: campos para deep links
-    "superbet_event_id": str(event.get("eventId", "")),
-    "tournament_id": str(event.get("tournamentId", "")),
-    "betradar_id": str(event.get("betradarId", "")),
-}
+---
+
+## Output Esperado
+
+### Console (PM2 logs)
+```text
+2026-02-06 00:05:00 | INFO     | alias-gen | Starting alias generator with interval: 300s
+2026-02-06 00:05:00 | INFO     | alias-gen | Auto-create enabled: True
+2026-02-06 00:05:01 | INFO     | alias-gen | Loaded 485 teams, 1247 aliases
+2026-02-06 00:05:02 | INFO     | alias-gen | [Auto-create] 'Celta de Vigo' -> 'Celta Vigo' (97%)
+2026-02-06 00:05:02 | INFO     | alias-gen | [Cycle 1] Auto-created: 3, Pending: 7, Duration: 1.2s
+2026-02-06 00:05:02 | INFO     | alias-gen | SQL saved to logs/pending_aliases.sql
+```
+
+### Arquivo SQL Gerado
+```sql
+-- =====================================================
+-- Aliases Pendentes - Gerado em 2026-02-06T00:05:02
+-- Total: 7 aliases
+-- =====================================================
+
+-- RC Celta (bet365) -> Celta Vigo [82%]
+INSERT INTO team_aliases (team_id, alias_name, bookmaker_source)
+VALUES ('uuid-celta', 'RC Celta', 'bet365');
+
+-- Internazionale (betano) -> Inter Milan [88%]
+INSERT INTO team_aliases (team_id, alias_name, bookmaker_source)
+VALUES ('uuid-inter', 'Internazionale', 'betano');
 ```
 
 ---
 
 ## Resumo das Alterações
 
-| Arquivo | Alteração | Prioridade |
-|---------|-----------|------------|
-| `superbet_scraper.py` | Converter UTC para horário Brasil (UTC-3) | ALTA |
-| `team_matcher.py` | Mudar `primary_bookmaker` de "betano" para "superbet" | ALTA |
-| `superbet_scraper.py` | Adicionar campos extras para deep links | MÉDIA |
-| `run_sequential.py` | Nenhuma - Superbet já é primeiro | - |
+| Arquivo | Ação |
+|---------|------|
+| `standalone/run_alias_generator.py` | NOVO - Serviço principal |
+| `ecosystem.config.js` | Adicionar entrada do serviço |
+| `team_matcher.py` | Adicionar método `log_unmatched_to_db` |
+| Migration SQL | Criar tabela `unmatched_teams_log` |
 
 ---
 
-## Fluxo Após Migração
+## Comandos PM2
 
-```text
-CICLO DE SCRAPING
-┌─────────────────────────────────────────────────────────────┐
-│                                                             │
-│  1. SUPERBET (Casa Mãe)                                     │
-│     └─ Cria times novos se não existem                      │
-│     └─ Define nomes canônicos                               │
-│     └─ Salva matches com horário Brasil                     │
-│                                                             │
-│  2. OUTRAS CASAS (Betano, Bet365, KTO, etc.)                │
-│     └─ Fazem matching via cache                             │
-│     └─ Se não achar, logam [UNMATCHED]                      │
-│     └─ NÃO criam times novos                                │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
+```bash
+# Iniciar apenas o alias generator
+pm2 start docs/scraper/ecosystem.config.js --only alias-generator
+
+# Ver logs
+pm2 logs alias-generator
+
+# Ver SQL gerado
+cat docs/scraper/logs/pending_aliases.sql
 ```
-
----
-
-## Riscos e Mitigações
-
-| Risco | Mitigação |
-|-------|-----------|
-| Times com nomes diferentes não são matcheados | Monitorar logs e criar aliases via `diagnose_team.py` |
-| Superbet não traz uma liga específica | Adicionar liga ao `FOOTBALL_LEAGUES` com ID correto |
-| Horário incorreto após conversão | Validar com jogos conhecidos antes de deploy |
-| Cache desatualizado com times antigos | Reiniciar PM2 para recarregar caches |
-
----
-
-## Pós-Migração (Checklist)
-
-1. ☐ Atualizar código (2 arquivos)
-2. ☐ Reiniciar scrapers: `pm2 restart all`
-3. ☐ Monitorar logs por 2-3 ciclos
-4. ☐ Verificar se horários estão corretos no frontend
-5. ☐ Criar aliases para times não matcheados (se houver)
