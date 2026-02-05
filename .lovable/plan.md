@@ -1,158 +1,139 @@
 
+# Plano: Corrigir Cálculo de DG (ROI e Stakes)
 
-# Plano: Corrigir Bot Telegram - Problemas de Envio e Restart
+## Problema Identificado
 
-## Problemas Identificados
+| Campo | Valor Atual (Errado) | Valor Correto (Calculadora) |
+|-------|---------------------|----------------------------|
+| Stake Empate | R$ 121.43 | R$ 147.96 |
+| Investimento | R$ 603.57 | R$ 751.53 |
+| ROI | +14.23% | -3.53% |
 
-| Problema | Causa | Evidência |
-|----------|-------|-----------|
-| **Bot reinicia a cada 4-5 min** | `watch_delay` ou sinal de cron externo | Logs mostram "Shutting down" regularmente |
-| **"2 DGs enviados" mas Telegram falha** | Código salva no banco mesmo com erro 404 | Histórico mostra dados, mas Telegram vazio |
-| **Contador mentiroso** | Log conta DGs encontrados, não enviados com sucesso | `count` incrementa antes de verificar envio |
+## Lógica Correta (Baseada na Calculadora)
+
+A estratégia Duplo Green equaliza o retorno em todos os cenários:
+
+```text
+Dados: odd_casa=1.45, odd_empate=4.90, odd_fora=7.00, stake_base=500
+
+1. stake_casa = stake_base = 500
+2. stake_fora = stake_base * odd_casa / odd_fora = 500 * 1.45 / 7.00 = 103.57
+3. retorno_green = stake_casa * odd_casa = 500 * 1.45 = 725.00
+   (também: stake_fora * odd_fora = 103.57 * 7.00 = 725.00) ✓
+4. stake_empate = retorno_green / odd_empate = 725.00 / 4.90 = 147.96
+5. investimento = stake_casa + stake_fora + stake_empate = 500 + 103.57 + 147.96 = 751.53
+6. lucro = retorno_green - investimento = 725.00 - 751.53 = -26.53
+7. roi = (lucro / investimento) * 100 = (-26.53 / 751.53) * 100 = -3.53%
+```
 
 ---
 
-## Correções Necessárias
+## Alterações no Código
 
-### 1. Só Salvar no Banco se Telegram Enviou com Sucesso
+### Arquivo: `docs/scraper/standalone/run_telegram.py`
 
-**Arquivo**: `docs/scraper/standalone/run_telegram.py`
-
-```python
-# Linha 340-347: Modificar para só salvar se enviou
-for match_id, match in matches.items():
-    if match_id in enviados:
-        continue
-    
-    dg = self.calculate_dg(match)
-    if not dg:
-        continue
-    
-    self.logger.info(f"DG encontrado: {dg['team1']} x {dg['team2']} (ROI: {dg['roi']:.2f}%)")
-    
-    # Enviar ao Telegram
-    msg_id = await self.send_telegram(dg)
-    
-    # SÓ salva e conta se enviou com sucesso
-    if msg_id is not None:
-        await self.save_enviado(dg, msg_id)
-        dgs_encontrados += 1
-        self.logger.info(f"✅ Enviado ao Telegram (msg_id: {msg_id})")
-    else:
-        self.logger.error(f"❌ Falha ao enviar {dg['team1']} x {dg['team2']}")
-    
-    await asyncio.sleep(2)
-```
-
-### 2. Melhorar Log do Ciclo
+#### 1. Corrigir cálculo de stakes (linhas 180-202)
 
 ```python
-# Linha 376-380: Log mais preciso
-count = await bot.run_cycle()
-if count > 0:
-    log.info(f"✅ Ciclo completo: {count} DGs enviados com sucesso")
-else:
-    log.debug("Ciclo completo: nenhum DG enviado")
+# Calcular stakes com lógica correta
+stake_base = float(self.config['stake_base'])
+stake_casa = stake_base
+
+# Stake fora proporcional para equalizar retorno
+stake_fora = stake_base * (home_odd / away_odd)
+
+# Retorno garantido (igual em Casa e Fora)
+retorno_green = stake_casa * home_odd  # = stake_fora * away_odd
+
+# Stake empate para equalizar retorno do empate
+stake_empate = retorno_green / draw_odd
+
+# Investimento TOTAL inclui os 3 resultados
+total_stake = stake_casa + stake_fora + stake_empate
+
+# Lucro = retorno - investimento
+lucro = retorno_green - total_stake
+
+# ROI baseado no investimento total
+roi = (lucro / total_stake) * 100
 ```
 
-### 3. Adicionar Handler de Sinal para PM2
-
-O PM2 envia SIGINT para parar o processo. O código atual captura `asyncio.CancelledError` no sleep, mas precisamos também capturar sinais.
+#### 2. Atualizar campo `total_stake` no dicionário (linha 222)
 
 ```python
-import signal
-
-async def main():
-    # ... código existente ...
-    
-    # Handler de sinal
-    loop = asyncio.get_running_loop()
-    
-    def shutdown_handler():
-        log.info("Recebido sinal de shutdown")
-        for task in asyncio.all_tasks(loop):
-            task.cancel()
-    
-    for sig in (signal.SIGINT, signal.SIGTERM):
-        loop.add_signal_handler(sig, shutdown_handler)
-    
-    # ... resto do código ...
-```
-
-### 4. Aumentar Timeout do PM2
-
-**Arquivo**: `docs/scraper/ecosystem.config.js`
-
-```javascript
-{
-  name: 'telegram-dg-bot',
-  script: 'standalone/run_telegram.py',
-  interpreter: 'python3',
-  args: '--interval 60 --debug',
-  cwd: __dirname,
-  max_memory_restart: '100M',
-  restart_delay: 10000,      // 10s entre restarts
-  max_restarts: 50,
-  min_uptime: 60000,         // AUMENTAR: 60s para considerar estável
-  kill_timeout: 60000,       // AUMENTAR: 60s para aguardar shutdown
-  autorestart: true,
-  watch: false,              // ADICIONAR: Desabilitar watch (pode causar restarts)
-  env: {
-    PYTHONUNBUFFERED: '1'
-  }
+return {
+    # ... outros campos ...
+    'total_stake': total_stake,  # Agora inclui stake_empate
+    'retorno_green': retorno_green,
+    'lucro': lucro,
 }
 ```
 
----
+#### 3. Atualizar mensagem Telegram (linhas 244-252)
 
-## Diagnóstico do Erro 404
+```python
+⚖️ <b>EMPATE (SO):</b> {dg['empate']['bookmaker']}
+   └ ODD: {dg['empate']['odd']:.2f} | Stake: R$ {dg['empate']['stake']:.2f}
 
-O erro 404 no Telegram indica que o bot token ou channel_id está errado. Precisamos verificar:
-
-```bash
-# Na VPS, testar se o token é válido
-curl "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/getMe"
-
-# Testar se o channel_id está correto
-curl -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
-  -H "Content-Type: application/json" \
-  -d '{"chat_id": "$TELEGRAM_CHANNEL_ID", "text": "Teste"}'
+# Investimento já inclui os 3 stakes
+💰 <b>Investimento:</b> R$ {dg['total_stake']:.2f}
+📊 <b>ROI:</b> {roi_sign}{dg['roi']:.2f}%
+✅ <b>Retorno possível duplo Green:</b> R$ {dg['retorno_green']:.2f}
 ```
 
-**Possíveis causas do 404:**
-- Token inválido ou expirado
-- Bot não foi adicionado ao canal/grupo
-- Channel ID em formato errado (deve ser `-100XXXXXXXXXX` para grupos)
-
 ---
 
-## Resumo das Alterações
+## Verificação com Números Reais
 
-| Arquivo | Alteração |
-|---------|-----------|
-| `run_telegram.py` | Só salvar no banco se `msg_id` não for `None` |
-| `run_telegram.py` | Corrigir contador para contar apenas envios bem-sucedidos |
-| `run_telegram.py` | Adicionar handler de sinal para shutdown gracioso |
-| `ecosystem.config.js` | Aumentar `min_uptime` e `kill_timeout` para 60s |
-| `ecosystem.config.js` | Adicionar `watch: false` |
+```text
+Ajax x Fortuna Sittard (calculadora):
+- odd_casa=1.45, odd_empate=4.90, odd_fora=7.00, base=500
 
----
-
-## Após as Alterações
-
-```bash
-# Verificar variáveis de ambiente
-pm2 env telegram-dg-bot | grep TELEGRAM
-
-# Se não aparecerem, adicionar ao .env e recarregar
-echo "TELEGRAM_BOT_TOKEN=seu_token" >> .env
-echo "TELEGRAM_CHANNEL_ID=-100xxxxxxxx" >> .env
-
-# Reiniciar com nova config
-pm2 delete telegram-dg-bot
-pm2 start ecosystem.config.js --only telegram-dg-bot
-
-# Ver logs
-pm2 logs telegram-dg-bot --lines 30
+Cálculo:
+- stake_casa = 500.00
+- stake_fora = 500 * 1.45 / 7.00 = 103.57
+- retorno_green = 500 * 1.45 = 725.00
+- stake_empate = 725.00 / 4.90 = 147.96
+- investimento = 500 + 103.57 + 147.96 = 751.53
+- lucro = 725.00 - 751.53 = -26.53
+- roi = -26.53 / 751.53 * 100 = -3.53% ✓
 ```
 
+---
+
+## Resumo das Mudanças
+
+| Local | Antes | Depois |
+|-------|-------|--------|
+| stake_empate | `risco / (odd - 1)` | `retorno_green / odd_empate` |
+| total_stake | `casa + fora` | `casa + fora + empate` |
+| retorno_green | média dos cenários | `stake_casa * odd_casa` |
+| Mensagem Empate | "Risco" | "Stake" |
+
+---
+
+## Resultado Esperado
+
+Mensagem corrigida:
+```text
+🦈 DUPLO GREEN ENCONTRADO 🦈
+
+⚽ AFC Ajax x Fortuna Sittard
+🏆 Eredivisie
+📅 2026-02-14
+
+🏠 CASA (PA): Novibet
+   └ ODD: 1.45 | Stake: R$ 500.00
+
+⚖️ EMPATE (SO): stake
+   └ ODD: 4.90 | Stake: R$ 147.96
+
+🚀 FORA (PA): esportivabet
+   └ ODD: 7.00 | Stake: R$ 103.57
+
+💰 Investimento: R$ 751.53
+📊 ROI: -3.53%
+✅ Retorno possível duplo Green: R$ 725.00
+
+🦈 #BetSharkPro #DuploGreen
+```
