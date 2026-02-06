@@ -188,11 +188,13 @@ module.exports = {
       name: 'scraper-mcgames',
       script: 'standalone/run_scraper.py',
       interpreter: 'python3',
-      args: '--scraper mcgames --interval 30',
+      args: '--scraper mcgames --interval 120',
       cwd: __dirname,
-      max_memory_restart: '100M',
-      restart_delay: 3000,
-      max_restarts: 50,
+      max_memory_restart: '200M',
+      restart_delay: 10000,
+      max_restarts: 5,
+      min_uptime: 30000,
+      kill_timeout: 30000,
       autorestart: true,
       env: {
         PYTHONUNBUFFERED: '1'
@@ -236,11 +238,13 @@ module.exports = {
       name: 'scraper-jogodeouro',
       script: 'standalone/run_scraper.py',
       interpreter: 'python3',
-      args: '--scraper jogodeouro --interval 30',
+      args: '--scraper jogodeouro --interval 120 --initial-delay 120',
       cwd: __dirname,
-      max_memory_restart: '100M',
-      restart_delay: 3000,
-      max_restarts: 50,
+      max_memory_restart: '200M',
+      restart_delay: 10000,
+      max_restarts: 5,
+      min_uptime: 30000,
+      kill_timeout: 30000,
       autorestart: true,
       env: {
         PYTHONUNBUFFERED: '1'
@@ -293,36 +297,10 @@ module.exports = {
         PYTHONUNBUFFERED: '1'
       }
     },
-    {
-      name: 'scraper-mcgames-nba',
-      script: 'standalone/run_scraper.py',
-      interpreter: 'python3',
-      args: '--scraper mcgames_nba --interval 30',
-      cwd: __dirname,
-      max_memory_restart: '100M',
-      restart_delay: 3000,
-      max_restarts: 50,
-      autorestart: true,
-      env: {
-        PYTHONUNBUFFERED: '1'
-      }
-    },
+    // REMOVIDO: scraper-mcgames-nba (unificado em scraper-mcgames)
     // REMOVIDO: scraper-aposta1-nba (unificado em scraper-aposta1)
     // REMOVIDO: scraper-esportivabet-nba (unificado em scraper-esportivabet)
-    {
-      name: 'scraper-jogodeouro-nba',
-      script: 'standalone/run_scraper.py',
-      interpreter: 'python3',
-      args: '--scraper jogodeouro_nba --interval 30',
-      cwd: __dirname,
-      max_memory_restart: '100M',
-      restart_delay: 3000,
-      max_restarts: 50,
-      autorestart: true,
-      env: {
-        PYTHONUNBUFFERED: '1'
-      }
-    },
+    // REMOVIDO: scraper-jogodeouro-nba (unificado em scraper-jogodeouro)
     
     // ============================================
     // SERVIÇOS AUXILIARES
