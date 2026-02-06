@@ -145,7 +145,7 @@ def group_odds_for_json(raw_data: list, log: logger) -> list:
         if away_odd > 0 and away_odd < group["worst_away"]:
             group["worst_away"] = away_odd
     
-    # Converter infinity para 0 para serialização JSON
+    # Converter infinity para 0/null e ajustar basquete
     result = []
     for match in match_map.values():
         if match["worst_home"] == float('inf'):
@@ -154,6 +154,14 @@ def group_odds_for_json(raw_data: list, log: logger) -> list:
             match["worst_draw"] = 0
         if match["worst_away"] == float('inf'):
             match["worst_away"] = 0
+        
+        # Basquete: draw deve ser null (não existe empate)
+        if match.get("sport_type") == "basketball":
+            match["best_draw"] = None
+            match["worst_draw"] = None
+            for odds in match.get("odds", []):
+                odds["draw_odd"] = None
+        
         result.append(match)
     
     # Ordenar por data
