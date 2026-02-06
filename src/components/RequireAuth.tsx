@@ -20,7 +20,9 @@ export const RequireAuth = ({ children, pageKey }: RequireAuthProps) => {
   }
 
   if (!user) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    // Salvar URL atual como query param para sobreviver ao refresh
+    const returnTo = encodeURIComponent(location.pathname + location.search);
+    return <Navigate to={`/login?returnTo=${returnTo}`} replace />;
   }
 
   // Verificar se usuário está aprovado
