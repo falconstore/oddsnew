@@ -1,91 +1,46 @@
 
 
-# Fix Jogo de Ouro: Cross-Site Token Strategy
+# Fix Jogo de Ouro: Usar integration=mcgames2 nas API calls
 
-## Root Cause (Confirmed)
+## Problema Identificado
 
-The VPS IP is blocked by Cloudflare on `jogodeouro.bet.br`. Every page load returns:
-- Title: "Attention Required! | Cloudflare"
-- Body: "Sorry, you have been blocked"
+O token Altenar e vinculado a integracao onde foi gerado. Quando o Playwright abre `mcgames.bet.br`, o widget inicializa com `integration=mcgames2` e o token e emitido para essa integracao.
 
-This is an IP-level block that cannot be bypassed with stealth techniques, Chrome args, or anti-detection scripts.
+Ao usar esse token com `integration=jogodeouro`, a API Altenar rejeita com 403 porque o token nao corresponde a integracao.
 
-## Solution: Cross-Site Token Capture
+## Por que isso funciona
 
-All Altenar-powered sites share the same API backend:
-- `sb2frontend-altenar2.biahosted.com/api/widget/GetEvents`
+Mcgames e Jogo de Ouro sao white-labels do mesmo backend Altenar. Os championship IDs sao identicos (Serie A = 2942, Premier League = 2936, NBA = 2980, etc.). As odds retornadas sao as mesmas porque ambos usam a mesma plataforma Altenar como provedor de odds.
 
-The only difference between bookmakers is the `integration` query parameter:
-- Mcgames uses `integration=mcgames2`
-- Esportivabet uses `integration=esportiva`
-- Jogo de Ouro uses `integration=jogodeouro`
+O `bookmaker_name` nos ScrapedOdds continua sendo `"jogodeouro"`, entao os dados sao registrados corretamente no banco como pertencendo ao Jogo de Ouro.
 
-The token is an Altenar session token, not tied to a specific bookmaker. We can capture a token from `mcgames.bet.br` (which has NO Cloudflare and works perfectly) and use it with `integration=jogodeouro`.
+## Mudancas no Arquivo
 
-## File: `docs/scraper/scrapers/jogodeouro_scraper.py`
+**`docs/scraper/scrapers/jogodeouro_scraper.py`** - 3 mudancas cirurgicas:
 
-### Changes to `setup()` method:
-
-Replace the Playwright section that tries to open `jogodeouro.bet.br` with a strategy that opens `mcgames.bet.br` instead:
-
-1. Change `WARMUP_URLS` to use mcgames.bet.br URLs (since they have no Cloudflare):
-   ```
-   WARMUP_URLS = [
-       "https://mcgames.bet.br/sports/futebol/italia/serie-a/c-2942",
-       "https://mcgames.bet.br/sports/futebol",
-   ]
-   ```
-
-2. In `setup()`, keep the same Playwright interception logic but targeting `mcgames.bet.br`
-
-3. In `_fetch_league_data()`, the API calls already use `integration=jogodeouro` and `origin: jogodeouro.bet.br` - these stay the same since the API endpoint (`biahosted.com`) is NOT behind Cloudflare
-
-4. Remove the extra Chrome args and stealth scripts (not needed since mcgames.bet.br has no Cloudflare). Simplify to match the Mcgames scraper config that already works
-
-### Specific code changes:
-
-**WARMUP_URLS** - Change from jogodeouro.bet.br to mcgames.bet.br:
-```python
-WARMUP_URLS = [
-    "https://mcgames.bet.br/sports/futebol/italia/serie-a/c-2942",
-    "https://mcgames.bet.br/sports/futebol",
-]
+### 1. Mudar INTEGRATION (linha 58)
+```
+Antes:  INTEGRATION = "jogodeouro"
+Depois: INTEGRATION = "mcgames2"
 ```
 
-**CHROME_ARGS** - Simplify back to 5 (matching Mcgames which works):
-```python
-CHROME_ARGS = [
-    '--no-sandbox',
-    '--disable-blink-features=AutomationControlled',
-    '--single-process',
-    '--disable-gpu',
-    '--memory-pressure-off',
-]
+### 2. Mudar origin no _fetch_league_data() (linha 279)
+```
+Antes:  "origin": "https://jogodeouro.bet.br"
+Depois: "origin": "https://mcgames.bet.br"
 ```
 
-**setup()** method:
-- Remove `add_init_script` stealth injection (not needed, mcgames has no bot detection)
-- Remove `locale` from context (not needed)
-- Simplify viewport back to `800x600`
-- Change `wait_until` back to `"domcontentloaded"` (faster)
-- Reduce timeout back to `15000` (mcgames loads fast)
-- Remove double-scroll, keep single scroll of 1000px
-- Reduce final wait from 15s back to 5s
-- Remove diagnostic HTML body logging (not needed once working)
-- Keep the `handle_request` interceptor checking for `biahosted.com/api`
+### 3. Mudar referer no _fetch_league_data() (linha 280)
+```
+Antes:  "referer": "https://jogodeouro.bet.br/"
+Depois: "referer": "https://mcgames.bet.br/"
+```
 
-**_fetch_league_data()** - No changes needed:
-- Already uses `integration=jogodeouro` (correct)
-- Already uses `origin: jogodeouro.bet.br` (correct)
-- The Altenar API at `biahosted.com` does NOT validate origin headers
+Nada mais precisa mudar. O `bookmaker_name="jogodeouro"` nos ScrapedOdds permanece inalterado, garantindo que os dados entrem no banco como odds do Jogo de Ouro.
 
-### Why this works:
+## Nenhum outro arquivo afetado
 
-The Altenar token is a session identifier for the widget platform, not for a specific bookmaker. The `integration` parameter tells the API which bookmaker's data to return. Since both mcgames and jogodeouro use the exact same API endpoint and championship IDs, a token from either site works for both.
-
-## No other files need changes
-
-The scraper class name (`JogodeOuroUnifiedScraper`) and import path remain identical, so `run_scraper.py` and `ecosystem.config.js` need no updates.
+A classe, import path, e todos os metodos de parsing permanecem identicos.
 
 ## Deploy
 
@@ -93,9 +48,9 @@ The scraper class name (`JogodeOuroUnifiedScraper`) and import path remain ident
 1. git pull no VPS
 2. pm2 restart scraper-jogodeouro
 3. pm2 logs scraper-jogodeouro --lines 20
-4. Expected output:
-   - "[JogodeOuro] Token captured via request interception"
-   - "[JogodeOuro] Serie A: XX odds"
-   - "[JogodeOuro] Premier League: XX odds"
+4. Esperado:
+   - "[JogodeOuro] Token captured via mcgames.bet.br request interception"
+   - "[JogodeOuro] Cross-site token capture successful!"
+   - "[JogodeOuro] Serie A: XX odds"  (em vez de "Token issue HTTP 403")
 ```
 
