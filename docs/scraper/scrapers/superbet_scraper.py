@@ -221,14 +221,12 @@ class SuperbetScraper(BaseScraper):
                 home_team = parts[0].strip()
                 away_team = parts[1].strip()
                 
-                # Parse match date and convert UTC to Brazil time (UTC-3)
+                # Parse match date - keep in UTC (frontend converts to local)
                 utc_date = event.get("utcDate", "")
                 try:
-                    match_date_utc = datetime.fromisoformat(utc_date.replace("Z", "+00:00"))
-                    # Convert to Brazil time (UTC-3) - Superbet returns UTC
-                    match_date = match_date_utc - timedelta(hours=3)
+                    match_date = datetime.fromisoformat(utc_date.replace("Z", "+00:00"))
                 except:
-                    match_date = datetime.now(timezone.utc) - timedelta(hours=3)
+                    match_date = datetime.now(timezone.utc)
                 
                 # Extract odds from the correct market
                 event_odds = event.get("odds") or []

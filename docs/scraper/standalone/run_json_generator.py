@@ -82,11 +82,12 @@ def group_odds_for_json(raw_data: list, log: logger) -> list:
         except (ValueError, TypeError):
             continue
         
-        # Composite key para evitar duplicatas
+        # Composite key com liga para evitar duplicatas e colisões cross-league
         home_team = row.get("home_team", "")
         away_team = row.get("away_team", "")
+        league_name = row.get("league_name", "")
         match_date_key = match_date.date().isoformat()
-        composite_key = f"{home_team}_{away_team}_{match_date_key}"
+        composite_key = f"{league_name}_{home_team}_{away_team}_{match_date_key}"
         
         if composite_key not in match_map:
             match_map[composite_key] = {

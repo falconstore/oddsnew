@@ -672,11 +672,12 @@ class Orchestrator:
             except (ValueError, TypeError):
                 continue
             
-            # Use composite key to prevent duplicates from different match_ids
+            # Use composite key with league to prevent duplicates and cross-league collisions
             home_team = row.get("home_team", "")
             away_team = row.get("away_team", "")
+            league_name = row.get("league_name", "")
             match_date_key = match_date.date().isoformat()
-            composite_key = f"{home_team}_{away_team}_{match_date_key}"
+            composite_key = f"{league_name}_{home_team}_{away_team}_{match_date_key}"
             
             if composite_key not in match_map:
                 match_map[composite_key] = {
