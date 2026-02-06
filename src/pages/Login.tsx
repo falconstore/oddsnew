@@ -25,7 +25,11 @@ const Login = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  const from = (location.state as any)?.from?.pathname || '/';
+  const searchParams = new URLSearchParams(location.search);
+  const returnToParam = searchParams.get('returnTo');
+  const from = returnToParam 
+    ? decodeURIComponent(returnToParam) 
+    : (location.state as any)?.from?.pathname || '/';
 
   useEffect(() => {
     if (user && isApproved) {
