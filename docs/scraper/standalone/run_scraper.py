@@ -87,8 +87,8 @@ def get_scraper_class(scraper_name: str):
         "esportivabet": ("scrapers.esportivabet_unified_scraper", "EsportivabetUnifiedScraper"),
         
         # Unified Playwright scrapers (Football + NBA) - Altenar API
-        "mcgames": ("scrapers.mcgames_unified_scraper", "McgamesUnifiedScraper"),
-        "jogodeouro": ("scrapers.jogodeouro_unified_scraper", "JogodeOuroUnifiedScraper"),
+        "mcgames": ("scrapers.mcgames_scraper", "McgamesUnifiedScraper"),
+        "jogodeouro": ("scrapers.jogodeouro_scraper", "JogodeOuroUnifiedScraper"),
         
         # HTTPX-based scrapers (light) - Football only
         "br4bet": ("scrapers.br4bet_scraper", "Br4betScraper"),
