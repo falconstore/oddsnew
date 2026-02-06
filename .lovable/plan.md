@@ -1,187 +1,184 @@
 
-# Plano: Implementar Paginação para Carregar Todas as 219 Partidas
 
-## Problema Confirmado
+# Plano: Unificar Scrapers Mcgames e Jogo de Ouro (Futebol + NBA) e Corrigir Conexao
 
-| Fonte | Valor |
-|-------|-------|
-| Banco de dados | **219 partidas** (2431 linhas de odds) |
-| odds.json | ~70 partidas |
+## Contexto
 
-O Supabase/PostgREST tem um limite padrao de **1000 linhas por request**. O codigo atual nao faz paginacao, entao recebe apenas um recorte dos dados.
+Atualmente existem **4 scrapers separados** que precisam ser consolidados em **2 scrapers unificados**:
 
----
+- `mcgames_scraper.py` (futebol) + `mcgames_nba_scraper.py` (NBA) --> `mcgames_unified_scraper.py`
+- `jogodeouro_scraper.py` (futebol) + `jogodeouro_nba_scraper.py` (NBA) --> `jogodeouro_unified_scraper.py`
 
-## Causa Raiz
+Alem disso, o scraper da Jogo de Ouro tem problemas de conexao frequentes (timeout ao capturar token via Playwright).
 
-**Arquivo**: `docs/scraper/supabase_client.py` (linhas 702-728)
+## Beneficios da Unificacao
 
-```python
-async def fetch_odds_for_json(self) -> List[Dict[str, Any]]:
-    response = (
-        self.client.table("odds_comparison")
-        .select("*")
-        .order("match_date", desc=False)
-        .execute()  # ← Retorna no maximo ~1000 linhas!
-    )
-    return response.data or []
-```
-
-O mesmo problema existe em `fetch_nba_odds_for_json()`.
+| Antes | Depois |
+|-------|--------|
+| 4 processos PM2 separados | 2 processos PM2 |
+| 2 capturas de token Playwright por casa | 1 captura por casa |
+| 4 sessoes HTTP | 2 sessoes HTTP |
+| Mcgames: 2 processos Chrome | 1 processo Chrome |
+| Jogo de Ouro: 2 processos Chrome | 1 processo Chrome |
 
 ---
 
-## Solucao: Implementar Paginacao
+## Parte 1: Mcgames Unified Scraper
 
-### Correcao 1: Metodo helper para paginacao
+Criar `docs/scraper/scrapers/mcgames_unified_scraper.py` seguindo o padrao ja usado em `aposta1_unified_scraper.py` e `esportivabet_unified_scraper.py`.
 
-Adicionar um metodo generico de paginacao no `SupabaseClient`:
+### Estrutura
 
-```python
-def _fetch_all_paginated(self, table_name: str, order_by: str = "match_date", page_size: int = 1000) -> List[Dict[str, Any]]:
-    """
-    Fetch all rows from a table/view using pagination.
-    Supabase/PostgREST limits responses to ~1000 rows by default.
-    """
-    all_data = []
-    offset = 0
-    
-    while True:
-        response = (
-            self.client.table(table_name)
-            .select("*")
-            .order(order_by, desc=False)
-            .range(offset, offset + page_size - 1)
-            .execute()
-        )
-        
-        batch = response.data or []
-        all_data.extend(batch)
-        
-        # Se retornou menos que page_size, acabaram os dados
-        if len(batch) < page_size:
-            break
-            
-        offset += page_size
-    
-    return all_data
+```text
+McgamesUnifiedScraper
+  - FOOTBALL_LEAGUES (17 ligas, inclui todas do mcgames_scraper.py)
+  - BASKETBALL_LEAGUES (NBA, champ_id 2980)
+  - setup(): 1 unica captura de token via Playwright
+  - scrape_all(): Futebol + NBA em sequencia
+  - _scrape_football_league(): market typeId=1 (1x2)
+  - _scrape_basketball_league(): market typeId=219 (Moneyline)
+  - teardown(): fecha session, limpa estado
 ```
 
-### Correcao 2: Atualizar fetch_odds_for_json
+### Detalhes tecnicos
 
-```python
-async def fetch_odds_for_json(self) -> List[Dict[str, Any]]:
-    """Fetch all football odds data from the comparison view for JSON export."""
-    try:
-        data = self._fetch_all_paginated("odds_comparison", "match_date")
-        self.logger.info(f"Fetched {len(data)} football odds rows")
-        return data
-    except Exception as e:
-        self.logger.error(f"Error fetching odds for JSON: {e}")
-        return []
-```
-
-### Correcao 3: Atualizar fetch_nba_odds_for_json
-
-```python
-async def fetch_nba_odds_for_json(self) -> List[Dict[str, Any]]:
-    """Fetch all NBA odds data from the nba_odds_comparison view for JSON export."""
-    try:
-        data = self._fetch_all_paginated("nba_odds_comparison", "match_date")
-        self.logger.info(f"Fetched {len(data)} NBA odds rows")
-        return data
-    except Exception as e:
-        self.logger.error(f"Error fetching NBA odds for JSON: {e}")
-        return []
-```
+- Usa o mesmo `API_BASE` e `integration=mcgames2` para ambos os esportes
+- Futebol: `typeId=1` para mercado 1x2, odds typeId 1/2/3 (home/draw/away)
+- NBA: `typeId=219` para mercado Moneyline, odds typeId 1/3 (home/away), draw_odd=None
+- Token e session compartilhados entre futebol e NBA
+- Mesma variavel de ambiente `MCGAMES_AUTH_TOKEN` como fallback manual
+- Warm-up URLs: usa as URLs de futebol (mais estaveis) para captura de token
 
 ---
 
-## Correcao Adicional: NBA com draw null
+## Parte 2: Jogo de Ouro Unified Scraper
 
-O frontend espera `draw_odd: null` para basquete, mas o gerador esta colocando `0`.
+Criar `docs/scraper/scrapers/jogodeouro_unified_scraper.py` seguindo o mesmo padrao.
 
-**Arquivo**: `docs/scraper/standalone/run_json_generator.py`
+### Estrutura
 
-Apos agrupar as partidas, garantir que basquete tenha valores null:
-
-```python
-# Apos o loop de agrupamento, antes de retornar
-for match in match_map.values():
-    if match.get("sport_type") == "basketball":
-        match["best_draw"] = None
-        match["worst_draw"] = None
-        for odds in match.get("odds", []):
-            odds["draw_odd"] = None
+```text
+JogodeOuroUnifiedScraper
+  - FOOTBALL_LEAGUES (17 ligas, inclui todas do jogodeouro_scraper.py)
+  - BASKETBALL_LEAGUES (NBA, champ_id 2980)
+  - setup(): 1 unica captura de token com melhorias de resiliencia
+  - scrape_all(): Futebol + NBA em sequencia
+  - _scrape_football_league(): market typeId=1 (1x2)
+  - _scrape_basketball_league(): market typeId=219 (Moneyline)
+  - teardown(): fecha session, limpa estado
 ```
 
+### Correcao do problema de conexao
+
+O scraper atual da Jogo de Ouro tem problemas frequentes de timeout na captura do token. As melhorias serao:
+
+1. **Timeout reduzido por URL**: de 60s para 20s (falhar rapido, tentar proxima URL)
+2. **Mais URLs de warm-up**: adicionar URLs especificas de ligas populares que carregam mais rapido
+3. **Argumentos Chrome otimizados**: adicionar `--single-process`, `--disable-gpu`, `--memory-pressure-off` (mesmo padrao dos scrapers Playwright otimizados)
+4. **Viewport reduzido**: 800x600 em vez de tamanho padrao (menos recursos)
+5. **Retry no scrape_all()**: se o token falhar no setup(), tenta uma vez mais apos limpar estado
+6. **Fallback robusto para env var**: `JOGODEOURO_AUTH_TOKEN` ja existente, mas com logging melhorado
+
 ---
 
-## Resumo das Alteracoes
+## Parte 3: Atualizacao dos Registros (run_sequential, ecosystem, __init__)
 
-| Arquivo | Alteracao |
-|---------|-----------|
-| `supabase_client.py` | Adicionar `_fetch_all_paginated()` |
-| `supabase_client.py` | Atualizar `fetch_odds_for_json()` para usar paginacao |
-| `supabase_client.py` | Atualizar `fetch_nba_odds_for_json()` para usar paginacao |
-| `run_json_generator.py` | Garantir `draw_odd = null` para basquete |
+### 3.1 - `docs/scraper/standalone/run_sequential.py`
+
+**Atualizar SCRAPER_MAP** em `get_scraper_class()`:
+
+```python
+# Substituir entradas separadas por unificadas
+"mcgames": ("scrapers.mcgames_unified_scraper", "McgamesUnifiedScraper"),
+"jogodeouro": ("scrapers.jogodeouro_unified_scraper", "JogodeOuroUnifiedScraper"),
+```
+
+**Remover das listas**:
+- `LIGHT_SCRAPERS`: remover "mcgames_nba" e "jogodeouro_nba"
+- `ALL_SCRAPERS_INTERLEAVED`: remover "mcgames_nba" e "jogodeouro_nba"  
+- `HYBRID_TRIPLETS`: remover "mcgames_nba" e "jogodeouro_nba" do ultimo triplet de NBA
+
+### 3.2 - `docs/scraper/standalone/run_scraper.py`
+
+**Atualizar SCRAPER_MAP**:
+
+```python
+"mcgames": ("scrapers.mcgames_unified_scraper", "McgamesUnifiedScraper"),
+"jogodeouro": ("scrapers.jogodeouro_unified_scraper", "JogodeOuroUnifiedScraper"),
+```
+
+Remover entradas `mcgames_nba` e `jogodeouro_nba`.
+
+### 3.3 - `docs/scraper/ecosystem.config.js`
+
+- **Remover** processo `scraper-mcgames-nba`
+- **Remover** processo `scraper-jogodeouro-nba`
+- **Atualizar** `scraper-mcgames`: mudar interval de 30s para 120s (agora e hibrido Playwright + curl_cffi)
+- **Atualizar** `scraper-jogodeouro`: mudar interval de 30s para 120s, adicionar `--initial-delay 120` e aumentar max_memory para 200M
+
+### 3.4 - `docs/scraper/scrapers/__init__.py`
+
+Atualizar `__all__` para incluir os novos scrapers unificados e remover os antigos separados.
 
 ---
 
-## Resultado Esperado
+## Resumo de Arquivos
 
-Apos as correcoes:
+| Acao | Arquivo |
+|------|---------|
+| Criar | `docs/scraper/scrapers/mcgames_unified_scraper.py` |
+| Criar | `docs/scraper/scrapers/jogodeouro_unified_scraper.py` |
+| Editar | `docs/scraper/standalone/run_sequential.py` |
+| Editar | `docs/scraper/standalone/run_scraper.py` |
+| Editar | `docs/scraper/ecosystem.config.js` |
+| Editar | `docs/scraper/scrapers/__init__.py` |
 
-- **Antes**: ~1000 linhas → ~70 partidas
-- **Depois**: ~2431 linhas → ~219 partidas
-
-O sistema voltara a mostrar todas as partidas disponiveis, como funcionava antes.
+Os arquivos antigos (`mcgames_scraper.py`, `mcgames_nba_scraper.py`, `jogodeouro_scraper.py`, `jogodeouro_nba_scraper.py`) serao mantidos no repositorio para referencia, mas nao serao mais usados pelos runners.
 
 ---
 
 ## Secao Tecnica
 
-### Como o PostgREST limita resultados
+### Padrao scrape_all() (obrigatorio)
 
-O Supabase usa PostgREST que tem um limite padrao de linhas por request (geralmente 1000). Para buscar mais, e necessario usar `.range(offset, limit)`:
+Todos os scrapers unificados devem implementar `scrape_all()` que:
+1. Chama `setup()` uma vez (captura token)
+2. Itera por todas as ligas de futebol
+3. Itera por todas as ligas de basquete
+4. Chama `teardown()` no finally
+5. Retorna `List[ScrapedOdds]`
 
-```python
-# Pagina 1: linhas 0-999
-.range(0, 999)
+### API Altenar (compartilhada por Mcgames e Jogo de Ouro)
 
-# Pagina 2: linhas 1000-1999
-.range(1000, 1999)
+Ambos usam a mesma API Altenar (`sb2frontend-altenar2.biahosted.com`), diferindo apenas no parametro `integration`:
+- Mcgames: `integration=mcgames2`
+- Jogo de Ouro: `integration=jogodeouro`
 
-# E assim por diante...
-```
+Os championship IDs sao os mesmos para ambos (ex: NBA = 2980, Premier League = 2936).
 
-### Por que o problema so apareceu agora?
+### Correcao de conexao Jogo de Ouro - detalhes
 
-Antes da Superbet como casa mae:
-
-- Menos casas coletando odds
-- Menos linhas totais na view
-- Provavelmente ficava abaixo do limite de 1000
-
-Com a Superbet + todas as outras casas:
-
-- Mais partidas sendo criadas
-- Mais odds por partida
-- Total ultrapassou 1000 linhas → truncamento
-
-### Fluxo corrigido
+O problema principal e que o site jogodeouro.bet.br tem protecoes anti-bot mais agressivas e carrega lentamente. As melhorias no setup():
 
 ```text
-1. fetch_odds_for_json()
-   - Pagina 1: linhas 0-999 (1000 rows)
-   - Pagina 2: linhas 1000-1999 (1000 rows)
-   - Pagina 3: linhas 2000-2431 (431 rows)
-   - Total: 2431 rows ✓
+Antes:
+  - 3 URLs com timeout de 60s cada
+  - Espera 3s + scroll + 2s + scroll + 2s por URL
+  - Total maximo: ~210s (muito lento, frequentemente da timeout no PM2)
 
-2. group_odds_for_json()
-   - Agrupa por league + home + away + date
-   - Resultado: 219 partidas ✓
-
-3. odds.json
-   - matches_count: 219 ✓
+Depois:
+  - 4 URLs com timeout de 20s cada  
+  - Espera 2s + scroll + 1.5s por URL
+  - Chrome otimizado (--single-process, viewport 800x600)
+  - Total maximo: ~90s (dentro do timeout de 120s do PM2)
 ```
+
+### Deploy
+
+1. git pull no VPS
+2. `pm2 stop scraper-mcgames scraper-mcgames-nba scraper-jogodeouro scraper-jogodeouro-nba`
+3. `pm2 delete scraper-mcgames-nba scraper-jogodeouro-nba`
+4. `pm2 start ecosystem.config.js --only scraper-mcgames,scraper-jogodeouro`
+5. Verificar logs: `pm2 logs scraper-mcgames --lines 30` e `pm2 logs scraper-jogodeouro --lines 30`
+6. Confirmar que aparece "Total: X futebol + Y NBA" nos logs
+
