@@ -19,9 +19,10 @@ Available scrapers:
         - superbet, estrelabet, kto, sportingbet, novibet, betnacional, stake
         - betano, betbra (Playwright)
         - aposta1, esportivabet (Playwright - unified)
+        - mcgames, jogodeouro (Playwright + curl_cffi - unified)
     
-    Football only: br4bet, mcgames, jogodeouro, bet365, tradeball
-    NBA only: br4bet_nba, mcgames_nba, jogodeouro_nba
+    Football only: br4bet, bet365, tradeball
+    NBA only: br4bet_nba
 """
 
 __all__ = [
@@ -31,9 +32,10 @@ __all__ = [
     # Unified (Playwright)
     "BetanoUnifiedScraper", "BetbraUnifiedScraper",
     "Aposta1UnifiedScraper", "EsportivabetUnifiedScraper",
+    # Unified (Playwright + curl_cffi)
+    "McgamesUnifiedScraper", "JogodeOuroUnifiedScraper",
     # Football only
-    "Br4betScraper", "McgamesScraper", "JogodeOuroScraper", 
-    "Bet365Scraper", "TradeballScraper",
+    "Br4betScraper", "Bet365Scraper", "TradeballScraper",
     # NBA only
-    "Br4betNBAScraper", "McgamesNBAScraper", "JogodeOuroNBAScraper",
+    "Br4betNBAScraper",
 ]

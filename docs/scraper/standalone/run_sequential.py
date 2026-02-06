@@ -51,8 +51,6 @@ LIGHT_SCRAPERS = [
     "bet365",
     # NBA-only (HTTPX)
     "br4bet_nba",
-    "mcgames_nba",
-    "jogodeouro_nba",
 ]
 
 # Scrapers pesados (Playwright) - ~60s cada
@@ -83,8 +81,8 @@ ALL_SCRAPERS_INTERLEAVED = [
     "tradeball", "bet365",
     "aposta1",  # PESADO
     
-    # Bloco 5: 3 leves + 1 pesado
-    "br4bet_nba", "mcgames_nba", "jogodeouro_nba",
+    # Bloco 5: 1 leve + 1 pesado
+    "br4bet_nba",
     "esportivabet",  # PESADO
 ]
 
@@ -95,14 +93,14 @@ HYBRID_TRIPLETS = [
     ("superbet", "novibet", "betano"),
     ("kto", "estrelabet", "betbra"),
     ("sportingbet", "betnacional", "stake"),
-    ("br4bet", "mcgames", "aposta1"),
-    ("jogodeouro", "tradeball", "esportivabet"),
+    ("br4bet", "tradeball", "aposta1"),
+    ("mcgames", "jogodeouro", "esportivabet"),
     
     # API externa (solo para respeitar rate limit)
     ("bet365",),
     
-    # NBA (todos leves, podem rodar juntos)
-    ("br4bet_nba", "mcgames_nba", "jogodeouro_nba"),
+    # NBA-only (leve)
+    ("br4bet_nba",),
 ]
 
 # Timeout máximo por scraper (segundos)
@@ -168,17 +166,17 @@ def get_scraper_class(scraper_name: str):
         "aposta1": ("scrapers.aposta1_unified_scraper", "Aposta1UnifiedScraper"),
         "esportivabet": ("scrapers.esportivabet_unified_scraper", "EsportivabetUnifiedScraper"),
         
+        # Unified Playwright scrapers (Football + NBA) - Altenar API
+        "mcgames": ("scrapers.mcgames_unified_scraper", "McgamesUnifiedScraper"),
+        "jogodeouro": ("scrapers.jogodeouro_unified_scraper", "JogodeOuroUnifiedScraper"),
+        
         # HTTPX-based scrapers (light) - Football only
         "br4bet": ("scrapers.br4bet_scraper", "Br4betScraper"),
-        "mcgames": ("scrapers.mcgames_scraper", "McgamesScraper"),
-        "jogodeouro": ("scrapers.jogodeouro_scraper", "JogodeOuroScraper"),
         "bet365": ("scrapers.bet365_scraper", "Bet365Scraper"),
         "tradeball": ("scrapers.tradeball_scraper", "TradeballScraper"),
         
         # NBA-only scrapers (HTTPX-based, kept for compatibility)
         "br4bet_nba": ("scrapers.br4bet_nba_scraper", "Br4betNBAScraper"),
-        "mcgames_nba": ("scrapers.mcgames_nba_scraper", "McgamesNBAScraper"),
-        "jogodeouro_nba": ("scrapers.jogodeouro_nba_scraper", "JogodeOuroNBAScraper"),
     }
     
     scraper_key = scraper_name.lower()

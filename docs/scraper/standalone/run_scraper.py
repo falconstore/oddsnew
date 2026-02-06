@@ -86,17 +86,17 @@ def get_scraper_class(scraper_name: str):
         "aposta1": ("scrapers.aposta1_unified_scraper", "Aposta1UnifiedScraper"),
         "esportivabet": ("scrapers.esportivabet_unified_scraper", "EsportivabetUnifiedScraper"),
         
+        # Unified Playwright scrapers (Football + NBA) - Altenar API
+        "mcgames": ("scrapers.mcgames_unified_scraper", "McgamesUnifiedScraper"),
+        "jogodeouro": ("scrapers.jogodeouro_unified_scraper", "JogodeOuroUnifiedScraper"),
+        
         # HTTPX-based scrapers (light) - Football only
         "br4bet": ("scrapers.br4bet_scraper", "Br4betScraper"),
-        "mcgames": ("scrapers.mcgames_scraper", "McgamesScraper"),
-        "jogodeouro": ("scrapers.jogodeouro_scraper", "JogodeOuroScraper"),
         "bet365": ("scrapers.bet365_scraper", "Bet365Scraper"),
         "tradeball": ("scrapers.tradeball_scraper", "TradeballScraper"),
         
         # NBA-only scrapers (HTTPX-based, kept for compatibility)
         "br4bet_nba": ("scrapers.br4bet_nba_scraper", "Br4betNBAScraper"),
-        "mcgames_nba": ("scrapers.mcgames_nba_scraper", "McgamesNBAScraper"),
-        "jogodeouro_nba": ("scrapers.jogodeouro_nba_scraper", "JogodeOuroNBAScraper"),
     }
     
     scraper_key = scraper_name.lower()
