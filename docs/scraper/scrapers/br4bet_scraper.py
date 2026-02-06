@@ -58,7 +58,53 @@ class Br4betScraper(BaseScraper):
             "champ_id": "2972",
             "name": "EFL Cup",
             "country": "inglaterra"
+       },
+    	"copa_do_rei": {
+            "champ_id": "2973",
+            "name": "Copa do Rei",
+            "country": "Espanha"
         },
+         "champions_league": {
+            "champ_id": "16808",
+            "name": "Champions League",
+            "country": "Europa"
+        },
+         "liga_europa": {
+            "champ_id": "16809",
+            "name": "Liga Europa",
+            "country": "Europa"
+        },
+         "liga_da_conferencia": {
+            "champ_id": "31608",
+            "name": "Liga da Conferencia",
+            "country": "Europa"
+        },
+         "eredivisie": {
+            "champ_id": "3065",
+            "name": "Eredivisie",
+            "country": "Holanda"
+        },
+         "brasileirao_serie_a": {
+            "champ_id": "11318",
+            "name": "Brasileirão Série A",
+            "country": "Brasil"
+        },
+        "libertadores": {
+            "champ_id": "3709",
+            "name": "Libertadores",
+            "country": "América do Sul"
+        },
+        "liga_portuguesa": {
+            "champ_id": "3152",
+            "name": "Liga Portuguesa",
+            "country": "Portugal"
+        },
+        "carioca": {
+            "champ_id": "3357",
+            "name": "Carioca",
+            "country": "Brasil"
+        },
+    }
     }
     
     API_URL = "https://sb2frontend-altenar2.biahosted.com/api/widget/GetEvents"
