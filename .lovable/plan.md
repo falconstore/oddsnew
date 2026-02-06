@@ -1,104 +1,101 @@
 
 
-# Corrigir Captura de Token do Jogo de Ouro - Abordagem Diagnostica + Fix
+# Fix Jogo de Ouro: Cross-Site Token Strategy
 
-## Analise Comparativa
+## Root Cause (Confirmed)
 
-Comparando os 3 scrapers Altenar lado a lado, encontrei diferencas criticas na configuracao do Playwright:
+The VPS IP is blocked by Cloudflare on `jogodeouro.bet.br`. Every page load returns:
+- Title: "Attention Required! | Cloudflare"
+- Body: "Sorry, you have been blocked"
 
-| Config | Mcgames (funciona) | Esportivabet (funciona) | Jogo de Ouro (FALHA) |
-|---|---|---|---|
-| Page timeout | 15s | **60s** | 15s |
-| Wait apos load | 2s | **3s** | 2s |
-| Scrolls | 1x (1000px) | **2x (500 + 1000px)** | 1x (1000px) |
-| Wait final | 5s | **10s** | 5s |
-| Chrome args | 5 basicos | **11 (com anti-detect)** | 5 basicos |
-| Anti-webdriver | Nao | Nao | Nao |
-| Debug logging | Nao | Sim (`debug`) | Nao |
+This is an IP-level block that cannot be bypassed with stealth techniques, Chrome args, or anti-detection scripts.
 
-O problema: jogodeouro.bet.br provavelmente tem protecao anti-bot mais agressiva que mcgames.bet.br. A pagina carrega (sem erro de navegacao), mas o widget Altenar nao inicializa, ou e bloqueado.
+## Solution: Cross-Site Token Capture
 
-## Solucao: 3 Camadas de Fix
+All Altenar-powered sites share the same API backend:
+- `sb2frontend-altenar2.biahosted.com/api/widget/GetEvents`
 
-### Camada 1: Diagnostico (entender o que acontece)
+The only difference between bookmakers is the `integration` query parameter:
+- Mcgames uses `integration=mcgames2`
+- Esportivabet uses `integration=esportiva`
+- Jogo de Ouro uses `integration=jogodeouro`
 
-Adicionar logging de TODAS as requests interceptadas pelo Playwright, nao apenas `biahosted.com`. Tambem logar o `document.title` e um trecho do HTML apos o carregamento para verificar se a pagina esta renderizando ou se caiu em um Cloudflare challenge.
+The token is an Altenar session token, not tied to a specific bookmaker. We can capture a token from `mcgames.bet.br` (which has NO Cloudflare and works perfectly) and use it with `integration=jogodeouro`.
 
+## File: `docs/scraper/scrapers/jogodeouro_scraper.py`
+
+### Changes to `setup()` method:
+
+Replace the Playwright section that tries to open `jogodeouro.bet.br` with a strategy that opens `mcgames.bet.br` instead:
+
+1. Change `WARMUP_URLS` to use mcgames.bet.br URLs (since they have no Cloudflare):
+   ```
+   WARMUP_URLS = [
+       "https://mcgames.bet.br/sports/futebol/italia/serie-a/c-2942",
+       "https://mcgames.bet.br/sports/futebol",
+   ]
+   ```
+
+2. In `setup()`, keep the same Playwright interception logic but targeting `mcgames.bet.br`
+
+3. In `_fetch_league_data()`, the API calls already use `integration=jogodeouro` and `origin: jogodeouro.bet.br` - these stay the same since the API endpoint (`biahosted.com`) is NOT behind Cloudflare
+
+4. Remove the extra Chrome args and stealth scripts (not needed since mcgames.bet.br has no Cloudflare). Simplify to match the Mcgames scraper config that already works
+
+### Specific code changes:
+
+**WARMUP_URLS** - Change from jogodeouro.bet.br to mcgames.bet.br:
 ```python
-# Log todas as requests para diagnosticar
-async def handle_request(request):
-    url = request.url
-    # Log qualquer request de API para debug
-    if any(x in url for x in ["biahosted.com", "altenar", "widget"]):
-        self.logger.info(f"[JogodeOuro] API request detected: {url[:100]}")
-        headers = request.headers
-        if "authorization" in headers:
-            token = headers["authorization"]
-            if not token_future.done():
-                token_future.set_result(token)
-    
-# Apos carregar a pagina:
-title = await page.evaluate("document.title")
-self.logger.info(f"[JogodeOuro] Page title: {title}")
+WARMUP_URLS = [
+    "https://mcgames.bet.br/sports/futebol/italia/serie-a/c-2942",
+    "https://mcgames.bet.br/sports/futebol",
+]
 ```
 
-### Camada 2: Config agressiva (match Esportivabet)
-
-Aplicar TODAS as configuracoes que fazem a Esportivabet funcionar:
-
-- **Chrome args expandidos**: adicionar `--disable-dev-shm-usage`, `--disable-extensions`, `--disable-background-networking`, `--disable-sync`, `--disable-translate`, `--no-first-run`, `--disable-default-apps`
-- **Page timeout**: 15s para **30s**
-- **Wait apos load**: 2s para **3s**
-- **Scrolls**: 2 scrolls (500px + 1000px) com 2s wait cada
-- **Wait final**: 5s para **15s**
-- **Mais URLs de warmup**: 4 URLs com championship IDs variados
-
-### Camada 3: Anti-deteccao (injetar stealth JS)
-
-Adicionar `context.add_init_script()` para remover marcadores de automacao que podem estar bloqueando o widget:
-
+**CHROME_ARGS** - Simplify back to 5 (matching Mcgames which works):
 ```python
-await context.add_init_script("""
-    Object.defineProperty(navigator, 'webdriver', { get: () => false });
-    Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3] });
-    Object.defineProperty(navigator, 'languages', { get: () => ['pt-BR', 'pt', 'en'] });
-    window.chrome = { runtime: {} };
-""")
+CHROME_ARGS = [
+    '--no-sandbox',
+    '--disable-blink-features=AutomationControlled',
+    '--single-process',
+    '--disable-gpu',
+    '--memory-pressure-off',
+]
 ```
 
-## Arquivo Modificado
+**setup()** method:
+- Remove `add_init_script` stealth injection (not needed, mcgames has no bot detection)
+- Remove `locale` from context (not needed)
+- Simplify viewport back to `800x600`
+- Change `wait_until` back to `"domcontentloaded"` (faster)
+- Reduce timeout back to `15000` (mcgames loads fast)
+- Remove double-scroll, keep single scroll of 1000px
+- Reduce final wait from 15s back to 5s
+- Remove diagnostic HTML body logging (not needed once working)
+- Keep the `handle_request` interceptor checking for `biahosted.com/api`
 
-**`docs/scraper/scrapers/jogodeouro_scraper.py`** - Apenas o metodo `setup()` e as constantes `CHROME_ARGS` e `WARMUP_URLS`:
+**_fetch_league_data()** - No changes needed:
+- Already uses `integration=jogodeouro` (correct)
+- Already uses `origin: jogodeouro.bet.br` (correct)
+- The Altenar API at `biahosted.com` does NOT validate origin headers
 
-### Mudancas especificas:
+### Why this works:
 
-1. **WARMUP_URLS**: Expandir para 4 URLs com championship IDs diferentes (Serie A, Premier League, generico, raiz)
+The Altenar token is a session identifier for the widget platform, not for a specific bookmaker. The `integration` parameter tells the API which bookmaker's data to return. Since both mcgames and jogodeouro use the exact same API endpoint and championship IDs, a token from either site works for both.
 
-2. **CHROME_ARGS**: Expandir de 5 para 11 args (match Esportivabet)
+## No other files need changes
 
-3. **setup()**: 
-   - Adicionar `context.add_init_script()` com stealth JS
-   - Mudar `wait_until` de `"domcontentloaded"` para `"load"` 
-   - Aumentar timeout de 15s para 30s
-   - Logar `document.title` apos cada pagina carregar
-   - Logar TODAS requests que contenham "altenar", "biahosted", ou "widget"
-   - Fazer 2 scrolls (500px + 1000px) em vez de 1
-   - Aumentar wait final de 5s para 15s
-
-4. **Nenhuma mudanca** nos metodos de parsing ou fetch (esses estao corretos)
+The scraper class name (`JogodeOuroUnifiedScraper`) and import path remain identical, so `run_scraper.py` and `ecosystem.config.js` need no updates.
 
 ## Deploy
 
 ```
 1. git pull no VPS
-2. pm2 restart scraper-jogodeouro (ou scraper-hybrid)
-3. pm2 logs scraper-jogodeouro --lines 50
-4. Procurar nos logs:
-   - "[JogodeOuro] Page title: ..." -> Se diz "Cloudflare" ou esta vazio = site bloqueando
-   - "[JogodeOuro] API request detected: ..." -> Se aparece = widget carregou
-   - "[JogodeOuro] Token captured" -> Sucesso!
-5. Se o titulo da pagina mostrar Cloudflare, precisaremos de outra abordagem
+2. pm2 restart scraper-jogodeouro
+3. pm2 logs scraper-jogodeouro --lines 20
+4. Expected output:
+   - "[JogodeOuro] Token captured via request interception"
+   - "[JogodeOuro] Serie A: XX odds"
+   - "[JogodeOuro] Premier League: XX odds"
 ```
-
-Os logs de diagnostico vao nos dizer exatamente por que a captura falha, permitindo uma correcao definitiva.
 
