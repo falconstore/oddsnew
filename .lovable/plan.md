@@ -1,96 +1,66 @@
 
-# Corrigir Jogo de Ouro e Remover Scrapers NBA Separados
 
-## Problema 1: Jogo de Ouro nao captura token
+# Reescrever Jogo de Ouro com Captura Dinamica de Token (Padrao Mcgames)
 
-### Diagnostico
+## Diagnostico
 
-Os logs mostram que cada URL carrega em ~3-4s sem erro, mas nenhuma API call do Altenar e interceptada. A raiz do problema tem duas causas:
+O scraper atual da Jogo de Ouro le um token de um arquivo (`jogodeouro_token.txt`) que foi capturado no seu Mac. A API Altenar valida o token contra o IP de origem, entao quando o VPS tenta usar esse token, recebe 403.
 
-1. **URLs sem championship ID**: A Mcgames usa URLs com `/c-2942` no path, o que forca o widget Altenar a carregar imediatamente e fazer API calls. A Jogo de Ouro usa URLs genericas (`/sports/futebol/italia/serie-a`) que nao forcam o carregamento do widget.
+A Mcgames usa o mesmo backend Altenar e funciona perfeitamente porque captura o token **dinamicamente via Playwright** direto no VPS. O token e gerado para o IP do VPS e funciona imediatamente.
 
-2. **3 Playwright simultaneos no triplet**: O triplet atual `("mcgames", "jogodeouro", "esportivabet")` roda 3 browsers Chrome ao mesmo tempo. A Mcgames captura rapido (10s), mas Jogo de Ouro compete com Esportivabet por CPU/RAM.
+## Solucao
 
-### Correcao
+Reescrever `docs/scraper/scrapers/jogodeouro_scraper.py` usando o padrao identico ao `mcgames_unified_scraper.py`:
 
-No arquivo `docs/scraper/scrapers/jogodeouro_unified_scraper.py`:
+1. **Playwright captura o token**: Abre o site jogodeouro.bet.br no Chromium headless, intercepta as requests para `biahosted.com/api` e extrai o header `authorization`
+2. **curl_cffi faz as requests da API**: Usa o token capturado para chamar `GetEvents` com o `integration=jogodeouro`
+3. **Football + NBA unificado**: Scrape de futebol (1x2, typeId=1) e NBA (moneyline, typeId=219) na mesma sessao
 
-**a) Adicionar championship ID nas warm-up URLs** (mesmo padrao da Mcgames que funciona):
+## Mudancas Principais
+
+### Arquivo: `docs/scraper/scrapers/jogodeouro_scraper.py` (reescrita completa)
+
+O que muda em relacao ao codigo atual:
+
+| Antes (Token Estatico) | Depois (Playwright Dinamico) |
+|---|---|
+| Le token de `jogodeouro_token.txt` | Captura token via Playwright no VPS |
+| Token do Mac, IP incompativel | Token gerado no IP do VPS |
+| Sem suporte NBA | Football + NBA unificado |
+| `AsyncSession` com headers fixos | Headers dinamicos com UA do Playwright |
+| Sem retry de token | Invalida token em 403, recaptura proximo ciclo |
+
+Estrutura do novo scraper (baseado no McgamesUnifiedScraper):
+
+- Classe `JogodeOuroUnifiedScraper` herda `BaseScraper`
+- `INTEGRATION = "jogodeouro"` (em vez de `mcgames2`)
+- `WARMUP_URLS` apontando para `jogodeouro.bet.br/sports/futebol/italia/serie-a/c-2942`
+- `origin` e `referer` para `jogodeouro.bet.br`
+- `bookmaker_name = "jogodeouro"` nos ScrapedOdds
+- Mesmas ligas de futebol + NBA (champ_id="2980")
+- Metodo `scrape_all()` que faz setup, scrape football, scrape NBA, teardown
+- Metodo `_fetch_league_data()` com tratamento de 403 (invalida token)
+- Metodo `_scrape_football_league()` (typeId=1, 1x2)
+- Metodo `_scrape_basketball_league()` (typeId=219, moneyline)
+
+### Nenhum outro arquivo precisa ser alterado
+
+Os runners (`run_sequential.py` e `run_scraper.py`) ja apontam para:
 ```python
-WARMUP_URLS = [
-    "https://jogodeouro.bet.br/sports/futebol/italia/serie-a/c-2942",
-    "https://jogodeouro.bet.br/sports/futebol/inglaterra/premier-league/c-2936",
-    "https://jogodeouro.bet.br/sports/futebol",
-    "https://jogodeouro.bet.br/sports",
-]
+"jogodeouro": ("scrapers.jogodeouro_scraper", "JogodeOuroUnifiedScraper")
 ```
 
-**b) Aumentar tempo de espera** por URL para dar tempo ao widget Altenar:
-- Wait inicial: de 2s para 3s
-- Wait apos scroll: de 1.5s para 2s
-- Wait final: de 5s para 10s
-
-**c) Usar `wait_until="load"`** em vez de `"domcontentloaded"` (espera JS carregar)
-
----
-
-## Problema 2: Triplet com 3 Playwright
-
-No arquivo `docs/scraper/standalone/run_sequential.py`, reorganizar os triplets para que Jogo de Ouro rode **sozinha** (sem competir por recursos):
-
-```text
-Antes:
-  Triplet 5: (mcgames, jogodeouro, esportivabet) -- 3 Chrome!
-  Triplet 6: (bet365,)
-  Triplet 7: (br4bet_nba,)
-
-Depois:
-  Triplet 5: (bet365, mcgames, esportivabet)  -- 1 leve + 2 Chrome
-  Triplet 6: (jogodeouro,)                     -- 1 Chrome solo
-```
-
-Tambem mover `mcgames` e `jogodeouro` de `LIGHT_SCRAPERS` para `HEAVY_SCRAPERS`, pois agora usam Playwright.
-
----
-
-## Problema 3: Remover br4bet_nba (ja unificado)
-
-O scraper br4bet NBA separado deve ser removido dos seguintes locais:
-
-### Arquivo: `docs/scraper/standalone/run_sequential.py`
-- Remover "br4bet_nba" de `LIGHT_SCRAPERS`
-- Remover "br4bet_nba" de `ALL_SCRAPERS_INTERLEAVED`
-- Remover triplet `("br4bet_nba",)` de `HYBRID_TRIPLETS`
-- Remover entrada "br4bet_nba" do `SCRAPER_MAP`
-
-### Arquivo: `docs/scraper/standalone/run_scraper.py`
-- Remover entrada "br4bet_nba" do `SCRAPER_MAP`
-
-### Arquivo: `docs/scraper/ecosystem.config.js`
-- Remover processo `scraper-br4bet-nba` (linhas 286-299)
-
----
-
-## Resumo de alteracoes
-
-| Arquivo | O que muda |
-|---------|-----------|
-| `docs/scraper/scrapers/jogodeouro_unified_scraper.py` | URLs com `/c-XXXX`, wait_until="load", tempos maiores |
-| `docs/scraper/standalone/run_sequential.py` | Triplets reorganizados, br4bet_nba removido, mcgames/jogodeouro em HEAVY |
-| `docs/scraper/standalone/run_scraper.py` | br4bet_nba removido do SCRAPER_MAP |
-| `docs/scraper/ecosystem.config.js` | Processo scraper-br4bet-nba removido |
-
----
+A classe continua sendo `JogodeOuroUnifiedScraper`, entao nao ha quebra de importacao.
 
 ## Deploy
 
-```text
-1. git pull no VPS
-2. Copiar jogodeouro_unified_scraper.py para jogodeouro_scraper.py no VPS
-   (ou renomear, mantendo o conteudo unificado)
-3. pm2 stop scraper-br4bet-nba
-4. pm2 delete scraper-br4bet-nba
-5. pm2 restart scraper-hybrid
-6. Verificar logs: pm2 logs scraper-hybrid --lines 30
-7. Confirmar: "[JogodeOuro] Token capture successful!" e totais de futebol + NBA
 ```
+1. git pull no VPS
+2. pm2 restart scraper-hybrid (ou scraper-jogodeouro se estiver standalone)
+3. Verificar logs: pm2 logs scraper-jogodeouro --lines 20
+4. Deve aparecer: "[JogodeOuro] Token captured via request interception"
+5. Seguido de: "[JogodeOuro] Serie A: XX odds"
+```
+
+O arquivo `jogodeouro_token.txt` nao sera mais necessario.
+
