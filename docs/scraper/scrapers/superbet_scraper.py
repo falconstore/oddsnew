@@ -34,7 +34,7 @@ class SuperbetScraper(BaseScraper):
         "la_liga": {"id": "98", "name": "La Liga", "country": "Espanha"},
         "bundesliga": {"id": "245", "name": "Bundesliga", "country": "Alemanha"},
         "ligue_1": {"id": "100", "name": "Ligue 1", "country": "Franca"},
-        "paulistao": {"id": "20934", "name": "Paulistao A1", "country": "Brasil"},
+        "paulistao": {"id": "20934", "name": "Paulistao", "country": "Brasil"},
         "fa_cup": {"id": "107", "name": "FA Cup", "country": "Inglaterra"},
         "efl_cup": {"id": "90", "name": "EFL Cup", "country": "Inglaterra"},
         "copa_do_rei": {"id": "26", "name": "Copa do Rei", "country": "Espanha"},
@@ -43,9 +43,9 @@ class SuperbetScraper(BaseScraper):
         "liga_da_conferencia": {"id": "56652", "name": "Liga da Conferencia", "country": "Europa"},
         "eredivisie": {"id": "256", "name": "Eredivisie", "country": "Holanda"},
         "brasileira_serie_a": {"id": "1698", "name": "Brasileirao Serie A", "country": "Brasil"},
-        "libertadores_da_america": {"id": "389", "name": "Copa Libertadores da América", "country": "América do Sul"},
+        "libertadores": {"id": "389", "name": "Libertadores", "country": "América do Sul"},
         "carioca": {"id": "21132", "name": "Carioca", "country": "Brasil"},
-        "liga_portuguesa": {"id": "142", "name": "Liga Portuguesa", "country": "Portugal"},
+        "championship": {"id": "27", "name": "Championship", "country": "Inglaterra"},
     }
     
     # Basketball Leagues
