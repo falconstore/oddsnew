@@ -24,7 +24,7 @@ class JogodeOuroLeague:
     league_slug: str
 
 
-class JogodeOuroScraper(BaseScraper):
+class JogodeOuroUnifiedScraper(BaseScraper):
     
     LEAGUES = {
         "serie_a": JogodeOuroLeague(champ_id="2942", category_id="502", name="Serie A", country="italia", league_slug="serie-a"),
@@ -106,22 +106,23 @@ class JogodeOuroScraper(BaseScraper):
             
             page.on("request", handle_request)
             
-            # URLs para tentar (paths reais)
+            # URLs com championship ID para forçar carregamento do widget Altenar
             target_urls = [
-                "https://jogodeouro.bet.br/sports/futebol/italia/serie-a",
+                "https://jogodeouro.bet.br/sports/futebol/italia/serie-a/c-2942",
+                "https://jogodeouro.bet.br/sports/futebol/inglaterra/premier-league/c-2936",
                 "https://jogodeouro.bet.br/sports/futebol",
                 "https://jogodeouro.bet.br/sports",
             ]
             
             try:
-                for target_url in target_urls:
+                for i, target_url in enumerate(target_urls, 1):
                     if token_future.done():
                         break
                     
-                    self.logger.info(f"[JogodeOuro] Navegando para {target_url}...")
+                    self.logger.info(f"[JogodeOuro] Trying URL {i}/{len(target_urls)}: {target_url}")
                     
                     try:
-                        await page.goto(target_url, wait_until="domcontentloaded", timeout=60000)
+                        await page.goto(target_url, wait_until="load", timeout=60000)
                     except Exception as nav_error:
                         self.logger.warning(f"[JogodeOuro] Navegacao falhou: {nav_error}")
                         continue
@@ -137,21 +138,31 @@ class JogodeOuroScraper(BaseScraper):
                         await page.evaluate("window.scrollTo(0, 1000)")
                         await page.wait_for_timeout(2000)
                 
-                # Aguarda token com timeout total
+                # Aguarda token com timeout final
                 if not token_future.done():
+                    self.logger.info("[JogodeOuro] Waiting final 10s for token...")
                     self.auth_token = await asyncio.wait_for(token_future, timeout=10.0)
                 else:
                     self.auth_token = token_future.result()
                 
                 self.user_agent = await page.evaluate("navigator.userAgent")
-                self.logger.info(f"[JogodeOuro] Token capturado! UA: {self.user_agent[:30]}...")
+                self.logger.info(f"[JogodeOuro] Token capture successful! UA: {self.user_agent[:30]}...")
                 
             except asyncio.TimeoutError:
-                self.logger.error("[JogodeOuro] Timeout capturando token apos todas as tentativas.")
+                self.logger.error("[JogodeOuro] FAILED: Could not capture token after all attempts")
             except Exception as e:
                 self.logger.error(f"[JogodeOuro] Erro no Playwright: {e}")
             finally:
                 await browser.close()
+        
+        # Retry automático: se falhou, tenta uma segunda vez
+        if not self.auth_token:
+            if not hasattr(self, '_retry_done') or not self._retry_done:
+                self._retry_done = True
+                self.logger.warning("[JogodeOuro] Token failed on first attempt, retrying...")
+                self._setup_attempted = False
+                await self.setup()
+                return
         
         if self.auth_token and self.user_agent:
             self._init_session()
@@ -177,8 +188,9 @@ class JogodeOuroScraper(BaseScraper):
         if self.session:
             await self.session.close()
             self.session = None
-        # Reset apenas o flag, mantém token para reutilização
+        # Reset flags, mantém token para reutilização
         self._setup_attempted = False
+        self._retry_done = False
 
     async def get_available_leagues(self) -> List[LeagueConfig]:
         leagues = []
@@ -364,7 +376,7 @@ class JogodeOuroScraper(BaseScraper):
 
 
 async def main():
-    scraper = JogodeOuroScraper()
+    scraper = JogodeOuroUnifiedScraper()
     try:
         await scraper.setup()
         leagues = await scraper.get_available_leagues()

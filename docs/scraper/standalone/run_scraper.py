@@ -95,8 +95,6 @@ def get_scraper_class(scraper_name: str):
         "bet365": ("scrapers.bet365_scraper", "Bet365Scraper"),
         "tradeball": ("scrapers.tradeball_scraper", "TradeballScraper"),
         
-        # NBA-only scrapers (HTTPX-based, kept for compatibility)
-        "br4bet_nba": ("scrapers.br4bet_nba_scraper", "Br4betNBAScraper"),
     }
     
     scraper_key = scraper_name.lower()

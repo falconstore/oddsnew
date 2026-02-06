@@ -279,28 +279,8 @@ module.exports = {
       }
     },
     
-    // ============================================
-    // HTTPX SCRAPERS - NBA ONLY (30s interval)
-    // ============================================
-    
-    {
-      name: 'scraper-br4bet-nba',
-      script: 'standalone/run_scraper.py',
-      interpreter: 'python3',
-      args: '--scraper br4bet_nba --interval 30',
-      cwd: __dirname,
-      max_memory_restart: '100M',
-      restart_delay: 3000,
-      max_restarts: 50,
-      autorestart: true,
-      env: {
-        PYTHONUNBUFFERED: '1'
-      }
-    },
-    // REMOVIDO: scraper-mcgames-nba (unificado em scraper-mcgames)
-    // REMOVIDO: scraper-aposta1-nba (unificado em scraper-aposta1)
-    // REMOVIDO: scraper-esportivabet-nba (unificado em scraper-esportivabet)
-    // REMOVIDO: scraper-jogodeouro-nba (unificado em scraper-jogodeouro)
+    // NOTA: Todos os scrapers NBA foram unificados nos scrapers principais
+    // (betano, betbra, mcgames, jogodeouro, aposta1, esportivabet, etc.)
     
     // ============================================
     // SERVIÇOS AUXILIARES

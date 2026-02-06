@@ -45,12 +45,8 @@ LIGHT_SCRAPERS = [
     "sportingbet",
     "betnacional",
     "br4bet",
-    "mcgames",
-    "jogodeouro",
     "tradeball",
     "bet365",
-    # NBA-only (HTTPX)
-    "br4bet_nba",
 ]
 
 # Scrapers pesados (Playwright) - ~60s cada
@@ -60,6 +56,8 @@ HEAVY_SCRAPERS = [
     "stake",
     "aposta1",
     "esportivabet",
+    "mcgames",
+    "jogodeouro",
 ]
 
 # Ordem intercalada para distribuir carga (modo "all")
@@ -73,17 +71,18 @@ ALL_SCRAPERS_INTERLEAVED = [
     "estrelabet", "sportingbet", "betnacional",
     "betbra",  # PESADO
     
-    # Bloco 3: 3 leves + 1 pesado
-    "br4bet", "mcgames", "jogodeouro",
-    "stake",  # PESADO (com pool reduzido)
+    # Bloco 3: 2 leves + 1 pesado
+    "br4bet", "tradeball",
+    "stake",  # PESADO
     
-    # Bloco 4: 2 leves + 1 pesado
-    "tradeball", "bet365",
+    # Bloco 4: 1 leve + 1 pesado
+    "bet365",
     "aposta1",  # PESADO
     
-    # Bloco 5: 1 leve + 1 pesado
-    "br4bet_nba",
-    "esportivabet",  # PESADO
+    # Bloco 5: pesados Altenar/Playwright
+    "mcgames",      # PESADO (Altenar)
+    "esportivabet", # PESADO
+    "jogodeouro",   # PESADO (Altenar, solo)
 ]
 
 # Triplets otimizados: 2 leves + 1 pesado quando possível
@@ -94,13 +93,12 @@ HYBRID_TRIPLETS = [
     ("kto", "estrelabet", "betbra"),
     ("sportingbet", "betnacional", "stake"),
     ("br4bet", "tradeball", "aposta1"),
-    ("mcgames", "jogodeouro", "esportivabet"),
     
-    # API externa (solo para respeitar rate limit)
-    ("bet365",),
+    # Triplet com 1 leve + 2 Playwright (bet365 é leve/API)
+    ("bet365", "mcgames", "esportivabet"),
     
-    # NBA-only (leve)
-    ("br4bet_nba",),
+    # Jogo de Ouro roda solo para máxima estabilidade na captura de token
+    ("jogodeouro",),
 ]
 
 # Timeout máximo por scraper (segundos)
@@ -175,8 +173,6 @@ def get_scraper_class(scraper_name: str):
         "bet365": ("scrapers.bet365_scraper", "Bet365Scraper"),
         "tradeball": ("scrapers.tradeball_scraper", "TradeballScraper"),
         
-        # NBA-only scrapers (HTTPX-based, kept for compatibility)
-        "br4bet_nba": ("scrapers.br4bet_nba_scraper", "Br4betNBAScraper"),
     }
     
     scraper_key = scraper_name.lower()
