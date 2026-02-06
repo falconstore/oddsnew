@@ -1,172 +1,187 @@
 
-
-# Plano: Corrigir Queda de Partidas no JSON (166 para 68)
+# Plano: Implementar Paginação para Carregar Todas as 219 Partidas
 
 ## Problema Confirmado
 
-As partidas **NAO estao sendo deletadas do banco** - elas continuam la. O problema esta na **geracao do JSON** dentro do `orchestrator.py`, que filtra partidas durante o agrupamento.
+| Fonte | Valor |
+|-------|-------|
+| Banco de dados | **219 partidas** (2431 linhas de odds) |
+| odds.json | ~70 partidas |
 
-## Causa Raiz: Conflito de Timezone
-
-O scraper da Superbet converte UTC para horario do Brasil **ANTES** de salvar:
-
-```python
-# superbet_scraper.py linha 227-229
-match_date_utc = datetime.fromisoformat(utc_date.replace("Z", "+00:00"))
-# Convert to Brazil time (UTC-3) - Superbet returns UTC
-match_date = match_date_utc - timedelta(hours=3)  # ← PROBLEMA!
-```
-
-Resultado: se um jogo e as 15:00 UTC, a Superbet grava como 12:00 (Brasil) mas **SEM timezone info**. 
-
-Depois, no `_group_odds_for_json`, o codigo compara:
-```python
-now = datetime.now(timezone.utc)  # Ex: 03:30 UTC
-five_minutes_ago = now - timedelta(minutes=5)  # 03:25 UTC
-
-# match_date foi gravado como 00:30 (Brasil = 03:30 UTC menos 3h)
-# mas sem timezone, entao e interpretado como 00:30 UTC
-if match_date < five_minutes_ago:  # 00:30 < 03:25 → TRUE!
-    continue  # ← Partida VALIDA sendo descartada!
-```
-
-**Isso explica porque 166 vira 68**: partidas que deveriam aparecer sao filtradas porque o horario foi subtraido 3h mas o filtro compara como se fosse UTC.
-
-## Problema Secundario: Composite Key sem Liga
-
-A chave de agrupamento nao inclui a liga:
-
-```python
-composite_key = f"{home_team}_{away_team}_{match_date_key}"
-```
-
-Se Corinthians joga contra Palmeiras no Paulistao E na Copa do Brasil no mesmo dia, uma partida sobrescreve a outra.
+O Supabase/PostgREST tem um limite padrao de **1000 linhas por request**. O codigo atual nao faz paginacao, entao recebe apenas um recorte dos dados.
 
 ---
 
-## Correcoes Necessarias
+## Causa Raiz
 
-### Correcao 1: Superbet deve gravar em UTC (nao subtrair 3h)
-
-**Arquivo**: `docs/scraper/scrapers/superbet_scraper.py`
-
-**Linha 227-231** - Alterar de:
+**Arquivo**: `docs/scraper/supabase_client.py` (linhas 702-728)
 
 ```python
-match_date_utc = datetime.fromisoformat(utc_date.replace("Z", "+00:00"))
-# Convert to Brazil time (UTC-3) - Superbet returns UTC
-match_date = match_date_utc - timedelta(hours=3)
+async def fetch_odds_for_json(self) -> List[Dict[str, Any]]:
+    response = (
+        self.client.table("odds_comparison")
+        .select("*")
+        .order("match_date", desc=False)
+        .execute()  # ← Retorna no maximo ~1000 linhas!
+    )
+    return response.data or []
 ```
 
-Para:
+O mesmo problema existe em `fetch_nba_odds_for_json()`.
+
+---
+
+## Solucao: Implementar Paginacao
+
+### Correcao 1: Metodo helper para paginacao
+
+Adicionar um metodo generico de paginacao no `SupabaseClient`:
 
 ```python
-# Manter em UTC - o frontend converte para local
-match_date = datetime.fromisoformat(utc_date.replace("Z", "+00:00"))
+def _fetch_all_paginated(self, table_name: str, order_by: str = "match_date", page_size: int = 1000) -> List[Dict[str, Any]]:
+    """
+    Fetch all rows from a table/view using pagination.
+    Supabase/PostgREST limits responses to ~1000 rows by default.
+    """
+    all_data = []
+    offset = 0
+    
+    while True:
+        response = (
+            self.client.table(table_name)
+            .select("*")
+            .order(order_by, desc=False)
+            .range(offset, offset + page_size - 1)
+            .execute()
+        )
+        
+        batch = response.data or []
+        all_data.extend(batch)
+        
+        # Se retornou menos que page_size, acabaram os dados
+        if len(batch) < page_size:
+            break
+            
+        offset += page_size
+    
+    return all_data
 ```
 
-### Correcao 2: Adicionar liga na composite key
-
-**Arquivo**: `docs/scraper/orchestrator.py`
-
-**Linha 675-679** - Alterar de:
+### Correcao 2: Atualizar fetch_odds_for_json
 
 ```python
-home_team = row.get("home_team", "")
-away_team = row.get("away_team", "")
-match_date_key = match_date.date().isoformat()
-composite_key = f"{home_team}_{away_team}_{match_date_key}"
+async def fetch_odds_for_json(self) -> List[Dict[str, Any]]:
+    """Fetch all football odds data from the comparison view for JSON export."""
+    try:
+        data = self._fetch_all_paginated("odds_comparison", "match_date")
+        self.logger.info(f"Fetched {len(data)} football odds rows")
+        return data
+    except Exception as e:
+        self.logger.error(f"Error fetching odds for JSON: {e}")
+        return []
 ```
 
-Para:
+### Correcao 3: Atualizar fetch_nba_odds_for_json
 
 ```python
-home_team = row.get("home_team", "")
-away_team = row.get("away_team", "")
-league_name = row.get("league_name", "")
-match_date_key = match_date.date().isoformat()
-composite_key = f"{league_name}_{home_team}_{away_team}_{match_date_key}"
+async def fetch_nba_odds_for_json(self) -> List[Dict[str, Any]]:
+    """Fetch all NBA odds data from the nba_odds_comparison view for JSON export."""
+    try:
+        data = self._fetch_all_paginated("nba_odds_comparison", "match_date")
+        self.logger.info(f"Fetched {len(data)} NBA odds rows")
+        return data
+    except Exception as e:
+        self.logger.error(f"Error fetching NBA odds for JSON: {e}")
+        return []
 ```
 
-### Correcao 3: Mesmo fix no JSON Generator standalone
+---
+
+## Correcao Adicional: NBA com draw null
+
+O frontend espera `draw_odd: null` para basquete, mas o gerador esta colocando `0`.
 
 **Arquivo**: `docs/scraper/standalone/run_json_generator.py`
 
-**Linha 85-89** - Adicionar league_name na composite key:
+Apos agrupar as partidas, garantir que basquete tenha valores null:
 
 ```python
-home_team = row.get("home_team", "")
-away_team = row.get("away_team", "")
-league_name = row.get("league_name", "")
-match_date_key = match_date.date().isoformat()
-composite_key = f"{league_name}_{home_team}_{away_team}_{match_date_key}"
+# Apos o loop de agrupamento, antes de retornar
+for match in match_map.values():
+    if match.get("sport_type") == "basketball":
+        match["best_draw"] = None
+        match["worst_draw"] = None
+        for odds in match.get("odds", []):
+            odds["draw_odd"] = None
 ```
 
 ---
 
-## Por Que 166 Vira 68
+## Resumo das Alteracoes
 
-| Ciclo | Superbet grava | Outras casas gravam | Filtro interpreta |
-|-------|----------------|---------------------|-------------------|
-| 1 | 12:00 (Brasil, sem TZ) | 15:00 UTC | 12:00 < 03:25 UTC → removida |
-| 1 | 12:00 (Brasil, sem TZ) | - | Mesmo problema |
-
-A cada ciclo do orchestrator:
-
-1. View retorna 1900 odds (166 partidas)
-2. Filtro `match_date < five_minutes_ago` remove ~98 partidas por erro de TZ
-3. Resultado: 68 partidas
+| Arquivo | Alteracao |
+|---------|-----------|
+| `supabase_client.py` | Adicionar `_fetch_all_paginated()` |
+| `supabase_client.py` | Atualizar `fetch_odds_for_json()` para usar paginacao |
+| `supabase_client.py` | Atualizar `fetch_nba_odds_for_json()` para usar paginacao |
+| `run_json_generator.py` | Garantir `draw_odd = null` para basquete |
 
 ---
 
-## Checklist de Implementacao
+## Resultado Esperado
 
-| Prioridade | Arquivo | Alteracao |
-|------------|---------|-----------|
-| 1 | superbet_scraper.py | Remover subtracao de 3h (manter UTC) |
-| 2 | orchestrator.py | Adicionar league_name na composite key |
-| 3 | run_json_generator.py | Adicionar league_name na composite key |
+Apos as correcoes:
+
+- **Antes**: ~1000 linhas → ~70 partidas
+- **Depois**: ~2431 linhas → ~219 partidas
+
+O sistema voltara a mostrar todas as partidas disponiveis, como funcionava antes.
 
 ---
 
 ## Secao Tecnica
 
-### Fluxo do Problema
+### Como o PostgREST limita resultados
 
-```text
-1. Superbet API retorna: utcDate = "2026-02-06T15:00:00Z" (15h UTC)
+O Supabase usa PostgREST que tem um limite padrao de linhas por request (geralmente 1000). Para buscar mais, e necessario usar `.range(offset, limit)`:
 
-2. superbet_scraper.py:
-   match_date = 15:00 UTC - 3h = 12:00 (naive datetime, sem TZ)
+```python
+# Pagina 1: linhas 0-999
+.range(0, 999)
 
-3. Banco de dados (matches.match_date):
-   Grava 12:00 sem timezone (timestamp without time zone)
+# Pagina 2: linhas 1000-1999
+.range(1000, 1999)
 
-4. View odds_comparison:
-   Retorna 12:00 (interpretado como UTC pelo PostgREST)
-
-5. orchestrator._group_odds_for_json:
-   now = 03:30 UTC
-   five_minutes_ago = 03:25 UTC
-   match_date = 12:00 (interpretado como UTC)
-   
-   12:00 < 03:25? SIM (errado - 12:00 e FUTURO no Brasil!)
-   → Partida descartada
-
-6. odds.json: 68 partidas (deveria ter 166)
+# E assim por diante...
 ```
 
-### Solucao Correta
+### Por que o problema so apareceu agora?
 
-Todos os scrapers devem gravar datas em **UTC**. O frontend converte para horario local usando `toLocaleString()` do JavaScript.
+Antes da Superbet como casa mae:
 
-A Superbet estava tentando "ajudar" convertendo para Brasil, mas isso quebrou o filtro de comparacao.
+- Menos casas coletando odds
+- Menos linhas totais na view
+- Provavelmente ficava abaixo do limite de 1000
 
-### Impacto Esperado
+Com a Superbet + todas as outras casas:
 
-Apos as correcoes:
+- Mais partidas sendo criadas
+- Mais odds por partida
+- Total ultrapassou 1000 linhas → truncamento
 
-- Todas as 166 partidas aparecerão no JSON
-- Partidas de ligas diferentes com mesmos times nao colidirao
-- O sistema voltara a funcionar como antes da migracao para Superbet como casa mae
+### Fluxo corrigido
 
+```text
+1. fetch_odds_for_json()
+   - Pagina 1: linhas 0-999 (1000 rows)
+   - Pagina 2: linhas 1000-1999 (1000 rows)
+   - Pagina 3: linhas 2000-2431 (431 rows)
+   - Total: 2431 rows ✓
+
+2. group_odds_for_json()
+   - Agrupa por league + home + away + date
+   - Resultado: 219 partidas ✓
+
+3. odds.json
+   - matches_count: 219 ✓
+```
