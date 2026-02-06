@@ -57,10 +57,12 @@ class JogodeOuroUnifiedScraper(BaseScraper):
     API_BASE = "https://sb2frontend-altenar2.biahosted.com/api/widget/GetEvents"
     INTEGRATION = "jogodeouro"
     
-    # Warm-up URLs for token capture
+    # Warm-up URLs for token capture (multiple paths to maximize chances)
     WARMUP_URLS = [
         "https://jogodeouro.bet.br/sports/futebol/italia/serie-a/c-2942",
+        "https://jogodeouro.bet.br/sports/futebol/inglaterra/premier-league/c-2936",
         "https://jogodeouro.bet.br/sports/futebol",
+        "https://jogodeouro.bet.br/sports",
     ]
     
     CHROME_ARGS = [
@@ -69,6 +71,13 @@ class JogodeOuroUnifiedScraper(BaseScraper):
         '--single-process',
         '--disable-gpu',
         '--memory-pressure-off',
+        '--disable-dev-shm-usage',
+        '--disable-extensions',
+        '--disable-background-networking',
+        '--disable-sync',
+        '--disable-translate',
+        '--no-first-run',
+        '--disable-default-apps',
     ]
     
     def __init__(self):
@@ -89,7 +98,7 @@ class JogodeOuroUnifiedScraper(BaseScraper):
             self.logger.info("[JogodeOuro] Session initialized")
     
     async def setup(self) -> None:
-        """Capture authorization token via Playwright with robust fallbacks."""
+        """Capture authorization token via Playwright with stealth + diagnostics."""
         
         # Reuse existing token if available
         if self.auth_token and self.user_agent:
@@ -122,15 +131,31 @@ class JogodeOuroUnifiedScraper(BaseScraper):
             )
             
             context = await browser.new_context(
-                viewport={'width': 800, 'height': 600},
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+                viewport={'width': 1280, 'height': 720},
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+                locale="pt-BR",
             )
+            
+            # Layer 3: Anti-detection stealth injection
+            await context.add_init_script("""
+                Object.defineProperty(navigator, 'webdriver', { get: () => false });
+                Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
+                Object.defineProperty(navigator, 'languages', { get: () => ['pt-BR', 'pt', 'en-US', 'en'] });
+                window.chrome = { runtime: {} };
+                // Remove automation indicators
+                delete window.__playwright;
+                delete window.__pw_manual;
+            """)
             
             page = await context.new_page()
             token_future = asyncio.get_event_loop().create_future()
             
+            # Layer 1: Diagnostic logging for ALL relevant requests
             async def handle_request(request):
-                if "biahosted.com/api" in request.url:
+                url = request.url
+                # Log any Altenar/widget API request for diagnostics
+                if any(x in url for x in ["biahosted.com", "altenar", "widget"]):
+                    self.logger.info(f"[JogodeOuro] API request detected: {url[:120]}")
                     headers = request.headers
                     if "authorization" in headers:
                         token = headers["authorization"]
@@ -149,31 +174,51 @@ class JogodeOuroUnifiedScraper(BaseScraper):
                     self.logger.info(f"[JogodeOuro] Trying URL {i+1}/{len(self.WARMUP_URLS)}: {target_url}")
                     
                     try:
-                        await page.goto(target_url, wait_until="domcontentloaded", timeout=15000)
-                        await page.wait_for_timeout(2000)
+                        # Layer 2: Increased timeout, wait_until="load" instead of "domcontentloaded"
+                        await page.goto(target_url, wait_until="load", timeout=30000)
+                        await page.wait_for_timeout(3000)
+                        
+                        # Diagnostic: log page title to detect Cloudflare/blocks
+                        title = await page.evaluate("document.title")
+                        self.logger.info(f"[JogodeOuro] Page title: '{title}'")
                         
                         if not token_future.done():
+                            # Layer 2: Double scroll pattern (500px + 1000px) to trigger widget
+                            await page.evaluate("window.scrollTo(0, 500)")
+                            await page.wait_for_timeout(2000)
                             await page.evaluate("window.scrollTo(0, 1000)")
-                            await page.wait_for_timeout(1500)
+                            await page.wait_for_timeout(2000)
+                            
+                            # Try clicking on a sport link if available
+                            try:
+                                await page.evaluate("window.scrollTo(0, 0)")
+                                await page.wait_for_timeout(1000)
+                            except Exception:
+                                pass
                             
                     except Exception as url_error:
                         self.logger.warning(f"[JogodeOuro] URL {i+1} failed: {url_error}")
                         continue
                 
-                # Final wait for token if still not captured
+                # Layer 2: Extended final wait (15s instead of 5s)
                 if not token_future.done():
-                    self.logger.info("[JogodeOuro] Waiting final 5s for token...")
+                    self.logger.info("[JogodeOuro] Waiting final 15s for token...")
                     try:
-                        self.auth_token = await asyncio.wait_for(token_future, timeout=5.0)
+                        self.auth_token = await asyncio.wait_for(token_future, timeout=15.0)
                     except asyncio.TimeoutError:
-                        self.logger.error("[JogodeOuro] FAILED: Could not capture token after all attempts")
+                        # Diagnostic: log page HTML snippet to understand what loaded
+                        try:
+                            body_text = await page.evaluate("document.body?.innerText?.substring(0, 300) || 'empty'")
+                            self.logger.error(f"[JogodeOuro] FAILED: Could not capture token. Page body preview: {body_text[:200]}")
+                        except Exception:
+                            self.logger.error("[JogodeOuro] FAILED: Could not capture token after all attempts")
                         self.auth_token = None
                 else:
                     self.auth_token = token_future.result()
                 
                 if self.auth_token:
                     self.user_agent = await page.evaluate("navigator.userAgent")
-                    self.logger.info("[JogodeOuro] Token capture successful!")
+                    self.logger.info(f"[JogodeOuro] Token capture successful! Token: {self.auth_token[:15]}...")
                 
             except Exception as e:
                 self.logger.error(f"[JogodeOuro] Playwright error: {type(e).__name__}: {e}")
