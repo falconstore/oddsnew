@@ -1,217 +1,172 @@
 
-# Plano: Corrigir Mapeamento Incorreto de Ligas (Paulistão → Libertadores)
 
-## Diagnóstico do Problema
+# Plano: Corrigir Queda de Partidas no JSON (166 para 68)
 
-O problema identificado é que **jogos do Campeonato Paulista estão sendo salvos como "Libertadores"** no banco de dados.
+## Problema Confirmado
 
-### Evidências nos Logs
+As partidas **NAO estao sendo deletadas do banco** - elas continuam la. O problema esta na **geracao do JSON** dentro do `orchestrator.py`, que filtra partidas durante o agrupamento.
 
-Os dados que você mostrou confirmam:
-- "Portuguesa de Desportos SP vs Ponte Preta" → **Libertadores** (deveria ser Paulistão)
-- "Guarani-SP vs Botafogo-SP" → **Libertadores** (deveria ser Paulistão)  
-- "Corinthians vs Palmeiras" → **Libertadores** (deveria ser Paulistão - clássico!)
-- "Capivariano SP vs Mirassol" → **Libertadores** (deveria ser Paulistão)
+## Causa Raiz: Conflito de Timezone
 
-### Causa Raiz
-
-O `LeagueMatcher` usa **fuzzy matching com threshold de 80%** para encontrar ligas:
+O scraper da Superbet converte UTC para horario do Brasil **ANTES** de salvar:
 
 ```python
-result = process.extractOne(
-    raw_name,            # "Paulistao" 
-    all_names,           # Ligas cadastradas no banco
-    scorer=fuzz.token_sort_ratio,
-    score_cutoff=80      # Threshold baixo!
-)
+# superbet_scraper.py linha 227-229
+match_date_utc = datetime.fromisoformat(utc_date.replace("Z", "+00:00"))
+# Convert to Brazil time (UTC-3) - Superbet returns UTC
+match_date = match_date_utc - timedelta(hours=3)  # ← PROBLEMA!
 ```
 
-Quando o scraper envia `league_raw = "Paulistao"` e essa liga **não está cadastrada** no banco, o fuzzy matching encontra a liga mais similar. O problema é que "Paulistao" pode casar erroneamente com outras ligas brasileiras.
+Resultado: se um jogo e as 15:00 UTC, a Superbet grava como 12:00 (Brasil) mas **SEM timezone info**. 
 
-**Teste de similaridade:**
-- "Paulistao" vs "Libertadores" → score pode ser alto o suficiente (>80%) por terem letras em comum
+Depois, no `_group_odds_for_json`, o codigo compara:
+```python
+now = datetime.now(timezone.utc)  # Ex: 03:30 UTC
+five_minutes_ago = now - timedelta(minutes=5)  # 03:25 UTC
 
----
-
-## Soluções Propostas
-
-### Parte 1: Cadastrar Liga "Paulistão" no Banco (CRÍTICO)
-
-Executar no SQL Editor do Supabase:
-
-```sql
--- Verificar se Paulistão já existe
-SELECT * FROM leagues WHERE name ILIKE '%paulist%';
-
--- Se não existir, cadastrar
-INSERT INTO leagues (name, country, status)
-VALUES ('Paulistao', 'Brasil', 'active')
-ON CONFLICT DO NOTHING;
-
--- Também cadastrar variações comuns
-INSERT INTO leagues (name, country, status)
-VALUES ('Paulistao A1', 'Brasil', 'active')
-ON CONFLICT DO NOTHING;
+# match_date foi gravado como 00:30 (Brasil = 03:30 UTC menos 3h)
+# mas sem timezone, entao e interpretado como 00:30 UTC
+if match_date < five_minutes_ago:  # 00:30 < 03:25 → TRUE!
+    continue  # ← Partida VALIDA sendo descartada!
 ```
 
-### Parte 2: Aumentar Threshold do LeagueMatcher
+**Isso explica porque 166 vira 68**: partidas que deveriam aparecer sao filtradas porque o horario foi subtraido 3h mas o filtro compara como se fosse UTC.
 
-Modificar o `score_cutoff` de 80 para 90+ para evitar falsos positivos:
+## Problema Secundario: Composite Key sem Liga
 
-**Arquivo**: `docs/scraper/team_matcher.py` (classe LeagueMatcher)
+A chave de agrupamento nao inclui a liga:
 
 ```python
-def find_league_id(self, raw_name: str) -> Optional[str]:
-    """Find league ID by name using fuzzy matching."""
-    normalized = raw_name.strip().lower()
-    
-    # Exact match
-    if normalized in self.reverse_cache:
-        return self.reverse_cache[normalized]
-    
-    # Fuzzy match com threshold MAIS ALTO para evitar falsos positivos
-    all_names = list(self.leagues_cache.values())
-    result = process.extractOne(
-        raw_name,
-        all_names,
-        scorer=fuzz.token_sort_ratio,
-        score_cutoff=92  # Aumentado de 80 para 92
-    )
-    
-    if result:
-        return next(
-            (lid for lid, name in self.leagues_cache.items() 
-             if name == result[0]),
-            None
-        )
-    
-    return None
+composite_key = f"{home_team}_{away_team}_{match_date_key}"
 ```
 
-### Parte 3: Adicionar Aliases de Ligas (Opcional)
+Se Corinthians joga contra Palmeiras no Paulistao E na Copa do Brasil no mesmo dia, uma partida sobrescreve a outra.
 
-Criar uma tabela de aliases de ligas similar a `team_aliases`:
+---
 
-```sql
--- Criar tabela de aliases de ligas
-CREATE TABLE IF NOT EXISTS public.league_aliases (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    league_id UUID REFERENCES public.leagues(id) ON DELETE CASCADE NOT NULL,
-    alias_name TEXT NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE(alias_name)
-);
+## Correcoes Necessarias
 
--- Cadastrar aliases comuns
-INSERT INTO league_aliases (league_id, alias_name) 
-SELECT id, 'Campeonato Paulista' FROM leagues WHERE name = 'Paulistao'
-UNION ALL
-SELECT id, 'Paulista A1' FROM leagues WHERE name = 'Paulistao'
-UNION ALL
-SELECT id, 'Paulistão Série A1' FROM leagues WHERE name = 'Paulistao';
+### Correcao 1: Superbet deve gravar em UTC (nao subtrair 3h)
+
+**Arquivo**: `docs/scraper/scrapers/superbet_scraper.py`
+
+**Linha 227-231** - Alterar de:
+
+```python
+match_date_utc = datetime.fromisoformat(utc_date.replace("Z", "+00:00"))
+# Convert to Brazil time (UTC-3) - Superbet returns UTC
+match_date = match_date_utc - timedelta(hours=3)
 ```
 
-### Parte 4: Corrigir Partidas Existentes
+Para:
 
-Mover as partidas do Paulistão que estão erroneamente na Libertadores:
+```python
+# Manter em UTC - o frontend converte para local
+match_date = datetime.fromisoformat(utc_date.replace("Z", "+00:00"))
+```
 
-```sql
--- 1. Verificar liga correta do Paulistão
-SELECT id, name FROM leagues WHERE name ILIKE '%paulist%';
--- Assumindo que retorna: id = 'XXXX-XXXX-XXXX'
+### Correcao 2: Adicionar liga na composite key
 
--- 2. Verificar liga da Libertadores
-SELECT id, name FROM leagues WHERE name ILIKE '%libertadores%';
--- Assumindo que retorna: id = 'YYYY-YYYY-YYYY'
+**Arquivo**: `docs/scraper/orchestrator.py`
 
--- 3. Identificar partidas de times paulistas na Libertadores
-SELECT m.id, ht.standard_name as home, at.standard_name as away, l.name as league
-FROM matches m
-JOIN teams ht ON m.home_team_id = ht.id
-JOIN teams at ON m.away_team_id = at.id
-JOIN leagues l ON m.league_id = l.id
-WHERE l.name ILIKE '%libertadores%'
-  AND (
-    ht.standard_name ILIKE '%SP%' 
-    OR ht.standard_name ILIKE '%Corinthians%'
-    OR ht.standard_name ILIKE '%Palmeiras%'
-    OR ht.standard_name ILIKE '%Santos%'
-    OR ht.standard_name ILIKE '%Guarani%'
-    OR ht.standard_name ILIKE '%Ponte Preta%'
-    OR ht.standard_name ILIKE '%Portuguesa%'
-  );
+**Linha 675-679** - Alterar de:
 
--- 4. Corrigir as partidas (AJUSTAR IDs conforme resultado acima)
--- UPDATE matches SET league_id = 'PAULISTAO_ID' WHERE id IN (...);
+```python
+home_team = row.get("home_team", "")
+away_team = row.get("away_team", "")
+match_date_key = match_date.date().isoformat()
+composite_key = f"{home_team}_{away_team}_{match_date_key}"
+```
+
+Para:
+
+```python
+home_team = row.get("home_team", "")
+away_team = row.get("away_team", "")
+league_name = row.get("league_name", "")
+match_date_key = match_date.date().isoformat()
+composite_key = f"{league_name}_{home_team}_{away_team}_{match_date_key}"
+```
+
+### Correcao 3: Mesmo fix no JSON Generator standalone
+
+**Arquivo**: `docs/scraper/standalone/run_json_generator.py`
+
+**Linha 85-89** - Adicionar league_name na composite key:
+
+```python
+home_team = row.get("home_team", "")
+away_team = row.get("away_team", "")
+league_name = row.get("league_name", "")
+match_date_key = match_date.date().isoformat()
+composite_key = f"{league_name}_{home_team}_{away_team}_{match_date_key}"
 ```
 
 ---
 
-## Resumo das Alterações
+## Por Que 166 Vira 68
 
-| Componente | Alteração | Prioridade |
-|------------|-----------|------------|
-| Banco de Dados | Cadastrar liga "Paulistão" | **CRÍTICA** |
-| team_matcher.py | Aumentar threshold de 80 → 92 | Alta |
-| Banco de Dados | Corrigir partidas existentes | Alta |
-| Banco de Dados | Criar tabela league_aliases | Média |
+| Ciclo | Superbet grava | Outras casas gravam | Filtro interpreta |
+|-------|----------------|---------------------|-------------------|
+| 1 | 12:00 (Brasil, sem TZ) | 15:00 UTC | 12:00 < 03:25 UTC → removida |
+| 1 | 12:00 (Brasil, sem TZ) | - | Mesmo problema |
+
+A cada ciclo do orchestrator:
+
+1. View retorna 1900 odds (166 partidas)
+2. Filtro `match_date < five_minutes_ago` remove ~98 partidas por erro de TZ
+3. Resultado: 68 partidas
 
 ---
 
-## Fluxo Corrigido
+## Checklist de Implementacao
+
+| Prioridade | Arquivo | Alteracao |
+|------------|---------|-----------|
+| 1 | superbet_scraper.py | Remover subtracao de 3h (manter UTC) |
+| 2 | orchestrator.py | Adicionar league_name na composite key |
+| 3 | run_json_generator.py | Adicionar league_name na composite key |
+
+---
+
+## Secao Tecnica
+
+### Fluxo do Problema
 
 ```text
-Scraper envia: league_raw = "Paulistao"
-              ↓
-LeagueMatcher.find_league_id("Paulistao")
-              ↓
-Busca exata: "paulistao" no reverse_cache → ✅ ENCONTRADO
-              ↓
-Retorna league_id do Paulistão
-              ↓
-Partida é salva com liga correta
-              ↓
-✅ Monitor mostra na categoria certa
+1. Superbet API retorna: utcDate = "2026-02-06T15:00:00Z" (15h UTC)
+
+2. superbet_scraper.py:
+   match_date = 15:00 UTC - 3h = 12:00 (naive datetime, sem TZ)
+
+3. Banco de dados (matches.match_date):
+   Grava 12:00 sem timezone (timestamp without time zone)
+
+4. View odds_comparison:
+   Retorna 12:00 (interpretado como UTC pelo PostgREST)
+
+5. orchestrator._group_odds_for_json:
+   now = 03:30 UTC
+   five_minutes_ago = 03:25 UTC
+   match_date = 12:00 (interpretado como UTC)
+   
+   12:00 < 03:25? SIM (errado - 12:00 e FUTURO no Brasil!)
+   → Partida descartada
+
+6. odds.json: 68 partidas (deveria ter 166)
 ```
 
----
+### Solucao Correta
 
-## SQL de Diagnóstico Imediato
+Todos os scrapers devem gravar datas em **UTC**. O frontend converte para horario local usando `toLocaleString()` do JavaScript.
 
-Execute este SQL no Supabase para verificar o estado atual:
+A Superbet estava tentando "ajudar" convertendo para Brasil, mas isso quebrou o filtro de comparacao.
 
-```sql
--- 1. Listar todas as ligas cadastradas
-SELECT id, name, country, status FROM leagues ORDER BY name;
+### Impacto Esperado
 
--- 2. Verificar se Paulistão existe
-SELECT * FROM leagues WHERE name ILIKE '%paulist%';
+Apos as correcoes:
 
--- 3. Contar partidas por liga
-SELECT l.name, COUNT(m.id) as matches
-FROM leagues l
-LEFT JOIN matches m ON l.id = m.league_id
-WHERE m.match_date > NOW()
-GROUP BY l.name
-ORDER BY matches DESC;
+- Todas as 166 partidas aparecerão no JSON
+- Partidas de ligas diferentes com mesmos times nao colidirao
+- O sistema voltara a funcionar como antes da migracao para Superbet como casa mae
 
--- 4. Identificar partidas suspeitas na Libertadores
-SELECT m.id, ht.standard_name as home, at.standard_name as away, m.match_date
-FROM matches m
-JOIN teams ht ON m.home_team_id = ht.id  
-JOIN teams at ON m.away_team_id = at.id
-JOIN leagues l ON m.league_id = l.id
-WHERE l.name ILIKE '%libertadores%'
-  AND m.match_date > NOW()
-ORDER BY m.match_date;
-```
-
----
-
-## Próximos Passos
-
-1. **Executar diagnóstico SQL** para confirmar que Paulistão não está cadastrado
-2. **Cadastrar a liga Paulistão** no banco
-3. **Aumentar threshold** do LeagueMatcher para evitar futuros erros
-4. **Mover partidas** existentes para a liga correta
-5. **Reiniciar scrapers** para aplicar as correções
