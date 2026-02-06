@@ -414,7 +414,9 @@ export const useOddsComparison = (filters?: {
       return matches;
     },
     refetchInterval: 15000, // Fetch new JSON every 15 seconds
-    staleTime: 5000
+    staleTime: 10000,
+    placeholderData: (previousData) => previousData, // Mantém dados antigos durante refetch
+    retry: 3,
   });
 };
 
@@ -447,13 +449,10 @@ async function fallbackDatabaseQuery(filters?: {
 
 function groupOddsByMatch(data: OddsComparison[]): MatchOddsGroup[] {
   const matchMap = new Map<string, MatchOddsGroup>();
-  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+  // NOTA: Filtro de partidas passadas removido - o backend (JSON Generator) já aplica esse filtro
+  // Isso evita problemas de timezone entre frontend e servidor
 
   for (const row of data) {
-    // Skip matches that started more than 5 minutes ago
-    const matchDate = new Date(row.match_date);
-    if (matchDate < fiveMinutesAgo) continue;
-
     if (!matchMap.has(row.match_id)) {
       const isBasketball = row.sport_type === 'basketball';
       matchMap.set(row.match_id, {
