@@ -6,9 +6,11 @@ export const useScraperStatus = () => {
   return useQuery({
     queryKey: ['scraper_status'],
     queryFn: async () => {
+      const HIDDEN_SCRAPERS = ['br4bet_nba', 'jogodeouro_nba', 'mcgames_nba'];
       const { data, error } = await supabase
         .from('scraper_status_view')
         .select('*')
+        .not('scraper_name', 'in', `(${HIDDEN_SCRAPERS.join(',')})`)
         .order('scraper_name');
       
       if (error) throw error;
