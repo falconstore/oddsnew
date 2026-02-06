@@ -55,7 +55,7 @@ class JogodeOuroUnifiedScraper(BaseScraper):
     }
     
     API_BASE = "https://sb2frontend-altenar2.biahosted.com/api/widget/GetEvents"
-    INTEGRATION = "jogodeouro"
+    INTEGRATION = "mcgames2"
     
     # Cross-site token capture: use mcgames.bet.br (no Cloudflare)
     # Token is an Altenar session token, works with any integration parameter
@@ -276,8 +276,8 @@ class JogodeOuroUnifiedScraper(BaseScraper):
             "accept": "*/*",
             "accept-language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
             "authorization": self.auth_token,
-            "origin": "https://jogodeouro.bet.br",
-            "referer": "https://jogodeouro.bet.br/",
+            "origin": "https://mcgames.bet.br",
+            "referer": "https://mcgames.bet.br/",
             "user-agent": self.user_agent or "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
         }
         
