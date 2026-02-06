@@ -1,56 +1,75 @@
 
 
-# Fix Jogo de Ouro: Usar integration=mcgames2 nas API calls
+# Corrigir Memory Restart Loop no PM2
 
-## Problema Identificado
+## Problema
 
-O token Altenar e vinculado a integracao onde foi gerado. Quando o Playwright abre `mcgames.bet.br`, o widget inicializa com `integration=mcgames2` e o token e emitido para essa integracao.
+O PM2 esta reiniciando **8 processos em loop continuo** porque o `max_memory_restart` esta configurado abaixo do consumo real de memoria. Isso causa:
 
-Ao usar esse token com `integration=jogodeouro`, a API Altenar rejeita com 403 porque o token nao corresponde a integracao.
+- Perda de ciclos de scraping (cada restart leva ~5-10s para reinicializar shared_resources)
+- Cascade de restarts simultaneos sobrecarregando a VPS
+- Mensagens "failed to kill - retrying in 100ms" quando o PM2 nao consegue matar processos rapido o suficiente
+- O cleanup-service e json-generator nunca completam um ciclo inteiro
 
-## Por que isso funciona
+## Causa Raiz
 
-Mcgames e Jogo de Ouro sao white-labels do mesmo backend Altenar. Os championship IDs sao identicos (Serie A = 2942, Premier League = 2936, NBA = 2980, etc.). As odds retornadas sao as mesmas porque ambos usam a mesma plataforma Altenar como provedor de odds.
+Os scrapers HTTPX carregam o `shared_resources` (294 teams, 835 aliases, 19 leagues) na inicializacao, que consome ~80-90MB de base. Com o overhead do Python + httpx, o consumo real fica entre 100-115MB. O limite de 100MB e essencialmente igual ao consumo base, causando restarts constantes.
 
-O `bookmaker_name` nos ScrapedOdds continua sendo `"jogodeouro"`, entao os dados sao registrados corretamente no banco como pertencendo ao Jogo de Ouro.
+## Solucao
 
-## Mudancas no Arquivo
+Aumentar os limites de memoria no `docs/scraper/ecosystem.config.js` para refletir o consumo real com margem de seguranca:
 
-**`docs/scraper/scrapers/jogodeouro_scraper.py`** - 3 mudancas cirurgicas:
+### Mudancas no ecosystem.config.js
 
-### 1. Mudar INTEGRATION (linha 58)
-```
-Antes:  INTEGRATION = "jogodeouro"
-Depois: INTEGRATION = "mcgames2"
-```
+**HTTPX Scrapers (7 processos)**: `100M` para `150M`
+- scraper-superbet
+- scraper-novibet
+- scraper-kto
+- scraper-estrelabet
+- scraper-sportingbet
+- scraper-betnacional
+- scraper-br4bet
 
-### 2. Mudar origin no _fetch_league_data() (linha 279)
-```
-Antes:  "origin": "https://jogodeouro.bet.br"
-Depois: "origin": "https://mcgames.bet.br"
-```
+**Tradeball**: `100M` para `150M`
 
-### 3. Mudar referer no _fetch_league_data() (linha 280)
-```
-Antes:  "referer": "https://jogodeouro.bet.br/"
-Depois: "referer": "https://mcgames.bet.br/"
-```
+**json-generator**: `100M` para `200M`
+(Conforme nota de arquitetura existente: precisa de pelo menos 150M para processar o odds.json de ~1.1MB)
 
-Nada mais precisa mudar. O `bookmaker_name="jogodeouro"` nos ScrapedOdds permanece inalterado, garantindo que os dados entrem no banco como odds do Jogo de Ouro.
+**cleanup-service**: `50M` para `150M`
+(Consumo real de 84MB, com margem para picos)
 
-## Nenhum outro arquivo afetado
+**alias-generator**: `100M` para `150M`
+(Mesmo padrao dos outros servicos leves)
 
-A classe, import path, e todos os metodos de parsing permanecem identicos.
+### Resumo dos novos limites
+
+| Tipo | Processos | Limite anterior | Novo limite |
+|---|---|---|---|
+| Playwright pesado | betano, betbra | 300M | 300M (sem mudanca) |
+| Playwright pesado | stake | 400M | 400M (sem mudanca) |
+| Playwright medio | mcgames, aposta1, esportivabet, jogodeouro | 200M | 200M (sem mudanca) |
+| HTTPX scraper | superbet, novibet, kto, estrelabet, sportingbet, betnacional, br4bet, tradeball | 100M | 150M |
+| API scraper | bet365 | 200M | 200M (sem mudanca) |
+| Servico auxiliar | json-generator | 100M | 200M |
+| Servico auxiliar | cleanup-service | 50M | 150M |
+| Servico auxiliar | alias-generator | 100M | 150M |
+| Telegram bot | telegram-dg-bot | 150M | 150M (sem mudanca) |
+
+### Impacto na VPS
+
+- Aumento maximo teorico: ~550MB (se todos atingirem o novo limite)
+- Na pratica: consumo real fica ~100-115MB por HTTPX scraper, entao o aumento real e zero
+- Beneficio: elimina completamente o restart loop e as mensagens "failed to kill"
 
 ## Deploy
 
 ```
 1. git pull no VPS
-2. pm2 restart scraper-jogodeouro
-3. pm2 logs scraper-jogodeouro --lines 20
-4. Esperado:
-   - "[JogodeOuro] Token captured via mcgames.bet.br request interception"
-   - "[JogodeOuro] Cross-site token capture successful!"
-   - "[JogodeOuro] Serie A: XX odds"  (em vez de "Token issue HTTP 403")
+2. pm2 delete all
+3. pm2 start ecosystem.config.js
+4. pm2 save
+5. pm2 monit (verificar que nenhum processo esta em restart loop)
 ```
+
+Apos aplicar, os logs devem mostrar ciclos completos sem interrupcoes.
 
