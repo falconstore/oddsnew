@@ -32,10 +32,18 @@ class JogodeOuroScraper(BaseScraper):
         "la_liga": JogodeOuroLeague(champ_id="2941", category_id="501", name="La Liga", country="espanha", league_slug="laliga"),
         "bundesliga": JogodeOuroLeague(champ_id="2950", category_id="503", name="Bundesliga", country="alemanha", league_slug="bundesliga"),
         "ligue_1": JogodeOuroLeague(champ_id="2943", category_id="504", name="Ligue 1", country="franca", league_slug="ligue-1"),
-        "paulistao": JogodeOuroLeague(champ_id="3436", category_id="504", name="Paulistao", country="brasil", league_slug="paulistao"),
-	"fa_cup": JogodeOuroLeague(champ_id="2935", category_id="497", name="FA Cup", country="inglaterra", league_slug="fa-cup"),
-	"efl_cup": JogodeOuroLeague(champ_id="2972", category_id="498", name="EFL Cup", country="inglaterra", league_slug="efl-cup"),
-	"copa_do_rei": JogodeOuroLeague(champ_id="2973", category_id="499", name="Copa do Rei", country="espanha", league_slug="copa-do-rei"),
+        "paulistao": JogodeOuroLeague(champ_id="3436", category_id="506", name="Paulistao", country="brasil", league_slug="paulistao"),
+	    "fa_cup": JogodeOuroLeague(champ_id="2935", category_id="497", name="FA Cup", country="inglaterra", league_slug="fa-cup"),
+	    "efl_cup": JogodeOuroLeague(champ_id="2972", category_id="498", name="EFL Cup", country="inglaterra", league_slug="efl-cup"),
+	    "copa_do_rei": JogodeOuroLeague(champ_id="2973", category_id="499", name="Copa do Rei", country="espanha", league_slug="copa-do-rei"),
+        "champions_league": JogodeOuroLeague(champ_id="16808", category_id="499", name="Champions League", country="europa", league_slug="champions-league"),
+        "liga_europa": JogodeOuroLeague(champ_id="16809", category_id="499", name="Liga Europa", country="europa", league_slug="liga-europa"),
+        "liga_da_conferencia": JogodeOuroLeague(champ_id="31608", category_id="499", name="Liga da Conferencia", country="europa", league_slug="liga-da-conferencia"),
+        "eredivisie": JogodeOuroLeague(champ_id="3065", category_id="512", name="Eredivisie", country="holanda", league_slug="eredivisie"),
+        "libertadores": JogodeOuroLeague(champ_id="3709", category_id="510", name="Libertadores", country="América do Sul", league_slug="libertadores"),
+        "carioca": JogodeOuroLeague(champ_id="3357", category_id="520", name="Carioca", country="brasil", league_slug="carioca"),
+        "liga_portuguesa": JogodeOuroLeague(champ_id="3152", category_id="511", name="Liga Portuguesa", country="portugal", league_slug="liga-portuguesa"),
+        "brasileirao_serie_a": JogodeOuroLeague(champ_id="11318", category_id="505", name="Brasileirão Série A", country="brasil", league_slug="brasileirao-serie-a"),
     }
     
     API_BASE = "https://sb2frontend-altenar2.biahosted.com/api/widget"
