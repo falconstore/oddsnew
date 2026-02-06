@@ -1,237 +1,217 @@
 
-# Plano: Corrigir Desaparecimento de Jogos da Libertadores no Monitor
+# Plano: Corrigir Mapeamento Incorreto de Ligas (Paulistão → Libertadores)
 
-## Diagnóstico
+## Diagnóstico do Problema
 
-O problema de jogos da Libertadores aparecerem e sumirem pode ser causado por múltiplas camadas do sistema:
+O problema identificado é que **jogos do Campeonato Paulista estão sendo salvos como "Libertadores"** no banco de dados.
 
-### Causas Identificadas
+### Evidências nos Logs
 
-| Camada | Problema | Impacto |
-|--------|----------|---------|
-| **Backend (View SQL)** | Filtro `is_latest = TRUE` pode falhar se trigger tiver race condition | Partidas sem odds visíveis |
-| **Backend (JSON Generator)** | Deduplicação por composite key sobrescreve jogos duplicados | Jogos perdidos |
-| **Frontend (groupOddsByMatch)** | Filtro `fiveMinutesAgo` com timezone incorreto | Jogos descartados cedo demais |
-| **Frontend (React Query)** | Sem fallback para dados anteriores quando fetch falha | Dados somem em erros |
-| **Dados (Times Duplicados)** | 9 times duplicados podem criar inconsistências | Jogos associados a times órfãos |
+Os dados que você mostrou confirmam:
+- "Portuguesa de Desportos SP vs Ponte Preta" → **Libertadores** (deveria ser Paulistão)
+- "Guarani-SP vs Botafogo-SP" → **Libertadores** (deveria ser Paulistão)  
+- "Corinthians vs Palmeiras" → **Libertadores** (deveria ser Paulistão - clássico!)
+- "Capivariano SP vs Mirassol" → **Libertadores** (deveria ser Paulistão)
+
+### Causa Raiz
+
+O `LeagueMatcher` usa **fuzzy matching com threshold de 80%** para encontrar ligas:
+
+```python
+result = process.extractOne(
+    raw_name,            # "Paulistao" 
+    all_names,           # Ligas cadastradas no banco
+    scorer=fuzz.token_sort_ratio,
+    score_cutoff=80      # Threshold baixo!
+)
+```
+
+Quando o scraper envia `league_raw = "Paulistao"` e essa liga **não está cadastrada** no banco, o fuzzy matching encontra a liga mais similar. O problema é que "Paulistao" pode casar erroneamente com outras ligas brasileiras.
+
+**Teste de similaridade:**
+- "Paulistao" vs "Libertadores" → score pode ser alto o suficiente (>80%) por terem letras em comum
 
 ---
 
 ## Soluções Propostas
 
-### Parte 1: Frontend - React Query com Configuração Resiliente
+### Parte 1: Cadastrar Liga "Paulistão" no Banco (CRÍTICO)
 
-Configurar o `QueryClient` para:
-- Manter dados antigos em caso de erro (`keepPreviousData`)
-- Não refetch agressivo em window focus
-- Cache mais duradouro
-
-**Arquivo**: `src/App.tsx`
-
-```typescript
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 30000, // 30 segundos antes de considerar stale
-      gcTime: 5 * 60 * 1000, // 5 minutos no cache
-      retry: 2,
-      refetchOnWindowFocus: false, // Evita refetch ao voltar para aba
-      refetchOnReconnect: true,
-    },
-  },
-});
-```
-
-### Parte 2: Frontend - Remover Filtro de 5 Minutos Redundante
-
-O JSON Generator já filtra partidas passadas. O frontend não precisa refiltrar, o que pode causar discrepâncias de timezone.
-
-**Arquivo**: `src/hooks/useOddsData.ts` - Função `groupOddsByMatch`
-
-Remover as linhas 450-455:
-```typescript
-// REMOVER:
-const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-// REMOVER:
-if (matchDate < fiveMinutesAgo) continue;
-```
-
-O filtro no backend (view SQL) já cuida disso com `m.match_date > (NOW() - INTERVAL '30 minutes')`.
-
-### Parte 3: Frontend - Invalidação Inteligente do Cache
-
-Adicionar invalidação do cache quando o JSON é atualizado com sucesso:
-
-**Arquivo**: `src/hooks/useOddsData.ts` - Hook `useOddsComparison`
-
-```typescript
-export const useOddsComparison = (filters?: { ... }) => {
-  const queryClient = useQueryClient();
-  
-  return useQuery({
-    queryKey: ['odds_comparison', filters],
-    queryFn: async () => {
-      // ... fetch logic
-    },
-    refetchInterval: 15000,
-    staleTime: 10000,
-    placeholderData: (previousData) => previousData, // Manter dados antigos durante loading
-    retry: 3,
-  });
-};
-```
-
-### Parte 4: Backend - Melhorar Resiliência do JSON Generator
-
-O JSON generator deve ter fallback para dados anteriores se o fetch falhar.
-
-**Arquivo**: `docs/scraper/standalone/run_json_generator.py`
-
-Adicionar cache local do último JSON gerado com sucesso:
-```python
-last_valid_json = None
-
-async def run_forever(interval: int, log: logger):
-    global last_valid_json
-    
-    # ... dentro do loop
-    if success:
-        last_valid_json = json_data  # Salvar JSON válido
-    elif last_valid_json:
-        # Re-upload último JSON válido em caso de erro
-        supabase.upload_odds_json(last_valid_json)
-        log.warning("Re-uploaded last valid JSON due to error")
-```
-
-### Parte 5: Backend - Verificar Integridade do Trigger
-
-Criar query de diagnóstico para identificar partidas sem odds `is_latest`:
+Executar no SQL Editor do Supabase:
 
 ```sql
--- Partidas com odds mas nenhuma is_latest = TRUE
-SELECT m.id, ht.standard_name, at.standard_name, l.name
+-- Verificar se Paulistão já existe
+SELECT * FROM leagues WHERE name ILIKE '%paulist%';
+
+-- Se não existir, cadastrar
+INSERT INTO leagues (name, country, status)
+VALUES ('Paulistao', 'Brasil', 'active')
+ON CONFLICT DO NOTHING;
+
+-- Também cadastrar variações comuns
+INSERT INTO leagues (name, country, status)
+VALUES ('Paulistao A1', 'Brasil', 'active')
+ON CONFLICT DO NOTHING;
+```
+
+### Parte 2: Aumentar Threshold do LeagueMatcher
+
+Modificar o `score_cutoff` de 80 para 90+ para evitar falsos positivos:
+
+**Arquivo**: `docs/scraper/team_matcher.py` (classe LeagueMatcher)
+
+```python
+def find_league_id(self, raw_name: str) -> Optional[str]:
+    """Find league ID by name using fuzzy matching."""
+    normalized = raw_name.strip().lower()
+    
+    # Exact match
+    if normalized in self.reverse_cache:
+        return self.reverse_cache[normalized]
+    
+    # Fuzzy match com threshold MAIS ALTO para evitar falsos positivos
+    all_names = list(self.leagues_cache.values())
+    result = process.extractOne(
+        raw_name,
+        all_names,
+        scorer=fuzz.token_sort_ratio,
+        score_cutoff=92  # Aumentado de 80 para 92
+    )
+    
+    if result:
+        return next(
+            (lid for lid, name in self.leagues_cache.items() 
+             if name == result[0]),
+            None
+        )
+    
+    return None
+```
+
+### Parte 3: Adicionar Aliases de Ligas (Opcional)
+
+Criar uma tabela de aliases de ligas similar a `team_aliases`:
+
+```sql
+-- Criar tabela de aliases de ligas
+CREATE TABLE IF NOT EXISTS public.league_aliases (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    league_id UUID REFERENCES public.leagues(id) ON DELETE CASCADE NOT NULL,
+    alias_name TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(alias_name)
+);
+
+-- Cadastrar aliases comuns
+INSERT INTO league_aliases (league_id, alias_name) 
+SELECT id, 'Campeonato Paulista' FROM leagues WHERE name = 'Paulistao'
+UNION ALL
+SELECT id, 'Paulista A1' FROM leagues WHERE name = 'Paulistao'
+UNION ALL
+SELECT id, 'Paulistão Série A1' FROM leagues WHERE name = 'Paulistao';
+```
+
+### Parte 4: Corrigir Partidas Existentes
+
+Mover as partidas do Paulistão que estão erroneamente na Libertadores:
+
+```sql
+-- 1. Verificar liga correta do Paulistão
+SELECT id, name FROM leagues WHERE name ILIKE '%paulist%';
+-- Assumindo que retorna: id = 'XXXX-XXXX-XXXX'
+
+-- 2. Verificar liga da Libertadores
+SELECT id, name FROM leagues WHERE name ILIKE '%libertadores%';
+-- Assumindo que retorna: id = 'YYYY-YYYY-YYYY'
+
+-- 3. Identificar partidas de times paulistas na Libertadores
+SELECT m.id, ht.standard_name as home, at.standard_name as away, l.name as league
 FROM matches m
 JOIN teams ht ON m.home_team_id = ht.id
 JOIN teams at ON m.away_team_id = at.id
 JOIN leagues l ON m.league_id = l.id
-WHERE m.match_date > NOW()
-AND NOT EXISTS (
-    SELECT 1 FROM odds_history oh 
-    WHERE oh.match_id = m.id AND oh.is_latest = TRUE
-)
-AND EXISTS (
-    SELECT 1 FROM odds_history oh 
-    WHERE oh.match_id = m.id
-);
-```
+WHERE l.name ILIKE '%libertadores%'
+  AND (
+    ht.standard_name ILIKE '%SP%' 
+    OR ht.standard_name ILIKE '%Corinthians%'
+    OR ht.standard_name ILIKE '%Palmeiras%'
+    OR ht.standard_name ILIKE '%Santos%'
+    OR ht.standard_name ILIKE '%Guarani%'
+    OR ht.standard_name ILIKE '%Ponte Preta%'
+    OR ht.standard_name ILIKE '%Portuguesa%'
+  );
 
----
-
-## Alterações de Código
-
-### Arquivo 1: `src/App.tsx`
-
-Configurar QueryClient com opções resilientes:
-
-```typescript
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter } from "react-router-dom";
-import { AuthProvider } from "@/contexts/AuthContext";
-import { AnimatedRoutes } from "@/components/AnimatedRoutes";
-import { ThemeProvider } from "next-themes";
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 30 * 1000, // 30 segundos
-      gcTime: 5 * 60 * 1000, // 5 minutos
-      retry: 2,
-      refetchOnWindowFocus: false, // Evita reset ao trocar de aba
-      refetchOnReconnect: true,
-    },
-  },
-});
-
-const App = () => (
-  // ... resto igual
-);
-```
-
-### Arquivo 2: `src/hooks/useOddsData.ts`
-
-**Mudança 1**: Remover filtro redundante de 5 minutos na função `groupOddsByMatch`:
-
-```typescript
-function groupOddsByMatch(data: OddsComparison[]): MatchOddsGroup[] {
-  const matchMap = new Map<string, MatchOddsGroup>();
-  // REMOVIDO: const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-
-  for (const row of data) {
-    // REMOVIDO: filtro de matchDate < fiveMinutesAgo
-    
-    if (!matchMap.has(row.match_id)) {
-      // ... resto da lógica
-    }
-    // ...
-  }
-  return Array.from(matchMap.values());
-}
-```
-
-**Mudança 2**: Adicionar `placeholderData` no hook `useOddsComparison`:
-
-```typescript
-export const useOddsComparison = (filters?: {...}) => {
-  return useQuery({
-    queryKey: ['odds_comparison', filters],
-    queryFn: async () => {
-      // ... fetch logic existente
-    },
-    refetchInterval: 15000,
-    staleTime: 10000,
-    placeholderData: (previousData) => previousData, // NOVO: manter dados durante refetch
-  });
-};
+-- 4. Corrigir as partidas (AJUSTAR IDs conforme resultado acima)
+-- UPDATE matches SET league_id = 'PAULISTAO_ID' WHERE id IN (...);
 ```
 
 ---
 
 ## Resumo das Alterações
 
-| Arquivo | Alteração |
-|---------|-----------|
-| `src/App.tsx` | Configurar QueryClient com `refetchOnWindowFocus: false` e staleTime maior |
-| `src/hooks/useOddsData.ts` | Remover filtro redundante de 5 minutos em `groupOddsByMatch` |
-| `src/hooks/useOddsData.ts` | Adicionar `placeholderData` para manter dados durante loading |
+| Componente | Alteração | Prioridade |
+|------------|-----------|------------|
+| Banco de Dados | Cadastrar liga "Paulistão" | **CRÍTICA** |
+| team_matcher.py | Aumentar threshold de 80 → 92 | Alta |
+| Banco de Dados | Corrigir partidas existentes | Alta |
+| Banco de Dados | Criar tabela league_aliases | Média |
 
 ---
 
-## Benefícios Esperados
+## Fluxo Corrigido
 
-1. **Dados persistem ao trocar de aba**: `refetchOnWindowFocus: false` evita resets desnecessários
-2. **Sem filtros de timezone conflitantes**: Remoção do filtro de 5 minutos no frontend
-3. **Dados visíveis durante loading**: `placeholderData` mantém última versão enquanto busca nova
-4. **Cache mais eficiente**: Reduz chamadas desnecessárias ao JSON
+```text
+Scraper envia: league_raw = "Paulistao"
+              ↓
+LeagueMatcher.find_league_id("Paulistao")
+              ↓
+Busca exata: "paulistao" no reverse_cache → ✅ ENCONTRADO
+              ↓
+Retorna league_id do Paulistão
+              ↓
+Partida é salva com liga correta
+              ↓
+✅ Monitor mostra na categoria certa
+```
 
 ---
 
-## Notas Técnicas
+## SQL de Diagnóstico Imediato
 
-### Por que remover o filtro de 5 minutos?
+Execute este SQL no Supabase para verificar o estado atual:
 
-O pipeline de dados já aplica esse filtro em duas camadas:
-1. **View SQL**: `m.match_date > (NOW() - INTERVAL '30 minutes')`
-2. **JSON Generator**: `if match_date < five_minutes_ago: continue`
+```sql
+-- 1. Listar todas as ligas cadastradas
+SELECT id, name, country, status FROM leagues ORDER BY name;
 
-Aplicar novamente no frontend pode causar problemas porque:
-- O timezone do browser pode diferir do servidor
-- Cria discrepância entre o que o JSON contém e o que é exibido
+-- 2. Verificar se Paulistão existe
+SELECT * FROM leagues WHERE name ILIKE '%paulist%';
 
-### React Query `placeholderData` vs `keepPreviousData`
+-- 3. Contar partidas por liga
+SELECT l.name, COUNT(m.id) as matches
+FROM leagues l
+LEFT JOIN matches m ON l.id = m.league_id
+WHERE m.match_date > NOW()
+GROUP BY l.name
+ORDER BY matches DESC;
 
-- `placeholderData: (prev) => prev` mostra os dados antigos instantaneamente
-- Evita o "flash" de loading entre refetches
-- Se o fetch falhar, os dados antigos permanecem visíveis
+-- 4. Identificar partidas suspeitas na Libertadores
+SELECT m.id, ht.standard_name as home, at.standard_name as away, m.match_date
+FROM matches m
+JOIN teams ht ON m.home_team_id = ht.id  
+JOIN teams at ON m.away_team_id = at.id
+JOIN leagues l ON m.league_id = l.id
+WHERE l.name ILIKE '%libertadores%'
+  AND m.match_date > NOW()
+ORDER BY m.match_date;
+```
+
+---
+
+## Próximos Passos
+
+1. **Executar diagnóstico SQL** para confirmar que Paulistão não está cadastrado
+2. **Cadastrar a liga Paulistão** no banco
+3. **Aumentar threshold** do LeagueMatcher para evitar futuros erros
+4. **Mover partidas** existentes para a liga correta
+5. **Reiniciar scrapers** para aplicar as correções
