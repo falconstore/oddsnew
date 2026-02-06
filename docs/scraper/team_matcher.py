@@ -799,13 +799,13 @@ class LeagueMatcher:
         if normalized in self.reverse_cache:
             return self.reverse_cache[normalized]
         
-        # Fuzzy match
+        # Fuzzy match - threshold alto para evitar falsos positivos (Paulistao → Libertadores)
         all_names = list(self.leagues_cache.values())
         result = process.extractOne(
             raw_name,
             all_names,
             scorer=fuzz.token_sort_ratio,
-            score_cutoff=80
+            score_cutoff=92  # Aumentado de 80 para 92
         )
         
         if result:
