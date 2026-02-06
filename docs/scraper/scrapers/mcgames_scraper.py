@@ -32,7 +32,7 @@ class McgamesScraper(BaseScraper):
         "la_liga": McgamesLeague(champ_id="2941", name="La Liga", country="espanha"),
         "bundesliga": McgamesLeague(champ_id="2950", name="Bundesliga", country="alemanha"),
         "ligue_1": McgamesLeague(champ_id="2943", name="Ligue 1", country="franca"),
-        "paulistao": McgamesLeague(champ_id="3436", name="Paulistao A1", country="brasil"),
+        "paulistao": McgamesLeague(champ_id="3436", name="Paulistao", country="brasil"),
         "fa_cup": McgamesLeague(champ_id="2935", name="FA Cup", country="inglaterra"),
         "efl_cup": McgamesLeague(champ_id="2972", name="EFL Cup", country="inglaterra"),
         "champions_league": McgamesLeague(champ_id="16808", name="Champions League", country="europa"),
@@ -41,6 +41,9 @@ class McgamesScraper(BaseScraper):
         "copa_do_rei": McgamesLeague(champ_id="2973", name="Copa do Rei", country="espanha"),
         "eredivisie": McgamesLeague(champ_id="3065", name="Eredivisie", country="holanda"),
         "brasileirao_serie_a": McgamesLeague(champ_id="11318", name="Brasileirão Série A", country="brasil"),
+        "libertadores": McgamesLeague(champ_id="3709", name="Libertadores", country="América do Sul"),
+        "carioca": McgamesLeague(champ_id="3357", name="Carioca", country="brasil"),
+        "liga_portuguesa": McgamesLeague(champ_id="3152", name="Liga Portuguesa", country="portugal"),
     }
     
     API_BASE = "https://sb2frontend-altenar2.biahosted.com/api/widget/GetEvents"
