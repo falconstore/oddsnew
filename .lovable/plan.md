@@ -1,66 +1,104 @@
 
 
-# Reescrever Jogo de Ouro com Captura Dinamica de Token (Padrao Mcgames)
+# Corrigir Captura de Token do Jogo de Ouro - Abordagem Diagnostica + Fix
 
-## Diagnostico
+## Analise Comparativa
 
-O scraper atual da Jogo de Ouro le um token de um arquivo (`jogodeouro_token.txt`) que foi capturado no seu Mac. A API Altenar valida o token contra o IP de origem, entao quando o VPS tenta usar esse token, recebe 403.
+Comparando os 3 scrapers Altenar lado a lado, encontrei diferencas criticas na configuracao do Playwright:
 
-A Mcgames usa o mesmo backend Altenar e funciona perfeitamente porque captura o token **dinamicamente via Playwright** direto no VPS. O token e gerado para o IP do VPS e funciona imediatamente.
+| Config | Mcgames (funciona) | Esportivabet (funciona) | Jogo de Ouro (FALHA) |
+|---|---|---|---|
+| Page timeout | 15s | **60s** | 15s |
+| Wait apos load | 2s | **3s** | 2s |
+| Scrolls | 1x (1000px) | **2x (500 + 1000px)** | 1x (1000px) |
+| Wait final | 5s | **10s** | 5s |
+| Chrome args | 5 basicos | **11 (com anti-detect)** | 5 basicos |
+| Anti-webdriver | Nao | Nao | Nao |
+| Debug logging | Nao | Sim (`debug`) | Nao |
 
-## Solucao
+O problema: jogodeouro.bet.br provavelmente tem protecao anti-bot mais agressiva que mcgames.bet.br. A pagina carrega (sem erro de navegacao), mas o widget Altenar nao inicializa, ou e bloqueado.
 
-Reescrever `docs/scraper/scrapers/jogodeouro_scraper.py` usando o padrao identico ao `mcgames_unified_scraper.py`:
+## Solucao: 3 Camadas de Fix
 
-1. **Playwright captura o token**: Abre o site jogodeouro.bet.br no Chromium headless, intercepta as requests para `biahosted.com/api` e extrai o header `authorization`
-2. **curl_cffi faz as requests da API**: Usa o token capturado para chamar `GetEvents` com o `integration=jogodeouro`
-3. **Football + NBA unificado**: Scrape de futebol (1x2, typeId=1) e NBA (moneyline, typeId=219) na mesma sessao
+### Camada 1: Diagnostico (entender o que acontece)
 
-## Mudancas Principais
+Adicionar logging de TODAS as requests interceptadas pelo Playwright, nao apenas `biahosted.com`. Tambem logar o `document.title` e um trecho do HTML apos o carregamento para verificar se a pagina esta renderizando ou se caiu em um Cloudflare challenge.
 
-### Arquivo: `docs/scraper/scrapers/jogodeouro_scraper.py` (reescrita completa)
-
-O que muda em relacao ao codigo atual:
-
-| Antes (Token Estatico) | Depois (Playwright Dinamico) |
-|---|---|
-| Le token de `jogodeouro_token.txt` | Captura token via Playwright no VPS |
-| Token do Mac, IP incompativel | Token gerado no IP do VPS |
-| Sem suporte NBA | Football + NBA unificado |
-| `AsyncSession` com headers fixos | Headers dinamicos com UA do Playwright |
-| Sem retry de token | Invalida token em 403, recaptura proximo ciclo |
-
-Estrutura do novo scraper (baseado no McgamesUnifiedScraper):
-
-- Classe `JogodeOuroUnifiedScraper` herda `BaseScraper`
-- `INTEGRATION = "jogodeouro"` (em vez de `mcgames2`)
-- `WARMUP_URLS` apontando para `jogodeouro.bet.br/sports/futebol/italia/serie-a/c-2942`
-- `origin` e `referer` para `jogodeouro.bet.br`
-- `bookmaker_name = "jogodeouro"` nos ScrapedOdds
-- Mesmas ligas de futebol + NBA (champ_id="2980")
-- Metodo `scrape_all()` que faz setup, scrape football, scrape NBA, teardown
-- Metodo `_fetch_league_data()` com tratamento de 403 (invalida token)
-- Metodo `_scrape_football_league()` (typeId=1, 1x2)
-- Metodo `_scrape_basketball_league()` (typeId=219, moneyline)
-
-### Nenhum outro arquivo precisa ser alterado
-
-Os runners (`run_sequential.py` e `run_scraper.py`) ja apontam para:
 ```python
-"jogodeouro": ("scrapers.jogodeouro_scraper", "JogodeOuroUnifiedScraper")
+# Log todas as requests para diagnosticar
+async def handle_request(request):
+    url = request.url
+    # Log qualquer request de API para debug
+    if any(x in url for x in ["biahosted.com", "altenar", "widget"]):
+        self.logger.info(f"[JogodeOuro] API request detected: {url[:100]}")
+        headers = request.headers
+        if "authorization" in headers:
+            token = headers["authorization"]
+            if not token_future.done():
+                token_future.set_result(token)
+    
+# Apos carregar a pagina:
+title = await page.evaluate("document.title")
+self.logger.info(f"[JogodeOuro] Page title: {title}")
 ```
 
-A classe continua sendo `JogodeOuroUnifiedScraper`, entao nao ha quebra de importacao.
+### Camada 2: Config agressiva (match Esportivabet)
+
+Aplicar TODAS as configuracoes que fazem a Esportivabet funcionar:
+
+- **Chrome args expandidos**: adicionar `--disable-dev-shm-usage`, `--disable-extensions`, `--disable-background-networking`, `--disable-sync`, `--disable-translate`, `--no-first-run`, `--disable-default-apps`
+- **Page timeout**: 15s para **30s**
+- **Wait apos load**: 2s para **3s**
+- **Scrolls**: 2 scrolls (500px + 1000px) com 2s wait cada
+- **Wait final**: 5s para **15s**
+- **Mais URLs de warmup**: 4 URLs com championship IDs variados
+
+### Camada 3: Anti-deteccao (injetar stealth JS)
+
+Adicionar `context.add_init_script()` para remover marcadores de automacao que podem estar bloqueando o widget:
+
+```python
+await context.add_init_script("""
+    Object.defineProperty(navigator, 'webdriver', { get: () => false });
+    Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3] });
+    Object.defineProperty(navigator, 'languages', { get: () => ['pt-BR', 'pt', 'en'] });
+    window.chrome = { runtime: {} };
+""")
+```
+
+## Arquivo Modificado
+
+**`docs/scraper/scrapers/jogodeouro_scraper.py`** - Apenas o metodo `setup()` e as constantes `CHROME_ARGS` e `WARMUP_URLS`:
+
+### Mudancas especificas:
+
+1. **WARMUP_URLS**: Expandir para 4 URLs com championship IDs diferentes (Serie A, Premier League, generico, raiz)
+
+2. **CHROME_ARGS**: Expandir de 5 para 11 args (match Esportivabet)
+
+3. **setup()**: 
+   - Adicionar `context.add_init_script()` com stealth JS
+   - Mudar `wait_until` de `"domcontentloaded"` para `"load"` 
+   - Aumentar timeout de 15s para 30s
+   - Logar `document.title` apos cada pagina carregar
+   - Logar TODAS requests que contenham "altenar", "biahosted", ou "widget"
+   - Fazer 2 scrolls (500px + 1000px) em vez de 1
+   - Aumentar wait final de 5s para 15s
+
+4. **Nenhuma mudanca** nos metodos de parsing ou fetch (esses estao corretos)
 
 ## Deploy
 
 ```
 1. git pull no VPS
-2. pm2 restart scraper-hybrid (ou scraper-jogodeouro se estiver standalone)
-3. Verificar logs: pm2 logs scraper-jogodeouro --lines 20
-4. Deve aparecer: "[JogodeOuro] Token captured via request interception"
-5. Seguido de: "[JogodeOuro] Serie A: XX odds"
+2. pm2 restart scraper-jogodeouro (ou scraper-hybrid)
+3. pm2 logs scraper-jogodeouro --lines 50
+4. Procurar nos logs:
+   - "[JogodeOuro] Page title: ..." -> Se diz "Cloudflare" ou esta vazio = site bloqueando
+   - "[JogodeOuro] API request detected: ..." -> Se aparece = widget carregou
+   - "[JogodeOuro] Token captured" -> Sucesso!
+5. Se o titulo da pagina mostrar Cloudflare, precisaremos de outra abordagem
 ```
 
-O arquivo `jogodeouro_token.txt` nao sera mais necessario.
+Os logs de diagnostico vao nos dizer exatamente por que a captura falha, permitindo uma correcao definitiva.
 
