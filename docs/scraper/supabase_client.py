@@ -699,16 +699,57 @@ class SupabaseClient:
     # JSON EXPORT (for frontend)
     # ==========================================
     
+    def _fetch_all_paginated(
+        self, 
+        table_name: str, 
+        order_by: str = "match_date", 
+        page_size: int = 1000
+    ) -> List[Dict[str, Any]]:
+        """
+        Fetch all rows from a table/view using pagination.
+        Supabase/PostgREST limits responses to ~1000 rows by default.
+        
+        Args:
+            table_name: Name of the table or view to query
+            order_by: Column to order results by
+            page_size: Number of rows per page (default 1000)
+            
+        Returns:
+            All rows from the table/view
+        """
+        all_data = []
+        offset = 0
+        
+        while True:
+            response = (
+                self.client.table(table_name)
+                .select("*")
+                .order(order_by, desc=False)
+                .range(offset, offset + page_size - 1)
+                .execute()
+            )
+            
+            batch = response.data or []
+            all_data.extend(batch)
+            
+            self.logger.debug(
+                f"Paginated fetch {table_name}: offset={offset}, got={len(batch)}"
+            )
+            
+            # Se retornou menos que page_size, acabaram os dados
+            if len(batch) < page_size:
+                break
+                
+            offset += page_size
+        
+        return all_data
+    
     async def fetch_odds_for_json(self) -> List[Dict[str, Any]]:
         """Fetch all football odds data from the comparison view for JSON export."""
         try:
-            response = (
-                self.client.table("odds_comparison")
-                .select("*")
-                .order("match_date", desc=False)
-                .execute()
-            )
-            return response.data or []
+            data = self._fetch_all_paginated("odds_comparison", "match_date")
+            self.logger.info(f"Fetched {len(data)} football odds rows (paginated)")
+            return data
         except Exception as e:
             self.logger.error(f"Error fetching odds for JSON: {e}")
             return []
@@ -716,13 +757,9 @@ class SupabaseClient:
     async def fetch_nba_odds_for_json(self) -> List[Dict[str, Any]]:
         """Fetch all NBA odds data from the nba_odds_comparison view for JSON export."""
         try:
-            response = (
-                self.client.table("nba_odds_comparison")
-                .select("*")
-                .order("match_date", desc=False)
-                .execute()
-            )
-            return response.data or []
+            data = self._fetch_all_paginated("nba_odds_comparison", "match_date")
+            self.logger.info(f"Fetched {len(data)} NBA odds rows (paginated)")
+            return data
         except Exception as e:
             self.logger.error(f"Error fetching NBA odds for JSON: {e}")
             return []
