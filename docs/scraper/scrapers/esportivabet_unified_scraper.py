@@ -58,6 +58,9 @@ class EsportivabetUnifiedScraper(BaseScraper):
         "liga_da_conferencia": EsportivabetLeague(champ_id="31608", category_id="511", name="Liga da Conferencia", country="Europa", league_slug="liga-da-conferencia"),
         "eredivisie": EsportivabetLeague(champ_id="3065", category_id="512", name="Eredivisie", country="Holanda", league_slug="eredivisie"),
         "brasileirao_serie_a": EsportivabetLeague(champ_id="11318", category_id="513", name="Brasileirão Série A", country="Brasil", league_slug="brasileirao-serie-a"),
+        "carioca": EsportivabetLeague(champ_id="3357", category_id="520", name="Carioca", country="Brasil", league_slug="carioca"),
+        "liga_portuguesa": EsportivabetLeague(champ_id="3075", category_id="519", name="Liga Portuguesa", country="Portugal", league_slug="liga-portuguesa"),
+        "libertadores": EsportivabetLeague(champ_id="3436", category_id="518", name="Libertadores", country="América do Sul", league_slug="libertadores"),
     }
     
     # ==================== LIGAS DE BASQUETE ====================
