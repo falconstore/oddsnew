@@ -311,17 +311,41 @@ class TelegramDGBot:
         if not pa_odds or not so_odds:
             return None
         
-        # Melhor Casa (PA)
+        # Melhor Casa (PA) - ordenar por odd decrescente
         pa_with_home = [o for o in pa_odds if o.get('home_odd')]
         if not pa_with_home:
             return None
-        best_home = max(pa_with_home, key=lambda x: x['home_odd'])
+        pa_with_home.sort(key=lambda x: x['home_odd'], reverse=True)
         
-        # Melhor Fora (PA)
+        # Melhor Fora (PA) - ordenar por odd decrescente
         pa_with_away = [o for o in pa_odds if o.get('away_odd')]
         if not pa_with_away:
             return None
-        best_away = max(pa_with_away, key=lambda x: x['away_odd'])
+        pa_with_away.sort(key=lambda x: x['away_odd'], reverse=True)
+        
+        best_home = pa_with_home[0]
+        best_away = pa_with_away[0]
+        
+        # Se CASA e FORA cairam na mesma casa, testar alternativas
+        if best_home['bookmaker_name'] == best_away['bookmaker_name']:
+            alt_home_list = [o for o in pa_with_home if o['bookmaker_name'] != best_away['bookmaker_name']]
+            alt_away_list = [o for o in pa_with_away if o['bookmaker_name'] != best_home['bookmaker_name']]
+            
+            candidates = []
+            
+            # Opcao 1: melhor CASA original + segundo melhor FORA
+            if alt_away_list:
+                candidates.append((best_home, alt_away_list[0]))
+            
+            # Opcao 2: segundo melhor CASA + melhor FORA original
+            if alt_home_list:
+                candidates.append((alt_home_list[0], best_away))
+            
+            if not candidates:
+                return None  # So tem 1 casa PA, impossivel montar DG
+            
+            # Escolher a combinacao com maior soma de odds (melhor ROI)
+            best_home, best_away = max(candidates, key=lambda c: c[0]['home_odd'] + c[1]['away_odd'])
         
         # Melhor Empate (SO) - prioriza Betbra
         so_with_draw = [o for o in so_odds if o.get('draw_odd')]
