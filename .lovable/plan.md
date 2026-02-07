@@ -1,101 +1,94 @@
 
 
-# Correcao: Highlighting de Odds e Bot Telegram Multi-Liga
+# Fix: Estrelabet mostrando apenas PA ou SO (nunca ambos)
 
-## Problema 1: Monitor marcando odds menores como "melhores"
+## Diagnostico
 
-Na tabela de detalhes de uma partida, o sistema compara odds individuais com o melhor valor usando `===` (igualdade estrita). Quando existem valores como 1.65 e 1.66, o valor correto (1.66) deveria ser destacado, mas variacoes de precisao numerica no pipeline de dados (PostgreSQL DECIMAL -> JSON -> JavaScript Number) podem fazer `===` falhar.
+Tracei todo o pipeline de dados:
 
-### Correcao
+1. **Scraper** (OK) - Estrelabet produz PA e SO corretamente (logs confirmam "13 PA + 4 SO = 17 total")
+2. **Orchestrator** (OK) - Passa `odds_type` para o banco (linha 505: `"odds_type": odds.odds_type`)
+3. **Banco de dados** (PROBLEMA) - O trigger `mark_old_odds_not_latest()` provavelmente NAO inclui `odds_type` no WHERE. Quando SO e inserido, marca PA como `is_latest = FALSE` (ou vice-versa)
+4. **View** `odds_comparison` (OK se trigger estiver correto) - Filtra por `is_latest = TRUE`
+5. **JSON Generator** (OK) - Sem deduplicacao por bookmaker
+6. **Frontend** (OK) - Usa key `bookmaker_id-odds_type`, renderiza ambos
 
-Trocar a comparacao `===` por uma funcao de tolerancia que arredonda ambos os valores antes de comparar:
+O problema esta no trigger. A funcao `mark_old_odds_not_latest()` precisa usar a combinacao `(match_id, bookmaker_id, odds_type)` para decidir qual registro marcar como nao mais recente. Sem o `odds_type`, inserir SO anula o PA.
 
-```
-// Antes:
-isBest={odds.away_odd === bestAway}
+## Correcoes
 
-// Depois:
-isBest={Math.round(odds.away_odd * 100) === Math.round(bestAway * 100)}
-```
+### 1. Banco de Dados (SQL no Supabase)
 
-**Arquivos afetados:**
-- `src/pages/MatchDetails.tsx` - Componente `OddCell`, linhas 344, 348, 352 (3 comparacoes: home, draw, away)
-- Mesma logica para `isWorst`
+O usuario precisa executar no SQL Editor do Supabase:
 
-Tambem precisa adicionar `tradeball` na lista `KNOWN_SO_BOOKMAKERS` em `src/lib/oddsTypeUtils.ts`, pois hoje tradeball pode entrar no grupo PA por engano (nao esta na lista de SO conhecidos), distorcendo o calculo de `bestPA`.
+```sql
+-- Atualizar trigger para separar por odds_type
+CREATE OR REPLACE FUNCTION public.mark_old_odds_not_latest()
+RETURNS TRIGGER AS $$
+BEGIN
+    UPDATE public.odds_history
+    SET is_latest = FALSE
+    WHERE match_id = NEW.match_id 
+      AND bookmaker_id = NEW.bookmaker_id 
+      AND odds_type = NEW.odds_type
+      AND id != NEW.id
+      AND is_latest = TRUE;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 
----
-
-## Problema 2: Bot Telegram so pega jogos do Brasileirao
-
-### Causa raiz
-
-O metodo `fetch_odds()` no bot (linha 258-264) faz uma query simples sem paginacao:
-
-```python
-response = self.supabase.client.table('odds_comparison').select('*').execute()
-```
-
-O Supabase/PostgREST retorna no maximo **1000 linhas por default**. Com ~220 partidas x ~10 casas cada = **2200+ linhas**, apenas as primeiras 1000 sao retornadas. Como a view ordena por `match_date`, as partidas mais proximas (que tendem a ser de uma ou duas ligas) preenchem o limite, excluindo outras ligas.
-
-O JSON generator ja usa paginacao (`_fetch_all_paginated`) e por isso o frontend mostra todas as ligas normalmente. O bot nao.
-
-### Correcao
-
-Implementar paginacao no `fetch_odds()` do bot, identica ao padrao ja usado pelo JSON generator:
-
-```python
-async def fetch_odds(self) -> list:
-    try:
-        all_data = []
-        offset = 0
-        page_size = 1000
-        
-        while True:
-            response = (
-                self.supabase.client.table('odds_comparison')
-                .select('*')
-                .order('match_date', desc=False)
-                .range(offset, offset + page_size - 1)
-                .execute()
-            )
-            batch = response.data or []
-            all_data.extend(batch)
-            
-            if len(batch) < page_size:
-                break
-            offset += page_size
-        
-        return all_data
-    except Exception as e:
-        self.logger.error(f"Erro ao buscar odds: {e}")
-        return []
+-- Corrigir registros existentes: marcar ambos PA e SO como is_latest
+-- para as entradas mais recentes de cada combinacao
+WITH ranked AS (
+    SELECT id,
+           ROW_NUMBER() OVER (
+               PARTITION BY match_id, bookmaker_id, odds_type
+               ORDER BY scraped_at DESC
+           ) AS rn
+    FROM public.odds_history
+)
+UPDATE public.odds_history oh
+SET is_latest = (ranked.rn = 1)
+FROM ranked
+WHERE oh.id = ranked.id;
 ```
 
-**Arquivo afetado:**
-- `docs/scraper/standalone/run_telegram.py` - Metodo `fetch_odds()`, linhas 257-264
+A primeira parte corrige o trigger para futuras insercoes. A segunda parte corrige os dados existentes, garantindo que tanto PA quanto SO tenham seu proprio `is_latest = TRUE`.
 
----
+### 2. Frontend - Correcao menor
 
-## Resumo das mudancas
+**Arquivo: `src/pages/MatchDetails.tsx`** - Linha 822
 
-| Arquivo | Mudanca |
-|---|---|
-| `src/pages/MatchDetails.tsx` (OddCell) | Trocar `===` por comparacao arredondada para best/worst highlighting |
-| `src/lib/oddsTypeUtils.ts` | Adicionar `tradeball` a `KNOWN_SO_BOOKMAKERS` |
-| `docs/scraper/standalone/run_telegram.py` | Paginacao no `fetch_odds()` para buscar TODAS as odds |
+Existe uma terceira instancia de `knownSOBookmakers` que ficou sem `tradeball`:
+
+```
+Antes:  const knownSOBookmakers = ['novibet', 'betbra', 'betnacional'];
+Depois: const knownSOBookmakers = ['novibet', 'betbra', 'betnacional', 'tradeball'];
+```
+
+Isso afeta o calculo de melhor/pior odds por grupo (SO vs PA) na tabela detalhada.
+
+## Resumo
+
+| O que | Onde | Mudanca |
+|---|---|---|
+| Trigger com odds_type | Supabase SQL Editor | `CREATE OR REPLACE FUNCTION` com `AND odds_type = NEW.odds_type` |
+| Corrigir dados existentes | Supabase SQL Editor | UPDATE com window function para remarcar `is_latest` |
+| knownSOBookmakers | `src/pages/MatchDetails.tsx` linha 822 | Adicionar `'tradeball'` |
+
+## Resultado esperado
+
+Apos aplicar o SQL e o fix no frontend, ao abrir o jogo Alaves x Getafe CF, a tabela de odds mostrara:
+- Estrelabet com badge **PA** na secao "Pagamento Antecipado"
+- Estrelabet com badge **SO** na secao "Super Odds"
+- Ambas com odds potencialmente diferentes
 
 ## Deploy
 
 ```text
-Frontend:
-- Automatico via Lovable (publicar apos aprovacao)
-
-Backend (VPS):
-1. git pull
-2. pm2 restart telegram-dg-bot
-3. pm2 logs telegram-dg-bot --lines 20
-4. Verificar que agora aparece "Buscando DGs: 2200+ odds" (em vez de ~1000)
-5. Verificar que DGs de ligas europeias tambem sao detectados
+1. Supabase SQL Editor: Executar os dois comandos SQL acima
+2. Frontend: Automatico via Lovable (publicar apos aprovacao)
+3. Aguardar 15-30 segundos para o JSON Generator gerar novo odds.json com ambos os tipos
+4. Verificar no jogo Alaves x Getafe que Estrelabet aparece nas duas secoes
 ```
 
