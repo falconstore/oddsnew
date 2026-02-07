@@ -1,7 +1,7 @@
 import type { BookmakerOdds } from '@/types/database';
 
 // Known SO bookmakers (Super Odds / sem pagamento antecipado)
-const KNOWN_SO_BOOKMAKERS = ['novibet', 'betbra', 'betnacional'];
+const KNOWN_SO_BOOKMAKERS = ['novibet', 'betbra', 'betnacional', 'tradeball'];
 
 interface BestSOResult {
   home: number;

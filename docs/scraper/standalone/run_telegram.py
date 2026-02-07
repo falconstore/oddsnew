@@ -255,10 +255,29 @@ class TelegramDGBot:
             return inicio <= now <= fim
     
     async def fetch_odds(self) -> list:
-        """Busca odds da view de comparação."""
+        """Busca odds da view de comparação com paginação."""
         try:
-            response = self.supabase.client.table('odds_comparison').select('*').execute()
-            return response.data or []
+            all_data = []
+            offset = 0
+            page_size = 1000
+            
+            while True:
+                response = (
+                    self.supabase.client.table('odds_comparison')
+                    .select('*')
+                    .order('match_date', desc=False)
+                    .range(offset, offset + page_size - 1)
+                    .execute()
+                )
+                batch = response.data or []
+                all_data.extend(batch)
+                
+                if len(batch) < page_size:
+                    break
+                offset += page_size
+            
+            self.logger.debug(f"Fetched {len(all_data)} odds rows ({offset // page_size + 1} pages)")
+            return all_data
         except Exception as e:
             self.logger.error(f"Erro ao buscar odds: {e}")
             return []

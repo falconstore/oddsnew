@@ -24,7 +24,7 @@ function sortBookmakerOdds(odds: BookmakerOdds[]): { sorted: BookmakerOdds[]; be
   const paOdds: BookmakerOdds[] = [];
   const soOdds: BookmakerOdds[] = [];
   
-  const knownSOBookmakers = ['novibet', 'betbra', 'betnacional'];
+  const knownSOBookmakers = ['novibet', 'betbra', 'betnacional', 'tradeball'];
   
   odds.forEach((odd) => {
     const name = odd.bookmaker_name.toLowerCase();
@@ -341,15 +341,15 @@ function OddsRow({
         </div>
       </TableCell>
       <TableCell className="text-center">
-        <OddCell value={odds.home_odd} isBest={odds.home_odd === bestHome} isWorst={odds.home_odd === worstHome} oddsType={oddsType} />
+        <OddCell value={odds.home_odd} isBest={Math.round((odds.home_odd || 0) * 100) === Math.round(bestHome * 100)} isWorst={Math.round((odds.home_odd || 0) * 100) === Math.round(worstHome * 100)} oddsType={oddsType} />
       </TableCell>
       {!isBasketball && (
         <TableCell className="text-center">
-          <OddCell value={odds.draw_odd} isBest={odds.draw_odd === bestDraw} isWorst={odds.draw_odd === worstDraw} oddsType={oddsType} />
+          <OddCell value={odds.draw_odd} isBest={Math.round((odds.draw_odd || 0) * 100) === Math.round((bestDraw || 0) * 100)} isWorst={Math.round((odds.draw_odd || 0) * 100) === Math.round((worstDraw || 0) * 100)} oddsType={oddsType} />
         </TableCell>
       )}
       <TableCell className="text-center">
-        <OddCell value={odds.away_odd} isBest={odds.away_odd === bestAway} isWorst={odds.away_odd === worstAway} oddsType={oddsType} />
+        <OddCell value={odds.away_odd} isBest={Math.round((odds.away_odd || 0) * 100) === Math.round(bestAway * 100)} isWorst={Math.round((odds.away_odd || 0) * 100) === Math.round(worstAway * 100)} oddsType={oddsType} />
       </TableCell>
       <TableCell className="text-center">
         <div className="flex items-center justify-center gap-1">
