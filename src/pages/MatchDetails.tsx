@@ -819,7 +819,7 @@ const MatchDetails = () => {
                   const { bestSO, paOdds: paOddsList } = getBestOddsByType(match.odds, isBasketball);
                   const bestPA = getBestPAOdds(paOddsList, isBasketball);
                   
-                  const knownSOBookmakers = ['novibet', 'betbra', 'betnacional'];
+                  const knownSOBookmakers = ['novibet', 'betbra', 'betnacional', 'tradeball'];
                   
                   return sorted.map((odds, index) => {
                     const elements: React.ReactNode[] = [];
