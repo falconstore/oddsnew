@@ -1,15 +1,15 @@
-import { useState, useMemo } from 'react';
-import { Layout } from '@/components/Layout';
-import { useOddsComparison, useLeagues, useBookmakers } from '@/hooks/useOddsData';
-import { FreebetConfig } from '@/components/freebet/FreebetConfig';
-import { FreebetFilters } from '@/components/freebet/FreebetFilters';
-import { FreebetCard } from '@/components/freebet/FreebetCard';
-import { generateFreebetOpportunitiesWithFilters } from '@/lib/freebetUtils';
-import { generateBookmakerLink } from '@/lib/bookmakerLinks';
-import { Skeleton } from '@/components/ui/skeleton';
-import { AlertCircle } from 'lucide-react';
-import type { FreebetFiltersState } from '@/types/freebet';
-import { defaultFreebetFilters } from '@/types/freebet';
+import { useState, useMemo, useEffect } from "react";
+import { Layout } from "@/components/Layout";
+import { useOddsComparison, useLeagues, useBookmakers } from "@/hooks/useOddsData";
+import { FreebetConfig } from "@/components/freebet/FreebetConfig";
+import { FreebetFilters } from "@/components/freebet/FreebetFilters";
+import { FreebetCard } from "@/components/freebet/FreebetCard";
+import { generateFreebetOpportunitiesWithFilters } from "@/lib/freebetUtils";
+import { generateBookmakerLink } from "@/lib/bookmakerLinks";
+import { Skeleton } from "@/components/ui/skeleton";
+import { AlertCircle } from "lucide-react";
+import type { FreebetFiltersState } from "@/types/freebet";
+import { defaultFreebetFilters } from "@/types/freebet";
 
 function FreebetCardSkeleton() {
   return (
@@ -37,21 +37,28 @@ function FreebetCardSkeleton() {
 export default function FreebetExtraction() {
   const [freebetValue, setFreebetValue] = useState(10);
   const [filters, setFilters] = useState<FreebetFiltersState>(defaultFreebetFilters);
-  
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(new Date()), 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   const { data: matches, isLoading, error } = useOddsComparison();
   const { data: leagues } = useLeagues();
   const { data: bookmakers } = useBookmakers();
-  
+
   const opportunities = useMemo(() => {
     if (!matches) return [];
-    return generateFreebetOpportunitiesWithFilters(
-      matches, 
-      freebetValue, 
-      generateBookmakerLink,
-      filters
-    );
-  }, [matches, freebetValue, filters]);
-  
+    const allOpps = generateFreebetOpportunitiesWithFilters(matches, freebetValue, generateBookmakerLink, filters);
+    return allOpps.filter((opp) => {
+      const matchTime = new Date(opp.match.match_date).getTime();
+      const diffMs = now.getTime() - matchTime;
+      if (diffMs > 5 * 60 * 1000) return false;
+      return true;
+    });
+  }, [matches, freebetValue, filters, now]);
+
   // Check if any filter is active
   const hasActiveFilters = useMemo(() => {
     return (
@@ -61,16 +68,16 @@ export default function FreebetExtraction() {
       filters.minExtraction > 0
     );
   }, [filters]);
-  
+
   // Prepare bookmakers and leagues for filters
   const activeBookmakers = useMemo(() => {
-    return bookmakers?.filter(b => b.status === 'active') || [];
+    return bookmakers?.filter((b) => b.status === "active") || [];
   }, [bookmakers]);
-  
+
   const activeLeagues = useMemo(() => {
     return leagues || [];
   }, [leagues]);
-  
+
   return (
     <Layout>
       <div className="space-y-4">
@@ -79,7 +86,7 @@ export default function FreebetExtraction() {
           onFreebetValueChange={setFreebetValue}
           opportunitiesCount={opportunities.length}
         />
-        
+
         <FreebetFilters
           filters={filters}
           onFiltersChange={setFilters}
@@ -87,14 +94,14 @@ export default function FreebetExtraction() {
           leagues={activeLeagues}
           hasActiveFilters={hasActiveFilters}
         />
-        
+
         {error && (
           <div className="flex items-center gap-2 p-4 bg-destructive/10 text-destructive rounded-lg">
             <AlertCircle className="h-5 w-5" />
             <span>Erro ao carregar dados: {error.message}</span>
           </div>
         )}
-        
+
         {isLoading ? (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {Array.from({ length: 8 }).map((_, i) => (
@@ -106,20 +113,18 @@ export default function FreebetExtraction() {
             <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
             <h3 className="text-lg font-semibold">Nenhuma oportunidade encontrada</h3>
             <p className="text-muted-foreground max-w-md mt-1">
-              {hasActiveFilters 
-                ? 'Nenhuma oportunidade corresponde aos filtros selecionados. Tente ajustar os filtros.'
-                : 'Não há oportunidades de extração de freebet com lucro positivo no momento. Tente novamente mais tarde ou ajuste o valor da freebet.'
-              }
+              {hasActiveFilters
+                ? "Nenhuma oportunidade corresponde aos filtros selecionados. Tente ajustar os filtros."
+                : "Não há oportunidades de extração de freebet com lucro positivo no momento. Tente novamente mais tarde ou ajuste o valor da freebet."}
             </p>
           </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {opportunities.map((opportunity) => (
-              <FreebetCard
-                key={opportunity.match.match_id}
-                opportunity={opportunity}
-              />
-            ))}
+            {opportunities.map((opportunity) => {
+              const matchTime = new Date(opportunity.match.match_date).getTime();
+              const started = now.getTime() >= matchTime;
+              return <FreebetCard key={opportunity.match.match_id} opportunity={opportunity} matchStarted={started} />;
+            })}
           </div>
         )}
       </div>
