@@ -15,8 +15,9 @@ import argparse
 import os
 import signal
 import sys
+import time
 from pathlib import Path
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -46,9 +47,30 @@ class TelegramDGBot:
         self.channel_id = os.getenv('TELEGRAM_CHANNEL_ID')
         self.logger = logger.bind(component="telegram-dg")
         self.config = None
+        self._last_sent_state = {}   # match_id -> fingerprint dict (bookmakers + odds)
+        self._last_send_time = 0     # timestamp do último envio global
         
         if not self.bot_token or not self.channel_id:
             self.logger.warning("TELEGRAM_BOT_TOKEN ou TELEGRAM_CHANNEL_ID não configurados")
+    
+    def _build_state_key(self, dg: dict) -> dict:
+        """Cria fingerprint do DG para comparação."""
+        return {
+            'casa_bk': dg['casa']['bookmaker'],
+            'casa_odd': round(dg['casa']['odd'], 2),
+            'empate_bk': dg['empate']['bookmaker'],
+            'empate_odd': round(dg['empate']['odd'], 2),
+            'fora_bk': dg['fora']['bookmaker'],
+            'fora_odd': round(dg['fora']['odd'], 2),
+        }
+    
+    def _has_changed(self, match_id: str, dg: dict) -> bool:
+        """Verifica se o DG mudou desde o último envio."""
+        current_state = self._build_state_key(dg)
+        last_state = self._last_sent_state.get(match_id)
+        if last_state is None:
+            return True  # Nunca foi enviado nesta sessão
+        return current_state != last_state
     
     def slugify(self, text: str) -> str:
         """Normaliza texto para URL slug."""
@@ -348,9 +370,21 @@ class TelegramDGBot:
         if roi < self.config['roi_minimo']:
             return None
         
-        # Parse da data
-        match_date_str = match['match_date'][:10] if match['match_date'] else ''
-        kickoff_str = match['match_date'][11:16] if len(match['match_date']) > 11 else ''
+        # Parse da data - converter UTC para Brasília (UTC-3)
+        raw_date = match['match_date'] or ''
+        try:
+            if 'T' in raw_date:
+                utc_dt = datetime.fromisoformat(raw_date.replace('Z', '+00:00'))
+            else:
+                utc_dt = datetime.strptime(raw_date[:19], '%Y-%m-%d %H:%M:%S')
+                utc_dt = utc_dt.replace(tzinfo=timezone.utc)
+            
+            brasilia_dt = utc_dt + timedelta(hours=-3)
+            match_date_str = brasilia_dt.strftime('%Y-%m-%d')
+            kickoff_str = brasilia_dt.strftime('%H:%M')
+        except Exception:
+            match_date_str = raw_date[:10] if raw_date else ''
+            kickoff_str = raw_date[11:16] if len(raw_date) > 11 else ''
         
         return {
             'match_id': match['match_id'],
@@ -360,6 +394,7 @@ class TelegramDGBot:
             'match_date': match_date_str,
             'kickoff': kickoff_str,
             'roi': roi,
+            'roi_reais': lucro_simples,
             'casa': {'bookmaker': best_home['bookmaker_name'], 'odd': home_odd, 'stake': stake_casa},
             'empate': {'bookmaker': best_draw['bookmaker_name'], 'odd': draw_odd, 'stake': stake_empate},
             'fora': {'bookmaker': best_away['bookmaker_name'], 'odd': away_odd, 'stake': stake_fora},
@@ -406,7 +441,7 @@ class TelegramDGBot:
    └ ODD: {dg['fora']['odd']:.2f} | Stake: R$ {dg['fora']['stake']:.2f}
 
 💰 <b>Investimento:</b> R$ {dg['total_stake']:.2f}
-📊 <b>ROI:</b> {roi_sign}{dg['roi']:.2f}%
+📊 <b>ROI:</b> {roi_sign}{dg['roi']:.2f}% ({"+" if dg['roi_reais'] >= 0 else ""}R$ {dg['roi_reais']:.2f})
 ✅ <b>Lucro Duplo Green:</b> {lucro_sign}R$ {dg['lucro']:.2f}
 
 🦈 #BetSharkPro #DuploGreen"""
@@ -507,23 +542,31 @@ class TelegramDGBot:
         
         # Buscar dados
         odds = await self.fetch_odds()
-        enviados = await self.get_enviados_ids()
         
-        self.logger.info(f"Buscando DGs: {len(odds)} odds, {len(enviados)} já enviados hoje")
+        self.logger.info(f"Buscando DGs: {len(odds)} odds")
         
         # Agrupar e processar
         matches = self.group_odds_by_match(odds)
         dgs_encontrados = 0
         
         for match_id, match in matches.items():
-            if match_id in enviados:
-                continue
-            
             dg = self.calculate_dg(match)
             if not dg:
                 continue
             
+            # Verificar se mudou desde último envio (cache em memória)
+            if not self._has_changed(match_id, dg):
+                continue  # Sem mudança, pular
+            
             self.logger.info(f"DG encontrado: {dg['team1']} x {dg['team2']} (ROI: {dg['roi']:.2f}%)")
+            
+            # Verificar delay mínimo de 45 segundos entre envios
+            now = time.time()
+            elapsed = now - self._last_send_time
+            if elapsed < 45:
+                wait_time = 45 - elapsed
+                self.logger.debug(f"Aguardando {wait_time:.0f}s (cooldown 45s)")
+                await asyncio.sleep(wait_time)
             
             # Enviar ao Telegram
             msg_id = await self.send_telegram(dg)
@@ -531,13 +574,12 @@ class TelegramDGBot:
             # SÓ salva e conta se enviou com sucesso
             if msg_id is not None:
                 await self.save_enviado(dg, msg_id)
+                self._last_sent_state[match_id] = self._build_state_key(dg)
+                self._last_send_time = time.time()
                 dgs_encontrados += 1
                 self.logger.info(f"✅ Enviado ao Telegram (msg_id: {msg_id})")
             else:
                 self.logger.error(f"❌ Falha ao enviar {dg['team1']} x {dg['team2']}")
-            
-            # Pequeno intervalo entre envios para não sobrecarregar
-            await asyncio.sleep(2)
         
         return dgs_encontrados
 
