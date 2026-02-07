@@ -1,204 +1,98 @@
 
 
-# Melhorias no Bot Telegram - 3 Correcoes
+# Fix: Impedir mesma casa de aposta no CASA e FORA
 
-## Problema 1: Horario Errado
+## Problema
 
-O bot exibe o horario da partida em UTC (00:30) em vez do horario de Brasilia (21:30). A causa esta nas linhas 352-353 do `run_telegram.py`:
+O `calculate_dg()` seleciona independentemente a melhor odd CASA (PA) e melhor odd FORA (PA), sem verificar se sao da mesma casa de aposta. Quando uma casa (ex: Superbet) tem a melhor odd nos dois lados, o bot envia um DG impossivel de executar.
+
+## Logica da Correcao
+
+Quando CASA e FORA caem na mesma casa, testar duas combinacoes alternativas:
+
+1. **Melhor CASA + segundo melhor FORA** (de outra casa)
+2. **Segundo melhor CASA + melhor FORA** (de outra casa)
+
+Escolher a combinacao que gera o melhor ROI. Se nao existir segundo melhor (so tem 1 casa PA), retornar `None`.
+
+## Mudanca no Arquivo
+
+**`docs/scraper/standalone/run_telegram.py`** - funcao `calculate_dg()`, linhas 314-324
+
+### Codigo atual (linhas 314-324)
 
 ```python
-match_date_str = match['match_date'][:10]
-kickoff_str = match['match_date'][11:16]
+# Melhor Casa (PA)
+pa_with_home = [o for o in pa_odds if o.get('home_odd')]
+if not pa_with_home:
+    return None
+best_home = max(pa_with_home, key=lambda x: x['home_odd'])
+
+# Melhor Fora (PA)
+pa_with_away = [o for o in pa_odds if o.get('away_odd')]
+if not pa_with_away:
+    return None
+best_away = max(pa_with_away, key=lambda x: x['away_odd'])
 ```
 
-O codigo simplesmente fatia a string ISO do banco (que esta em UTC) sem converter para o fuso horario local. Desde 2019, o Brasil nao usa mais horario de verao, entao UTC-3 e fixo.
-
-### Correcao
-
-Na funcao `calculate_dg()`, ao processar `match['match_date']`, converter de UTC para UTC-3 antes de extrair data e hora:
+### Codigo novo
 
 ```python
-from datetime import datetime, timedelta, timezone
+# Melhor Casa (PA)
+pa_with_home = [o for o in pa_odds if o.get('home_odd')]
+if not pa_with_home:
+    return None
+pa_with_home.sort(key=lambda x: x['home_odd'], reverse=True)
 
-# Converter UTC -> Brasilia (UTC-3)
-raw_date = match['match_date']
-try:
-    if 'T' in raw_date:
-        utc_dt = datetime.fromisoformat(raw_date.replace('Z', '+00:00'))
-    else:
-        utc_dt = datetime.strptime(raw_date[:19], '%Y-%m-%d %H:%M:%S')
-        utc_dt = utc_dt.replace(tzinfo=timezone.utc)
+# Melhor Fora (PA)
+pa_with_away = [o for o in pa_odds if o.get('away_odd')]
+if not pa_with_away:
+    return None
+pa_with_away.sort(key=lambda x: x['away_odd'], reverse=True)
+
+best_home = pa_with_home[0]
+best_away = pa_with_away[0]
+
+# Se CASA e FORA cairam na mesma casa, testar alternativas
+if best_home['bookmaker_name'] == best_away['bookmaker_name']:
+    # Filtrar alternativas de casas diferentes
+    alt_home_list = [o for o in pa_with_home if o['bookmaker_name'] != best_away['bookmaker_name']]
+    alt_away_list = [o for o in pa_with_away if o['bookmaker_name'] != best_home['bookmaker_name']]
     
-    brasilia_dt = utc_dt + timedelta(hours=-3)
-    match_date_str = brasilia_dt.strftime('%Y-%m-%d')
-    kickoff_str = brasilia_dt.strftime('%H:%M')
-except:
-    match_date_str = raw_date[:10] if raw_date else ''
-    kickoff_str = raw_date[11:16] if len(raw_date) > 11 else ''
-```
-
----
-
-## Problema 2: Mensagens Duplicadas Sem Parar
-
-O sistema atual de deduplicacao apenas verifica se o `match_id` ja foi enviado hoje (via banco). Isso causa dois problemas:
-
-- Se o DG e detectado em cada ciclo (a cada 60s) com as mesmas odds, ele tenta enviar novamente
-- A unica protecao e o indice unico `(match_id, match_date)` no banco, que impede o INSERT mas nao impede o envio da mensagem no Telegram
-
-O usuario quer:
-- **Nao reenviar** se nada mudou (mesmas casas e odds)
-- **Reenviar** se algo mudou (casa diferente ou odd diferente)
-- **Minimo 45 segundos** entre envios consecutivos
-
-### Correcao
-
-Adicionar um sistema de cache em memoria na classe `TelegramDGBot`:
-
-1. **Dicionario `_last_sent_state`**: Armazena por `match_id` o estado enviado (bookmakers + odds)
-2. **Timestamp `_last_send_time`**: Controla o intervalo minimo entre envios
-3. **Metodo `_has_changed()`**: Compara estado atual com o ultimo enviado
-
-```python
-def __init__(self):
-    ...
-    self._last_sent_state = {}   # match_id -> {casa_bk, casa_odd, empate_bk, ...}
-    self._last_send_time = 0     # timestamp do ultimo envio
-
-def _build_state_key(self, dg: dict) -> dict:
-    """Cria fingerprint do DG para comparacao."""
-    return {
-        'casa_bk': dg['casa']['bookmaker'],
-        'casa_odd': round(dg['casa']['odd'], 2),
-        'empate_bk': dg['empate']['bookmaker'],
-        'empate_odd': round(dg['empate']['odd'], 2),
-        'fora_bk': dg['fora']['bookmaker'],
-        'fora_odd': round(dg['fora']['odd'], 2),
-    }
-
-def _has_changed(self, match_id: str, dg: dict) -> bool:
-    """Verifica se o DG mudou desde o ultimo envio."""
-    current_state = self._build_state_key(dg)
-    last_state = self._last_sent_state.get(match_id)
-    if last_state is None:
-        return True  # Nunca foi enviado nesta sessao
-    return current_state != last_state
-```
-
-No `run_cycle()`, a logica muda para:
-
-```python
-for match_id, match in matches.items():
-    dg = self.calculate_dg(match)
-    if not dg:
-        continue
+    candidates = []
     
-    # Verificar se mudou desde ultimo envio
-    if not self._has_changed(match_id, dg):
-        continue  # Sem mudanca, pular
+    # Opcao 1: melhor CASA original + segundo melhor FORA
+    if alt_away_list:
+        candidates.append((best_home, alt_away_list[0]))
     
-    # Verificar delay minimo de 45 segundos
-    now = time.time()
-    elapsed = now - self._last_send_time
-    if elapsed < 45:
-        await asyncio.sleep(45 - elapsed)
+    # Opcao 2: segundo melhor CASA + melhor FORA original
+    if alt_home_list:
+        candidates.append((alt_home_list[0], best_away))
     
-    # Enviar
-    msg_id = await self.send_telegram(dg)
-    if msg_id is not None:
-        await self.save_enviado(dg, msg_id)
-        self._last_sent_state[match_id] = self._build_state_key(dg)
-        self._last_send_time = time.time()
+    if not candidates:
+        return None  # So tem 1 casa PA, impossivel montar DG
+    
+    # Escolher a combinacao com maior soma de odds (melhor ROI)
+    best_home, best_away = max(candidates, key=lambda c: c[0]['home_odd'] + c[1]['away_odd'])
 ```
 
-A verificacao de `enviados` (banco) e removida - o controle agora e feito pelo cache em memoria. Isso permite reenviar se houver mudanca, mas nao reenviar se estiver igual.
+## Comportamento esperado
 
-O indice unico `(match_id, match_date)` no banco precisa ser removido ou alterado, ja que agora queremos permitir multiplos registros do mesmo match quando houver mudanca.
-
-### Mudanca no banco
-
-```sql
-DROP INDEX IF EXISTS idx_telegram_dg_match_date;
-```
-
----
-
-## Problema 3: Adicionar ROI em R$
-
-O bot mostra apenas `ROI: +0.06%` mas o usuario quer tambem o valor em Reais.
-
-O ROI em R$ e o lucro simples: `retorno_green - total_stake` (lucro se acertar 1 resultado).
-
-### Correcao
-
-Na mensagem do Telegram (metodo `send_telegram`), adicionar uma linha:
-
-```
-Antes:
-📊 ROI: +0.06%
-✅ Lucro Duplo Green: +R$ 1701.04
-
-Depois:
-📊 ROI: +0.06% (R$ +1.02)
-✅ Lucro Duplo Green: +R$ 1701.04
-```
-
-O calculo do ROI em R$ ja existe no `calculate_dg()` como `lucro_simples = retorno_green - total_stake`. Basta adiciona-lo ao retorno e a mensagem.
-
-No dicionario retornado por `calculate_dg()`, adicionar:
-
-```python
-'roi_reais': lucro_simples,  # ROI em R$
-```
-
-Na mensagem:
-
-```python
-roi_reais_sign = '+' if dg['roi_reais'] >= 0 else ''
-# Linha atualizada:
-f"📊 <b>ROI:</b> {roi_sign}{dg['roi']:.2f}% ({roi_reais_sign}R$ {dg['roi_reais']:.2f})"
-```
-
----
-
-## Resumo das mudancas
-
-### Arquivo: `docs/scraper/standalone/run_telegram.py`
-
-| Local | Mudanca |
+| Cenario | Resultado |
 |---|---|
-| `__init__()` | Adicionar `self._last_sent_state = {}` e `self._last_send_time = 0` |
-| Nova funcao `_build_state_key()` | Cria fingerprint do DG |
-| Nova funcao `_has_changed()` | Compara com ultimo envio |
-| `calculate_dg()` linhas 352-353 | Converter UTC para UTC-3 (Brasilia) |
-| `calculate_dg()` retorno | Adicionar campo `roi_reais` |
-| `send_telegram()` mensagem | Adicionar ROI em R$ na linha do ROI |
-| `run_cycle()` linhas 518-541 | Substituir logica de dedup por cache + delay 45s |
-| Import | Adicionar `import time` |
+| Superbet tem melhor CASA e FORA | Testa "Superbet CASA + 2o FORA" vs "2o CASA + Superbet FORA", escolhe o melhor |
+| Casas diferentes nos dois lados | Nenhuma mudanca, funciona como antes |
+| So 1 casa PA disponivel | Retorna None (DG impossivel) |
 
-### Banco de dados (SQL manual)
+## Nenhum outro arquivo afetado
 
-```sql
-DROP INDEX IF EXISTS idx_telegram_dg_match_date;
+A mudanca e exclusivamente na logica de selecao dentro de `calculate_dg()`. O formato da mensagem, o state tracking e tudo mais permanecem iguais.
+
+## Deploy
+
 ```
-
-Este DROP e necessario para permitir multiplos registros do mesmo match quando houver mudanca de odds.
-
-### Nenhum outro arquivo afetado
-
-O frontend (`TelegramBot.tsx`) e os tipos (`telegram.ts`) nao precisam de mudanca.
-
-### Deploy
-
-```text
-1. Rodar SQL no Supabase: DROP INDEX IF EXISTS idx_telegram_dg_match_date;
-2. git pull no VPS
-3. pm2 restart telegram-dg-bot
-4. pm2 logs telegram-dg-bot --lines 20
-5. Esperado:
-   - Horarios corretos (21:30 em vez de 00:30)
-   - Sem mensagens duplicadas quando nada muda
-   - Reenvio apenas quando casa ou odd muda (com delay de 45s)
-   - ROI mostrando % e R$
+1. git pull no VPS
+2. pm2 restart telegram-dg-bot
+3. pm2 logs telegram-dg-bot --lines 20
+4. Verificar que CASA e FORA mostram casas diferentes
 ```
-
