@@ -745,24 +745,31 @@ class SupabaseClient:
         return all_data
     
     async def fetch_odds_for_json(self) -> List[Dict[str, Any]]:
-        """Fetch all football odds data from the comparison view for JSON export."""
+        """Fetch football odds via RPC function (optimized, no pagination needed)."""
         try:
-            data = self._fetch_all_paginated("odds_comparison", "match_date")
-            self.logger.info(f"Fetched {len(data)} football odds rows (paginated)")
+            response = self.client.rpc("get_odds_for_json", {"p_sport_type": "football"}).execute()
+            data = response.data or []
+            self.logger.info(f"Fetched {len(data)} football odds rows (RPC)")
             return data
         except Exception as e:
-            self.logger.error(f"Error fetching odds for JSON: {e}")
-            return []
+            self.logger.warning(f"RPC failed, falling back to view: {e}")
+            # Fallback to paginated view
+            data = self._fetch_all_paginated("odds_comparison", "match_date")
+            self.logger.info(f"Fetched {len(data)} football odds rows (fallback)")
+            return data
     
     async def fetch_nba_odds_for_json(self) -> List[Dict[str, Any]]:
-        """Fetch all NBA odds data from the nba_odds_comparison view for JSON export."""
+        """Fetch NBA odds via RPC function (optimized, no pagination needed)."""
         try:
-            data = self._fetch_all_paginated("nba_odds_comparison", "match_date")
-            self.logger.info(f"Fetched {len(data)} NBA odds rows (paginated)")
+            response = self.client.rpc("get_nba_odds_for_json").execute()
+            data = response.data or []
+            self.logger.info(f"Fetched {len(data)} NBA odds rows (RPC)")
             return data
         except Exception as e:
-            self.logger.error(f"Error fetching NBA odds for JSON: {e}")
-            return []
+            self.logger.warning(f"NBA RPC failed, falling back to view: {e}")
+            data = self._fetch_all_paginated("nba_odds_comparison", "match_date")
+            self.logger.info(f"Fetched {len(data)} NBA odds rows (fallback)")
+            return data
     
     def upload_odds_json(self, data: Dict[str, Any]) -> bool:
         """
