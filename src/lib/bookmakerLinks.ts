@@ -49,8 +49,8 @@ export function generateBookmakerLink(
   }
   
   if (name.includes('br4bet')) {
-    const eventId = extraData.br4bet_event_id;
-    const country = extraData.br4bet_country || 'italia';
+    const eventId = extraData.br4bet_event_id || extraData.event_id;
+    const country = (extraData.br4bet_country || extraData.country || 'italia') as string;
     if (eventId && homeTeam && awayTeam) {
       const homeSlug = homeTeam.toLowerCase().replace(/\s+/g, '-').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
       const awaySlug = awayTeam.toLowerCase().replace(/\s+/g, '-').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
