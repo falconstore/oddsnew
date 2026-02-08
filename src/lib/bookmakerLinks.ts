@@ -174,8 +174,8 @@ export function generateBookmakerLink(
     }
   }
   
-  if (name.includes('jogodeouro')) {
-    const eventId = extraData.jogodeouro_event_id;
+  if (name.includes('jogodeouro') || name.includes('jogo de ouro')) {
+    const eventId = extraData.jogodeouro_event_id || extraData.event_id;
     if (eventId) {
       return `https://jogodeouro.bet.br/pt/sports?page=event&eventId=${eventId}&sportId=66`;
     }

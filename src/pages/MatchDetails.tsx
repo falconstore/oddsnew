@@ -272,9 +272,9 @@ function generateBookmakerLink(
     }
   }
   
-  // Jogo de Ouro - query params format
-  if (name.includes('jogodeouro')) {
-    const eventId = extraData.jogodeouro_event_id;
+  // Jogo de Ouro - query params format (cobrir "jogodeouro" e "jogo de ouro")
+  if (name.includes('jogodeouro') || name.includes('jogo de ouro')) {
+    const eventId = extraData.jogodeouro_event_id || extraData.event_id;
     if (eventId) {
       return `https://jogodeouro.bet.br/pt/sports?page=event&eventId=${eventId}&sportId=66`;
     }
@@ -314,9 +314,15 @@ function OddsRow({
   const [copied, setCopied] = useState(false);
   const bookmakerLink = generateBookmakerLink(odds.bookmaker_name, odds.extra_data, homeTeam, awayTeam);
 
+  // Debug temporário para diagnosticar extra_data de br4bet e jogo de ouro
+  if (odds.bookmaker_name.toLowerCase().includes('br4bet') || 
+      odds.bookmaker_name.toLowerCase().includes('jogo')) {
+    console.log(`[DEBUG] ${odds.bookmaker_name} extra_data:`, odds.extra_data);
+  }
+
   const getOddsType = (bookmakerName: string): 'SO' | 'PA' => {
     const name = bookmakerName.toLowerCase();
-    if (name.includes('novibet') || name.includes('betbra')) {
+    if (name.includes('novibet') || name.includes('betbra') || name.includes('betnacional') || name.includes('tradeball')) {
       return 'SO';
     }
     return 'PA';
