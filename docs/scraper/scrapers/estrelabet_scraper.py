@@ -27,12 +27,12 @@ class EstrelabetScraper(BaseScraper):
         "serie_a": {"champ_id": "2942", "name": "Serie A", "country": "Italia"},
         "premier_league": {"champ_id": "2936", "name": "Premier League", "country": "Inglaterra"},
         "la_liga": {"champ_id": "2941", "name": "La Liga", "country": "Espanha"},
-	    "bundesliga": {"champ_id": "2950", "name": "Bundesliga", "country": "Alemanha"},
-	    "ligue_1": {"champ_id": "2943", "name": "Ligue 1", "country": "Franca"},
-	    "paulista": {"champ_id": "3436", "name": "Paulistao A1", "country": "Brasil"},
-	    "fa_cup": {"champ_id": "2935", "name": "FA Cup", "country": "Inglaterra"},
-	    "efl_cup": {"champ_id": "2972", "name": "EFL Cup", "country": "Inglaterra"},
-	    "champions_league": {"champ_id": "16808", "name": "Champions League", "country": "Europa"},
+        "bundesliga": {"champ_id": "2950", "name": "Bundesliga", "country": "Alemanha"},
+        "ligue_1": {"champ_id": "2943", "name": "Ligue 1", "country": "Franca"},
+        "paulista": {"champ_id": "3436", "name": "Paulistao A1", "country": "Brasil"},
+        "fa_cup": {"champ_id": "2935", "name": "FA Cup", "country": "Inglaterra"},
+        "efl_cup": {"champ_id": "2972", "name": "EFL Cup", "country": "Inglaterra"},
+        "champions_league": {"champ_id": "16808", "name": "Champions League", "country": "Europa"},
         "copa_do_rei": {"champ_id": "2973", "name": "Copa do Rei", "country": "Espanha"},
         "liga_europa": {"champ_id": "16809", "name": "Liga Europa", "country": "Europa"},
         "liga_da_conferencia": {"champ_id": "31608", "name": "Liga da Conferencia", "country": "Europa"},
@@ -183,7 +183,7 @@ class EstrelabetScraper(BaseScraper):
         return self._parse_basketball_response(data, config["name"])
 
     def _parse_football_response(self, data: Dict[str, Any], league_name: str) -> List[ScrapedOdds]:
-        """Parse Altenar API response for Football 1X2 odds."""
+        """Parse Altenar API response for Football 1X2 odds (PA + SO)."""
         results = []
         
         all_odds = {o["id"]: o for o in data.get("odds", [])}
@@ -207,8 +207,7 @@ class EstrelabetScraper(BaseScraper):
                 except:
                     dt = datetime.now()
                 
-                # Find 1X2 market (typeId=1)
-                found_odds = {}
+                odds_by_type = {}
                 
                 for mid in market_ids:
                     market = all_markets.get(mid)
@@ -216,6 +215,13 @@ class EstrelabetScraper(BaseScraper):
                         continue
                     
                     if market.get("typeId") == 1:
+                        market_name = market.get("name", "")
+                        if "Super Odds" in market_name:
+                            odds_type = "SO"
+                        else:
+                            odds_type = "PA"
+                        
+                        found_odds = {}
                         for odd_id in market.get("oddIds", []):
                             odd = all_odds.get(odd_id)
                             if not odd:
@@ -231,9 +237,10 @@ class EstrelabetScraper(BaseScraper):
                             elif type_id == 3:
                                 found_odds['away'] = price
                         
-                        break
+                        if len(found_odds) == 3:
+                            odds_by_type[odds_type] = found_odds
                 
-                if len(found_odds) == 3:
+                for odds_type, found_odds in odds_by_type.items():
                     scraped = ScrapedOdds(
                         bookmaker_name="estrelabet",
                         home_team_raw=home_raw.strip(),
@@ -245,6 +252,7 @@ class EstrelabetScraper(BaseScraper):
                         away_odd=found_odds['away'],
                         sport="football",
                         market_type="1x2",
+                        odds_type=odds_type,
                         extra_data={"event_id": str(event_id)}
                     )
                     results.append(scraped)
@@ -252,7 +260,9 @@ class EstrelabetScraper(BaseScraper):
             except Exception as e:
                 continue
 
-        self.logger.info(f"Futebol {league_name}: {len(results)} jogos")
+        so_count = len([r for r in results if r.odds_type == "SO"])
+        pa_count = len([r for r in results if r.odds_type == "PA"])
+        self.logger.info(f"Futebol {league_name}: {pa_count} PA + {so_count} SO = {len(results)} total")
         return results
 
     def _parse_basketball_response(self, data: Dict[str, Any], league_name: str) -> List[ScrapedOdds]:
@@ -354,11 +364,13 @@ if __name__ == "__main__":
         
         football = [o for o in odds if o.sport == "football"]
         basketball = [o for o in odds if o.sport == "basketball"]
+        so_count = len([o for o in football if o.odds_type == "SO"])
+        pa_count = len([o for o in football if o.odds_type == "PA"])
         
-        print(f"Futebol: {len(football)}")
+        print(f"Futebol: {len(football)} ({pa_count} PA + {so_count} SO)")
         print(f"Basquete: {len(basketball)}")
         
-        for o in odds[:5]:
-            print(f"{o.home_team_raw} vs {o.away_team_raw} ({o.sport})")
+        for o in odds[:10]:
+            print(f"[{o.odds_type}] {o.home_team_raw} vs {o.away_team_raw} ({o.sport}) - {o.home_odd}/{o.draw_odd}/{o.away_odd}")
             
     asyncio.run(run())
