@@ -413,38 +413,54 @@ export const useOddsComparison = (filters?: {
 
       return matches;
     },
-    refetchInterval: 15000, // Fetch new JSON every 15 seconds
-    staleTime: 10000,
+    refetchInterval: 30000, // Fetch new JSON every 30 seconds (was 15s - reduces IO)
+    staleTime: 20000, // Consider data stale after 20s
     placeholderData: (previousData) => previousData, // Mantém dados antigos durante refetch
     retry: 3,
   });
 };
 
-// Fallback function for when JSON is not available
+// Fallback function for when JSON is not available (with pagination to bypass 1000-row limit)
 async function fallbackDatabaseQuery(filters?: {
   leagueName?: string;
   dateFrom?: string;
   dateTo?: string;
 }): Promise<MatchOddsGroup[]> {
-  let query = supabase
-    .from('odds_comparison')
-    .select('*')
-    .order('match_date', { ascending: true });
+  const allData: OddsComparison[] = [];
+  let offset = 0;
+  const batchSize = 1000;
+  let hasMore = true;
 
-  if (filters?.leagueName) {
-    query = query.eq('league_name', filters.leagueName);
-  }
-  if (filters?.dateFrom) {
-    query = query.gte('match_date', filters.dateFrom);
-  }
-  if (filters?.dateTo) {
-    query = query.lte('match_date', filters.dateTo);
+  while (hasMore) {
+    let query = supabase
+      .from('odds_comparison')
+      .select('*')
+      .order('match_date', { ascending: true })
+      .range(offset, offset + batchSize - 1);
+
+    if (filters?.leagueName) {
+      query = query.eq('league_name', filters.leagueName);
+    }
+    if (filters?.dateFrom) {
+      query = query.gte('match_date', filters.dateFrom);
+    }
+    if (filters?.dateTo) {
+      query = query.lte('match_date', filters.dateTo);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    if (data && data.length > 0) {
+      allData.push(...(data as OddsComparison[]));
+      offset += batchSize;
+      hasMore = data.length === batchSize;
+    } else {
+      hasMore = false;
+    }
   }
 
-  const { data, error } = await query;
-  if (error) throw error;
-
-  return groupOddsByMatch(data as OddsComparison[]);
+  return groupOddsByMatch(allData);
 }
 
 function groupOddsByMatch(data: OddsComparison[]): MatchOddsGroup[] {
