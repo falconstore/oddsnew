@@ -113,8 +113,8 @@ function generateBookmakerLink(
   }
   
   if (name.includes('br4bet')) {
-    const eventId = extraData.br4bet_event_id;
-    const country = extraData.br4bet_country || 'italia';
+    const eventId = extraData.br4bet_event_id || extraData.event_id;
+    const country = (extraData.br4bet_country || extraData.country || 'italia') as string;
     if (eventId && homeTeam && awayTeam) {
       const homeSlug = homeTeam.toLowerCase().replace(/\s+/g, '-').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
       const awaySlug = awayTeam.toLowerCase().replace(/\s+/g, '-').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -314,10 +314,10 @@ function OddsRow({
   const [copied, setCopied] = useState(false);
   const bookmakerLink = generateBookmakerLink(odds.bookmaker_name, odds.extra_data, homeTeam, awayTeam);
 
-  // Debug temporário para diagnosticar extra_data de br4bet e jogo de ouro
+  // Debug temporário - verificar extra_data e odds_type
   if (odds.bookmaker_name.toLowerCase().includes('br4bet') || 
-      odds.bookmaker_name.toLowerCase().includes('jogo')) {
-    console.log(`[DEBUG] ${odds.bookmaker_name} extra_data:`, odds.extra_data);
+      odds.bookmaker_name.toLowerCase().includes('estrelabet')) {
+    console.log(`[DEBUG] ${odds.bookmaker_name} | odds_type: ${odds.odds_type} | extra_data:`, odds.extra_data);
   }
 
   const getOddsType = (bookmakerName: string): 'SO' | 'PA' => {
@@ -849,7 +849,7 @@ const MatchDetails = () => {
                     // Pass best values from the corresponding group
                     elements.push(
                       <OddsRow 
-                        key={`${odds.bookmaker_id}-${odds.odds_type ?? 'PA'}`}
+                        key={`${odds.bookmaker_id}-${odds.odds_type ?? 'PA'}-${index}`}
                         odds={odds} 
                         bestHome={isSOType ? bestSO.home : bestPA.home}
                         bestDraw={isSOType ? bestSO.draw : bestPA.draw}
