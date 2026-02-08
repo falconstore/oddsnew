@@ -1,151 +1,148 @@
 
+# Correcao: Links br4bet + Estrelabet PA/SO dupla
 
-# Revisao Geral: Reset de Odds + Links br4bet/jogodeouro + Estrelabet PA/SO
+## Diagnostico Completo
 
-## Diagnostico
+Tracei todo o pipeline desde o scraper ate o frontend para ambos os problemas.
 
-Tracei todo o pipeline para os tres problemas:
+### Problema 1: Link da br4bet nao aparece
 
-### 1. Links br4bet e jogodeouro sumiram
+**Pipeline verificado:**
+- Scraper: Correto - seta `extra_data = {"br4bet_event_id": "...", "br4bet_country": "..."}` (linhas 407-410 do `br4bet_scraper.py`)
+- Orchestrator: Correto - passa `extra_data: odds.extra_data or {}` (linha 507)
+- Database: Correto - coluna JSONB com default `{}`
+- View: Correto - inclui `oh.extra_data`
+- JSON Generator: Correto - inclui `row.get("extra_data")`
+- Frontend: Verifica `extraData.br4bet_event_id` (linhas 115-123)
 
-A funcao `generateBookmakerLink` em `MatchDetails.tsx` depende do campo `extra_data` de cada odd. Se `extra_data` for `null` ou `{}`, nenhum link e gerado. Possivel causa: a query de reparo de dados (`UPDATE is_latest`) pode ter promovido registros antigos (sem extra_data) como "mais recentes", sobrescrevendo os que tinham links.
+**Causa provavel**: Apos o UPDATE de `is_latest` que fizemos anteriormente, registros antigos sem `extra_data` (ou com `extra_data = {}`) foram promovidos como "mais recentes", e mesmo apos o reset, pode ser que os scrapers ainda nao tenham rodado um ciclo completo. Alem disso, falta um fallback para `event_id` (como fizemos com jogodeouro).
 
-Alem disso, existe um risco de nome: se o bookmaker no banco for "jogo de ouro" (com espacos), o check `name.includes('jogodeouro')` falha. O frontend precisa tratar ambas as variantes.
+**Correcao**: Adicionar fallback `event_id` no br4bet e melhorar o debug.
 
-### 2. Estrelabet PA/SO nao aparece no frontend
+### Problema 2: Estrelabet mostra apenas PA ou SO, nunca ambos
 
-O banco tem ambos PA e SO com `is_latest = TRUE` (confirmado pelo usuario). O trigger esta correto. O JSON generator inclui `extra_data` e `odds_type`. Se o JSON tem ambos e o frontend usa `key={bookmaker_id-odds_type}`, deveria renderizar ambos. O reset vai limpar qualquer dado inconsistente e permitir dados frescos.
+**Pipeline verificado:**
+- Database: Confirmado - 141 PA + 19 SO com `is_latest = TRUE`
+- View `odds_comparison`: Inclui `odds_type` e retorna ambos
+- JSON Generator (`run_json_generator.py`): NAO faz deduplicacao - apenas appenda todas as odds por match (linha 132: `group["odds"].append(bookmaker_odds)`)
+- Frontend `sortBookmakerOdds`: Separa corretamente PA e SO com base em `odds.odds_type`
+- React key: `${bookmaker_id}-${odds.odds_type ?? 'PA'}` - chaves unicas
 
-### 3. Dados estranhos/inconsistentes
+**O pipeline inteiro parece correto!** O problema pode ser:
+1. O `odds.json` no Storage NAO contem ambos os tipos (verificar com curl)
+2. Os dados no JSON estao corretos mas a renderizacao tem um bug sutil
+3. `odds_type` esta chegando como `null` para ambos os registros, fazendo ambas as keys serem `uuid-PA`
 
-Apos multiplas correcoes de trigger e reparos de dados, o historico pode ter registros orfaos, duplicatas, ou records sem extra_data marcados como latest. Um reset limpo e a melhor abordagem.
+**Correcao**: Adicionar debug logging detalhado + verificar se o JSON realmente contem ambos os tipos.
 
 ---
 
-## Plano de Acao
+## Mudancas no Frontend
 
-### Parte 1: SQL para resetar TODOS os dados de odds (executar no Supabase SQL Editor)
+### 1. `src/pages/MatchDetails.tsx` - Link br4bet com fallback
 
-```sql
--- RESET COMPLETO DE ODDS (futebol + NBA)
--- Isso vai limpar o frontend imediatamente
-
--- 1. Deletar todas as odds de futebol
-DELETE FROM public.odds_history;
-
--- 2. Deletar todas as odds de NBA
-DELETE FROM public.nba_odds_history;
-
--- 3. Deletar todos os alertas (dependem de partidas)
-DELETE FROM public.alerts;
-
--- Verificar que ficou vazio:
-SELECT 'odds_history' AS tabela, COUNT(*) FROM odds_history
-UNION ALL
-SELECT 'nba_odds_history', COUNT(*) FROM nba_odds_history
-UNION ALL
-SELECT 'alerts', COUNT(*) FROM alerts;
-```
-
-Isso vai:
-- Limpar todas as odds (o frontend mostrara 0 partidas apos o JSON generator rodar)
-- Manter as partidas, times, ligas, aliases (nao precisa recriar)
-- Apos 1-2 ciclos dos scrapers (~40 segundos), dados frescos com `extra_data` correto vao aparecer
-- O JSON generator vai gerar um `odds.json` vazio e depois um com dados novos
-
-### Parte 2: Frontend - Corrigir links br4bet e jogodeouro (MatchDetails.tsx)
-
-Tornar o matching de nomes mais robusto para cobrir variantes com/sem espaco:
-
-**Arquivo: `src/pages/MatchDetails.tsx`**
-
-Dentro de `generateBookmakerLink`, linhas 115 e 276:
+Linha 115-123: Adicionar fallback para `event_id` (caso o scraper use outra chave):
 
 ```typescript
-// Antes (linha 115):
 if (name.includes('br4bet')) {
+    const eventId = extraData.br4bet_event_id || extraData.event_id;
+    const country = (extraData.br4bet_country || extraData.country || 'italia') as string;
+    if (eventId && homeTeam && awayTeam) {
+```
 
-// Depois (sem mudanca necessaria - br4bet e sempre uma palavra):
+### 2. `src/lib/bookmakerLinks.ts` - Mesma correcao do br4bet
+
+Linha 47-55: Mesma logica de fallback:
+
+```typescript
 if (name.includes('br4bet')) {
-
-// Antes (linha 276):
-if (name.includes('jogodeouro')) {
-
-// Depois (cobrir "jogo de ouro" e "jogodeouro"):
-if (name.includes('jogodeouro') || name.includes('jogo de ouro')) {
+    const eventId = extraData.br4bet_event_id || extraData.event_id;
+    const country = (extraData.br4bet_country || extraData.country || 'italia') as string;
+    if (eventId && homeTeam && awayTeam) {
 ```
 
-E na mesma funcao, adicionar fallback para `jogodeouro_event_id` OU `event_id`:
+### 3. `src/pages/MatchDetails.tsx` - Debug logging aprimorado
+
+Substituir o debug atual (linhas 317-321) por um mais completo que cobre br4bet E Estrelabet:
 
 ```typescript
-// Antes:
-const eventId = extraData.jogodeouro_event_id;
-
-// Depois:
-const eventId = extraData.jogodeouro_event_id || extraData.event_id;
-```
-
-Mesma correcao no arquivo `src/lib/bookmakerLinks.ts` (funcao duplicada).
-
-### Parte 3: Frontend - Corrigir getOddsType fallback (MatchDetails.tsx)
-
-**Arquivo: `src/pages/MatchDetails.tsx`**, linha 319:
-
-```typescript
-// Antes:
-if (name.includes('novibet') || name.includes('betbra')) {
-
-// Depois:
-if (name.includes('novibet') || name.includes('betbra') || name.includes('betnacional') || name.includes('tradeball')) {
-```
-
-### Parte 4: Frontend - Adicionar log de debug temporario
-
-Para diagnosticar se `extra_data` chega ao frontend, adicionar um `console.log` temporario no `OddsRow` que mostra o extra_data de br4bet e jogodeouro:
-
-```typescript
-// Em OddsRow, apos a linha 315:
+// Debug temporario - verificar extra_data e odds_type
 if (odds.bookmaker_name.toLowerCase().includes('br4bet') || 
-    odds.bookmaker_name.toLowerCase().includes('jogo')) {
-  console.log(`[DEBUG] ${odds.bookmaker_name} extra_data:`, odds.extra_data);
+    odds.bookmaker_name.toLowerCase().includes('estrelabet')) {
+  console.log(`[DEBUG] ${odds.bookmaker_name} | odds_type: ${odds.odds_type} | extra_data:`, odds.extra_data);
 }
 ```
 
-Isso aparecera no console do navegador e permitira verificar se `extra_data` esta chegando com os campos esperados.
+Isso vai mostrar no console:
+- Se `extra_data` do br4bet tem `br4bet_event_id`
+- Se `odds_type` da Estrelabet esta chegando como "PA" e "SO" (ou ambos null)
+
+### 4. `src/pages/MatchDetails.tsx` - Protecao contra odds_type null
+
+Na funcao `sortBookmakerOdds` (linha 31), garantir que `odds_type` null nao cause duplicatas:
+
+```typescript
+// Na linha 31, dentro do forEach:
+const oddsType = odd.odds_type || (knownSOBookmakers.some(b => name.includes(b)) ? 'SO' : 'PA');
+```
+
+Este codigo ja existe e esta correto. Mas a key do React na linha 852 precisa ser mais robusta:
+
+```typescript
+// Antes (linha 852):
+key={`${odds.bookmaker_id}-${odds.odds_type ?? 'PA'}`}
+
+// Depois (incluir index como fallback de seguranca):
+key={`${odds.bookmaker_id}-${odds.odds_type ?? 'PA'}-${index}`}
+```
+
+Isso garante que mesmo se dois registros tiverem a mesma combinacao bookmaker_id + odds_type (por um bug), ambos vao renderizar.
 
 ---
 
-## Resumo das mudancas
+## SQL de Verificacao (para o usuario rodar no Supabase)
 
-| O que | Onde | Mudanca |
-|---|---|---|
-| Reset completo de odds | Supabase SQL Editor | DELETE de odds_history, nba_odds_history, alerts |
-| Link jogodeouro robusto | `src/pages/MatchDetails.tsx` linha 276 | Adicionar `name.includes('jogo de ouro')` |
-| Link jogodeouro fallback | `src/pages/MatchDetails.tsx` linha 277 | Adicionar `extraData.event_id` como fallback |
-| Link jogodeouro (lib) | `src/lib/bookmakerLinks.ts` linha 177 | Mesma correcao |
-| getOddsType fallback | `src/pages/MatchDetails.tsx` linha 319 | Adicionar betnacional e tradeball |
-| Debug log temporario | `src/pages/MatchDetails.tsx` OddsRow | console.log para extra_data |
+Apos o reset e 1-2 ciclos dos scrapers, rodar:
 
-## Sequencia de deploy
+```sql
+-- Verificar se br4bet tem extra_data preenchido
+SELECT bookmaker_name, odds_type, extra_data 
+FROM odds_comparison 
+WHERE bookmaker_name ILIKE '%br4bet%' 
+LIMIT 3;
 
-```text
-1. Supabase SQL Editor:
-   - Executar o DELETE de odds_history, nba_odds_history e alerts
-   - Verificar que as tabelas ficaram vazias
-
-2. Frontend (automatico via Lovable):
-   - Publicar apos aprovacao
-
-3. VPS:
-   - Os scrapers ja estao rodando e vao popular dados frescos
-   - Aguardar 1-2 ciclos (~40 segundos)
-   - O JSON generator vai gerar odds.json com dados novos
-
-4. Verificacao:
-   - Abrir qualquer partida no frontend
-   - Verificar console do navegador para logs "[DEBUG] br4bet extra_data:"
-   - Se extra_data tiver br4bet_event_id, os icones devem aparecer
-   - Se extra_data for null/vazio, o problema esta no scraper ou orchestrator
-   - Verificar Estrelabet aparecendo com PA e SO separados
+-- Verificar se Estrelabet tem PA E SO
+SELECT bookmaker_name, odds_type, COUNT(*) 
+FROM odds_comparison 
+WHERE bookmaker_name ILIKE '%estrelabet%' 
+GROUP BY bookmaker_name, odds_type;
 ```
 
+Se br4bet mostrar `extra_data: {}` ou `null`, o scraper nao esta enviando o event_id. Se Estrelabet mostrar apenas um odds_type, o trigger ou o scraper tem um bug.
+
+---
+
+## Resumo das mudancas por arquivo
+
+| Arquivo | Linha | Mudanca |
+|---|---|---|
+| `src/pages/MatchDetails.tsx` | 116-117 | br4bet: fallback `event_id` e `country` |
+| `src/pages/MatchDetails.tsx` | 317-321 | Debug log: incluir Estrelabet, remover jogodeouro |
+| `src/pages/MatchDetails.tsx` | 852 | Key do React: adicionar index para seguranca |
+| `src/lib/bookmakerLinks.ts` | 48-49 | br4bet: fallback `event_id` e `country` |
+
+## Deploy
+
+```text
+1. Frontend: automatico via Lovable (publicar apos aprovacao)
+2. Verificar console do navegador:
+   - Abrir qualquer jogo com br4bet
+   - Procurar "[DEBUG] br4bet | odds_type: PA | extra_data: {...}"
+   - Se extra_data tiver br4bet_event_id, o link deve aparecer
+   - Se extra_data for null/{}, o scraper nao esta enviando
+3. Para Estrelabet:
+   - Procurar "[DEBUG] Estrelabet | odds_type: PA | extra_data: {...}"
+   - E "[DEBUG] Estrelabet | odds_type: SO | extra_data: {...}"
+   - Se so aparecer UM tipo, o dados no JSON tem apenas um tipo
+4. Rodar as queries SQL de verificacao
+```
