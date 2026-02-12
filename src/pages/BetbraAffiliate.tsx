@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { usePersistedState } from '@/hooks/usePersistedState';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Plus, Calendar, RefreshCw, Download } from 'lucide-react';
@@ -35,7 +36,7 @@ export default function BetbraAffiliate() {
 
   const [showModal, setShowModal] = useState(false);
   const [editingEntry, setEditingEntry] = useState<BetbraEntry | null>(null);
-  const [selectedMonth, setSelectedMonth] = useState(new Date());
+  const [selectedMonth, setSelectedMonth] = usePersistedState('betbra_month', new Date());
 
   // Filter entries by selected month
   const filteredEntries = useMemo(() => {

@@ -6,8 +6,6 @@ import { PAGE_KEYS } from '@/types/auth';
 
 // Pages
 import Dashboard from '@/pages/Dashboard';
-import MonitorFutebol from '@/pages/MonitorFutebol';
-import MonitorBasquete from '@/pages/MonitorBasquete';
 import MatchDetails from '@/pages/MatchDetails';
 import EntityManagement from '@/pages/EntityManagement';
 import Settings from '@/pages/Settings';
@@ -18,7 +16,7 @@ import ScraperStatus from '@/pages/admin/ScraperStatus';
 import ProcedureControl from '@/pages/ProcedureControl';
 import BetbraAffiliate from '@/pages/BetbraAffiliate';
 import Subscriptions from '@/pages/Subscriptions';
-import FreebetExtraction from '@/pages/FreebetExtraction';
+
 import TelegramBot from '@/pages/TelegramBot';
 import NotFound from '@/pages/NotFound';
 
@@ -59,27 +57,6 @@ export function AnimatedRoutes() {
           <RequireAuth pageKey={PAGE_KEYS.DASHBOARD}>
             <PageTransition>
               <Dashboard />
-            </PageTransition>
-          </RequireAuth>
-        } />
-        <Route path="/monitor-futebol" element={
-          <RequireAuth pageKey={PAGE_KEYS.MONITOR_FUTEBOL}>
-            <PageTransition>
-              <MonitorFutebol />
-            </PageTransition>
-          </RequireAuth>
-        } />
-        <Route path="/monitor-basquete" element={
-          <RequireAuth pageKey={PAGE_KEYS.MONITOR_BASQUETE}>
-            <PageTransition>
-              <MonitorBasquete />
-            </PageTransition>
-          </RequireAuth>
-        } />
-        <Route path="/freebet" element={
-          <RequireAuth pageKey={PAGE_KEYS.FREEBET_EXTRACTION}>
-            <PageTransition>
-              <FreebetExtraction />
             </PageTransition>
           </RequireAuth>
         } />
