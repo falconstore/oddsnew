@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { usePersistedState } from '@/hooks/usePersistedState';
 import { startOfMonth, endOfMonth, endOfDay, differenceInDays, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { 
@@ -55,12 +56,12 @@ export default function ProcedureControl() {
   
   const [showModal, setShowModal] = useState(false);
   const [editingProcedure, setEditingProcedure] = useState<Procedure | null>(null);
-  const [selectedMonth, setSelectedMonth] = useState(new Date());
+  const [selectedMonth, setSelectedMonth] = usePersistedState('proc_month', new Date());
   const [showNotifications, setShowNotifications] = useState(true);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showColumnCustomizer, setShowColumnCustomizer] = useState(false);
   
-  const [filters, setFilters] = useState<FiltersType>({
+  const [filters, setFilters] = usePersistedState<FiltersType>('proc_filters', {
     searchNumber: '',
     searchPromotion: '',
     searchTags: 'all',
@@ -73,10 +74,7 @@ export default function ProcedureControl() {
     onlyFavorites: false
   });
   
-  const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
-    const saved = localStorage.getItem('procedureVisibleColumns');
-    return saved ? JSON.parse(saved) : AVAILABLE_COLUMNS.map(col => col.key);
-  });
+  const [visibleColumns, setVisibleColumns] = usePersistedState<string[]>('proc_columns', AVAILABLE_COLUMNS.map(col => col.key));
 
   const handleEdit = (proc: Procedure) => {
     setEditingProcedure(proc);

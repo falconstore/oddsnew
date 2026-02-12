@@ -1,4 +1,4 @@
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Trophy, Users, Building2 } from 'lucide-react';
@@ -8,6 +8,7 @@ import { LeaguesTab } from '@/components/entities/LeaguesTab';
 import { TeamsTab } from '@/components/entities/TeamsTab';
 import { BookmakersTab } from '@/components/entities/BookmakersTab';
 import { useMemo } from 'react';
+import { usePersistedState } from '@/hooks/usePersistedState';
 
 type TabConfig = {
   id: string;
@@ -32,12 +33,16 @@ const EntityManagement = () => {
     [canViewPage]
   );
 
-  // Obter aba ativa da URL ou usar a primeira disponível
+  const [persistedTab, setPersistedTab] = usePersistedState('cadastros_tab', 'leagues');
+
+  // URL param takes priority, then persisted, then first available
   const urlTab = searchParams.get('tab');
   const defaultTab = availableTabs[0]?.id || 'leagues';
-  const activeTab = availableTabs.some(t => t.id === urlTab) ? urlTab! : defaultTab;
+  const candidateTab = urlTab || persistedTab;
+  const activeTab = availableTabs.some(t => t.id === candidateTab) ? candidateTab : defaultTab;
 
   const handleTabChange = (tab: string) => {
+    setPersistedTab(tab);
     setSearchParams({ tab });
   };
 

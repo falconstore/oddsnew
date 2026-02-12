@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { usePersistedState } from '@/hooks/usePersistedState';
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,7 +33,7 @@ export default function Subscriptions() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [subscriberToDelete, setSubscriberToDelete] = useState<string | null>(null);
 
-  const [filters, setFilters] = useState<Filters>({
+  const [filters, setFilters] = usePersistedState<Filters>('subs_filters', {
     searchName: '',
     plan: 'all',
     status: 'all',

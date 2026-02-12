@@ -32,9 +32,6 @@ export interface UserRole {
 // Chaves de páginas disponíveis no sistema
 export const PAGE_KEYS = {
   DASHBOARD: 'dashboard',
-  MONITOR_FUTEBOL: 'monitor_futebol',
-  MONITOR_BASQUETE: 'monitor_basquete',
-  FREEBET_EXTRACTION: 'freebet_extraction',
   LEAGUES: 'leagues',
   TEAMS: 'teams',
   BOOKMAKERS: 'bookmakers',
@@ -56,19 +53,7 @@ export const PAGE_CONFIG: Record<PageKey, { label: string; description: string }
     label: 'Dashboard', 
     description: 'Visão geral do sistema'
   },
-  [PAGE_KEYS.MONITOR_FUTEBOL]: { 
-    label: 'Monitor Futebol', 
-    description: 'Monitor de odds de futebol'
-  },
-  [PAGE_KEYS.MONITOR_BASQUETE]: { 
-    label: 'Monitor Basquete', 
-    description: 'Monitor de odds de basquete'
-  },
-  [PAGE_KEYS.FREEBET_EXTRACTION]: { 
-    label: 'Extração Freebet', 
-    description: 'Monitor de arbitragem para extração de freebets'
-  },
-  [PAGE_KEYS.LEAGUES]: { 
+  [PAGE_KEYS.LEAGUES]: {
     label: 'Ligas', 
     description: 'Gerenciar campeonatos'
   },
@@ -117,7 +102,5 @@ export const PAGE_CONFIG: Record<PageKey, { label: string; description: string }
 // Permissões padrão para novos usuários aprovados
 export const DEFAULT_USER_PERMISSIONS: { pageKey: PageKey; canView: boolean; canEdit: boolean }[] = [
   { pageKey: PAGE_KEYS.DASHBOARD, canView: true, canEdit: true },
-  { pageKey: PAGE_KEYS.MONITOR_FUTEBOL, canView: true, canEdit: true },
-  { pageKey: PAGE_KEYS.MONITOR_BASQUETE, canView: true, canEdit: true },
   { pageKey: PAGE_KEYS.SETTINGS, canView: true, canEdit: true },
 ];
