@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
-import { UserProfile, UserPermission, UserStatus, PageKey } from '@/types/auth';
+import { UserProfile, UserPermissionRow, UserStatus, PageKey, PAGE_KEY_TO_COLUMN } from '@/types/auth';
 
 interface AuthContextType {
   user: User | null;
@@ -14,7 +14,7 @@ interface AuthContextType {
   isApproved: boolean;
   userStatus: UserStatus | null;
   userProfile: UserProfile | null;
-  userPermissions: UserPermission[];
+  userPermissions: UserPermissionRow | null;
   canViewPage: (pageKey: PageKey) => boolean;
   canEditPage: (pageKey: PageKey) => boolean;
   refreshUserData: () => Promise<void>;
@@ -31,16 +31,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isApproved, setIsApproved] = useState(false);
   const [userStatus, setUserStatus] = useState<UserStatus | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [userPermissions, setUserPermissions] = useState<UserPermission[]>([]);
+  const [userPermissions, setUserPermissions] = useState<UserPermissionRow | null>(null);
 
-  const loadUserData = async (userId: string) => {
+  const loadUserData = async (currentUser: User) => {
     setUserDataLoading(true);
     try {
+      const userEmail = currentUser.email;
+      if (!userEmail) return;
+
       // Verificar role admin
       const { data: roleData } = await supabase
         .from('user_roles')
         .select('role')
-        .eq('user_id', userId)
+        .eq('user_id', currentUser.id)
         .eq('role', 'admin')
         .maybeSingle();
 
@@ -50,20 +53,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const { data: profileData } = await supabase
         .from('user_profiles')
         .select('*')
-        .eq('user_id', userId)
+        .eq('user_id', currentUser.id)
         .maybeSingle();
 
       setUserProfile(profileData);
       setUserStatus(profileData?.status || null);
       setIsApproved(profileData?.status === 'approved');
 
-      // Carregar permissões da nova tabela
-      const { data: permissionsData } = await supabase
-        .from('user_page_access')
+      // Carregar permissões da tabela user_permissions por email
+      const { data: permData } = await supabase
+        .from('user_permissions')
         .select('*')
-        .eq('user_id', userId);
+        .eq('user_email', userEmail)
+        .maybeSingle();
 
-      setUserPermissions(permissionsData || []);
+      setUserPermissions(permData as UserPermissionRow | null);
     } catch (error) {
       console.error('Error loading user data:', error);
     } finally {
@@ -73,12 +77,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const refreshUserData = async () => {
     if (user) {
-      await loadUserData(user.id);
+      await loadUserData(user);
     }
   };
 
   useEffect(() => {
-    // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setSession(session);
@@ -87,26 +90,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         if (session?.user) {
           setTimeout(() => {
-            loadUserData(session.user.id);
+            loadUserData(session.user);
           }, 0);
         } else {
           setIsAdmin(false);
           setIsApproved(false);
           setUserStatus(null);
           setUserProfile(null);
-          setUserPermissions([]);
+          setUserPermissions(null);
         }
       }
     );
 
-    // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
 
       if (session?.user) {
-        loadUserData(session.user.id);
+        loadUserData(session.user);
       }
     });
 
@@ -114,21 +116,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const canViewPage = (pageKey: PageKey): boolean => {
-    // Admins têm acesso total
     if (isAdmin) return true;
-    
-    // Verificar permissão específica de visualização
-    const permission = userPermissions.find(p => p.page_key === pageKey);
-    return permission?.can_view ?? false;
+    if (!userPermissions) return false;
+
+    const column = PAGE_KEY_TO_COLUMN[pageKey];
+    if (!column) return false;
+
+    return (userPermissions as any)[column] === true;
   };
 
   const canEditPage = (pageKey: PageKey): boolean => {
-    // Admins têm acesso total
+    // No banco externo só tem can_view, então editar = visualizar para admins
     if (isAdmin) return true;
-    
-    // Verificar permissão específica de edição
-    const permission = userPermissions.find(p => p.page_key === pageKey);
-    return permission?.can_edit ?? false;
+    return canViewPage(pageKey);
   };
 
   const signIn = async (email: string, password: string) => {
@@ -164,10 +164,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsApproved(false);
     setUserStatus(null);
     setUserProfile(null);
-    setUserPermissions([]);
+    setUserPermissions(null);
   };
 
-  // Combinar loading states
   const isLoading = loading || (!!user && userDataLoading);
 
   return (
