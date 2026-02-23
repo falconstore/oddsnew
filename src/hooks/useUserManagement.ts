@@ -34,9 +34,9 @@ export function useUserManagement() {
 
       if (rolesError) throw rolesError;
 
-      // Buscar todas as permissões
+      // Buscar todas as permissões da nova tabela
       const { data: permissions, error: permissionsError } = await supabase
-        .from('user_permissions')
+        .from('user_page_access')
         .select('*');
 
       if (permissionsError) throw permissionsError;
@@ -100,13 +100,12 @@ export function useUserManagement() {
   const createDefaultPermissions = async (userId: string) => {
     for (const perm of DEFAULT_USER_PERMISSIONS) {
       await supabase
-        .from('user_permissions')
+        .from('user_page_access')
         .upsert({
           user_id: userId,
           page_key: perm.pageKey,
           can_view: perm.canView,
           can_edit: perm.canEdit,
-          can_access: perm.canView, // Legacy compatibility
         }, { onConflict: 'user_id,page_key' });
     }
   };
@@ -160,13 +159,12 @@ export function useUserManagement() {
     
     for (const pageKey of allPages) {
       await supabase
-        .from('user_permissions')
+        .from('user_page_access')
         .upsert({
           user_id: userId,
           page_key: pageKey,
           can_view: true,
           can_edit: true,
-          can_access: true, // Legacy compatibility
         }, { onConflict: 'user_id,page_key' });
     }
   };
@@ -182,13 +180,12 @@ export function useUserManagement() {
       const finalCanEdit = canView ? canEdit : false;
       
       const { error } = await supabase
-        .from('user_permissions')
+        .from('user_page_access')
         .upsert({
           user_id: userId,
           page_key: pageKey,
           can_view: canView,
           can_edit: finalCanEdit,
-          can_access: canView, // Legacy compatibility
         }, { onConflict: 'user_id,page_key' });
 
       if (error) throw error;
@@ -213,13 +210,12 @@ export function useUserManagement() {
         const finalCanEdit = perm.canView ? perm.canEdit : false;
         
         await supabase
-          .from('user_permissions')
+          .from('user_page_access')
           .upsert({
             user_id: userId,
             page_key: perm.pageKey,
             can_view: perm.canView,
             can_edit: finalCanEdit,
-            can_access: perm.canView, // Legacy compatibility
           }, { onConflict: 'user_id,page_key' });
       }
 

@@ -76,8 +76,8 @@ const AdminUsers = () => {
   const getUserPermission = (user: UserWithDetails, pageKey: string) => {
     const perm = user.permissions.find(p => p.page_key === pageKey);
     return {
-      canView: perm?.can_view ?? perm?.can_access ?? false,
-      canEdit: perm?.can_edit ?? perm?.can_access ?? false,
+      canView: perm?.can_view ?? false,
+      canEdit: perm?.can_edit ?? false,
     };
   };
 
