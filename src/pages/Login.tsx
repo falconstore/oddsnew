@@ -15,7 +15,7 @@ const LoginBackground3D = lazy(() => import('@/components/login/LoginBackground3
 const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { signIn, signUp, signOut, user, isApproved, userStatus, loading: authLoading } = useAuth();
+  const { signIn, signUp, signOut, user, isApproved, loading: authLoading } = useAuth();
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -131,13 +131,9 @@ const Login = () => {
                   <Clock className="h-8 w-8 text-primary" />
                 </div>
               </div>
-              <CardTitle className="text-foreground">
-                {userStatus === 'pending' ? 'Aguardando Aprovação' : 'Acesso Negado'}
-              </CardTitle>
+              <CardTitle className="text-foreground">Aguardando Aprovação</CardTitle>
               <CardDescription className="text-muted-foreground">
-                {userStatus === 'pending' 
-                  ? 'Seu cadastro está em análise. Você receberá acesso assim que um administrador aprovar sua conta.'
-                  : 'Seu cadastro foi rejeitado. Entre em contato com o administrador para mais informações.'}
+                Seu cadastro está em análise. Você receberá acesso assim que um administrador aprovar sua conta adicionando suas permissões.
               </CardDescription>
             </CardHeader>
             <CardContent>
