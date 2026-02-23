@@ -133,6 +133,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return { error: error as Error | null };
     }
 
+    // Auto-criar registro em user_permissions com tudo false para o admin aprovar
+    try {
+      await supabase
+        .from('user_permissions')
+        .upsert({
+          user_email: email,
+          can_view_dashboard: false,
+          can_view_payment_control: false,
+          can_view_procedure_control: false,
+          can_view_freebet_calculator: false,
+          can_view_admin: false,
+          can_view_sharkodds: false,
+          can_view_conta_corrente: false,
+          can_view_plataformas: false,
+          can_view_betbra: false,
+          is_super_admin: false,
+        } as any, { onConflict: 'user_email' });
+    } catch (e) {
+      console.error('Error creating user_permissions entry:', e);
+    }
+
     return { error: null };
   };
 
