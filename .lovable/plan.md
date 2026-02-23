@@ -1,66 +1,60 @@
 
-# Tornar falconstoregja@gmail.com Super Admin e Refatorar Gestao de Usuarios
 
-## Problema Atual
+# Corrigir Sistema de Cadastro e Autenticacao - Alinhar com Banco Externo
 
-A pagina "Gerenciar Usuarios" esta quebrando porque tenta buscar dados de `user_profiles` e `user_roles`, tabelas que nao existem no banco externo. Apenas `user_permissions` existe.
+## Problema
 
-## Solucao em 3 Partes
+O `AuthContext` ainda faz queries para `user_roles` e `user_profiles` no banco externo, que retornam 404. Isso gera erros no console e requests desnecessarios. O sistema precisa ser simplificado para usar APENAS a tabela `user_permissions` que existe no banco externo.
 
-### 1. Adicionar coluna `is_super_admin` na tabela `user_permissions` (externo)
+## O que vai mudar
 
-Voce precisara executar este SQL no dashboard do seu Supabase externo (wspsuempnswljkphatur):
+### 1. Simplificar AuthContext (`src/contexts/AuthContext.tsx`)
 
-```text
-ALTER TABLE user_permissions ADD COLUMN IF NOT EXISTS is_super_admin BOOLEAN DEFAULT false;
-UPDATE user_permissions SET is_super_admin = true WHERE user_email = 'falconstoregja@gmail.com';
-```
-
-Tambem garantir que todas as permissoes estao ativadas para esse usuario:
+Remover completamente as queries para `user_roles` e `user_profiles`. A logica ficara:
 
 ```text
-UPDATE user_permissions 
-SET can_view_dashboard = true, can_view_sharkodds = true, can_view_payment_control = true,
-    can_view_procedure_control = true, can_view_freebet_calculator = true, can_view_admin = true,
-    can_view_conta_corrente = true, can_view_shark_premium = true, can_view_plataformas = true,
-    can_view_betbra = true, is_super_admin = true
-WHERE user_email = 'falconstoregja@gmail.com';
+loadUserData(currentUser):
+  1. Buscar user_permissions por email do usuario
+  2. isAdmin = can_view_admin === true OU is_super_admin === true
+  3. isApproved = registro existe em user_permissions
+  4. FIM - sem mais queries
 ```
 
-### 2. Atualizar `AuthContext` para usar `is_super_admin`
+Remover tambem os estados `userProfile` e `userStatus` que nao sao mais necessarios (dependiam de tabelas inexistentes).
+
+### 2. Simplificar interface AuthContextType
+
+Remover campos que dependiam de tabelas inexistentes:
+- `userStatus` -> remover (vinha de `user_profiles.status`)
+- `userProfile` -> remover (vinha de `user_profiles`)
+
+Manter:
+- `userPermissions` -> continua (vem de `user_permissions`)
+- `isAdmin`, `isApproved` -> continuam (derivados de `user_permissions`)
+
+### 3. Atualizar pagina de Login (`src/pages/Login.tsx`)
+
+Remover referencias a `userStatus` no componente de login (tela de "Aguardando Aprovacao" / "Acesso Negado" que usava `userStatus`). Simplificar: se nao esta aprovado, mostrar mensagem generica.
+
+### 4. Atualizar signUp no AuthContext
+
+O `signUp` atual salva `full_name` e `phone` nos metadados do Supabase Auth, mas nao cria registro em `user_permissions`. Novos usuarios precisam que um admin crie o registro em `user_permissions` para terem acesso. Manter esse fluxo (cadastro -> admin aprova adicionando na tabela).
+
+### 5. Atualizar tipos (`src/types/auth.ts`)
+
+Remover `UserProfile` do uso no contexto (manter a interface para compatibilidade, mas nao depender dela no AuthContext).
+
+## Arquivos a Alterar
 
 | Arquivo | Mudanca |
 |---------|---------|
-| `src/types/auth.ts` | Adicionar `is_super_admin` ao tipo `UserPermissionRow` |
-| `src/contexts/AuthContext.tsx` | Usar `is_super_admin` para definir `isAdmin` |
+| `src/contexts/AuthContext.tsx` | Remover queries de `user_roles` e `user_profiles`. Remover estados `userProfile` e `userStatus`. Simplificar `loadUserData` para usar apenas `user_permissions` |
+| `src/pages/Login.tsx` | Remover referencia a `userStatus`. Simplificar tela de usuario nao aprovado |
 
-### 3. Refatorar pagina de Gerenciar Usuarios
+## Resultado
 
-A pagina admin/Users e o hook `useUserManagement` precisam funcionar apenas com a tabela `user_permissions`, sem depender de `user_profiles` ou `user_roles`.
+- Zero erros 404 no console
+- Login rapido (1 query em vez de 3)
+- Codigo alinhado com a estrutura real do banco externo
+- Fluxo claro: usuario so entra se tiver registro em `user_permissions`
 
-| Arquivo | Mudanca |
-|---------|---------|
-| `src/hooks/useUserManagement.ts` | Refatorar `fetchUsers` para buscar apenas de `user_permissions`. Listar usuarios por email. Remover dependencia de `user_profiles` e `user_roles` |
-| `src/pages/admin/Users.tsx` | Adaptar a tabela para mostrar dados de `user_permissions` (email, permissoes, super_admin). Remover tabs de status (pending/approved/rejected). Adicionar toggle de super admin |
-
-### Detalhes Tecnicos
-
-**UserPermissionRow atualizado:**
-```text
-interface UserPermissionRow {
-  ...campos existentes...
-  is_super_admin: boolean;   // NOVO
-}
-```
-
-**useUserManagement refatorado:**
-- `fetchUsers`: busca apenas `user_permissions` -> lista usuarios por email
-- `updatePermissionsByEmail`: ja funciona (mantido)
-- `toggleSuperAdmin`: novo metodo para ativar/desativar super admin
-- Remover `updateUserStatus`, `setUserRole`, `deleteUser` (dependiam de tabelas inexistentes)
-
-**Admin Users page:**
-- Tabela simples: Email | Permissoes | Super Admin | Acoes
-- Botao para configurar permissoes (modal existente, mantido)
-- Toggle para super admin
-- Sem tabs de status (nao existe mais conceito de pending/approved/rejected)
