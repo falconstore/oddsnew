@@ -1,29 +1,27 @@
 
 
-# Atualizar Anon Key do Supabase Externo
+# Corrigir Typo na URL do Supabase
 
 ## Problema
 
-A chave atual `sb_publishable_zZhAHFCjDF5zj3xFWIBJDw_GWigFnZh` nao e uma anon key valida do Supabase, causando erro 401 no login.
+O dominio `wspsuempnswljkphathur.supabase.co` nao existe (ERR_NAME_NOT_RESOLVED). O projeto real e `wspsuempnswljkphatur` (sem o 'h' antes de 'ur').
 
 ## Solucao
 
-Substituir a chave em `src/lib/supabase.ts` pela anon key correta fornecida:
+### 1. `src/lib/supabase.ts`
+- Corrigir a URL de `wspsuempnswljkphathur` para `wspsuempnswljkphatur`
+- Atualizar a anon key se necessario (a key atual tambem contem o ref errado)
 
 ```text
-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndzcHN1ZW1wbnN3bGprcGhhdHVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAzNTc1NTEsImV4cCI6MjA3NTkzMzU1MX0.zgEcoHFulNHrSxyHOZTbCCtDKfqjppHLRh1junsmsoA
+Antes:  https://wspsuempnswljkphathur.supabase.co
+Depois: https://wspsuempnswljkphatur.supabase.co
 ```
 
-**Observacao importante:** Esta chave contem o ref `wspsuempnswljkphathur`, que e diferente do URL atual (`cjlsctsvzedrjzpcuire`). O ref na chave precisa corresponder ao projeto. Vou atualizar o URL tambem para `https://wspsuempnswljkphathur.supabase.co` para que tudo fique consistente.
+## Importante
 
-## Arquivo a alterar
-
-| Arquivo | Mudanca |
-|---------|---------|
-| `src/lib/supabase.ts` | Atualizar `supabaseUrl` para `https://wspsuempnswljkphathur.supabase.co` e `supabaseAnonKey` para a chave JWT fornecida |
+A anon key atual tambem precisa ser verificada, pois contem o ref `wspsuempnswljkphathur` no JWT. Se o login continuar falhando apos a correcao da URL, voce precisara fornecer a anon key correta do dashboard (Settings > API > anon public).
 
 ## Impacto
 
-- Login vai funcionar corretamente
-- Todas as queries de dados (odds, permissoes, etc.) vao apontar para o projeto correto
-
+- Corrige o erro de DNS que impede qualquer comunicacao com o Supabase
+- Login, dados e permissoes voltarao a funcionar
