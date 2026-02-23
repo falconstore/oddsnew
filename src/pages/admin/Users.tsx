@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Layout } from '@/components/Layout';
 import { useUserManagement, UserWithDetails } from '@/hooks/useUserManagement';
-import { PAGE_KEYS, PAGE_CONFIG, PageKey, UserStatus } from '@/types/auth';
+import { PAGE_KEYS, PERMISSION_COLUMNS, UserPermissionRow, UserStatus } from '@/types/auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -33,13 +33,10 @@ import {
   Trash2,
   Loader2,
   Eye,
-  Pencil,
   Save
 } from 'lucide-react';
 
-interface PermissionState {
-  [pageKey: string]: { canView: boolean; canEdit: boolean };
-}
+type PermissionState = Record<string, boolean>;
 
 const AdminUsers = () => {
   const { 
@@ -47,9 +44,8 @@ const AdminUsers = () => {
     loading, 
     updateUserStatus, 
     setUserRole, 
-    updateAllPermissions, 
+    updatePermissionsByEmail,
     deleteUser,
-    grantAllPermissions 
   } = useUserManagement();
   
   const [selectedUser, setSelectedUser] = useState<UserWithDetails | null>(null);
@@ -73,14 +69,6 @@ const AdminUsers = () => {
     return user.roles.some(r => r.role === 'admin');
   };
 
-  const getUserPermission = (user: UserWithDetails, pageKey: string) => {
-    const perm = user.permissions.find(p => p.page_key === pageKey);
-    return {
-      canView: perm?.can_view ?? false,
-      canEdit: perm?.can_edit ?? false,
-    };
-  };
-
   const filterUsersByStatus = (status: UserStatus | 'all') => {
     if (status === 'all') return users;
     return users.filter(u => u.profile?.status === status);
@@ -89,56 +77,23 @@ const AdminUsers = () => {
   const openPermissions = (user: UserWithDetails) => {
     setSelectedUser(user);
     
-    // Inicializar estado de permissões
     const initialState: PermissionState = {};
-    Object.values(PAGE_KEYS).forEach(pageKey => {
-      const perm = getUserPermission(user, pageKey);
-      initialState[pageKey] = perm;
+    PERMISSION_COLUMNS.forEach(({ column }) => {
+      initialState[column] = user.permissions ? (user.permissions as any)[column] === true : false;
     });
     setPermissionState(initialState);
     setPermissionsOpen(true);
   };
 
-  const handlePermissionChange = (pageKey: string, field: 'canView' | 'canEdit', value: boolean) => {
-    setPermissionState(prev => {
-      const updated = { ...prev };
-      if (field === 'canView') {
-        updated[pageKey] = { 
-          canView: value, 
-          // Se desmarcar visualizar, desmarcar editar também
-          canEdit: value ? prev[pageKey]?.canEdit ?? false : false 
-        };
-      } else {
-        updated[pageKey] = { 
-          ...prev[pageKey], 
-          canEdit: value 
-        };
-      }
-      return updated;
-    });
+  const handlePermissionChange = (column: string, value: boolean) => {
+    setPermissionState(prev => ({ ...prev, [column]: value }));
   };
 
-  const handleSelectAllView = (checked: boolean) => {
+  const handleSelectAll = (checked: boolean) => {
     setPermissionState(prev => {
       const updated: PermissionState = {};
-      Object.values(PAGE_KEYS).forEach(pageKey => {
-        updated[pageKey] = { 
-          canView: checked, 
-          canEdit: checked ? prev[pageKey]?.canEdit ?? false : false 
-        };
-      });
-      return updated;
-    });
-  };
-
-  const handleSelectAllEdit = (checked: boolean) => {
-    setPermissionState(prev => {
-      const updated: PermissionState = {};
-      Object.values(PAGE_KEYS).forEach(pageKey => {
-        updated[pageKey] = { 
-          canView: prev[pageKey]?.canView ?? false, 
-          canEdit: prev[pageKey]?.canView ? checked : false 
-        };
+      PERMISSION_COLUMNS.forEach(({ column }) => {
+        updated[column] = checked;
       });
       return updated;
     });
@@ -147,14 +102,15 @@ const AdminUsers = () => {
   const handleSavePermissions = async () => {
     if (!selectedUser) return;
     
-    setSaving(true);
-    const permissions = Object.entries(permissionState).map(([pageKey, perm]) => ({
-      pageKey,
-      canView: perm.canView,
-      canEdit: perm.canEdit,
-    }));
+    // Precisamos do email do usuário para salvar
+    const email = selectedUser.email;
+    if (!email) {
+      console.error('User email not available');
+      return;
+    }
     
-    await updateAllPermissions(selectedUser.id, permissions);
+    setSaving(true);
+    await updatePermissionsByEmail(email, permissionState as any);
     setSaving(false);
     setPermissionsOpen(false);
   };
@@ -167,14 +123,8 @@ const AdminUsers = () => {
     await setUserRole(user.id, 'admin', false);
   };
 
-  // Calcular totais de seleção
-  const allViewChecked = useMemo(() => 
-    Object.values(permissionState).every(p => p.canView),
-    [permissionState]
-  );
-  
-  const allEditChecked = useMemo(() => 
-    Object.values(permissionState).every(p => p.canEdit),
+  const allChecked = useMemo(() => 
+    PERMISSION_COLUMNS.every(({ column }) => permissionState[column]),
     [permissionState]
   );
 
@@ -273,6 +223,7 @@ const AdminUsers = () => {
                           <TableCell>
                             <div>
                               <p className="font-medium">{user.profile?.full_name || 'N/A'}</p>
+                              {user.email && <p className="text-xs text-muted-foreground">{user.email}</p>}
                             </div>
                           </TableCell>
                           <TableCell>{user.profile?.phone || 'N/A'}</TableCell>
@@ -317,6 +268,7 @@ const AdminUsers = () => {
                                     size="sm"
                                     variant="outline"
                                     onClick={() => openPermissions(user)}
+                                    disabled={!user.email}
                                   >
                                     <Settings className="h-4 w-4 mr-1" />
                                     Permissões
@@ -373,16 +325,16 @@ const AdminUsers = () => {
         </Card>
       </div>
 
-      {/* Modal de Permissões Redesenhado */}
+      {/* Modal de Permissões */}
       <Dialog open={permissionsOpen} onOpenChange={setPermissionsOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Settings className="h-5 w-5" />
               Permissões de {selectedUser?.profile?.full_name}
             </DialogTitle>
             <DialogDescription>
-              Configure quais páginas o usuário pode visualizar e editar.
+              Configure quais páginas o usuário pode visualizar.
             </DialogDescription>
           </DialogHeader>
           
@@ -390,69 +342,44 @@ const AdminUsers = () => {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50">
-                  <TableHead className="w-[50%]">Página</TableHead>
-                  <TableHead className="w-[25%] text-center">
+                  <TableHead className="w-[70%]">Página</TableHead>
+                  <TableHead className="w-[30%] text-center">
                     <div className="flex items-center justify-center gap-2">
                       <Eye className="h-4 w-4" />
-                      <span>Visualizar</span>
-                    </div>
-                  </TableHead>
-                  <TableHead className="w-[25%] text-center">
-                    <div className="flex items-center justify-center gap-2">
-                      <Pencil className="h-4 w-4" />
-                      <span>Editar</span>
+                      <span>Acesso</span>
                     </div>
                   </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {/* Linha de seleção total */}
                 <TableRow className="bg-primary/5 font-medium">
                   <TableCell>Selecionar Todos</TableCell>
                   <TableCell className="text-center">
                     <Checkbox
-                      checked={allViewChecked}
-                      onCheckedChange={(checked) => handleSelectAllView(!!checked)}
-                    />
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <Checkbox
-                      checked={allEditChecked}
-                      onCheckedChange={(checked) => handleSelectAllEdit(!!checked)}
+                      checked={allChecked}
+                      onCheckedChange={(checked) => handleSelectAll(!!checked)}
                     />
                   </TableCell>
                 </TableRow>
                 
-                {Object.entries(PAGE_CONFIG).map(([key, config]) => {
-                  const perm = permissionState[key] || { canView: false, canEdit: false };
-                  return (
-                    <TableRow key={key}>
-                      <TableCell>
-                        <div>
-                          <p className="font-medium text-sm">{config.label}</p>
-                          <p className="text-xs text-muted-foreground">{config.description}</p>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Checkbox
-                          checked={perm.canView}
-                          onCheckedChange={(checked) => 
-                            handlePermissionChange(key, 'canView', !!checked)
-                          }
-                        />
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Checkbox
-                          checked={perm.canEdit}
-                          disabled={!perm.canView}
-                          onCheckedChange={(checked) => 
-                            handlePermissionChange(key, 'canEdit', !!checked)
-                          }
-                        />
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
+                {PERMISSION_COLUMNS.map(({ column, label, description }) => (
+                  <TableRow key={column}>
+                    <TableCell>
+                      <div>
+                        <p className="font-medium text-sm">{label}</p>
+                        <p className="text-xs text-muted-foreground">{description}</p>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Checkbox
+                        checked={permissionState[column] ?? false}
+                        onCheckedChange={(checked) => 
+                          handlePermissionChange(column, !!checked)
+                        }
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           </div>

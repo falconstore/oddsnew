@@ -1,24 +1,11 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Supabase externo - projeto principal com auth e dados
+const supabaseUrl = 'https://cjlsctsvzedrjzpcuire.supabase.co';
+const supabaseAnonKey = 'sb_publishable_zZhAHFCjDF5zj3xFWIBJDw_GWigFnZh';
 
-// Verifica se as variáveis estão configuradas
-export const isSupabaseConfigured = () => {
-  return Boolean(supabaseUrl && supabaseAnonKey);
-};
+export const isSupabaseConfigured = () => true;
 
-// Cria o cliente apenas se as credenciais existirem
-let supabaseClient: SupabaseClient | null = null;
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-if (supabaseUrl && supabaseAnonKey) {
-  supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
-} else {
-  console.error('Supabase environment variables are not configured. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY');
-}
-
-// Export com fallback seguro
-export const supabase = supabaseClient as SupabaseClient;
-
-// Helper para compatibilidade
 export const getSupabase = () => supabase;
