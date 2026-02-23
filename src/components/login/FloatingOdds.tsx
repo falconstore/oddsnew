@@ -1,4 +1,4 @@
-import { useRef, useMemo } from 'react';
+import { useRef, useMemo, forwardRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Text, Float } from '@react-three/drei';
 import * as THREE from 'three';
@@ -10,7 +10,7 @@ interface OddData {
   rotationSpeed: number;
 }
 
-const FloatingOdd = ({ value, position, scale, rotationSpeed }: OddData) => {
+const FloatingOdd = forwardRef<THREE.Group, OddData>(({ value, position, scale, rotationSpeed }, ref) => {
   const textRef = useRef<THREE.Mesh>(null);
   
   useFrame((state) => {
@@ -41,7 +41,9 @@ const FloatingOdd = ({ value, position, scale, rotationSpeed }: OddData) => {
       </Text>
     </Float>
   );
-};
+});
+
+FloatingOdd.displayName = 'FloatingOdd';
 
 const FloatingOdds = () => {
   const odds = useMemo<OddData[]>(() => [

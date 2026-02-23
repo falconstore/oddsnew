@@ -1,4 +1,5 @@
 import { Canvas } from '@react-three/fiber';
+import * as THREE from 'three';
 import { useIsMobile } from '@/hooks/use-mobile';
 import FloatingBars from './FloatingBars';
 import TrendLines from './TrendLines';
@@ -6,9 +7,13 @@ import FloatingOdds from './FloatingOdds';
 import GlowingParticles from './GlowingParticles';
 import GridFloor from './GridFloor';
 
-const CameraController = () => {
-  return null; // Using default camera with slight adjustments
-};
+import { forwardRef } from 'react';
+
+const CameraController = forwardRef<THREE.Group>((_, ref) => {
+  return null;
+});
+
+CameraController.displayName = 'CameraController';
 
 const Scene = ({ isMobile }: { isMobile: boolean }) => {
   return (
