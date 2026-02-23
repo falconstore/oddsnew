@@ -39,28 +39,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const userEmail = currentUser.email;
       if (!userEmail) return;
 
-      // Verificar role admin
-      const { data: roleData } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', currentUser.id)
-        .eq('role', 'admin')
-        .maybeSingle();
-
-      setIsAdmin(!!roleData);
-
-      // Carregar perfil
-      const { data: profileData } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('user_id', currentUser.id)
-        .maybeSingle();
-
-      setUserProfile(profileData);
-      setUserStatus(profileData?.status || null);
-      setIsApproved(profileData?.status === 'approved');
-
-      // Carregar permissões da tabela user_permissions por email
+      // Carregar permissões da tabela user_permissions por email (esta existe no externo)
       const { data: permData } = await supabase
         .from('user_permissions')
         .select('*')
@@ -68,6 +47,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .maybeSingle();
 
       setUserPermissions(permData as UserPermissionRow | null);
+
+      // Tentar verificar role admin (pode não existir no externo)
+      const { data: roleData, error: roleError } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', currentUser.id)
+        .eq('role', 'admin')
+        .maybeSingle();
+
+      // Fallback: se user_roles não existe, usar can_view_admin de user_permissions
+      const hasAdminRole = !!roleData;
+      const hasAdminPermission = !!(permData as UserPermissionRow | null)?.can_view_admin;
+      setIsAdmin(hasAdminRole || hasAdminPermission);
+
+      // Tentar carregar perfil (pode não existir no externo)
+      const { data: profileData, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('user_id', currentUser.id)
+        .maybeSingle();
+
+      setUserProfile(profileData);
+      setUserStatus(profileData?.status || null);
+
+      // Fallback: se user_profiles não existe, considerar aprovado se tem registro em user_permissions
+      const approvedByProfile = profileData?.status === 'approved';
+      const approvedByPermissions = !!permData;
+      setIsApproved(approvedByProfile || approvedByPermissions);
     } catch (error) {
       console.error('Error loading user data:', error);
     } finally {
