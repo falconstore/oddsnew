@@ -57,9 +57,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUserStatus(profileData?.status || null);
       setIsApproved(profileData?.status === 'approved');
 
-      // Carregar permissões
+      // Carregar permissões da nova tabela
       const { data: permissionsData } = await supabase
-        .from('user_permissions')
+        .from('user_page_access')
         .select('*')
         .eq('user_id', userId);
 
@@ -119,8 +119,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     // Verificar permissão específica de visualização
     const permission = userPermissions.find(p => p.page_key === pageKey);
-    // Suporte para migração: usar can_view ou fallback para can_access
-    return permission?.can_view ?? permission?.can_access ?? false;
+    return permission?.can_view ?? false;
   };
 
   const canEditPage = (pageKey: PageKey): boolean => {
@@ -129,8 +128,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     // Verificar permissão específica de edição
     const permission = userPermissions.find(p => p.page_key === pageKey);
-    // Suporte para migração: usar can_edit ou fallback para can_access
-    return permission?.can_edit ?? permission?.can_access ?? false;
+    return permission?.can_edit ?? false;
   };
 
   const signIn = async (email: string, password: string) => {

@@ -18,7 +18,6 @@ export interface UserPermission {
   page_key: string;
   can_view: boolean;
   can_edit: boolean;
-  can_access?: boolean; // Legacy - para compatibilidade durante migração
   created_at: string;
 }
 
