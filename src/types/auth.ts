@@ -26,6 +26,7 @@ export interface UserPermissionRow {
   can_view_shark_premium: boolean;
   can_view_plataformas: boolean;
   can_view_betbra: boolean;
+  is_super_admin?: boolean;
   created_date: string;
   updated_date: string;
 }

@@ -56,10 +56,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .eq('role', 'admin')
         .maybeSingle();
 
-      // Fallback: se user_roles não existe, usar can_view_admin de user_permissions
+      // Fallback: se user_roles não existe, usar can_view_admin ou is_super_admin de user_permissions
       const hasAdminRole = !!roleData;
-      const hasAdminPermission = !!(permData as UserPermissionRow | null)?.can_view_admin;
-      setIsAdmin(hasAdminRole || hasAdminPermission);
+      const permTyped = permData as UserPermissionRow | null;
+      const hasAdminPermission = !!permTyped?.can_view_admin;
+      const isSuperAdmin = !!permTyped?.is_super_admin;
+      setIsAdmin(hasAdminRole || hasAdminPermission || isSuperAdmin);
 
       // Tentar carregar perfil (pode não existir no externo)
       const { data: profileData, error: profileError } = await supabase
