@@ -1,50 +1,47 @@
 
 
-# Criar Nova Tabela de Permissoes de Acesso
+# Corrigir Politicas RLS e Acesso ao Sistema
 
-## Problema atual
+## Problema 1: Auth retornando 403
 
-A tabela `user_permissions` existente tem a coluna `user_id` como `integer` em vez de `UUID`, causando erro 400 em todas as queries. Como essa tabela ja foi migrada para outro sistema, vamos criar uma nova tabela separada.
+O erro `403` no endpoint `/auth/v1/token` indica que o projeto externo pode estar pausado ou com problemas de conexao. Voce precisa verificar diretamente no dashboard do Supabase externo se o projeto `cjlsctsvzedrjzpcuire` esta ativo e funcionando.
 
-## Solucao
+**Acao necessaria do usuario:** Acessar o dashboard do Supabase externo e verificar o status do projeto.
 
-Criar uma nova tabela `user_page_access` com o schema correto e atualizar todo o codigo para usa-la.
+## Problema 2: Politicas RLS todas RESTRICTIVE
 
-### 1. Criar tabela no Supabase (migration SQL)
+Todas as 5 politicas RLS da tabela `user_page_access` estao configuradas como RESTRICTIVE (Permissive: No). Com politicas restrictive, **TODAS** precisam ser verdadeiras ao mesmo tempo. Resultado:
+
+- Um usuario comum precisa que `user_id = auth.uid()` E `has_role(admin)` sejam verdadeiros simultaneamente - impossivel para nao-admins
+- Admins precisam que `has_role(admin)` E `user_id = auth.uid()` sejam verdadeiros - so funciona para linhas do proprio admin
+
+### Correcao
+
+Recriar as politicas como PERMISSIVE (o padrao do Postgres), onde basta UMA ser verdadeira:
 
 ```text
-Tabela: user_page_access
-Colunas:
-  - id: UUID (PK, default gen_random_uuid())
-  - user_id: UUID (FK -> auth.users, NOT NULL)
-  - page_key: TEXT (NOT NULL)
-  - can_view: BOOLEAN (default false)
-  - can_edit: BOOLEAN (default false)
-  - created_at: TIMESTAMPTZ (default now())
-  - UNIQUE(user_id, page_key)
-
-RLS:
-  - Users can SELECT own rows
-  - Admins can SELECT/INSERT/UPDATE/DELETE all rows
+SQL a executar:
+1. DROP todas as 5 policies existentes
+2. Recriar como PERMISSIVE:
+   - SELECT: users veem suas proprias linhas OU admins veem todas
+   - INSERT: apenas admins
+   - UPDATE: apenas admins
+   - DELETE: apenas admins
 ```
 
-### 2. Atualizar codigo (4 arquivos)
+### Mesma correcao para user_profiles e user_roles
 
-| Arquivo | Mudanca |
-|---------|---------|
-| `src/contexts/AuthContext.tsx` | Trocar query de `user_permissions` para `user_page_access` |
-| `src/hooks/useUserManagement.ts` | Trocar todas as queries de `user_permissions` para `user_page_access` |
-| `src/types/auth.ts` | Remover campo legacy `can_access` do tipo `UserPermission` |
-| `docs/migration-user-page-access.sql` | Salvar o SQL da nova tabela como documentacao |
+As tabelas `user_profiles` e `user_roles` tambem tem policies RESTRICTIVE, o que pode causar o mesmo problema de acesso. Elas tambem serao corrigidas.
 
-### 3. O que NAO muda
+## Implementacao
 
-- Tabela `user_permissions` antiga permanece intocada
-- Tabela `user_profiles` continua funcionando normalmente
-- Tabela `user_roles` continua funcionando normalmente
-- Toda a logica de `canViewPage`/`canEditPage` continua igual, so muda a fonte de dados
+| Passo | Acao |
+|-------|------|
+| 1 | Executar migration SQL para recriar as politicas RLS como PERMISSIVE nas 3 tabelas |
+| 2 | Nenhuma alteracao de codigo necessaria - so as policies do banco |
 
 ## Apos a implementacao
 
-Voce precisara acessar a pagina de Usuarios (admin) e re-salvar as permissoes de cada usuario para popular a nova tabela.
+- Verificar se o projeto externo esta ativo (resolver o 403)
+- Testar login e acesso as paginas com um usuario nao-admin aprovado
 
