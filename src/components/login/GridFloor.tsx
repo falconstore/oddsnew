@@ -1,8 +1,8 @@
-import { useRef } from 'react';
+import { useRef, forwardRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
-const GridFloor = () => {
+const GridFloor = forwardRef<THREE.Group>((_, ref) => {
   const gridRef = useRef<THREE.GridHelper>(null);
 
   useFrame((state) => {
@@ -28,6 +28,8 @@ const GridFloor = () => {
       </mesh>
     </group>
   );
-};
+});
+
+GridFloor.displayName = 'GridFloor';
 
 export default GridFloor;

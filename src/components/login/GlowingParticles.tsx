@@ -1,8 +1,8 @@
-import { useRef, useMemo } from 'react';
+import { useRef, useMemo, forwardRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
-const GlowingParticles = () => {
+const GlowingParticles = forwardRef<THREE.Group>((_, ref) => {
   const pointsRef = useRef<THREE.Points>(null);
   const count = 80;
 
@@ -67,6 +67,8 @@ const GlowingParticles = () => {
       />
     </points>
   );
-};
+});
+
+GlowingParticles.displayName = 'GlowingParticles';
 
 export default GlowingParticles;
