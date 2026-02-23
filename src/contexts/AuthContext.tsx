@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
-import { UserProfile, UserPermissionRow, UserStatus, PageKey, PAGE_KEY_TO_COLUMN } from '@/types/auth';
+import { UserPermissionRow, PageKey, PAGE_KEY_TO_COLUMN } from '@/types/auth';
 
 interface AuthContextType {
   user: User | null;
@@ -12,8 +12,6 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   isAdmin: boolean;
   isApproved: boolean;
-  userStatus: UserStatus | null;
-  userProfile: UserProfile | null;
   userPermissions: UserPermissionRow | null;
   canViewPage: (pageKey: PageKey) => boolean;
   canEditPage: (pageKey: PageKey) => boolean;
@@ -29,8 +27,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [userDataLoading, setUserDataLoading] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isApproved, setIsApproved] = useState(false);
-  const [userStatus, setUserStatus] = useState<UserStatus | null>(null);
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [userPermissions, setUserPermissions] = useState<UserPermissionRow | null>(null);
 
   const loadUserData = async (currentUser: User) => {
@@ -39,44 +35,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const userEmail = currentUser.email;
       if (!userEmail) return;
 
-      // Carregar permissões da tabela user_permissions por email (esta existe no externo)
+      // Buscar apenas user_permissions (única tabela que existe no banco externo)
       const { data: permData } = await supabase
         .from('user_permissions')
         .select('*')
         .eq('user_email', userEmail)
         .maybeSingle();
 
-      setUserPermissions(permData as UserPermissionRow | null);
-
-      // Tentar verificar role admin (pode não existir no externo)
-      const { data: roleData, error: roleError } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', currentUser.id)
-        .eq('role', 'admin')
-        .maybeSingle();
-
-      // Fallback: se user_roles não existe, usar can_view_admin ou is_super_admin de user_permissions
-      const hasAdminRole = !!roleData;
       const permTyped = permData as UserPermissionRow | null;
-      const hasAdminPermission = !!permTyped?.can_view_admin;
-      const isSuperAdmin = !!permTyped?.is_super_admin;
-      setIsAdmin(hasAdminRole || hasAdminPermission || isSuperAdmin);
+      setUserPermissions(permTyped);
 
-      // Tentar carregar perfil (pode não existir no externo)
-      const { data: profileData, error: profileError } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('user_id', currentUser.id)
-        .maybeSingle();
+      // Admin = can_view_admin ou is_super_admin
+      setIsAdmin(!!permTyped?.can_view_admin || !!permTyped?.is_super_admin);
 
-      setUserProfile(profileData);
-      setUserStatus(profileData?.status || null);
-
-      // Fallback: se user_profiles não existe, considerar aprovado se tem registro em user_permissions
-      const approvedByProfile = profileData?.status === 'approved';
-      const approvedByPermissions = !!permData;
-      setIsApproved(approvedByProfile || approvedByPermissions);
+      // Aprovado = tem registro em user_permissions
+      setIsApproved(!!permData);
     } catch (error) {
       console.error('Error loading user data:', error);
     } finally {
@@ -104,8 +77,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else {
           setIsAdmin(false);
           setIsApproved(false);
-          setUserStatus(null);
-          setUserProfile(null);
           setUserPermissions(null);
         }
       }
@@ -171,8 +142,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setSession(null);
     setIsAdmin(false);
     setIsApproved(false);
-    setUserStatus(null);
-    setUserProfile(null);
     setUserPermissions(null);
   };
 
@@ -188,8 +157,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       signOut, 
       isAdmin,
       isApproved,
-      userStatus,
-      userProfile,
       userPermissions,
       canViewPage,
       canEditPage,

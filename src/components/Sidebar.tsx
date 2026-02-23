@@ -86,7 +86,7 @@ const navigation: NavigationItem[] = [
 
 export function Sidebar() {
   const location = useLocation();
-  const { user, isAdmin, signOut, canViewPage, userProfile } = useAuth();
+  const { user, isAdmin, signOut, canViewPage } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   // Swipe gesture to close sidebar on mobile
@@ -104,7 +104,7 @@ export function Sidebar() {
     await signOut();
   };
 
-  const displayName = userProfile?.full_name || user?.email || 'Usuário';
+  const displayName = user?.user_metadata?.full_name || user?.email || 'Usuário';
 
   // Calculate sidebar transform based on swipe distance
   const sidebarTransform = mobileOpen && swipeDistance > 0 
