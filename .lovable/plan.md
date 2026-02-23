@@ -1,45 +1,50 @@
 
 
-# Remover Arquivos Orfaos
+# Criar Nova Tabela de Permissoes de Acesso
 
-## Arquivos a remover
+## Problema atual
 
-Apos desativar as 3 abas, os seguintes arquivos nao sao mais importados por nenhum codigo ativo:
+A tabela `user_permissions` existente tem a coluna `user_id` como `integer` em vez de `UUID`, causando erro 400 em todas as queries. Como essa tabela ja foi migrada para outro sistema, vamos criar uma nova tabela separada.
 
-### Paginas (3 arquivos)
-- `src/pages/MonitorFutebol.tsx`
-- `src/pages/MonitorBasquete.tsx`
-- `src/pages/FreebetExtraction.tsx`
+## Solucao
 
-### Componentes Freebet (3 arquivos)
-- `src/components/freebet/FreebetCard.tsx`
-- `src/components/freebet/FreebetConfig.tsx`
-- `src/components/freebet/FreebetFilters.tsx`
+Criar uma nova tabela `user_page_access` com o schema correto e atualizar todo o codigo para usa-la.
 
-### Componentes do Monitor de Odds (4 arquivos)
-- `src/components/OddsMonitor.tsx` — usado apenas por MonitorFutebol/Basquete
-- `src/components/OddsComparisonTable.tsx` — nao importado em nenhum lugar ativo
-- `src/components/OddsFilters.tsx` — usado apenas por OddsMonitor e OddsComparisonTable
-- `src/components/MatchCardSkeleton.tsx` — usado apenas por OddsMonitor
-- `src/components/ViewToggle.tsx` — usado apenas por OddsMonitor e OddsComparisonTable
-- `src/components/StatsCards.tsx` — usado apenas por MonitorFutebol/Basquete
+### 1. Criar tabela no Supabase (migration SQL)
 
-### Hooks orfaos (2 arquivos)
-- `src/hooks/useSurebetDetection.ts` — usado apenas por OddsMonitor
-- `src/hooks/useFiltersFromUrl.ts` — usado apenas por OddsMonitor e OddsComparisonTable
+```text
+Tabela: user_page_access
+Colunas:
+  - id: UUID (PK, default gen_random_uuid())
+  - user_id: UUID (FK -> auth.users, NOT NULL)
+  - page_key: TEXT (NOT NULL)
+  - can_view: BOOLEAN (default false)
+  - can_edit: BOOLEAN (default false)
+  - created_at: TIMESTAMPTZ (default now())
+  - UNIQUE(user_id, page_key)
 
-### Libs e tipos orfaos (2 arquivos)
-- `src/lib/freebetUtils.ts` — usado apenas por FreebetExtraction e FreebetCard
-- `src/types/freebet.ts` — usado apenas por freebetUtils e componentes freebet
+RLS:
+  - Users can SELECT own rows
+  - Admins can SELECT/INSERT/UPDATE/DELETE all rows
+```
 
-**Total: 15 arquivos a remover**
+### 2. Atualizar codigo (4 arquivos)
 
-### Arquivos que ficam (nao sao orfaos)
-- `src/components/SurebetCalculator.tsx` — ainda usado por `MatchDetails.tsx`
-- `src/hooks/useOddsData.ts` — ainda usado por varias paginas ativas
-- `src/lib/bookmakerLinks.ts` — ainda usado por `MatchDetails.tsx`
+| Arquivo | Mudanca |
+|---------|---------|
+| `src/contexts/AuthContext.tsx` | Trocar query de `user_permissions` para `user_page_access` |
+| `src/hooks/useUserManagement.ts` | Trocar todas as queries de `user_permissions` para `user_page_access` |
+| `src/types/auth.ts` | Remover campo legacy `can_access` do tipo `UserPermission` |
+| `docs/migration-user-page-access.sql` | Salvar o SQL da nova tabela como documentacao |
 
-## Implementacao
+### 3. O que NAO muda
 
-Deletar os 15 arquivos listados acima e remover o diretorio `src/components/freebet/`.
+- Tabela `user_permissions` antiga permanece intocada
+- Tabela `user_profiles` continua funcionando normalmente
+- Tabela `user_roles` continua funcionando normalmente
+- Toda a logica de `canViewPage`/`canEditPage` continua igual, so muda a fonte de dados
+
+## Apos a implementacao
+
+Voce precisara acessar a pagina de Usuarios (admin) e re-salvar as permissoes de cada usuario para popular a nova tabela.
 
