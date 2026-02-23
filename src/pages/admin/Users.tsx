@@ -1,85 +1,37 @@
 import { useState, useMemo } from 'react';
 import { Layout } from '@/components/Layout';
-import { useUserManagement, UserWithDetails } from '@/hooks/useUserManagement';
-import { PAGE_KEYS, PERMISSION_COLUMNS, UserPermissionRow, UserStatus } from '@/types/auth';
+import { useUserManagement, UserWithPermissions } from '@/hooks/useUserManagement';
+import { PERMISSION_COLUMNS, UserPermissionRow } from '@/types/auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Switch } from '@/components/ui/switch';
 import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow 
 } from '@/components/ui/table';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
-import { 
-  CheckCircle, 
-  XCircle, 
-  Clock, 
-  Shield, 
-  User, 
-  Settings,
-  Trash2,
-  Loader2,
-  Eye,
-  Save
-} from 'lucide-react';
+import { Shield, Settings, Trash2, Loader2, Eye, Save, Users } from 'lucide-react';
 
 type PermissionState = Record<string, boolean>;
 
 const AdminUsers = () => {
   const { 
-    users, 
-    loading, 
-    updateUserStatus, 
-    setUserRole, 
-    updatePermissionsByEmail,
-    deleteUser,
+    users, loading, updatePermissionsByEmail, toggleSuperAdmin, deleteUserByEmail,
   } = useUserManagement();
   
-  const [selectedUser, setSelectedUser] = useState<UserWithDetails | null>(null);
+  const [selectedUser, setSelectedUser] = useState<UserWithPermissions | null>(null);
   const [permissionsOpen, setPermissionsOpen] = useState(false);
   const [permissionState, setPermissionState] = useState<PermissionState>({});
   const [saving, setSaving] = useState(false);
 
-  const getStatusBadge = (status: UserStatus | undefined) => {
-    switch (status) {
-      case 'approved':
-        return <Badge variant="default" className="bg-green-600"><CheckCircle className="h-3 w-3 mr-1" /> Aprovado</Badge>;
-      case 'rejected':
-        return <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" /> Rejeitado</Badge>;
-      case 'pending':
-      default:
-        return <Badge variant="secondary"><Clock className="h-3 w-3 mr-1" /> Pendente</Badge>;
-    }
-  };
-
-  const hasAdminRole = (user: UserWithDetails) => {
-    return user.roles.some(r => r.role === 'admin');
-  };
-
-  const filterUsersByStatus = (status: UserStatus | 'all') => {
-    if (status === 'all') return users;
-    return users.filter(u => u.profile?.status === status);
-  };
-
-  const openPermissions = (user: UserWithDetails) => {
+  const openPermissions = (user: UserWithPermissions) => {
     setSelectedUser(user);
-    
     const initialState: PermissionState = {};
     PERMISSION_COLUMNS.forEach(({ column }) => {
-      initialState[column] = user.permissions ? (user.permissions as any)[column] === true : false;
+      initialState[column] = (user.permissions as any)[column] === true;
     });
     setPermissionState(initialState);
     setPermissionsOpen(true);
@@ -90,43 +42,27 @@ const AdminUsers = () => {
   };
 
   const handleSelectAll = (checked: boolean) => {
-    setPermissionState(prev => {
-      const updated: PermissionState = {};
-      PERMISSION_COLUMNS.forEach(({ column }) => {
-        updated[column] = checked;
-      });
-      return updated;
-    });
+    const updated: PermissionState = {};
+    PERMISSION_COLUMNS.forEach(({ column }) => { updated[column] = checked; });
+    setPermissionState(updated);
   };
 
   const handleSavePermissions = async () => {
     if (!selectedUser) return;
-    
-    // Precisamos do email do usuário para salvar
-    const email = selectedUser.email;
-    if (!email) {
-      console.error('User email not available');
-      return;
-    }
-    
     setSaving(true);
-    await updatePermissionsByEmail(email, permissionState as any);
+    await updatePermissionsByEmail(selectedUser.email, permissionState as any);
     setSaving(false);
     setPermissionsOpen(false);
-  };
-
-  const handleMakeAdmin = async (user: UserWithDetails) => {
-    await setUserRole(user.id, 'admin', true);
-  };
-
-  const handleRemoveAdmin = async (user: UserWithDetails) => {
-    await setUserRole(user.id, 'admin', false);
   };
 
   const allChecked = useMemo(() => 
     PERMISSION_COLUMNS.every(({ column }) => permissionState[column]),
     [permissionState]
   );
+
+  const superAdminCount = users.filter(u => u.permissions.is_super_admin).length;
+  const activePermCount = (perms: UserPermissionRow) => 
+    PERMISSION_COLUMNS.filter(({ column }) => (perms as any)[column] === true).length;
 
   if (loading) {
     return (
@@ -143,40 +79,30 @@ const AdminUsers = () => {
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold">Gerenciar Usuários</h1>
-          <p className="text-muted-foreground">Aprove, rejeite e configure permissões de usuários.</p>
+          <p className="text-muted-foreground">Gerencie permissões e Super Admins do sistema.</p>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
           <Card>
             <CardHeader className="pb-1 sm:pb-2 px-3 sm:px-6 pt-3 sm:pt-6">
-              <CardTitle className="text-xs sm:text-sm font-medium">Total</CardTitle>
+              <CardTitle className="text-xs sm:text-sm font-medium">Total Usuários</CardTitle>
             </CardHeader>
             <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
-              <div className="text-xl sm:text-2xl font-bold">{users.length}</div>
+              <div className="text-xl sm:text-2xl font-bold flex items-center gap-2">
+                <Users className="h-5 w-5 text-muted-foreground" />
+                {users.length}
+              </div>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="pb-1 sm:pb-2 px-3 sm:px-6 pt-3 sm:pt-6">
-              <CardTitle className="text-xs sm:text-sm font-medium text-yellow-600">Pendentes</CardTitle>
+              <CardTitle className="text-xs sm:text-sm font-medium">Super Admins</CardTitle>
             </CardHeader>
             <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
-              <div className="text-xl sm:text-2xl font-bold">{filterUsersByStatus('pending').length}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-1 sm:pb-2 px-3 sm:px-6 pt-3 sm:pt-6">
-              <CardTitle className="text-xs sm:text-sm font-medium text-green-600">Aprovados</CardTitle>
-            </CardHeader>
-            <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
-              <div className="text-xl sm:text-2xl font-bold">{filterUsersByStatus('approved').length}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-1 sm:pb-2 px-3 sm:px-6 pt-3 sm:pt-6">
-              <CardTitle className="text-xs sm:text-sm font-medium text-red-600">Rejeitados</CardTitle>
-            </CardHeader>
-            <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
-              <div className="text-xl sm:text-2xl font-bold">{filterUsersByStatus('rejected').length}</div>
+              <div className="text-xl sm:text-2xl font-bold flex items-center gap-2">
+                <Shield className="h-5 w-5 text-primary" />
+                {superAdminCount}
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -184,143 +110,69 @@ const AdminUsers = () => {
         <Card>
           <CardHeader>
             <CardTitle>Usuários Cadastrados</CardTitle>
-            <CardDescription>Lista de todos os usuários do sistema.</CardDescription>
+            <CardDescription>Lista de todos os usuários com permissões no sistema.</CardDescription>
           </CardHeader>
           <CardContent className="px-3 sm:px-6">
-            <Tabs defaultValue="pending">
-              <TabsList className="w-full flex flex-wrap h-auto gap-1 sm:gap-0">
-                <TabsTrigger value="pending" className="flex-1 sm:flex-none text-xs sm:text-sm py-1.5 sm:py-2">
-                  Pendentes ({filterUsersByStatus('pending').length})
-                </TabsTrigger>
-                <TabsTrigger value="approved" className="flex-1 sm:flex-none text-xs sm:text-sm py-1.5 sm:py-2">
-                  Aprovados ({filterUsersByStatus('approved').length})
-                </TabsTrigger>
-                <TabsTrigger value="rejected" className="flex-1 sm:flex-none text-xs sm:text-sm py-1.5 sm:py-2">
-                  Rejeitados ({filterUsersByStatus('rejected').length})
-                </TabsTrigger>
-                <TabsTrigger value="all" className="flex-1 sm:flex-none text-xs sm:text-sm py-1.5 sm:py-2">
-                  Todos ({users.length})
-                </TabsTrigger>
-              </TabsList>
-
-              {['pending', 'approved', 'rejected', 'all'].map((tab) => (
-                <TabsContent key={tab} value={tab} className="overflow-x-auto -mx-3 sm:mx-0 px-3 sm:px-0">
-                  <div className="min-w-[700px]">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Nome</TableHead>
-                        <TableHead>Telefone</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Admin</TableHead>
-                        <TableHead>Data Cadastro</TableHead>
-                        <TableHead className="text-right">Ações</TableHead>
+            <div className="overflow-x-auto -mx-3 sm:mx-0 px-3 sm:px-0">
+              <div className="min-w-[600px]">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Permissões</TableHead>
+                      <TableHead>Super Admin</TableHead>
+                      <TableHead className="text-right">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {users.map((user) => (
+                      <TableRow key={user.email}>
+                        <TableCell>
+                          <p className="font-medium">{user.email}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Desde {new Date(user.permissions.created_date).toLocaleDateString('pt-BR')}
+                          </p>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">
+                            {activePermCount(user.permissions)}/{PERMISSION_COLUMNS.length}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Switch
+                            checked={!!user.permissions.is_super_admin}
+                            onCheckedChange={(checked) => toggleSuperAdmin(user.email, checked)}
+                          />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1 sm:gap-2">
+                            <Button size="sm" variant="outline" onClick={() => openPermissions(user)}>
+                              <Settings className="h-4 w-4 mr-1" />
+                              Permissões
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => deleteUserByEmail(user.email)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
                       </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filterUsersByStatus(tab as UserStatus | 'all').map((user) => (
-                        <TableRow key={user.id}>
-                          <TableCell>
-                            <div>
-                              <p className="font-medium">{user.profile?.full_name || 'N/A'}</p>
-                              {user.email && <p className="text-xs text-muted-foreground">{user.email}</p>}
-                            </div>
-                          </TableCell>
-                          <TableCell>{user.profile?.phone || 'N/A'}</TableCell>
-                          <TableCell>{getStatusBadge(user.profile?.status)}</TableCell>
-                          <TableCell>
-                            {hasAdminRole(user) ? (
-                              <Shield className="h-4 w-4 text-primary" />
-                            ) : (
-                              <User className="h-4 w-4 text-muted-foreground" />
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {user.profile?.created_at 
-                              ? new Date(user.profile.created_at).toLocaleDateString('pt-BR')
-                              : 'N/A'}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex flex-wrap justify-end gap-1 sm:gap-2">
-                              {user.profile?.status === 'pending' && (
-                                <>
-                                  <Button
-                                    size="sm"
-                                    variant="default"
-                                    onClick={() => updateUserStatus(user.id, 'approved')}
-                                  >
-                                    <CheckCircle className="h-4 w-4 mr-1" />
-                                    Aprovar
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="destructive"
-                                    onClick={() => updateUserStatus(user.id, 'rejected')}
-                                  >
-                                    <XCircle className="h-4 w-4 mr-1" />
-                                    Rejeitar
-                                  </Button>
-                                </>
-                              )}
-                              {user.profile?.status === 'approved' && (
-                                <>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => openPermissions(user)}
-                                    disabled={!user.email}
-                                  >
-                                    <Settings className="h-4 w-4 mr-1" />
-                                    Permissões
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant={hasAdminRole(user) ? "secondary" : "outline"}
-                                    onClick={() => hasAdminRole(user) 
-                                      ? handleRemoveAdmin(user) 
-                                      : handleMakeAdmin(user)
-                                    }
-                                  >
-                                    <Shield className="h-4 w-4 mr-1" />
-                                    {hasAdminRole(user) ? 'Remover Admin' : 'Tornar Admin'}
-                                  </Button>
-                                </>
-                              )}
-                              {user.profile?.status === 'rejected' && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => updateUserStatus(user.id, 'approved')}
-                                >
-                                  <CheckCircle className="h-4 w-4 mr-1" />
-                                  Aprovar
-                                </Button>
-                              )}
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="text-destructive hover:text-destructive"
-                                onClick={() => deleteUser(user.id)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                      {filterUsersByStatus(tab as UserStatus | 'all').length === 0 && (
-                        <TableRow>
-                          <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                            Nenhum usuário encontrado.
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                  </div>
-                </TabsContent>
-              ))}
-            </Tabs>
+                    ))}
+                    {users.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                          Nenhum usuário encontrado.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -331,7 +183,7 @@ const AdminUsers = () => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Settings className="h-5 w-5" />
-              Permissões de {selectedUser?.profile?.full_name}
+              Permissões de {selectedUser?.email}
             </DialogTitle>
             <DialogDescription>
               Configure quais páginas o usuário pode visualizar.
@@ -355,13 +207,9 @@ const AdminUsers = () => {
                 <TableRow className="bg-primary/5 font-medium">
                   <TableCell>Selecionar Todos</TableCell>
                   <TableCell className="text-center">
-                    <Checkbox
-                      checked={allChecked}
-                      onCheckedChange={(checked) => handleSelectAll(!!checked)}
-                    />
+                    <Checkbox checked={allChecked} onCheckedChange={(checked) => handleSelectAll(!!checked)} />
                   </TableCell>
                 </TableRow>
-                
                 {PERMISSION_COLUMNS.map(({ column, label, description }) => (
                   <TableRow key={column}>
                     <TableCell>
@@ -373,9 +221,7 @@ const AdminUsers = () => {
                     <TableCell className="text-center">
                       <Checkbox
                         checked={permissionState[column] ?? false}
-                        onCheckedChange={(checked) => 
-                          handlePermissionChange(column, !!checked)
-                        }
+                        onCheckedChange={(checked) => handlePermissionChange(column, !!checked)}
                       />
                     </TableCell>
                   </TableRow>
@@ -385,20 +231,12 @@ const AdminUsers = () => {
           </div>
 
           <DialogFooter className="flex-col sm:flex-row gap-2">
-            <Button variant="outline" onClick={() => setPermissionsOpen(false)}>
-              Cancelar
-            </Button>
+            <Button variant="outline" onClick={() => setPermissionsOpen(false)}>Cancelar</Button>
             <Button onClick={handleSavePermissions} disabled={saving}>
               {saving ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Salvando...
-                </>
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Salvando...</>
               ) : (
-                <>
-                  <Save className="h-4 w-4 mr-2" />
-                  Salvar Permissões
-                </>
+                <><Save className="h-4 w-4 mr-2" />Salvar Permissões</>
               )}
             </Button>
           </DialogFooter>
