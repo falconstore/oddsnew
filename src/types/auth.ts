@@ -23,7 +23,6 @@ export interface UserPermissionRow {
   can_view_admin: boolean;
   can_view_sharkodds: boolean;
   can_view_conta_corrente: boolean;
-  can_view_shark_premium: boolean;
   can_view_plataformas: boolean;
   can_view_betbra: boolean;
   is_super_admin?: boolean;
@@ -57,7 +56,6 @@ export const PAGE_KEYS = {
   FREEBET_CALCULATOR: 'freebet_calculator',
   ADMIN: 'admin',
   CONTA_CORRENTE: 'conta_corrente',
-  SHARK_PREMIUM: 'shark_premium',
   PLATAFORMAS: 'plataformas',
   BETBRA_AFFILIATE: 'betbra_affiliate',
   // Aliases para compatibilidade com código existente
@@ -85,8 +83,6 @@ export const PAGE_KEY_TO_COLUMN: Record<string, keyof UserPermissionRow> = {
   admin_users: 'can_view_admin',
   admin_logs: 'can_view_admin',
   conta_corrente: 'can_view_conta_corrente',
-  shark_premium: 'can_view_shark_premium',
-  plataformas: 'can_view_plataformas',
   betbra_affiliate: 'can_view_betbra',
   settings: 'can_view_dashboard', // settings acessível se tem dashboard
   scraper_status: 'can_view_admin',
@@ -102,7 +98,6 @@ export const PERMISSION_COLUMNS: { column: keyof UserPermissionRow; label: strin
   { column: 'can_view_freebet_calculator', label: 'Calculadora Freebet', description: 'Calculadora de apostas' },
   { column: 'can_view_admin', label: 'Admin', description: 'Acesso administrativo' },
   { column: 'can_view_conta_corrente', label: 'Conta Corrente', description: 'Controle financeiro' },
-  { column: 'can_view_shark_premium', label: 'Shark Premium', description: 'Conteúdo premium' },
   { column: 'can_view_plataformas', label: 'Plataformas', description: 'Gerenciar plataformas' },
   { column: 'can_view_betbra', label: 'Betbra', description: 'Dados de afiliação Betbra' },
 ];
@@ -118,7 +113,6 @@ export const PAGE_CONFIG: Record<string, { label: string; description: string }>
   [PAGE_KEYS.ADMIN_USERS]: { label: 'Gerenciar Usuários', description: 'Aprovar e gerenciar usuários' },
   [PAGE_KEYS.ADMIN_LOGS]: { label: 'Logs / Diagnóstico', description: 'Visualizar logs do sistema' },
   [PAGE_KEYS.CONTA_CORRENTE]: { label: 'Conta Corrente', description: 'Controle financeiro' },
-  [PAGE_KEYS.SHARK_PREMIUM]: { label: 'Shark Premium', description: 'Conteúdo premium' },
   [PAGE_KEYS.PLATAFORMAS]: { label: 'Plataformas', description: 'Gerenciar plataformas' },
   [PAGE_KEYS.BETBRA_AFFILIATE]: { label: 'Betbra Affiliate', description: 'Dados de afiliação Betbra' },
   [PAGE_KEYS.SETTINGS]: { label: 'Configurações', description: 'Configurações do sistema' },
