@@ -10,6 +10,7 @@ import MatchDetails from '@/pages/MatchDetails';
 import EntityManagement from '@/pages/EntityManagement';
 import Settings from '@/pages/Settings';
 import Login from '@/pages/Login';
+import ResetPassword from '@/pages/ResetPassword';
 import AdminUsers from '@/pages/admin/Users';
 import AdminLogs from '@/pages/admin/Logs';
 import ScraperStatus from '@/pages/admin/ScraperStatus';
@@ -49,6 +50,11 @@ export function AnimatedRoutes() {
         <Route path="/login" element={
           <PageTransition>
             <Login />
+          </PageTransition>
+        } />
+        <Route path="/reset-password" element={
+          <PageTransition>
+            <ResetPassword />
           </PageTransition>
         } />
         
