@@ -31,9 +31,10 @@ src/
 
 ## Key Configuration
 - **Vite**: Runs on port 5000, allows all hosts for Replit proxy
-- **Supabase**: External instance, credentials stored in Replit environment variables
-  - `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY` - Main Supabase project
-  - `VITE_PROCEDURES_SUPABASE_URL` / `VITE_PROCEDURES_SUPABASE_ANON_KEY` - Procedures Supabase project
+- **Supabase**: Two external Supabase instances, credentials stored in Replit environment variables
+  - `VITE_MAIN_SUPABASE_URL` / `VITE_MAIN_SUPABASE_ANON_KEY` - Auth & main data (wspsuempnswljkphatur)
+  - `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY` - Secondary Supabase project (hyccrhpvedvfnzhetxkz)
+  - `VITE_PROCEDURES_SUPABASE_URL` / `VITE_PROCEDURES_SUPABASE_ANON_KEY` - Procedures data (wspsuempnswljkphatur)
 
 ## Running
 - Workflow "Start application" runs `npm run dev` on port 5000
