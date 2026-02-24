@@ -13,7 +13,7 @@ import {
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
-import { Shield, Settings, Trash2, Loader2, Eye, Save, Users } from 'lucide-react';
+import { Shield, Settings, Trash2, Loader2, Eye, Save, Users, Clock } from 'lucide-react';
 
 type PermissionState = Record<string, boolean>;
 
@@ -63,6 +63,8 @@ const AdminUsers = () => {
   const superAdminCount = users.filter(u => u.permissions.is_super_admin).length;
   const activePermCount = (perms: UserPermissionRow) => 
     PERMISSION_COLUMNS.filter(({ column }) => (perms as any)[column] === true).length;
+  const isPending = (perms: UserPermissionRow) => activePermCount(perms) === 0 && !perms.is_super_admin;
+  const pendingCount = users.filter(u => isPending(u.permissions)).length;
 
   if (loading) {
     return (
@@ -82,7 +84,7 @@ const AdminUsers = () => {
           <p className="text-muted-foreground">Gerencie permissões e Super Admins do sistema.</p>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 sm:gap-4">
+        <div className="grid grid-cols-3 gap-3 sm:gap-4">
           <Card>
             <CardHeader className="pb-1 sm:pb-2 px-3 sm:px-6 pt-3 sm:pt-6">
               <CardTitle className="text-xs sm:text-sm font-medium">Total Usuários</CardTitle>
@@ -91,6 +93,17 @@ const AdminUsers = () => {
               <div className="text-xl sm:text-2xl font-bold flex items-center gap-2">
                 <Users className="h-5 w-5 text-muted-foreground" />
                 {users.length}
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-1 sm:pb-2 px-3 sm:px-6 pt-3 sm:pt-6">
+              <CardTitle className="text-xs sm:text-sm font-medium">Pendentes</CardTitle>
+            </CardHeader>
+            <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
+              <div className="text-xl sm:text-2xl font-bold flex items-center gap-2">
+                <Clock className="h-5 w-5 text-yellow-500" />
+                <span className={pendingCount > 0 ? 'text-yellow-500' : ''}>{pendingCount}</span>
               </div>
             </CardContent>
           </Card>
@@ -134,9 +147,15 @@ const AdminUsers = () => {
                           </p>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="secondary">
-                            {activePermCount(user.permissions)}/{PERMISSION_COLUMNS.length}
-                          </Badge>
+                          {isPending(user.permissions) ? (
+                            <Badge variant="outline" className="border-yellow-500 text-yellow-500">
+                              Pendente
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary">
+                              {activePermCount(user.permissions)}/{PERMISSION_COLUMNS.length}
+                            </Badge>
+                          )}
                         </TableCell>
                         <TableCell>
                           <Switch
