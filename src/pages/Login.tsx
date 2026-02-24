@@ -1,6 +1,7 @@
 import { useState, useEffect, Suspense, lazy } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -54,6 +55,24 @@ const Login = () => {
       }
     }
     
+    setLoading(false);
+  };
+
+  const handleForgotPassword = async () => {
+    if (!email.trim()) {
+      setError('Digite seu email para redefinir a senha.');
+      return;
+    }
+    setError(null);
+    setLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    if (error) {
+      setError(error.message);
+    } else {
+      setSuccess('Email de redefinição enviado! Verifique sua caixa de entrada.');
+    }
     setLoading(false);
   };
 
@@ -241,6 +260,16 @@ const Login = () => {
                   >
                     {loading ? 'Entrando...' : 'Entrar'}
                   </Button>
+                  <div className="text-center">
+                    <button
+                      type="button"
+                      onClick={handleForgotPassword}
+                      className="text-sm text-muted-foreground hover:text-primary transition-colors"
+                      disabled={loading}
+                    >
+                      Esqueceu sua senha?
+                    </button>
+                  </div>
                 </form>
               </TabsContent>
               
