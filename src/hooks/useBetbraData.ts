@@ -27,8 +27,9 @@ export function useBetbraData() {
 
       return (data || []) as BetbraEntry[];
     },
-    staleTime: 5000,
-    refetchInterval: 10000,
+    staleTime: 60000,
+    refetchInterval: 120000,
+    refetchIntervalInBackground: false,
     enabled: isProceduresSupabaseConfigured(),
   });
 }

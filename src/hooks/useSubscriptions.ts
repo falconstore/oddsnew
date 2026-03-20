@@ -22,7 +22,8 @@ export function useSubscriptions() {
 
       return data || [];
     },
-    refetchInterval: 10000, // Refetch every 10 seconds
+    refetchInterval: 120000,
+    refetchIntervalInBackground: false,
   });
 }
 

@@ -15,7 +15,6 @@ import {
   FileText,
   TrendingUp,
   CreditCard,
-  Bot,
   Zap,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -36,7 +35,6 @@ const navigation: NavigationItem[] = [
   { name: 'Procedimentos', href: '/procedures', icon: FileText, pageKey: PAGE_KEYS.PROCEDURE_CONTROL, color: 'text-cyan-400' },
   { name: 'Betbra Affiliate', href: '/betbra', icon: TrendingUp, pageKey: PAGE_KEYS.BETBRA_AFFILIATE, color: 'text-amber-400' },
   { name: 'Assinaturas', href: '/subscriptions', icon: CreditCard, pageKey: PAGE_KEYS.SUBSCRIPTIONS, color: 'text-purple-400' },
-  { name: 'Bot Telegram', href: '/telegram-bot', icon: Bot, pageKey: PAGE_KEYS.TELEGRAM_BOT, color: 'text-pink-400' },
   { name: 'Cadastros', href: '/cadastros', icon: Building2, pageKey: PAGE_KEYS.LEAGUES, color: 'text-indigo-400' },
   { name: 'Configurações', href: '/settings', icon: Settings, pageKey: PAGE_KEYS.SETTINGS, color: 'text-slate-400' },
   { name: 'Usuários', href: '/admin/users', icon: UserCog, pageKey: PAGE_KEYS.ADMIN_USERS, color: 'text-red-400' },
