@@ -19,7 +19,7 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
       <div className="glass border border-white/10 rounded-xl p-2.5 shadow-xl">
         <p className="text-[10px] text-muted-foreground mb-1">{label}</p>
         <p className="text-sm font-bold text-foreground">
-          R$ {payload[0].value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+          {payload[0].value.toLocaleString('pt-BR')}
         </p>
       </div>
     );
