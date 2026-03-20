@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { usePersistedState } from '@/hooks/usePersistedState';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Plus, Calendar, RefreshCw, Download } from 'lucide-react';
+import { Plus, Calendar, RefreshCw, Download, TrendingUp } from 'lucide-react';
 
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
