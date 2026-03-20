@@ -4,12 +4,11 @@ import { startOfMonth, endOfMonth, endOfDay, differenceInDays, format } from 'da
 import { ptBR } from 'date-fns/locale';
 import { 
   Plus, TrendingUp, Calendar, Activity, FileText, 
-  Clock, Trophy, Columns, Upload 
+  Clock, Trophy, Columns, Upload, ChevronDown, List
 } from 'lucide-react';
 
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 import { useProcedures, useDeleteProcedure, useToggleFavorite } from '@/hooks/useProcedures';
@@ -96,7 +95,6 @@ export default function ProcedureControl() {
     toggleFavorite.mutate({ id: proc.id, is_favorite: !proc.is_favorite });
   };
 
-  // Filtered procedures
   const filteredProcedures = useMemo(() => {
     const monthStart = startOfMonth(selectedMonth);
     const monthEnd = endOfDay(endOfMonth(selectedMonth));
@@ -105,7 +103,6 @@ export default function ProcedureControl() {
     return procedures.filter(proc => {
       const procDate = parseDate(proc.date);
       if (!procDate || procDate < monthStart || procDate > monthEnd) return false;
-
       if (filters.searchNumber && !proc.procedure_number?.toLowerCase().includes(filters.searchNumber.toLowerCase())) return false;
       if (filters.searchPromotion && proc.promotion_name && !proc.promotion_name.toLowerCase().includes(filters.searchPromotion.toLowerCase())) return false;
       if (filters.searchTags !== 'all' && !proc.tags?.includes(filters.searchTags)) return false;
@@ -122,7 +119,6 @@ export default function ProcedureControl() {
       if (filters.urgent !== 'all') {
         const daysAgo = procDate ? differenceInDays(today, procDate) : 0;
         const cleanStatus = (proc.status || '').trim().toLowerCase();
-        
         if (filters.urgent === 'urgent') {
           const isUrgent = (
             ((cleanStatus === 'falta girar freebet' || cleanStatus === 'falta girar freeebet') && daysAgo > 3) ||
@@ -131,7 +127,6 @@ export default function ProcedureControl() {
           );
           if (!isUrgent) return false;
         }
-        
         if (filters.urgent === 'pending') {
           const isPending = (
             cleanStatus === 'falta girar freebet' || 
@@ -157,150 +152,167 @@ export default function ProcedureControl() {
     });
   }, [procedures, selectedMonth, filters]);
 
-  // Stats
   const bestPlatform = getBestPlatform(procedures, selectedMonth);
   const dayWithMostProfit = getDayWithMostProfit(procedures, selectedMonth);
   const dayWithMostProcedures = getDayWithMostProcedures(procedures, selectedMonth);
 
-  // Procedures for notifications (current month only)
   const monthProcedures = useMemo(() => {
     const monthStart = startOfMonth(selectedMonth);
     const monthEnd = endOfDay(endOfMonth(selectedMonth));
-    
     return procedures.filter(proc => {
       const procDate = parseDate(proc.date);
       return procDate && procDate >= monthStart && procDate <= monthEnd;
     });
   }, [procedures, selectedMonth]);
 
+  const monthlyProfit = getCurrentMonthProfit(procedures, selectedMonth);
+
   return (
     <Layout>
-      <div className="space-y-4 md:space-y-6 animate-fade-in">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+      <div className="space-y-5 animate-fade-in">
+
+        {/* ── Header ── */}
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-cyan-500/5 border border-cyan-500/20 flex items-center justify-center flex-shrink-0">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-500/25 to-cyan-500/5 border border-cyan-500/25 flex items-center justify-center shadow-lg shadow-cyan-500/10 flex-shrink-0">
               <FileText className="h-5 w-5 text-cyan-400" />
             </div>
             <div>
-              <h1 className="text-xl md:text-2xl font-bold tracking-tight">Controle de Procedimentos</h1>
-              <p className="text-muted-foreground text-xs md:text-sm">Rastreie e gerencie procedimentos de apostas</p>
+              <h1 className="text-xl md:text-2xl font-bold tracking-tight gradient-text">
+                Controle de Procedimentos
+              </h1>
+              <p className="text-muted-foreground text-xs md:text-sm mt-0.5">
+                Rastreie e gerencie procedimentos de apostas
+              </p>
             </div>
           </div>
           {canEdit && (
             <div className="flex gap-2 flex-shrink-0">
-              <Button variant="outline" onClick={() => setShowImportModal(true)} size="sm">
-                <Upload className="w-4 h-4 mr-2" />
+              <Button
+                variant="outline"
+                onClick={() => setShowImportModal(true)}
+                size="sm"
+                className="border-white/10 hover:bg-white/5 h-9"
+              >
+                <Upload className="w-3.5 h-3.5 mr-1.5" />
                 Importar CSV
               </Button>
-              <Button onClick={handleAdd} size="sm">
-                <Plus className="w-4 h-4 mr-2" />
+              <Button
+                onClick={handleAdd}
+                size="sm"
+                className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground shadow-md shadow-primary/20 h-9 font-semibold"
+              >
+                <Plus className="w-3.5 h-3.5 mr-1.5" />
                 Adicionar
               </Button>
             </div>
           )}
         </div>
 
-        {/* Stats Row 1 */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-2 md:gap-3">
-          {/* Month Selector Card */}
-          <Card className="p-4 flex flex-col">
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <p className="text-[10px] text-muted-foreground font-medium mb-1">Mês Atual</p>
-                <Select
-                  value={selectedMonth.toISOString()}
-                  onValueChange={(value) => setSelectedMonth(new Date(value))}
-                >
-                  <SelectTrigger className="bg-transparent border-none text-xl font-bold p-0 h-auto hover:text-primary transition-colors">
-                    <SelectValue>
-                      {capitalizeMonth(format(selectedMonth, 'MMMM', { locale: ptBR }))}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {generateMonthOptions().map(option => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {capitalizeMonth(option.label)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-[10px] text-muted-foreground mt-0.5">
-                  {format(selectedMonth, 'yyyy', { locale: ptBR })}
-                </p>
-              </div>
-              <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center backdrop-blur-sm flex-shrink-0">
-                <Calendar className="w-5 h-5 text-primary" />
-              </div>
+        {/* ── Month Selector + Profit Hero ── */}
+        <div className="glass rounded-2xl border border-white/5 p-4 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+          <div className="flex items-center gap-3 flex-1">
+            <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
+              <Calendar className="w-5 h-5 text-primary" />
             </div>
-          </Card>
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Mês selecionado</p>
+              <Select
+                value={selectedMonth.toISOString()}
+                onValueChange={(value) => setSelectedMonth(new Date(value))}
+              >
+                <SelectTrigger className="bg-transparent border-none p-0 h-auto text-lg font-bold hover:text-primary transition-colors w-auto gap-1 focus:ring-0">
+                  <SelectValue>
+                    {capitalizeMonth(format(selectedMonth, 'MMMM', { locale: ptBR }))} {format(selectedMonth, 'yyyy')}
+                  </SelectValue>
+                  <ChevronDown className="w-4 h-4 opacity-50" />
+                </SelectTrigger>
+                <SelectContent>
+                  {generateMonthOptions().map(option => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {capitalizeMonth(option.label)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="flex items-center gap-6">
+            <div className="text-right">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Lucro do Mês</p>
+              <p className={`text-2xl font-bold ${monthlyProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                {monthlyProfit >= 0 ? '+' : ''}R$ {monthlyProfit.toFixed(2)}
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Total Proc.</p>
+              <p className="text-2xl font-bold text-foreground">{getTotalProceduresForMonth(procedures, selectedMonth)}</p>
+            </div>
+          </div>
+        </div>
 
+        {/* ── Stats Row 1 ── */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 md:gap-3">
           <StatCard
             title="Lucro Mensal"
             value={`R$ ${getCurrentMonthProfit(procedures, selectedMonth).toFixed(2)}`}
             icon={TrendingUp}
-            gradient="bg-success/10"
+            color="green"
           />
           <StatCard
             title="Lucro Médio Diário"
             value={`R$ ${getAverageDailyProfit(procedures, selectedMonth).toFixed(2)}`}
             icon={Activity}
-            gradient="bg-purple-500/10"
+            color="purple"
           />
           <StatCard
             title="Média Proc./Dia"
             value={getAverageProceduresPerDay(procedures, selectedMonth)}
             icon={FileText}
-            gradient="bg-cyan-500/10"
+            color="cyan"
           />
           <StatCard
-            title="Total de Procedimentos"
-            value={getTotalProceduresForMonth(procedures, selectedMonth)}
-            icon={FileText}
-            gradient="bg-indigo-500/10"
-          />
-        </div>
-
-        {/* Stats Row 2 */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 md:gap-3">
-          <StatCard
-            title="Procedimentos Abertos"
+            title="Proc. Abertos"
             value={getOpenProcedures(procedures, selectedMonth)}
             subtitle="Falta Girar Freebet"
             icon={Clock}
-            gradient="bg-amber-500/10"
+            color="amber"
           />
           <StatCard
-            title="Partidas em Aberto"
+            title="Partidas Abertas"
             value={getOpenMatches(procedures, selectedMonth)}
             subtitle="Aguardando resultado"
             icon={Activity}
-            gradient="bg-orange-500/10"
+            color="orange"
           />
+        </div>
+
+        {/* ── Stats Row 2 ── */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 md:gap-3">
           <StatCard
             title="Melhor Plataforma"
             value={bestPlatform.name}
             subtitle={`R$ ${bestPlatform.profit.toFixed(2)} • ${bestPlatform.count} proc.`}
             icon={Trophy}
-            gradient="bg-yellow-500/10"
+            color="yellow"
           />
           <StatCard
             title="Dia com Maior Lucro"
             value={dayWithMostProfit.date}
             subtitle={`R$ ${dayWithMostProfit.profit.toFixed(2)}`}
             icon={TrendingUp}
-            gradient="bg-success/10"
+            color="green"
           />
           <StatCard
             title="Dia com Mais Proc."
             value={dayWithMostProcedures.date}
             subtitle={`${dayWithMostProcedures.count} procedimentos`}
             icon={FileText}
-            gradient="bg-primary/10"
+            color="pink"
           />
         </div>
 
-        {/* Notifications */}
+        {/* ── Notifications ── */}
         {showNotifications && (
           <NotificationPanel
             procedures={monthProcedures}
@@ -309,7 +321,7 @@ export default function ProcedureControl() {
           />
         )}
 
-        {/* Filters */}
+        {/* ── Filters ── */}
         <ProcedureFilters
           filters={filters}
           onFilterChange={setFilters}
@@ -318,8 +330,8 @@ export default function ProcedureControl() {
           availableTags={getAllTags(procedures)}
         />
 
-        {/* Charts */}
-        <div className="grid grid-cols-1 gap-6">
+        {/* ── Charts ── */}
+        <div className="grid grid-cols-1 gap-5">
           <CalendarChart
             data={getDailyProfitData(procedures, selectedMonth)}
             title="Calendário de Lucro/Prejuízo"
@@ -331,28 +343,31 @@ export default function ProcedureControl() {
           />
         </div>
 
-        {/* Table */}
-        <Card>
-          <CardHeader>
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
-              <CardTitle className="text-base md:text-lg">Lista de Procedimentos</CardTitle>
-              <div className="flex items-center gap-3">
-                <span className="text-xs text-muted-foreground">
-                  Mostrando {filteredProcedures.length} de {procedures.length} procedimentos
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowColumnCustomizer(true)}
-                  className="hidden lg:flex"
-                >
-                  <Columns className="w-4 h-4 mr-2" />
-                  Colunas
-                </Button>
+        {/* ── Procedures Table ── */}
+        <div className="glass rounded-2xl border border-white/5 overflow-hidden">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 p-4 border-b border-white/5">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-primary/15 flex items-center justify-center">
+                <List className="w-4 h-4 text-primary" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-foreground">Lista de Procedimentos</h3>
+                <p className="text-[10px] text-muted-foreground">
+                  {filteredProcedures.length} de {procedures.length} procedimentos
+                </p>
               </div>
             </div>
-          </CardHeader>
-          <CardContent>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowColumnCustomizer(true)}
+              className="hidden lg:flex border-white/10 hover:bg-white/5 h-8 text-xs"
+            >
+              <Columns className="w-3.5 h-3.5 mr-1.5" />
+              Colunas
+            </Button>
+          </div>
+          <div className="p-0">
             <ProcedureTable
               procedures={filteredProcedures}
               visibleColumns={visibleColumns}
@@ -360,41 +375,41 @@ export default function ProcedureControl() {
               onDelete={canEdit ? handleDelete : undefined}
               onToggleFavorite={handleToggleFavorite}
             />
+          </div>
+          <div className="p-3">
             <ProcedureMobileCards
               procedures={filteredProcedures}
               onEdit={canEdit ? handleEdit : undefined}
               onDelete={canEdit ? handleDelete : undefined}
               onToggleFavorite={handleToggleFavorite}
             />
-          </CardContent>
-        </Card>
-
-        {/* Modals */}
-        {showModal && (
-          <ProcedureModal
-            procedure={editingProcedure}
-            onClose={() => {
-              setShowModal(false);
-              setEditingProcedure(null);
-            }}
-          />
-        )}
-
-        {showImportModal && (
-          <ImportModal
-            onClose={() => setShowImportModal(false)}
-            onSuccess={() => refetch()}
-          />
-        )}
-
-        {showColumnCustomizer && (
-          <ColumnCustomizer
-            visibleColumns={visibleColumns}
-            onColumnsChange={setVisibleColumns}
-            onClose={() => setShowColumnCustomizer(false)}
-          />
-        )}
+          </div>
+        </div>
       </div>
+
+      {/* ── Modals ── */}
+      {showModal && (
+        <ProcedureModal
+          procedure={editingProcedure}
+          onClose={() => {
+            setShowModal(false);
+            setEditingProcedure(null);
+          }}
+        />
+      )}
+      {showImportModal && (
+        <ImportModal
+          onClose={() => setShowImportModal(false)}
+          onSuccess={() => refetch()}
+        />
+      )}
+      {showColumnCustomizer && (
+        <ColumnCustomizer
+          visibleColumns={visibleColumns}
+          onColumnsChange={setVisibleColumns}
+          onClose={() => setShowColumnCustomizer(false)}
+        />
+      )}
     </Layout>
   );
 }
