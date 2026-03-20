@@ -228,12 +228,17 @@ export default function ScraperStatus() {
   
   return (
     <Layout>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Status dos Scrapers</h1>
-          <p className="text-muted-foreground">
-            Monitoramento em tempo real dos scrapers de odds. Atualiza automaticamente a cada 30 segundos.
-          </p>
+      <div className="space-y-6 animate-fade-in">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-cyan-500/5 border border-cyan-500/20 flex items-center justify-center flex-shrink-0">
+            <Activity className="h-5 w-5 text-cyan-400" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Status dos Scrapers</h1>
+            <p className="text-muted-foreground text-sm">
+              Monitoramento em tempo real. Atualiza automaticamente a cada 30 segundos.
+            </p>
+          </div>
         </div>
         
         <StatsCards stats={stats} />

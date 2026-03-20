@@ -88,15 +88,15 @@ export default function Subscriptions() {
 
   return (
     <Layout>
-      <div className="space-y-6 p-4 md:p-6">
+      <div className="space-y-6 animate-fade-in">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <CreditCard className="h-5 w-5 text-primary" />
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500/20 to-purple-500/5 border border-purple-500/20 flex items-center justify-center">
+              <CreditCard className="h-5 w-5 text-purple-400" />
             </div>
             <div>
-              <h1 className="text-xl font-semibold">Assinaturas</h1>
+              <h1 className="text-xl font-bold tracking-tight">Assinaturas</h1>
               <p className="text-xs text-muted-foreground">
                 Controle de pagamentos e assinantes
               </p>

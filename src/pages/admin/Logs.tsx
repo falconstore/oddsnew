@@ -140,17 +140,19 @@ export default function AdminLogs() {
 
   return (
     <Layout>
-      <div className="space-y-6">
+      <div className="space-y-6 animate-fade-in">
         {/* Header */}
-        <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <FileWarning className="h-6 w-6 text-amber-500" />
-              Logs / Diagnóstico
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              Identifique partidas com casas de apostas faltando para diagnosticar problemas de scraping
-            </p>
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500/20 to-amber-500/5 border border-amber-500/20 flex items-center justify-center flex-shrink-0">
+              <FileWarning className="h-5 w-5 text-amber-400" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">Logs / Diagnóstico</h1>
+              <p className="text-muted-foreground text-sm">
+                Identifique partidas com casas de apostas faltando para diagnosticar problemas de scraping
+              </p>
+            </div>
           </div>
           
           <div className="flex items-center gap-3">

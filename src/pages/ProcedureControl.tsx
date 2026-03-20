@@ -175,20 +175,25 @@ export default function ProcedureControl() {
 
   return (
     <Layout>
-      <div className="space-y-4 md:space-y-6">
+      <div className="space-y-4 md:space-y-6 animate-fade-in">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-          <div>
-            <h1 className="text-xl md:text-2xl lg:text-3xl font-bold mb-2">Controle de Procedimentos</h1>
-            <p className="text-muted-foreground text-xs md:text-sm">Rastreie e gerencie procedimentos de apostas</p>
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-cyan-500/5 border border-cyan-500/20 flex items-center justify-center flex-shrink-0">
+              <FileText className="h-5 w-5 text-cyan-400" />
+            </div>
+            <div>
+              <h1 className="text-xl md:text-2xl font-bold tracking-tight">Controle de Procedimentos</h1>
+              <p className="text-muted-foreground text-xs md:text-sm">Rastreie e gerencie procedimentos de apostas</p>
+            </div>
           </div>
           {canEdit && (
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setShowImportModal(true)}>
+            <div className="flex gap-2 flex-shrink-0">
+              <Button variant="outline" onClick={() => setShowImportModal(true)} size="sm">
                 <Upload className="w-4 h-4 mr-2" />
                 Importar CSV
               </Button>
-              <Button onClick={handleAdd}>
+              <Button onClick={handleAdd} size="sm">
                 <Plus className="w-4 h-4 mr-2" />
                 Adicionar
               </Button>

@@ -39,6 +39,16 @@ src/
 ## Running
 - Workflow "Start application" runs `npm run dev` on port 5000
 
+## Design System (Rebranded)
+- **Font**: Inter + Space Grotesk (sans), JetBrains Mono (mono)
+- **Primary color**: Neon green (`hsl(145 80% 48%)`)
+- **Dark background**: Deep navy `hsl(222 20% 5%)` with radial green glow
+- **Utility classes**: `gradient-text`, `glow-primary`, `glass`, `stat-green/cyan/amber/purple/pink`, `animate-fade-in-up`, `animate-pulse-glow`, `card-hover`
+- **Page headers**: Icon badge (color-coded per page) + title + subtitle — consistent across all pages
+- **Sidebar**: Gradient logo mark with live pulse dot, color-coded nav icons, user footer with avatar ring
+- **Cards**: Colored gradient stat cards with matching border accents
+
 ## User Preferences
 - Language: Portuguese (Brazilian) - all UI text is in Portuguese
-- Dark theme preferred
+- Dark theme preferred (default)
+- UI style: "Instagrammable" — neon accents, glassmorphism, gradient text, animated elements

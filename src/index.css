@@ -1,216 +1,178 @@
-@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap");
-@import url("https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&display=swap");
-@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap");
-@import url("https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600;700&display=swap");
-@import url("https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap");
-@import url("https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap");
-@import url("https://fonts.googleapis.com/css2?family=Libre+Caslon+Text:wght@400;700&display=swap");
-@import url("https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
-
 @layer base {
   :root {
-    /* === LIGHT THEME - Clean Beige/White (Material Design 3 inspired) === */
-    --background: 40 20% 97%;
-    --foreground: 240 10% 10%;
+    /* === LIGHT THEME === */
+    --background: 220 20% 97%;
+    --foreground: 220 15% 10%;
 
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 10%;
+    --card-foreground: 220 15% 10%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 10%;
+    --popover-foreground: 220 15% 10%;
 
-    --primary: 142 76% 36%;
+    --primary: 145 75% 38%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 240 5% 92%;
-    --secondary-foreground: 240 10% 20%;
+    --secondary: 220 10% 92%;
+    --secondary-foreground: 220 10% 20%;
 
-    --muted: 240 5% 85%;
-    --muted-foreground: 240 5% 40%;
+    --muted: 220 10% 88%;
+    --muted-foreground: 220 8% 42%;
 
-    --accent: 142 70% 95%;
-    --accent-foreground: 142 76% 30%;
+    --accent: 145 60% 93%;
+    --accent-foreground: 145 75% 28%;
 
     --destructive: 0 72% 50%;
     --destructive-foreground: 0 85% 97%;
 
-    --border: 40 10% 85%;
-    --input: 40 10% 85%;
-    --ring: 142 76% 36%;
+    --border: 220 12% 87%;
+    --input: 220 12% 87%;
+    --ring: 145 75% 38%;
 
-    --radius: 1rem;
+    --radius: 0.875rem;
 
-    /* === SEMANTIC COLORS === */
-    --success: 142 76% 36%;
+    --success: 145 75% 38%;
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 0%;
     --info: 199 89% 48%;
     --info-foreground: 0 0% 100%;
 
-    /* === SIDEBAR (LIGHT) === */
     --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 240 10% 10%;
-    --sidebar-primary: 142 76% 36%;
+    --sidebar-foreground: 220 15% 10%;
+    --sidebar-primary: 145 75% 38%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 142 70% 95%;
-    --sidebar-accent-foreground: 142 76% 30%;
-    --sidebar-border: 40 10% 90%;
-    --sidebar-ring: 142 76% 36%;
+    --sidebar-accent: 145 60% 93%;
+    --sidebar-accent-foreground: 145 75% 28%;
+    --sidebar-border: 220 12% 90%;
+    --sidebar-ring: 145 75% 38%;
     --sidebar: 0 0% 100%;
 
-    /* === CHARTS === */
-    --chart-1: 142 76% 36%;
-    --chart-2: 142 60% 45%;
-    --chart-3: 142 50% 55%;
-    --chart-4: 142 40% 65%;
-    --chart-5: 240 5% 45%;
+    --chart-1: 145 75% 38%;
+    --chart-2: 199 89% 48%;
+    --chart-3: 38 92% 50%;
+    --chart-4: 270 70% 55%;
+    --chart-5: 340 75% 55%;
 
-    /* === TYPOGRAPHY === */
-    --font-sans: 'Inter', 'Roboto', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
-    --font-serif: 'Libre Caslon Text', ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif;
-    --font-mono: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+    --font-sans: 'Inter', 'Space Grotesk', ui-sans-serif, system-ui, -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 
-    /* === SHADOWS (Deep for light mode - Elevated Cards) === */
     --shadow-2xs: 0 1px 2px 0px hsl(0 0% 0% / 0.03);
-    --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.04);
-    --shadow-sm: 0 2px 4px -1px hsl(0 0% 0% / 0.06), 0 1px 2px -1px hsl(0 0% 0% / 0.04);
-    --shadow: 0 4px 6px -1px hsl(0 0% 0% / 0.07), 0 2px 4px -2px hsl(0 0% 0% / 0.05);
-    --shadow-md: 0 6px 10px -2px hsl(0 0% 0% / 0.08), 0 3px 6px -3px hsl(0 0% 0% / 0.06);
-    --shadow-lg: 0 10px 20px -4px hsl(0 0% 0% / 0.1), 0 4px 8px -4px hsl(0 0% 0% / 0.06);
-    --shadow-xl: 0 20px 30px -6px hsl(0 0% 0% / 0.12), 0 8px 16px -8px hsl(0 0% 0% / 0.08);
+    --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
+    --shadow-sm: 0 2px 4px -1px hsl(0 0% 0% / 0.07), 0 1px 2px -1px hsl(0 0% 0% / 0.05);
+    --shadow: 0 4px 6px -1px hsl(0 0% 0% / 0.08), 0 2px 4px -2px hsl(0 0% 0% / 0.06);
+    --shadow-md: 0 6px 10px -2px hsl(0 0% 0% / 0.09), 0 3px 6px -3px hsl(0 0% 0% / 0.07);
+    --shadow-lg: 0 10px 20px -4px hsl(0 0% 0% / 0.11), 0 4px 8px -4px hsl(0 0% 0% / 0.07);
+    --shadow-xl: 0 20px 30px -6px hsl(0 0% 0% / 0.13), 0 8px 16px -8px hsl(0 0% 0% / 0.09);
     --shadow-2xl: 0 25px 50px -12px hsl(0 0% 0% / 0.25);
-    
-    /* === CARD SHADOW (Deep elevated effect) === */
-    --shadow-card: 0 4px 6px -1px hsl(0 0% 0% / 0.08), 
-                   0 10px 15px -3px hsl(0 0% 0% / 0.06),
-                   0 20px 25px -5px hsl(0 0% 0% / 0.04);
-    --shadow-card-hover: 0 10px 20px -5px hsl(0 0% 0% / 0.1),
-                         0 20px 30px -10px hsl(0 0% 0% / 0.08);
+    --shadow-card: 0 4px 6px -1px hsl(0 0% 0% / 0.08), 0 10px 15px -3px hsl(0 0% 0% / 0.06);
+    --shadow-card-hover: 0 10px 20px -5px hsl(0 0% 0% / 0.12), 0 20px 30px -10px hsl(0 0% 0% / 0.08);
 
-    /* === SPACING === */
-    --tracking-normal: 0em;
     --spacing: 0.25rem;
-
-    /* === GLASSMORPHISM === */
-    --glass-blur: 12px;
-    --glass-opacity: 0.7;
-
-    /* === TRANSITIONS === */
+    --glass-blur: 16px;
+    --glass-opacity: 0.75;
     --transition-fast: 150ms;
     --transition-normal: 250ms;
-    --transition-slow: 350ms;
+    --transition-slow: 400ms;
 
-    /* === ODDS COLORS === */
-    --odds-best: 142 76% 36%;
+    --odds-best: 145 75% 38%;
     --odds-good: 38 92% 50%;
     --odds-neutral: 0 0% 50%;
-    
-    /* === ODDS TYPE COLORS (SO vs PA) === */
     --odds-so: 38 92% 50%;
     --odds-so-foreground: 0 0% 100%;
-    --odds-pa: 142 76% 36%;
+    --odds-pa: 145 75% 38%;
     --odds-pa-foreground: 0 0% 100%;
-    
-    /* === GLOW EFFECTS === */
-    --glow-primary: 0 0 20px hsl(142 76% 36% / 0.2);
+    --glow-primary: 0 0 20px hsl(145 75% 38% / 0.2);
   }
 
   .dark {
-    /* === DARK THEME - Planquo Style (Graphite Gray, não preto) === */
-    --background: 240 10% 6%;
-    --foreground: 0 0% 95%;
+    /* === DARK THEME - Neon Shark === */
+    --background: 222 20% 5%;
+    --foreground: 210 20% 96%;
 
-    --card: 240 8% 12%;
-    --card-foreground: 0 0% 95%;
+    --card: 222 18% 9%;
+    --card-foreground: 210 20% 96%;
 
-    --popover: 240 8% 14%;
-    --popover-foreground: 0 0% 95%;
+    --popover: 222 18% 11%;
+    --popover-foreground: 210 20% 96%;
 
-    --primary: 142 70% 45%;
-    --primary-foreground: 240 10% 6%;
+    --primary: 145 80% 48%;
+    --primary-foreground: 222 20% 5%;
 
-    --secondary: 240 5% 18%;
-    --secondary-foreground: 0 0% 90%;
+    --secondary: 222 12% 15%;
+    --secondary-foreground: 210 15% 88%;
 
-    --muted: 240 5% 25%;
-    --muted-foreground: 240 5% 65%;
+    --muted: 222 12% 18%;
+    --muted-foreground: 220 10% 55%;
 
-    --accent: 142 50% 15%;
-    --accent-foreground: 142 70% 60%;
+    --accent: 145 55% 12%;
+    --accent-foreground: 145 80% 62%;
 
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 85% 97%;
+    --destructive: 0 85% 60%;
+    --destructive-foreground: 0 0% 98%;
 
-    --border: 240 5% 22%;
-    --input: 240 5% 22%;
-    --ring: 142 70% 45%;
+    --border: 222 12% 16%;
+    --input: 222 12% 16%;
+    --ring: 145 80% 48%;
 
-    --radius: 1rem;
+    --radius: 0.875rem;
 
-    /* === SEMANTIC COLORS (DARK) === */
-    --success: 142 70% 45%;
-    --success-foreground: 0 0% 100%;
-    --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 0%;
-    --info: 199 89% 48%;
-    --info-foreground: 0 0% 100%;
+    --success: 145 80% 48%;
+    --success-foreground: 0 0% 5%;
+    --warning: 38 95% 55%;
+    --warning-foreground: 0 0% 5%;
+    --info: 200 95% 55%;
+    --info-foreground: 0 0% 5%;
 
-    /* === SIDEBAR (DARK - Planquo style) === */
-    --sidebar-background: 240 8% 10%;
-    --sidebar-foreground: 0 0% 95%;
-    --sidebar-primary: 142 70% 45%;
-    --sidebar-primary-foreground: 240 10% 6%;
-    --sidebar-accent: 142 50% 15%;
-    --sidebar-accent-foreground: 142 70% 60%;
-    --sidebar-border: 240 5% 18%;
-    --sidebar-ring: 142 70% 45%;
-    --sidebar: 240 8% 12%;
+    --sidebar-background: 222 20% 7%;
+    --sidebar-foreground: 210 20% 94%;
+    --sidebar-primary: 145 80% 48%;
+    --sidebar-primary-foreground: 222 20% 5%;
+    --sidebar-accent: 145 55% 10%;
+    --sidebar-accent-foreground: 145 80% 65%;
+    --sidebar-border: 222 12% 13%;
+    --sidebar-ring: 145 80% 48%;
+    --sidebar: 222 20% 7%;
 
-    /* === CHARTS (DARK) === */
-    --chart-1: 142 70% 50%;
-    --chart-2: 142 60% 60%;
-    --chart-3: 142 50% 70%;
-    --chart-4: 142 40% 40%;
-    --chart-5: 240 5% 45%;
+    --chart-1: 145 80% 52%;
+    --chart-2: 200 90% 58%;
+    --chart-3: 38 95% 58%;
+    --chart-4: 270 75% 65%;
+    --chart-5: 340 80% 65%;
 
-    /* === SHADOWS (Minimal in dark mode) === */
-    --shadow-2xs: 0 1px 2px 0px hsl(0 0% 0% / 0.2);
-    --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.3);
-    --shadow-sm: 0 2px 4px 0px hsl(0 0% 0% / 0.3);
-    --shadow: 0 4px 6px 0px hsl(0 0% 0% / 0.3);
-    --shadow-md: 0 6px 10px 0px hsl(0 0% 0% / 0.3);
-    --shadow-lg: 0 10px 20px 0px hsl(0 0% 0% / 0.4);
-    --shadow-xl: 0 20px 30px 0px hsl(0 0% 0% / 0.4);
-    --shadow-2xl: 0 25px 50px 0px hsl(0 0% 0% / 0.5);
-    
-    /* === CARD SHADOW (None in dark - use borders instead) === */
+    --shadow-2xs: 0 1px 2px 0px hsl(0 0% 0% / 0.4);
+    --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.5);
+    --shadow-sm: 0 2px 4px 0px hsl(0 0% 0% / 0.5);
+    --shadow: 0 4px 6px 0px hsl(0 0% 0% / 0.5);
+    --shadow-md: 0 6px 12px 0px hsl(0 0% 0% / 0.5);
+    --shadow-lg: 0 10px 24px 0px hsl(0 0% 0% / 0.55);
+    --shadow-xl: 0 20px 40px 0px hsl(0 0% 0% / 0.6);
+    --shadow-2xl: 0 25px 60px 0px hsl(0 0% 0% / 0.7);
     --shadow-card: none;
     --shadow-card-hover: none;
 
-    /* === ODDS COLORS (DARK) === */
-    --odds-best: 142 70% 45%;
-    --odds-good: 38 92% 50%;
+    --odds-best: 145 80% 48%;
+    --odds-good: 38 95% 55%;
     --odds-neutral: 0 0% 50%;
-    
-    /* === ODDS TYPE COLORS (SO vs PA) - DARK === */
-    --odds-so: 38 80% 55%;
-    --odds-so-foreground: 0 0% 0%;
-    --odds-pa: 142 70% 45%;
-    --odds-pa-foreground: 0 0% 100%;
-    
-    /* === GLOW EFFECTS (Enhanced in dark mode) === */
-    --glow-primary: 0 0 30px hsl(142 70% 45% / 0.35);
-    --glow-primary-intense: 0 0 50px hsl(142 70% 45% / 0.5);
-    --glow-subtle: 0 0 15px hsl(142 70% 45% / 0.15);
+    --odds-so: 38 85% 58%;
+    --odds-so-foreground: 0 0% 5%;
+    --odds-pa: 145 80% 48%;
+    --odds-pa-foreground: 0 0% 5%;
+
+    --glow-primary: 0 0 30px hsl(145 80% 48% / 0.4);
+    --glow-primary-intense: 0 0 60px hsl(145 80% 48% / 0.6);
+    --glow-subtle: 0 0 15px hsl(145 80% 48% / 0.2);
+    --glow-cyan: 0 0 30px hsl(200 90% 58% / 0.3);
+    --glow-amber: 0 0 30px hsl(38 95% 58% / 0.3);
+    --glow-purple: 0 0 30px hsl(270 75% 65% / 0.3);
   }
 }
 
@@ -219,32 +181,286 @@ All colors MUST be HSL.
     @apply border-border;
   }
 
+  html {
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-sans);
   }
-  
-  /* Dark mode subtle gradient background */
+
+  /* Dark mode deep background */
   .dark body {
-    background: linear-gradient(
-      135deg,
-      hsl(240 10% 6%) 0%,
-      hsl(250 12% 8%) 25%,
-      hsl(240 10% 6%) 50%,
-      hsl(230 12% 8%) 75%,
-      hsl(240 10% 6%) 100%
-    );
+    background: 
+      radial-gradient(ellipse 80% 50% at 50% -20%, hsl(145 80% 48% / 0.08) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 40% at 80% 100%, hsl(200 90% 58% / 0.05) 0%, transparent 60%),
+      hsl(222 20% 5%);
     background-attachment: fixed;
   }
-  
-  /* Grain/noise texture overlay for dark mode */
+
+  /* Subtle grid pattern */
   .dark body::before {
     content: "";
     position: fixed;
     inset: 0;
     z-index: -1;
     pointer-events: none;
-    opacity: 0.025;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-    background-repeat: repeat;
+    background-image: 
+      linear-gradient(hsl(145 80% 48% / 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(145 80% 48% / 0.03) 1px, transparent 1px);
+    background-size: 60px 60px;
   }
+}
+
+/* ============================================
+   CUSTOM UTILITY CLASSES
+   ============================================ */
+
+@layer utilities {
+  /* --- Gradient Text --- */
+  .gradient-text {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(135deg, hsl(145 80% 55%) 0%, hsl(165 80% 55%) 50%, hsl(200 90% 65%) 100%);
+  }
+
+  .gradient-text-warm {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(135deg, hsl(38 95% 60%) 0%, hsl(20 90% 65%) 100%);
+  }
+
+  .gradient-text-purple {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(135deg, hsl(270 75% 70%) 0%, hsl(300 70% 65%) 100%);
+  }
+
+  /* --- Glow Effects --- */
+  .glow-primary {
+    box-shadow: 0 0 20px hsl(145 80% 48% / 0.35), 0 0 60px hsl(145 80% 48% / 0.15);
+  }
+
+  .glow-primary-sm {
+    box-shadow: 0 0 10px hsl(145 80% 48% / 0.3);
+  }
+
+  .glow-cyan {
+    box-shadow: 0 0 20px hsl(200 90% 58% / 0.35), 0 0 60px hsl(200 90% 58% / 0.15);
+  }
+
+  .glow-amber {
+    box-shadow: 0 0 20px hsl(38 95% 58% / 0.35), 0 0 60px hsl(38 95% 58% / 0.15);
+  }
+
+  .glow-purple {
+    box-shadow: 0 0 20px hsl(270 75% 65% / 0.35), 0 0 60px hsl(270 75% 65% / 0.15);
+  }
+
+  /* --- Glassmorphism --- */
+  .glass {
+    background: hsl(222 18% 9% / 0.6);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid hsl(145 80% 48% / 0.12);
+  }
+
+  .glass-subtle {
+    background: hsl(222 18% 9% / 0.4);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid hsl(210 20% 96% / 0.06);
+  }
+
+  /* --- Page Hero Pattern --- */
+  .hero-grid {
+    background-image: 
+      linear-gradient(hsl(145 80% 48% / 0.06) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(145 80% 48% / 0.06) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  /* --- Stat Card Gradients --- */
+  .stat-green {
+    background: linear-gradient(135deg, hsl(145 80% 48% / 0.15) 0%, hsl(145 80% 48% / 0.05) 100%);
+    border-color: hsl(145 80% 48% / 0.2);
+  }
+
+  .stat-cyan {
+    background: linear-gradient(135deg, hsl(200 90% 58% / 0.15) 0%, hsl(200 90% 58% / 0.05) 100%);
+    border-color: hsl(200 90% 58% / 0.2);
+  }
+
+  .stat-amber {
+    background: linear-gradient(135deg, hsl(38 95% 58% / 0.15) 0%, hsl(38 95% 58% / 0.05) 100%);
+    border-color: hsl(38 95% 58% / 0.2);
+  }
+
+  .stat-purple {
+    background: linear-gradient(135deg, hsl(270 75% 65% / 0.15) 0%, hsl(270 75% 65% / 0.05) 100%);
+    border-color: hsl(270 75% 65% / 0.2);
+  }
+
+  .stat-pink {
+    background: linear-gradient(135deg, hsl(340 80% 65% / 0.15) 0%, hsl(340 80% 65% / 0.05) 100%);
+    border-color: hsl(340 80% 65% / 0.2);
+  }
+
+  .stat-indigo {
+    background: linear-gradient(135deg, hsl(230 80% 65% / 0.15) 0%, hsl(230 80% 65% / 0.05) 100%);
+    border-color: hsl(230 80% 65% / 0.2);
+  }
+
+  .stat-orange {
+    background: linear-gradient(135deg, hsl(20 90% 60% / 0.15) 0%, hsl(20 90% 60% / 0.05) 100%);
+    border-color: hsl(20 90% 60% / 0.2);
+  }
+
+  /* --- Neon borders --- */
+  .border-neon-green {
+    border-color: hsl(145 80% 48% / 0.3);
+  }
+
+  .border-neon-cyan {
+    border-color: hsl(200 90% 58% / 0.3);
+  }
+}
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 15px hsl(145 80% 48% / 0.3); }
+  50% { box-shadow: 0 0 30px hsl(145 80% 48% / 0.6), 0 0 60px hsl(145 80% 48% / 0.2); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes slide-in-left {
+  from { opacity: 0; transform: translateX(-16px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes border-flow {
+  0% { border-image-source: linear-gradient(0deg, hsl(145 80% 48%), hsl(200 90% 58%)); }
+  50% { border-image-source: linear-gradient(180deg, hsl(145 80% 48%), hsl(200 90% 58%)); }
+  100% { border-image-source: linear-gradient(360deg, hsl(145 80% 48%), hsl(200 90% 58%)); }
+}
+
+@layer utilities {
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
+  }
+
+  .animate-pulse-glow {
+    animation: pulse-glow 2.5s ease-in-out infinite;
+  }
+
+  .animate-shimmer {
+    background: linear-gradient(90deg, transparent 0%, hsl(145 80% 48% / 0.1) 50%, transparent 100%);
+    background-size: 200% auto;
+    animation: shimmer 2s linear infinite;
+  }
+
+  .animate-fade-in-up {
+    animation: fade-in-up 0.5s ease-out both;
+  }
+
+  .animate-fade-in {
+    animation: fade-in 0.4s ease-out both;
+  }
+
+  .animate-scale-in {
+    animation: scale-in 0.3s ease-out both;
+  }
+
+  .animate-slide-in-left {
+    animation: slide-in-left 0.4s ease-out both;
+  }
+
+  /* Staggered delays */
+  .delay-100 { animation-delay: 100ms; }
+  .delay-150 { animation-delay: 150ms; }
+  .delay-200 { animation-delay: 200ms; }
+  .delay-300 { animation-delay: 300ms; }
+  .delay-400 { animation-delay: 400ms; }
+  .delay-500 { animation-delay: 500ms; }
+}
+
+/* ============================================
+   COMPONENT OVERRIDES
+   ============================================ */
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(222 12% 20%);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(145 80% 48% / 0.5);
+}
+
+/* Focus ring */
+.dark *:focus-visible {
+  outline: 2px solid hsl(145 80% 48% / 0.6);
+  outline-offset: 2px;
+}
+
+/* Selection */
+.dark ::selection {
+  background: hsl(145 80% 48% / 0.25);
+  color: hsl(145 80% 80%);
+}
+
+/* Font mono for numbers */
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+/* Page layout helpers */
+.page-container {
+  @apply space-y-6 md:space-y-8;
+}
+
+/* Card hover transition */
+.card-hover {
+  @apply transition-all duration-300 hover:-translate-y-0.5;
+}
+
+.dark .card-hover:hover {
+  box-shadow: 0 8px 32px hsl(0 0% 0% / 0.4), 0 0 0 1px hsl(145 80% 48% / 0.1);
 }

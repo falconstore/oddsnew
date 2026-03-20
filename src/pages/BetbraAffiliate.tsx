@@ -95,12 +95,17 @@ export default function BetbraAffiliate() {
 
   return (
     <Layout>
-      <div className="space-y-4 md:space-y-6">
+      <div className="space-y-4 md:space-y-6 animate-fade-in">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-          <div>
-            <h1 className="text-xl md:text-2xl lg:text-3xl font-bold mb-2">Betbra Affiliate</h1>
-            <p className="text-muted-foreground text-xs md:text-sm">Gerenciar dados de afiliação Betbra</p>
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500/20 to-amber-500/5 border border-amber-500/20 flex items-center justify-center flex-shrink-0">
+              <TrendingUp className="h-5 w-5 text-amber-400" />
+            </div>
+            <div>
+              <h1 className="text-xl md:text-2xl font-bold tracking-tight">Betbra Affiliate</h1>
+              <p className="text-muted-foreground text-xs md:text-sm">Gerenciar dados de afiliação Betbra</p>
+            </div>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={handleExportCSV}>

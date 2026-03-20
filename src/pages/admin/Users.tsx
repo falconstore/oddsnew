@@ -13,7 +13,7 @@ import {
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
-import { Shield, Settings, Trash2, Loader2, Eye, Save, Users, Clock } from 'lucide-react';
+import { Shield, Settings, Trash2, Loader2, Eye, Save, Users, Clock, UserCog } from 'lucide-react';
 
 type PermissionState = Record<string, boolean>;
 
@@ -78,10 +78,15 @@ const AdminUsers = () => {
 
   return (
     <Layout>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">Gerenciar Usuários</h1>
-          <p className="text-muted-foreground">Gerencie permissões e Super Admins do sistema.</p>
+      <div className="space-y-6 animate-fade-in">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-red-500/20 to-red-500/5 border border-red-500/20 flex items-center justify-center">
+            <UserCog className="h-5 w-5 text-red-400" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Gerenciar Usuários</h1>
+            <p className="text-muted-foreground text-sm">Gerencie permissões e Super Admins do sistema.</p>
+          </div>
         </div>
 
         <div className="grid grid-cols-3 gap-3 sm:gap-4">

@@ -1,4 +1,4 @@
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Trophy, Users, Building2 } from 'lucide-react';
@@ -27,15 +27,12 @@ const EntityManagement = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { canViewPage } = useAuth();
 
-  // Filtrar abas baseado em permissões
-  const availableTabs = useMemo(() => 
+  const availableTabs = useMemo(() =>
     ALL_TABS.filter(tab => canViewPage(tab.pageKey)),
     [canViewPage]
   );
 
   const [persistedTab, setPersistedTab] = usePersistedState('cadastros_tab', 'leagues');
-
-  // URL param takes priority, then persisted, then first available
   const urlTab = searchParams.get('tab');
   const defaultTab = availableTabs[0]?.id || 'leagues';
   const candidateTab = urlTab || persistedTab;
@@ -58,19 +55,29 @@ const EntityManagement = () => {
 
   return (
     <Layout>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">Cadastros</h1>
-          <p className="text-muted-foreground">Gerencie ligas, times e casas de apostas</p>
+      <div className="space-y-6 animate-fade-in">
+        {/* Page Header */}
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500/20 to-indigo-500/5 border border-indigo-500/20 flex items-center justify-center">
+            <Building2 className="h-5 w-5 text-indigo-400" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Cadastros</h1>
+            <p className="text-sm text-muted-foreground">Gerencie ligas, times e casas de apostas</p>
+          </div>
         </div>
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full" activationMode="manual">
-          <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-flex">
+          <TabsList className="bg-muted/50 dark:bg-white/[0.04] border border-border/50 p-1 rounded-xl h-auto gap-1">
             {availableTabs.map((tab) => (
-              <TabsTrigger key={tab.id} value={tab.id} className="gap-2">
+              <TabsTrigger
+                key={tab.id}
+                value={tab.id}
+                className="gap-2 rounded-lg data-[state=active]:bg-background dark:data-[state=active]:bg-card data-[state=active]:shadow-sm data-[state=active]:border data-[state=active]:border-border/50 px-4 py-2"
+              >
                 <tab.icon className="h-4 w-4" />
-                <span className="hidden sm:inline">{tab.label}</span>
-                <span className="sm:hidden">{tab.label.split(' ')[0]}</span>
+                <span className="hidden sm:inline font-medium">{tab.label}</span>
+                <span className="sm:hidden font-medium">{tab.label.split(' ')[0]}</span>
               </TabsTrigger>
             ))}
           </TabsList>

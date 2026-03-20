@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Bot, Send, Settings2, History, TrendingUp, DollarSign, Clock, Percent } from "lucide-react";
+import { Bot, Send, Settings2, History, TrendingUp, DollarSign, Clock, Percent, Activity } from "lucide-react";
 import {
   useTelegramBotConfig,
   useUpdateTelegramConfig,
@@ -35,7 +35,6 @@ export default function TelegramBot() {
     horario_fim: string;
   } | null>(null);
 
-  // Sync local state with fetched config
   const effectiveConfig =
     localConfig ||
     (config
@@ -70,22 +69,56 @@ export default function TelegramBot() {
     }
   };
 
+  const statCards = [
+    {
+      title: "Enviados Hoje",
+      icon: Send,
+      value: stats?.enviadosHoje || 0,
+      color: "stat-green",
+      iconColor: "text-primary",
+    },
+    {
+      title: "Total Enviados",
+      icon: History,
+      value: stats?.totalEnviados || 0,
+      color: "stat-cyan",
+      iconColor: "text-cyan-400",
+    },
+    {
+      title: "ROI Médio",
+      icon: Percent,
+      value: stats?.roiMedio ? `${stats.roiMedio >= 0 ? "+" : ""}${stats.roiMedio.toFixed(2)}%` : "0%",
+      color: "stat-amber",
+      iconColor: "text-amber-400",
+    },
+    {
+      title: "Lucro Potencial",
+      icon: DollarSign,
+      value: `R$ ${(stats?.lucroTotalPotencial || 0).toFixed(2)}`,
+      color: (stats?.lucroTotalPotencial || 0) >= 0 ? "stat-green" : "stat-pink",
+      iconColor: (stats?.lucroTotalPotencial || 0) >= 0 ? "text-primary" : "text-pink-400",
+    },
+  ];
+
   return (
     <Layout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Bot className="h-6 w-6 text-primary" />
-              Bot Telegram - Duplo Green
-            </h1>
-            <p className="text-muted-foreground">Alertas automáticos de oportunidades de Duplo Green</p>
+      <div className="space-y-6 animate-fade-in">
+        {/* Page Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-pink-500/20 to-pink-500/5 border border-pink-500/20 flex items-center justify-center">
+              <Bot className="h-5 w-5 text-pink-400" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">Bot Telegram</h1>
+              <p className="text-sm text-muted-foreground">Alertas automáticos de Duplo Green</p>
+            </div>
           </div>
 
           {config && canEdit && (
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-muted-foreground">{config.enabled ? "Ativo" : "Desativado"}</span>
+            <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-muted/40 dark:bg-white/[0.03] border border-border/50">
+              <div className={`w-2 h-2 rounded-full ${config.enabled ? 'bg-primary animate-pulse' : 'bg-muted-foreground/40'}`} />
+              <span className="text-sm font-medium">{config.enabled ? "Ativo" : "Desativado"}</span>
               <Switch
                 checked={config.enabled}
                 onCheckedChange={handleToggleEnabled}
@@ -96,76 +129,36 @@ export default function TelegramBot() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Enviados Hoje</CardTitle>
-              <Send className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              {statsLoading ? (
-                <Skeleton className="h-8 w-16" />
-              ) : (
-                <div className="text-2xl font-bold">{stats?.enviadosHoje || 0}</div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Total Enviados</CardTitle>
-              <History className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              {statsLoading ? (
-                <Skeleton className="h-8 w-16" />
-              ) : (
-                <div className="text-2xl font-bold">{stats?.totalEnviados || 0}</div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">ROI Médio</CardTitle>
-              <Percent className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              {statsLoading ? (
-                <Skeleton className="h-8 w-16" />
-              ) : (
-                <div className="text-2xl font-bold">
-                  {stats?.roiMedio ? `${stats.roiMedio >= 0 ? "+" : ""}${stats.roiMedio.toFixed(2)}%` : "0%"}
+        <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
+          {statCards.map((stat, i) => (
+            <Card
+              key={stat.title}
+              className={`border animate-fade-in-up card-hover ${stat.color}`}
+              style={{ animationDelay: `${i * 60}ms` }}
+            >
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-xs font-medium text-muted-foreground">{stat.title}</CardTitle>
+                <div className="w-8 h-8 rounded-lg bg-background/50 dark:bg-white/[0.05] flex items-center justify-center">
+                  <stat.icon className={`h-4 w-4 ${stat.iconColor}`} />
                 </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Lucro Potencial</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              {statsLoading ? (
-                <Skeleton className="h-8 w-16" />
-              ) : (
-                <div
-                  className={`text-2xl font-bold ${(stats?.lucroTotalPotencial || 0) >= 0 ? "text-green-500" : "text-red-500"}`}
-                >
-                  R$ {(stats?.lucroTotalPotencial || 0).toFixed(2)}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+              </CardHeader>
+              <CardContent>
+                {statsLoading ? (
+                  <Skeleton className="h-8 w-24" />
+                ) : (
+                  <div className="text-2xl font-bold font-mono">{stat.value}</div>
+                )}
+              </CardContent>
+            </Card>
+          ))}
         </div>
 
         <div className="grid gap-6 md:grid-cols-3">
-          {/* Configuration Card */}
-          <Card className="md:col-span-1">
+          {/* Config Card */}
+          <Card className="md:col-span-1 border-border/50">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Settings2 className="h-5 w-5" />
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Settings2 className="h-4 w-4 text-pink-400" />
                 Configurações
               </CardTitle>
               <CardDescription>Ajuste os parâmetros de detecção</CardDescription>
@@ -180,7 +173,7 @@ export default function TelegramBot() {
               ) : effectiveConfig ? (
                 <>
                   <div className="space-y-2">
-                    <Label htmlFor="roi_minimo">ROI Mínimo (%)</Label>
+                    <Label htmlFor="roi_minimo" className="text-xs font-medium">ROI Mínimo (%)</Label>
                     <Input
                       id="roi_minimo"
                       type="number"
@@ -195,12 +188,13 @@ export default function TelegramBot() {
                       }
                       disabled={!canEdit}
                       placeholder="-5.0"
+                      className="bg-muted/30 dark:bg-white/[0.03]"
                     />
                     <p className="text-xs text-muted-foreground">Valores negativos indicam risco no empate</p>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="stake_base">Stake Base (R$)</Label>
+                    <Label htmlFor="stake_base" className="text-xs font-medium">Stake Base (R$)</Label>
                     <Input
                       id="stake_base"
                       type="number"
@@ -215,12 +209,13 @@ export default function TelegramBot() {
                       }
                       disabled={!canEdit}
                       placeholder="1000"
+                      className="bg-muted/30 dark:bg-white/[0.03]"
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
-                      <Label htmlFor="horario_inicio">Início</Label>
+                      <Label htmlFor="horario_inicio" className="text-xs font-medium">Início</Label>
                       <Input
                         id="horario_inicio"
                         type="time"
@@ -233,10 +228,11 @@ export default function TelegramBot() {
                           }))
                         }
                         disabled={!canEdit}
+                        className="bg-muted/30 dark:bg-white/[0.03]"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="horario_fim">Fim</Label>
+                      <Label htmlFor="horario_fim" className="text-xs font-medium">Fim</Label>
                       <Input
                         id="horario_fim"
                         type="time"
@@ -249,34 +245,39 @@ export default function TelegramBot() {
                           }))
                         }
                         disabled={!canEdit}
+                        className="bg-muted/30 dark:bg-white/[0.03]"
                       />
                     </div>
                   </div>
 
                   {canEdit && (
-                    <Button onClick={handleSaveConfig} disabled={updateConfig.isPending} className="w-full">
+                    <Button
+                      onClick={handleSaveConfig}
+                      disabled={updateConfig.isPending}
+                      className="w-full"
+                    >
                       {updateConfig.isPending ? "Salvando..." : "Salvar Configurações"}
                     </Button>
                   )}
 
-                  <div className="pt-4 border-t">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Clock className="h-4 w-4" />
+                  <div className="pt-3 border-t border-border/50">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Clock className="h-3.5 w-3.5" />
                       <span>Atualizado: {config?.updated_at ? formatDateTime(config.updated_at) : "-"}</span>
                     </div>
                   </div>
                 </>
               ) : (
-                <p className="text-muted-foreground">Configuração não encontrada</p>
+                <p className="text-sm text-muted-foreground">Configuração não encontrada</p>
               )}
             </CardContent>
           </Card>
 
-          {/* History Table */}
-          <Card className="md:col-span-2">
+          {/* History Card */}
+          <Card className="md:col-span-2 border-border/50">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5" />
+              <CardTitle className="flex items-center gap-2 text-base">
+                <TrendingUp className="h-4 w-4 text-primary" />
                 Histórico de Envios
               </CardTitle>
               <CardDescription>Últimas oportunidades enviadas ao Telegram</CardDescription>
@@ -285,92 +286,95 @@ export default function TelegramBot() {
               {enviadosLoading ? (
                 <div className="space-y-2">
                   {[...Array(5)].map((_, i) => (
-                    <Skeleton key={i} className="h-12 w-full" />
+                    <Skeleton key={i} className="h-14 w-full" />
                   ))}
                 </div>
               ) : enviados && enviados.length > 0 ? (
-                <div className="space-y-3">
+                <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
                   {enviados.map((dg) => {
                     const investimento = (dg.stake_casa || 0) + (dg.stake_empate || 0) + (dg.stake_fora || 0);
                     const lucro = (dg.retorno_green || 0) - investimento;
+                    const isPositive = lucro >= 0;
                     return (
-                      <Card key={dg.id} className="border">
-                        <CardContent className="p-3 space-y-2">
-                          <div className="flex items-center justify-between gap-2 flex-wrap">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span className="font-semibold text-sm truncate">{dg.team1}</span>
-                              <span className="text-muted-foreground text-xs">vs</span>
-                              <span className="font-semibold text-sm truncate">{dg.team2}</span>
-                            </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                              <Badge variant="outline" className="text-[10px]">
-                                {dg.competition}
-                              </Badge>
-                              <Badge variant={dg.roi >= 0 ? "default" : "secondary"} className="text-[10px]">
-                                ROI {dg.roi >= 0 ? "+" : ""}
-                                {dg.roi.toFixed(2)}%
-                              </Badge>
-                            </div>
+                      <div
+                        key={dg.id}
+                        className={`rounded-xl border p-3 space-y-2.5 transition-colors ${
+                          isPositive
+                            ? 'border-primary/20 bg-primary/5 dark:bg-primary/[0.03]'
+                            : 'border-destructive/20 bg-destructive/5 dark:bg-destructive/[0.03]'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="font-semibold text-sm truncate">{dg.team1}</span>
+                            <span className="text-muted-foreground text-xs font-medium">vs</span>
+                            <span className="font-semibold text-sm truncate">{dg.team2}</span>
                           </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <Badge variant="outline" className="text-[10px] border-border/50">
+                              {dg.competition}
+                            </Badge>
+                            <Badge
+                              className={`text-[10px] ${
+                                dg.roi >= 0
+                                  ? 'bg-primary/20 text-primary border-primary/30'
+                                  : 'bg-destructive/20 text-destructive border-destructive/30'
+                              }`}
+                              variant="outline"
+                            >
+                              ROI {dg.roi >= 0 ? "+" : ""}{dg.roi.toFixed(2)}%
+                            </Badge>
+                          </div>
+                        </div>
 
-                          <div className="grid grid-cols-3 gap-2 text-xs">
-                            <div className="bg-emerald-500/10 rounded-md p-1.5">
-                              <div className="text-muted-foreground">Casa (PA)</div>
-                              <div className="font-mono font-bold text-emerald-500">
-                                {dg.casa_odd?.toFixed(2) || "-"}
-                              </div>
-                              <div className="text-muted-foreground truncate">{dg.casa_bookmaker || "-"}</div>
-                              <div className="text-muted-foreground">R$ {(dg.stake_casa || 0).toFixed(2)}</div>
-                            </div>
-                            <div className="bg-amber-500/10 rounded-md p-1.5">
-                              <div className="text-muted-foreground">Empate (SO)</div>
-                              <div className="font-mono font-bold text-amber-500">
-                                {dg.empate_odd?.toFixed(2) || "-"}
-                              </div>
-                              <div className="text-muted-foreground truncate">{dg.empate_bookmaker || "-"}</div>
-                              <div className="text-muted-foreground">R$ {(dg.stake_empate || 0).toFixed(2)}</div>
-                            </div>
-                            <div className="bg-emerald-500/10 rounded-md p-1.5">
-                              <div className="text-muted-foreground">Fora (PA)</div>
-                              <div className="font-mono font-bold text-emerald-500">
-                                {dg.fora_odd?.toFixed(2) || "-"}
-                              </div>
-                              <div className="text-muted-foreground truncate">{dg.fora_bookmaker || "-"}</div>
-                              <div className="text-muted-foreground">R$ {(dg.stake_fora || 0).toFixed(2)}</div>
-                            </div>
+                        <div className="grid grid-cols-3 gap-2 text-xs">
+                          <div className="bg-primary/10 dark:bg-primary/[0.08] rounded-lg p-2">
+                            <div className="text-muted-foreground text-[10px]">Casa (PA)</div>
+                            <div className="font-mono font-bold text-primary">{dg.casa_odd?.toFixed(2) || "-"}</div>
+                            <div className="text-muted-foreground text-[10px] truncate">{dg.casa_bookmaker || "-"}</div>
+                            <div className="text-muted-foreground text-[10px]">R$ {(dg.stake_casa || 0).toFixed(2)}</div>
                           </div>
+                          <div className="bg-amber-500/10 rounded-lg p-2">
+                            <div className="text-muted-foreground text-[10px]">Empate (SO)</div>
+                            <div className="font-mono font-bold text-amber-400">{dg.empate_odd?.toFixed(2) || "-"}</div>
+                            <div className="text-muted-foreground text-[10px] truncate">{dg.empate_bookmaker || "-"}</div>
+                            <div className="text-muted-foreground text-[10px]">R$ {(dg.stake_empate || 0).toFixed(2)}</div>
+                          </div>
+                          <div className="bg-primary/10 dark:bg-primary/[0.08] rounded-lg p-2">
+                            <div className="text-muted-foreground text-[10px]">Fora (PA)</div>
+                            <div className="font-mono font-bold text-primary">{dg.fora_odd?.toFixed(2) || "-"}</div>
+                            <div className="text-muted-foreground text-[10px] truncate">{dg.fora_bookmaker || "-"}</div>
+                            <div className="text-muted-foreground text-[10px]">R$ {(dg.stake_fora || 0).toFixed(2)}</div>
+                          </div>
+                        </div>
 
-                          <div className="flex items-center justify-between text-xs pt-1 border-t gap-2">
-                            <div className="flex items-center gap-3 flex-wrap">
-                              <span className="text-muted-foreground">
-                                Investido:{" "}
-                                <span className="font-semibold text-foreground">R$ {investimento.toFixed(2)}</span>
+                        <div className="flex items-center justify-between text-xs pt-1 border-t border-border/30 gap-2">
+                          <div className="flex items-center gap-4 flex-wrap">
+                            <span className="text-muted-foreground">
+                              Investido: <span className="font-semibold text-foreground">R$ {investimento.toFixed(2)}</span>
+                            </span>
+                            <span className="text-muted-foreground">
+                              Retorno: <span className="font-bold text-primary">R$ {(dg.retorno_green || 0).toFixed(2)}</span>
+                            </span>
+                            <span className="text-muted-foreground">
+                              Lucro: <span className={`font-bold ${isPositive ? "text-primary" : "text-destructive"}`}>
+                                R$ {lucro.toFixed(2)}
                               </span>
-                              <span className="text-muted-foreground">
-                                Retorno:{" "}
-                                <span className="font-bold text-green-500">
-                                  R$ {(dg.retorno_green || 0).toFixed(2)}
-                                </span>
-                              </span>
-                              <span className="text-muted-foreground">
-                                Lucro:{" "}
-                                <span className={`font-bold ${lucro >= 0 ? "text-green-500" : "text-red-500"}`}>
-                                  R$ {lucro.toFixed(2)}
-                                </span>
-                              </span>
-                            </div>
-                            <span className="text-muted-foreground shrink-0">{formatDateTime(dg.created_at)}</span>
+                            </span>
                           </div>
-                        </CardContent>
-                      </Card>
+                          <span className="text-muted-foreground shrink-0 text-[10px]">{formatDateTime(dg.created_at)}</span>
+                        </div>
+                      </div>
                     );
                   })}
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-                  <Send className="h-12 w-12 mb-4 opacity-50" />
-                  <p>Nenhum DG enviado ainda</p>
-                  <p className="text-sm">Ative o bot para começar a receber alertas</p>
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <div className="w-16 h-16 rounded-2xl bg-muted/30 flex items-center justify-center mb-4">
+                    <Send className="h-8 w-8 text-muted-foreground/40" />
+                  </div>
+                  <p className="font-medium text-muted-foreground">Nenhum DG enviado ainda</p>
+                  <p className="text-sm text-muted-foreground/60 mt-1">Ative o bot para começar a receber alertas</p>
                 </div>
               )}
             </CardContent>

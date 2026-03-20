@@ -65,9 +65,7 @@ const Login = () => {
     }
     setError(null);
     setLoading(true);
-    const redirectUrl = window.location.hostname === 'localhost' 
-      ? `${window.location.origin}/reset-password`
-      : `https://sharkoddsnew.lovable.app/reset-password`;
+    const redirectUrl = `${window.location.origin}/reset-password`;
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: redirectUrl,
     });
