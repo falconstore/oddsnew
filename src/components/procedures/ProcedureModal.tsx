@@ -8,7 +8,8 @@ import { X, Star, FileText, Calendar, Building2, Tag, TrendingUp, Link, Hash, Ti
 import { TagManager } from './TagManager';
 import { Procedure, ProcedureFormData, PROCEDURE_CATEGORIES, PROCEDURE_STATUSES } from '@/types/procedures';
 import { useCreateProcedure, useUpdateProcedure, useProcedures } from '@/hooks/useProcedures';
-import { getAllPlatforms, getAllTags } from '@/lib/procedureUtils';
+import { getAllTags } from '@/lib/procedureUtils';
+import { useBookmakers } from '@/hooks/useOddsData';
 
 interface ProcedureModalProps {
   procedure: Procedure | null;
@@ -43,12 +44,22 @@ function FieldLabel({ icon: Icon, label, required }: { icon: typeof FileText; la
 
 export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
   const { data: allProcedures = [] } = useProcedures();
+  const { data: bookmakers = [] } = useBookmakers();
   const createProcedure = useCreateProcedure();
   const updateProcedure = useUpdateProcedure();
 
   const [formData, setFormData] = useState<ProcedureFormData>(emptyForm);
 
-  const platforms = getAllPlatforms(allProcedures);
+  const activeBookmakerNames = bookmakers
+    .filter(b => b.status === 'active')
+    .sort((a, b) => a.priority - b.priority)
+    .map(b => b.name);
+
+  // Include current value if it's not in the bookmakers list (backward compatibility)
+  const platformOptions = formData.platform && !activeBookmakerNames.includes(formData.platform)
+    ? [formData.platform, ...activeBookmakerNames]
+    : activeBookmakerNames;
+
   const availableTags = getAllTags(allProcedures);
 
   useEffect(() => {
@@ -197,7 +208,7 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
                       <SelectValue placeholder="Selecione..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {platforms.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                      {platformOptions.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
