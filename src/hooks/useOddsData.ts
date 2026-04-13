@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import { supabaseProcedures } from '@/lib/supabaseProcedures';
 import type { League, Team, Bookmaker, Match, TeamAlias, OddsComparison, MatchOddsGroup, BookmakerOdds } from '@/types/database';
 import { toast } from '@/hooks/use-toast';
 
@@ -293,7 +294,7 @@ export const useBookmakers = () => {
   return useQuery({
     queryKey: ['bookmakers'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseProcedures
         .from('bookmakers')
         .select('*')
         .order('priority');
@@ -310,7 +311,7 @@ export const useCreateBookmaker = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (bookmaker: Partial<Bookmaker>) => {
-      const { data, error } = await supabase.from('bookmakers').insert(bookmaker).select().single();
+      const { data, error } = await supabaseProcedures.from('bookmakers').insert(bookmaker).select().single();
       if (error) throw error;
       return data;
     },
@@ -328,7 +329,7 @@ export const useUpdateBookmaker = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...bookmaker }: Partial<Bookmaker> & { id: string }) => {
-      const { data, error } = await supabase.from('bookmakers').update(bookmaker).eq('id', id).select().single();
+      const { data, error } = await supabaseProcedures.from('bookmakers').update(bookmaker).eq('id', id).select().single();
       if (error) throw error;
       return data;
     },
@@ -346,7 +347,7 @@ export const useDeleteBookmaker = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('bookmakers').delete().eq('id', id);
+      const { error } = await supabaseProcedures.from('bookmakers').delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
