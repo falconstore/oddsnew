@@ -144,6 +144,11 @@ function BookmakerModal({
 type SortKey = 'name' | 'count_month' | 'profit_month' | 'count_total' | 'profit_total';
 type SortDir = 'asc' | 'desc';
 
+const fmtBRL = (value: number, decimals = 2) => {
+  const sign = value >= 0 ? '+' : '';
+  return `${sign}R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}`;
+};
+
 const EntityManagement = () => {
   const { canEditPage } = useAuth();
   const canEdit = canEditPage(PAGE_KEYS.BOOKMAKERS);
@@ -156,6 +161,8 @@ const EntityManagement = () => {
   const [editingCasa, setEditingCasa] = useState<Bookmaker | null>(null);
   const [prefillName, setPrefillName] = useState<string | undefined>(undefined);
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [sourceFilter, setSourceFilter] = useState<'all' | 'db' | 'orphan'>('all');
   const [selectedMonth, setSelectedMonth] = usePersistedState('crm_month', new Date());
   const [sortKey, setSortKey] = useState<SortKey>('count_month');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
@@ -214,16 +221,18 @@ const EntityManagement = () => {
   );
 
   const filteredCasas = useMemo(() => {
-    if (!searchQuery) return bookmakers;
-    const q = searchQuery.toLowerCase();
-    return bookmakers.filter(b => b.name.toLowerCase().includes(q));
-  }, [bookmakers, searchQuery]);
+    let list = bookmakers;
+    if (statusFilter !== 'all') list = list.filter(b => b.status === statusFilter);
+    if (searchQuery) { const q = searchQuery.toLowerCase(); list = list.filter(b => b.name.toLowerCase().includes(q)); }
+    return list;
+  }, [bookmakers, searchQuery, statusFilter]);
 
   const filteredOrphans = useMemo(() => {
-    if (!searchQuery) return orphanPlatforms;
-    const q = searchQuery.toLowerCase();
-    return orphanPlatforms.filter(p => p.toLowerCase().includes(q));
-  }, [orphanPlatforms, searchQuery]);
+    if (statusFilter === 'inactive') return [];
+    let list = orphanPlatforms;
+    if (searchQuery) { const q = searchQuery.toLowerCase(); list = list.filter(p => p.toLowerCase().includes(q)); }
+    return list;
+  }, [orphanPlatforms, searchQuery, statusFilter]);
 
   const activeCasas = bookmakers.filter(b => b.status === 'active');
 
@@ -379,16 +388,45 @@ const EntityManagement = () => {
         {/* Tab: Casas */}
         {activeTab === 'casas' && (
           <div className="space-y-5">
-            {/* Search */}
-            <div className="relative max-w-xs">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Buscar casa..."
-                className="pl-9 bg-white/5 border-white/10 h-9 text-sm"
-                data-testid="input-search-casa"
-              />
+            {/* Filters */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative flex-1 min-w-[160px] max-w-xs">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Buscar casa..."
+                  className="pl-9 bg-white/5 border-white/10 h-9 text-sm"
+                  data-testid="input-search-casa"
+                />
+              </div>
+              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as 'all' | 'active' | 'inactive')} data-testid="select-filter-status">
+                <SelectTrigger className="bg-white/5 border-white/10 h-9 text-sm w-[140px]">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os status</SelectItem>
+                  <SelectItem value="active">Apenas ativas</SelectItem>
+                  <SelectItem value="inactive">Apenas inativas</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={sourceFilter} onValueChange={(v) => setSourceFilter(v as 'all' | 'db' | 'orphan')} data-testid="select-filter-source">
+                <SelectTrigger className="bg-white/5 border-white/10 h-9 text-sm w-[170px]">
+                  <SelectValue placeholder="Origem" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as origens</SelectItem>
+                  <SelectItem value="db">Cadastradas</SelectItem>
+                  <SelectItem value="orphan">Só nos procedimentos</SelectItem>
+                </SelectContent>
+              </Select>
+              {(searchQuery || statusFilter !== 'all' || sourceFilter !== 'all') && (
+                <Button variant="ghost" size="sm" className="h-9 text-xs text-muted-foreground hover:text-foreground px-2"
+                  onClick={() => { setSearchQuery(''); setStatusFilter('all'); setSourceFilter('all'); }}
+                  data-testid="button-clear-filters">
+                  Limpar filtros
+                </Button>
+              )}
             </div>
 
             {isLoading ? (
@@ -400,7 +438,7 @@ const EntityManagement = () => {
             ) : (
               <>
                 {/* Registered bookmakers */}
-                {filteredCasas.length > 0 && (
+                {sourceFilter !== 'orphan' && filteredCasas.length > 0 && (
                   <div className="space-y-3">
                     {bookmakers.length > 0 && (
                       <div className="flex items-center gap-2">
@@ -444,7 +482,7 @@ const EntityManagement = () => {
                               <div className="bg-white/3 rounded-xl p-2 border border-white/5">
                                 <p className="text-[9px] text-muted-foreground uppercase tracking-wider mb-0.5">Lucro Total</p>
                                 <p className={`text-sm font-bold ${s.profitTotal >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                                  {s.profitTotal >= 0 ? '+' : ''}{s.profitTotal.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                  {fmtBRL(s.profitTotal, 2)}
                                 </p>
                               </div>
                             </div>
@@ -472,7 +510,7 @@ const EntityManagement = () => {
                 )}
 
                 {/* Orphan platforms from procedures */}
-                {filteredOrphans.length > 0 && (
+                {sourceFilter !== 'db' && filteredOrphans.length > 0 && (
                   <div className="space-y-3">
                     <div className="flex items-center gap-2">
                       <div className="w-1.5 h-4 rounded-full bg-gradient-to-b from-amber-400 to-orange-500" />
@@ -504,7 +542,7 @@ const EntityManagement = () => {
                               <div className="bg-amber-500/5 rounded-xl p-2 border border-amber-500/10">
                                 <p className="text-[9px] text-muted-foreground uppercase tracking-wider mb-0.5">Lucro Total</p>
                                 <p className={`text-sm font-bold ${s.profitTotal >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                                  {s.profitTotal >= 0 ? '+' : ''}{s.profitTotal.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                  {fmtBRL(s.profitTotal, 2)}
                                 </p>
                               </div>
                             </div>
@@ -524,7 +562,7 @@ const EntityManagement = () => {
                 )}
 
                 {/* Empty state */}
-                {filteredCasas.length === 0 && filteredOrphans.length === 0 && (
+                {(sourceFilter === 'db' ? filteredCasas.length === 0 : sourceFilter === 'orphan' ? filteredOrphans.length === 0 : filteredCasas.length === 0 && filteredOrphans.length === 0) && (
                   <div className="glass rounded-2xl border border-white/5 p-12 text-center">
                     <Building2 className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
                     <p className="text-muted-foreground text-sm">
@@ -593,7 +631,7 @@ const EntityManagement = () => {
                     <p className="text-base font-bold text-emerald-400 truncate">{topProfitCasa?.name || '—'}</p>
                     {topProfitCasa && (
                       <p className="text-[10px] text-muted-foreground mt-0.5">
-                        {topProfitCasa.profit >= 0 ? '+' : ''}{topProfitCasa.profit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        {fmtBRL(topProfitCasa.profit)}
                       </p>
                     )}
                   </div>
@@ -667,11 +705,11 @@ const EntityManagement = () => {
                           </td>
                           <td className="px-4 py-3 text-indigo-400 font-semibold">{entry.countMonth}</td>
                           <td className={`px-4 py-3 font-bold ${entry.profitMonth >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                            {entry.profitMonth >= 0 ? '+' : ''}{entry.profitMonth.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            {fmtBRL(entry.profitMonth)}
                           </td>
                           <td className="px-4 py-3 text-muted-foreground font-medium">{entry.countTotal}</td>
                           <td className={`px-4 py-3 font-semibold ${entry.profitTotal >= 0 ? 'text-emerald-400/70' : 'text-red-400/70'}`}>
-                            {entry.profitTotal >= 0 ? '+' : ''}{entry.profitTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            {fmtBRL(entry.profitTotal)}
                           </td>
                         </tr>
                       );
