@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useBookmakers, useCreateBookmaker, useUpdateBookmaker, useDeleteBookmaker } from '@/hooks/useOddsData';
+import { useBookmakers, useCreateBookmaker, useUpdateBookmaker } from '@/hooks/useOddsData';
 import { useProcedures } from '@/hooks/useProcedures';
 import { usePersistedState } from '@/hooks/usePersistedState';
 import { useAuth } from '@/contexts/AuthContext';
@@ -159,7 +159,6 @@ const EntityManagement = () => {
 
   const createBookmaker = useCreateBookmaker();
   const updateBookmaker = useUpdateBookmaker();
-  const deleteBookmaker = useDeleteBookmaker();
 
   const handleEdit = (casa: Bookmaker) => { setEditingCasa(casa); setShowModal(true); };
   const handleAdd = () => { setEditingCasa(null); setShowModal(true); };

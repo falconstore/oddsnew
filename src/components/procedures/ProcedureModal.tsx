@@ -56,9 +56,11 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
     .map(b => b.name);
 
   // Include current value if it's not in the bookmakers list (backward compatibility)
-  const platformOptions = formData.platform && !activeBookmakerNames.includes(formData.platform)
-    ? [formData.platform, ...activeBookmakerNames]
-    : activeBookmakerNames;
+  const hasLegacyPlatform = !!formData.platform && !activeBookmakerNames.includes(formData.platform);
+  const platformOptions: { value: string; label: string }[] = [
+    ...(hasLegacyPlatform ? [{ value: formData.platform, label: `${formData.platform} (valor salvo)` }] : []),
+    ...activeBookmakerNames.map(n => ({ value: n, label: n })),
+  ];
 
   const availableTags = getAllTags(allProcedures);
 
@@ -208,7 +210,7 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
                       <SelectValue placeholder="Selecione..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {platformOptions.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                      {platformOptions.map((p) => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
