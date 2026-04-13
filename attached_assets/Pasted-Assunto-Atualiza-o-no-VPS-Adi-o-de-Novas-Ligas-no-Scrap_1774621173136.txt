@@ -1,0 +1,41 @@
+Assunto: Atualização no VPS - Adição de Novas Ligas no Scraper da Sporty
+
+O Contexto:
+Precisamos aumentar a cobertura de campeonatos monitorados pela casa de apostas Sporty. Tenho a lista exata das URLs e os nomes correspondentes das ligas que devem ser raspadas.
+
+Ação Exigida:
+
+Acessar o VPS e o Arquivo: Por favor, acesse o nosso servidor (VPS) e abra o arquivo responsável pelo scraper da Sporty, localizado no seguinte caminho:
+/root/Desktop/scraper/scrapers/sporty_scraper.py
+
+Atualizar o Mapeamento/Dicionário de Ligas: Analise como o código atual faz a requisição para a Sporty (seja por URL direta ou extraindo o ID do torneio como sr:tournament:XX). Adicione as seguintes ligas à rotina de raspagem, mapeando-as para os nossos nomes canônicos do sistema:
+
+Liga Turca: https://www.sporty.bet.br/br/sport/football/sr:category:top/sr:tournament:52
+
+Liga Japonesa: https://www.sporty.bet.br/br/sport/football/sr:category:top/sr:tournament:196
+
+Liga Dinamarca: https://www.sporty.bet.br/br/sport/football/sr:category:8/sr:tournament:39
+
+Brasileirão Série B: https://www.sporty.bet.br/br/sport/football/sr:category:13/sr:tournament:390
+
+Premier League: https://www.sporty.bet.br/br/sport/football/sr:category:top/sr:tournament:17
+
+Serie A (Itália): https://www.sporty.bet.br/br/sport/football/sr:category:top/sr:tournament:23
+
+Copa da Alemanha: https://www.sporty.bet.br/br/sport/football/sr:category:top/sr:tournament:217
+
+Liga Portuguesa: https://www.sporty.bet.br/br/sport/football/sr:category:top/sr:tournament:238
+
+Liga Saudita: https://www.sporty.bet.br/br/sport/football/sr:category:top/sr:tournament:955
+
+FA Cup: https://www.sporty.bet.br/br/sport/football/sr:category:top/sr:tournament:19
+
+Ligue 1: https://www.sporty.bet.br/br/sport/football/sr:category:top/sr:tournament:34
+
+Eredivisie: https://www.sporty.bet.br/br/sport/football/sr:category:top/sr:tournament:37
+
+Copa da Italia: https://www.sporty.bet.br/br/sport/football/sr:category:top/sr:tournament:328
+
+La Liga: https://www.sporty.bet.br/br/sport/football/sr:category:top/sr:tournament:8
+
+Validação: Após inserir as novas ligas, reinicie o processo deste scraper no PM2 (ex: pm2 restart sporty_scraper) e verifique os logs para garantir que os dados JSON dessas ligas estão sendo gerados corretamente e sem erros de sintaxe ou bloqueio da casa.
