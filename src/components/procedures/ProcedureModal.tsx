@@ -8,7 +8,7 @@ import { X, Star, FileText, Calendar, Building2, Tag, TrendingUp, Link, Hash, Ti
 import { TagManager } from './TagManager';
 import { Procedure, ProcedureFormData, PROCEDURE_CATEGORIES, PROCEDURE_STATUSES } from '@/types/procedures';
 import { useCreateProcedure, useUpdateProcedure, useProcedures } from '@/hooks/useProcedures';
-import { getAllTags } from '@/lib/procedureUtils';
+import { getAllTags, getAllPlatforms } from '@/lib/procedureUtils';
 import { useBookmakers } from '@/hooks/useOddsData';
 
 interface ProcedureModalProps {
@@ -55,11 +55,22 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
     .sort((a, b) => a.priority - b.priority)
     .map(b => b.name);
 
-  // Include current value if it's not in the bookmakers list (backward compatibility)
-  const hasLegacyPlatform = !!formData.platform && !activeBookmakerNames.includes(formData.platform);
+  // Platforms from procedures not already in bookmakers list
+  const procedurePlatforms = getAllPlatforms(allProcedures);
+  const extraPlatforms = procedurePlatforms.filter(
+    p => !activeBookmakerNames.some(n => n.toLowerCase() === p.toLowerCase())
+  );
+
+  // Build combined options: bookmakers first, then extra from procedures
+  // If editing and platform not in list anywhere, prepend it with a "(valor salvo)" label
+  const allKnownPlatforms = [...activeBookmakerNames, ...extraPlatforms];
+  const hasLegacyPlatform = !!formData.platform && !allKnownPlatforms.some(
+    n => n.toLowerCase() === formData.platform.toLowerCase()
+  );
   const platformOptions: { value: string; label: string }[] = [
     ...(hasLegacyPlatform ? [{ value: formData.platform, label: `${formData.platform} (valor salvo)` }] : []),
     ...activeBookmakerNames.map(n => ({ value: n, label: n })),
+    ...extraPlatforms.map(n => ({ value: n, label: n })),
   ];
 
   const availableTags = getAllTags(allProcedures);

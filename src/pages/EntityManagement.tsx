@@ -3,7 +3,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
   Building2, Plus, Pencil, Power, ExternalLink, BarChart2,
-  Trophy, TrendingUp, Activity, Calendar, Search, ChevronUp, ChevronDown, Zap
+  Trophy, TrendingUp, Activity, Calendar, Search, ChevronUp, ChevronDown, Zap, Download
 } from 'lucide-react';
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
@@ -17,8 +17,8 @@ import { usePersistedState } from '@/hooks/usePersistedState';
 import { useAuth } from '@/contexts/AuthContext';
 import { PAGE_KEYS } from '@/types/auth';
 import type { Bookmaker, EntityStatus } from '@/types/database';
-import { capitalizeMonth } from '@/lib/betbraUtils';
-import { generateBetbraMonthOptions } from '@/lib/betbraUtils';
+import { capitalizeMonth, generateBetbraMonthOptions } from '@/lib/betbraUtils';
+import { getAllPlatforms } from '@/lib/procedureUtils';
 
 function FieldLabel({ label, required }: { label: string; required?: boolean }) {
   return (
@@ -31,12 +31,14 @@ function FieldLabel({ label, required }: { label: string; required?: boolean }) 
 
 function BookmakerModal({
   bookmaker,
+  initialName,
   onClose,
   onCreate,
   onUpdate,
   isPending,
 }: {
   bookmaker: Bookmaker | null;
+  initialName?: string;
   onClose: () => void;
   onCreate: (data: Partial<Bookmaker>) => void;
   onUpdate: (data: Partial<Bookmaker> & { id: string }) => void;
@@ -44,7 +46,7 @@ function BookmakerModal({
 }) {
   const isEditing = !!bookmaker;
   const [formData, setFormData] = useState({
-    name: bookmaker?.name || '',
+    name: bookmaker?.name || initialName || '',
     website_url: bookmaker?.website_url || '',
     priority: bookmaker?.priority ?? 0,
     status: (bookmaker?.status || 'active') as EntityStatus,
@@ -72,8 +74,8 @@ function BookmakerModal({
                 <Building2 className="w-5 h-5 text-indigo-400" />
               </div>
               <div>
-                <h2 className="text-base font-bold">{isEditing ? 'Editar Casa' : 'Nova Casa'}</h2>
-                <p className="text-xs text-muted-foreground">{isEditing ? `Editando ${bookmaker?.name}` : 'Cadastrar nova casa de apostas'}</p>
+                <h2 className="text-base font-bold">{isEditing ? 'Editar Casa' : 'Cadastrar Casa'}</h2>
+                <p className="text-xs text-muted-foreground">{isEditing ? `Editando ${bookmaker?.name}` : 'Cadastrar casa de apostas'}</p>
               </div>
             </div>
           </div>
@@ -129,7 +131,7 @@ function BookmakerModal({
               <Button type="submit" disabled={isPending}
                 className="flex-1 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-400 hover:to-purple-500 text-white border-0 h-9 text-sm font-semibold"
                 data-testid="button-save-casa">
-                {isPending ? 'Salvando...' : isEditing ? 'Salvar' : 'Criar'}
+                {isPending ? 'Salvando...' : isEditing ? 'Salvar' : 'Cadastrar'}
               </Button>
             </div>
           </form>
@@ -147,11 +149,12 @@ const EntityManagement = () => {
   const canEdit = canEditPage(PAGE_KEYS.BOOKMAKERS);
 
   const { data: bookmakers = [], isLoading: loadingCasas } = useBookmakers();
-  const { data: procedures = [] } = useProcedures();
+  const { data: procedures = [], isLoading: loadingProcs } = useProcedures();
 
   const [activeTab, setActiveTab] = usePersistedState<'casas' | 'analise'>('crm_tab', 'casas');
   const [showModal, setShowModal] = useState(false);
   const [editingCasa, setEditingCasa] = useState<Bookmaker | null>(null);
+  const [prefillName, setPrefillName] = useState<string | undefined>(undefined);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMonth, setSelectedMonth] = usePersistedState('crm_month', new Date());
   const [sortKey, setSortKey] = useState<SortKey>('count_month');
@@ -160,14 +163,29 @@ const EntityManagement = () => {
   const createBookmaker = useCreateBookmaker();
   const updateBookmaker = useUpdateBookmaker();
 
-  const handleEdit = (casa: Bookmaker) => { setEditingCasa(casa); setShowModal(true); };
-  const handleAdd = () => { setEditingCasa(null); setShowModal(true); };
+  const handleEdit = (casa: Bookmaker) => { setEditingCasa(casa); setPrefillName(undefined); setShowModal(true); };
+  const handleAdd = (name?: string) => { setEditingCasa(null); setPrefillName(name); setShowModal(true); };
   const handleToggleStatus = (casa: Bookmaker) => {
     updateBookmaker.mutate({ id: casa.id, status: casa.status === 'active' ? 'inactive' : 'active' });
   };
-  const handleModalClose = () => { setShowModal(false); setEditingCasa(null); };
+  const handleModalClose = () => { setShowModal(false); setEditingCasa(null); setPrefillName(undefined); };
 
   const monthStr = format(selectedMonth, 'yyyy-MM');
+
+  // All platforms used in procedures (sorted)
+  const procedurePlatforms = useMemo(() => getAllPlatforms(procedures), [procedures]);
+
+  // Bookmaker names from DB (normalized for comparison)
+  const bookmakerNamesLower = useMemo(
+    () => new Set(bookmakers.map(b => b.name.toLowerCase().trim())),
+    [bookmakers]
+  );
+
+  // Platforms that exist in procedures but NOT in the bookmakers table
+  const orphanPlatforms = useMemo(
+    () => procedurePlatforms.filter(p => !bookmakerNamesLower.has(p.toLowerCase().trim())),
+    [procedurePlatforms, bookmakerNamesLower]
+  );
 
   const statsPerCasa = useMemo(() => {
     const map = new Map<string, { countTotal: number; countMonth: number; profitTotal: number; profitMonth: number }>();
@@ -186,7 +204,14 @@ const EntityManagement = () => {
     return map;
   }, [procedures, monthStr]);
 
-  const getCasaStats = (name: string) => statsPerCasa.get(name.toLowerCase().trim()) || { countTotal: 0, countMonth: 0, profitTotal: 0, profitMonth: 0 };
+  const getCasaStats = (name: string) =>
+    statsPerCasa.get(name.toLowerCase().trim()) || { countTotal: 0, countMonth: 0, profitTotal: 0, profitMonth: 0 };
+
+  // Combined list for filtering in Casas tab: DB bookmakers + orphan (from procedures)
+  const allKnownNames = useMemo(
+    () => [...bookmakers.map(b => b.name), ...orphanPlatforms],
+    [bookmakers, orphanPlatforms]
+  );
 
   const filteredCasas = useMemo(() => {
     if (!searchQuery) return bookmakers;
@@ -194,45 +219,67 @@ const EntityManagement = () => {
     return bookmakers.filter(b => b.name.toLowerCase().includes(q));
   }, [bookmakers, searchQuery]);
 
+  const filteredOrphans = useMemo(() => {
+    if (!searchQuery) return orphanPlatforms;
+    const q = searchQuery.toLowerCase();
+    return orphanPlatforms.filter(p => p.toLowerCase().includes(q));
+  }, [orphanPlatforms, searchQuery]);
+
   const activeCasas = bookmakers.filter(b => b.status === 'active');
 
+  // Combined ranking for Análise tab: DB bookmakers + orphan platforms as virtual entries
+  const allEntries = useMemo(() => {
+    const dbEntries = bookmakers.map(b => ({
+      key: b.id,
+      name: b.name,
+      isOrphan: false,
+      status: b.status,
+      bookmaker: b,
+    }));
+    const orphanEntries = orphanPlatforms.map(p => ({
+      key: `orphan:${p}`,
+      name: p,
+      isOrphan: true,
+      status: 'active' as EntityStatus,
+      bookmaker: null,
+    }));
+    return [...dbEntries, ...orphanEntries];
+  }, [bookmakers, orphanPlatforms]);
+
   const analiseRanking = useMemo(() => {
-    return bookmakers.map(b => {
-      const s = getCasaStats(b.name);
-      return { ...b, ...s };
+    return allEntries.map(e => {
+      const s = getCasaStats(e.name);
+      return { ...e, ...s };
     }).sort((a, b) => {
-      const key = sortKey;
+      if (sortKey === 'name') return sortDir === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
       let av = 0, bv = 0;
-      if (key === 'name') return sortDir === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
-      if (key === 'count_month') { av = a.countMonth; bv = b.countMonth; }
-      if (key === 'profit_month') { av = a.profitMonth; bv = b.profitMonth; }
-      if (key === 'count_total') { av = a.countTotal; bv = b.countTotal; }
-      if (key === 'profit_total') { av = a.profitTotal; bv = b.profitTotal; }
+      if (sortKey === 'count_month') { av = a.countMonth; bv = b.countMonth; }
+      if (sortKey === 'profit_month') { av = a.profitMonth; bv = b.profitMonth; }
+      if (sortKey === 'count_total') { av = a.countTotal; bv = b.countTotal; }
+      if (sortKey === 'profit_total') { av = a.profitTotal; bv = b.profitTotal; }
       return sortDir === 'asc' ? av - bv : bv - av;
     });
-  }, [bookmakers, statsPerCasa, sortKey, sortDir]);
+  }, [allEntries, statsPerCasa, sortKey, sortDir]);
 
   const topMonthCasa = useMemo(() => {
-    if (!bookmakers.length) return null;
-    let best = bookmakers[0];
+    let best: string | null = null;
     let bestCount = 0;
-    for (const b of bookmakers) {
-      const s = getCasaStats(b.name);
-      if (s.countMonth > bestCount) { bestCount = s.countMonth; best = b; }
+    for (const e of allEntries) {
+      const s = getCasaStats(e.name);
+      if (s.countMonth > bestCount) { bestCount = s.countMonth; best = e.name; }
     }
-    return bestCount > 0 ? { name: best.name, count: bestCount } : null;
-  }, [bookmakers, statsPerCasa]);
+    return bestCount > 0 ? { name: best!, count: bestCount } : null;
+  }, [allEntries, statsPerCasa]);
 
   const topProfitCasa = useMemo(() => {
-    if (!bookmakers.length) return null;
-    let best = bookmakers[0];
+    let best: string | null = null;
     let bestProfit = -Infinity;
-    for (const b of bookmakers) {
-      const s = getCasaStats(b.name);
-      if (s.profitMonth > bestProfit) { bestProfit = s.profitMonth; best = b; }
+    for (const e of allEntries) {
+      const s = getCasaStats(e.name);
+      if (s.profitMonth > bestProfit) { bestProfit = s.profitMonth; best = e.name; }
     }
-    return bestProfit > -Infinity ? { name: best.name, profit: bestProfit } : null;
-  }, [bookmakers, statsPerCasa]);
+    return bestProfit > -Infinity ? { name: best!, profit: bestProfit } : null;
+  }, [allEntries, statsPerCasa]);
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -257,6 +304,9 @@ const EntityManagement = () => {
       {label}
     </button>
   );
+
+  const isLoading = loadingCasas || loadingProcs;
+  const totalKnown = allKnownNames.length;
 
   return (
     <Layout>
@@ -303,12 +353,14 @@ const EntityManagement = () => {
                   <h1 className="text-2xl md:text-3xl font-bold tracking-tight gradient-text-purple">
                     Casas de Apostas
                   </h1>
-                  <p className="text-muted-foreground text-sm">{activeCasas.length} ativas · {bookmakers.length} cadastradas</p>
+                  <p className="text-muted-foreground text-sm">
+                    {activeCasas.length} cadastradas · {orphanPlatforms.length > 0 ? `${orphanPlatforms.length} apenas nos procedimentos` : `${totalKnown} total`}
+                  </p>
                 </div>
               </div>
             </div>
             {canEdit && activeTab === 'casas' && (
-              <Button size="sm" onClick={handleAdd}
+              <Button size="sm" onClick={() => handleAdd()}
                 className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-400 hover:to-purple-500 text-white font-semibold shadow-lg shadow-indigo-500/20 border-0"
                 data-testid="button-add-casa">
                 <Plus className="w-4 h-4 mr-1.5" />
@@ -326,7 +378,7 @@ const EntityManagement = () => {
 
         {/* Tab: Casas */}
         {activeTab === 'casas' && (
-          <div className="space-y-4">
+          <div className="space-y-5">
             {/* Search */}
             <div className="relative max-w-xs">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -339,88 +391,153 @@ const EntityManagement = () => {
               />
             </div>
 
-            {loadingCasas ? (
+            {isLoading ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {[...Array(6)].map((_, i) => (
                   <div key={i} className="glass rounded-2xl border border-white/5 p-4 h-36 animate-pulse bg-white/2" />
                 ))}
               </div>
-            ) : filteredCasas.length === 0 ? (
-              <div className="glass rounded-2xl border border-white/5 p-12 text-center">
-                <Building2 className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
-                <p className="text-muted-foreground text-sm">
-                  {searchQuery ? 'Nenhuma casa encontrada para esta busca' : 'Nenhuma casa cadastrada ainda'}
-                </p>
-                {!searchQuery && canEdit && (
-                  <Button size="sm" onClick={handleAdd} className="mt-4 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-400 border border-indigo-500/25">
-                    <Plus className="w-4 h-4 mr-1" /> Adicionar primeira casa
-                  </Button>
-                )}
-              </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                {filteredCasas.map((casa) => {
-                  const s = getCasaStats(casa.name);
-                  const isActive = casa.status === 'active';
-                  return (
-                    <div key={casa.id} className={`relative rounded-2xl border p-4 card-hover overflow-hidden transition-all duration-300
-                      ${isActive
-                        ? 'bg-gradient-to-br from-indigo-500/8 via-indigo-500/4 to-transparent border-indigo-500/20'
-                        : 'bg-white/2 border-white/8 opacity-60'
-                      }`}
-                      data-testid={`card-casa-${casa.id}`}
-                    >
-                      <div className={`absolute top-0 left-0 w-full h-0.5 bg-gradient-to-r ${isActive ? 'from-indigo-400 to-purple-500' : 'from-white/20 to-transparent'} opacity-70`} />
-
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1 min-w-0">
-                          <h3 className={`font-bold text-base truncate ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}>{casa.name}</h3>
-                          {casa.website_url && (
-                            <a href={casa.website_url} target="_blank" rel="noopener noreferrer"
-                              className="flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 truncate mt-0.5">
-                              <ExternalLink className="w-3 h-3 flex-shrink-0" />
-                              <span className="truncate">{(() => { try { return new URL(casa.website_url).hostname; } catch { return casa.website_url; } })()}</span>
-                            </a>
-                          )}
-                        </div>
-                        <Badge className={`text-[10px] ml-2 flex-shrink-0 ${isActive ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/25' : 'bg-white/5 text-muted-foreground border-white/10'}`}>
-                          {isActive ? 'Ativa' : 'Inativa'}
-                        </Badge>
+              <>
+                {/* Registered bookmakers */}
+                {filteredCasas.length > 0 && (
+                  <div className="space-y-3">
+                    {bookmakers.length > 0 && (
+                      <div className="flex items-center gap-2">
+                        <div className="w-1.5 h-4 rounded-full bg-gradient-to-b from-indigo-400 to-purple-600" />
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Cadastradas ({filteredCasas.length})</p>
                       </div>
-
-                      <div className="grid grid-cols-2 gap-2 mb-3">
-                        <div className="bg-white/3 rounded-xl p-2 border border-white/5">
-                          <p className="text-[9px] text-muted-foreground uppercase tracking-wider mb-0.5">Procedimentos</p>
-                          <p className="text-sm font-bold text-indigo-400">{s.countTotal}</p>
-                        </div>
-                        <div className="bg-white/3 rounded-xl p-2 border border-white/5">
-                          <p className="text-[9px] text-muted-foreground uppercase tracking-wider mb-0.5">Lucro Total</p>
-                          <p className={`text-sm font-bold ${s.profitTotal >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                            {s.profitTotal >= 0 ? '+' : ''}{s.profitTotal.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                          </p>
-                        </div>
-                      </div>
-
-                      {canEdit && (
-                        <div className="flex gap-1.5">
-                          <Button variant="ghost" size="sm" onClick={() => handleEdit(casa)}
-                            className="flex-1 h-7 text-xs text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 gap-1"
-                            data-testid={`button-edit-casa-${casa.id}`}>
-                            <Pencil className="w-3 h-3" />
-                            Editar
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleToggleStatus(casa)}
-                            className={`flex-1 h-7 text-xs gap-1 ${isActive ? 'text-muted-foreground hover:text-red-400 hover:bg-red-500/10' : 'text-muted-foreground hover:text-emerald-400 hover:bg-emerald-500/10'}`}
-                            data-testid={`button-toggle-casa-${casa.id}`}>
-                            <Power className="w-3 h-3" />
-                            {isActive ? 'Desativar' : 'Ativar'}
-                          </Button>
-                        </div>
-                      )}
+                    )}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                      {filteredCasas.map((casa) => {
+                        const s = getCasaStats(casa.name);
+                        const isActive = casa.status === 'active';
+                        return (
+                          <div key={casa.id} className={`relative rounded-2xl border p-4 card-hover overflow-hidden transition-all duration-300
+                            ${isActive
+                              ? 'bg-gradient-to-br from-indigo-500/8 via-indigo-500/4 to-transparent border-indigo-500/20'
+                              : 'bg-white/2 border-white/8 opacity-60'
+                            }`}
+                            data-testid={`card-casa-${casa.id}`}
+                          >
+                            <div className={`absolute top-0 left-0 w-full h-0.5 bg-gradient-to-r ${isActive ? 'from-indigo-400 to-purple-500' : 'from-white/20 to-transparent'} opacity-70`} />
+                            <div className="flex items-start justify-between mb-3">
+                              <div className="flex-1 min-w-0">
+                                <h3 className={`font-bold text-base truncate ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}>{casa.name}</h3>
+                                {casa.website_url && (
+                                  <a href={casa.website_url} target="_blank" rel="noopener noreferrer"
+                                    className="flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 truncate mt-0.5">
+                                    <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                                    <span className="truncate">{(() => { try { return new URL(casa.website_url).hostname; } catch { return casa.website_url; } })()}</span>
+                                  </a>
+                                )}
+                              </div>
+                              <Badge className={`text-[10px] ml-2 flex-shrink-0 ${isActive ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/25' : 'bg-white/5 text-muted-foreground border-white/10'}`}>
+                                {isActive ? 'Ativa' : 'Inativa'}
+                              </Badge>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 mb-3">
+                              <div className="bg-white/3 rounded-xl p-2 border border-white/5">
+                                <p className="text-[9px] text-muted-foreground uppercase tracking-wider mb-0.5">Procedimentos</p>
+                                <p className="text-sm font-bold text-indigo-400">{s.countTotal}</p>
+                              </div>
+                              <div className="bg-white/3 rounded-xl p-2 border border-white/5">
+                                <p className="text-[9px] text-muted-foreground uppercase tracking-wider mb-0.5">Lucro Total</p>
+                                <p className={`text-sm font-bold ${s.profitTotal >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                  {s.profitTotal >= 0 ? '+' : ''}{s.profitTotal.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                </p>
+                              </div>
+                            </div>
+                            {canEdit && (
+                              <div className="flex gap-1.5">
+                                <Button variant="ghost" size="sm" onClick={() => handleEdit(casa)}
+                                  className="flex-1 h-7 text-xs text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 gap-1"
+                                  data-testid={`button-edit-casa-${casa.id}`}>
+                                  <Pencil className="w-3 h-3" />
+                                  Editar
+                                </Button>
+                                <Button variant="ghost" size="sm" onClick={() => handleToggleStatus(casa)}
+                                  className={`flex-1 h-7 text-xs gap-1 ${isActive ? 'text-muted-foreground hover:text-red-400 hover:bg-red-500/10' : 'text-muted-foreground hover:text-emerald-400 hover:bg-emerald-500/10'}`}
+                                  data-testid={`button-toggle-casa-${casa.id}`}>
+                                  <Power className="w-3 h-3" />
+                                  {isActive ? 'Desativar' : 'Ativar'}
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
-                  );
-                })}
-              </div>
+                  </div>
+                )}
+
+                {/* Orphan platforms from procedures */}
+                {filteredOrphans.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-1.5 h-4 rounded-full bg-gradient-to-b from-amber-400 to-orange-500" />
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Nos procedimentos, não cadastradas ({filteredOrphans.length})</p>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                      {filteredOrphans.map((platformName) => {
+                        const s = getCasaStats(platformName);
+                        return (
+                          <div key={platformName}
+                            className="relative rounded-2xl border border-dashed border-amber-500/25 p-4 bg-amber-500/5 overflow-hidden transition-all duration-300 card-hover"
+                            data-testid={`card-orphan-${platformName}`}
+                          >
+                            <div className="absolute top-0 left-0 w-full h-0.5 bg-gradient-to-r from-amber-400/50 to-orange-500/30 opacity-70" />
+                            <div className="flex items-start justify-between mb-3">
+                              <div className="flex-1 min-w-0">
+                                <h3 className="font-bold text-base truncate text-amber-300">{platformName}</h3>
+                                <p className="text-[10px] text-amber-500/70 mt-0.5">Apenas nos procedimentos</p>
+                              </div>
+                              <Badge className="text-[10px] ml-2 flex-shrink-0 bg-amber-500/10 text-amber-400 border-amber-500/20">
+                                Importar
+                              </Badge>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 mb-3">
+                              <div className="bg-amber-500/5 rounded-xl p-2 border border-amber-500/10">
+                                <p className="text-[9px] text-muted-foreground uppercase tracking-wider mb-0.5">Procedimentos</p>
+                                <p className="text-sm font-bold text-amber-400">{s.countTotal}</p>
+                              </div>
+                              <div className="bg-amber-500/5 rounded-xl p-2 border border-amber-500/10">
+                                <p className="text-[9px] text-muted-foreground uppercase tracking-wider mb-0.5">Lucro Total</p>
+                                <p className={`text-sm font-bold ${s.profitTotal >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                  {s.profitTotal >= 0 ? '+' : ''}{s.profitTotal.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                </p>
+                              </div>
+                            </div>
+                            {canEdit && (
+                              <Button variant="ghost" size="sm" onClick={() => handleAdd(platformName)}
+                                className="w-full h-7 text-xs text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 gap-1"
+                                data-testid={`button-import-orphan-${platformName}`}>
+                                <Download className="w-3 h-3" />
+                                Cadastrar esta casa
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Empty state */}
+                {filteredCasas.length === 0 && filteredOrphans.length === 0 && (
+                  <div className="glass rounded-2xl border border-white/5 p-12 text-center">
+                    <Building2 className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
+                    <p className="text-muted-foreground text-sm">
+                      {searchQuery ? 'Nenhuma casa encontrada para esta busca' : 'Nenhuma casa encontrada'}
+                    </p>
+                    {!searchQuery && canEdit && (
+                      <Button size="sm" onClick={() => handleAdd()} className="mt-4 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-400 border border-indigo-500/25">
+                        <Plus className="w-4 h-4 mr-1" /> Adicionar primeira casa
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
@@ -489,9 +606,9 @@ const EntityManagement = () => {
                     <Activity className="w-5 h-5 text-purple-400" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider mb-1">Total de Casas Ativas</p>
-                    <p className="text-2xl font-bold text-purple-400">{activeCasas.length}</p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">{bookmakers.length} cadastradas</p>
+                    <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider mb-1">Casas Conhecidas</p>
+                    <p className="text-2xl font-bold text-purple-400">{totalKnown}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{activeCasas.length} cadastradas · {orphanPlatforms.length} só nos proc.</p>
                   </div>
                 </div>
               </div>
@@ -530,28 +647,31 @@ const EntityManagement = () => {
                   </thead>
                   <tbody>
                     {analiseRanking.length === 0 ? (
-                      <tr><td colSpan={5} className="text-center py-10 text-muted-foreground text-sm">Nenhuma casa cadastrada</td></tr>
-                    ) : analiseRanking.map((casa, i) => {
+                      <tr><td colSpan={5} className="text-center py-10 text-muted-foreground text-sm">Nenhuma casa encontrada</td></tr>
+                    ) : analiseRanking.map((entry, i) => {
                       const rank = i + 1;
                       const rankColor = rank === 1 ? 'text-yellow-400' : rank === 2 ? 'text-slate-300' : rank === 3 ? 'text-amber-600' : 'text-muted-foreground/50';
                       return (
-                        <tr key={casa.id} className="border-b border-white/5 hover:bg-white/3 transition-colors group">
+                        <tr key={entry.key} className="border-b border-white/5 hover:bg-white/3 transition-colors group">
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2">
                               <span className={`text-xs font-mono w-5 ${rankColor}`}>#{rank}</span>
-                              <span className="font-semibold text-foreground">{casa.name}</span>
-                              {casa.status === 'inactive' && (
+                              <span className="font-semibold text-foreground">{entry.name}</span>
+                              {entry.isOrphan && (
+                                <Badge className="text-[9px] bg-amber-500/10 text-amber-400 border-amber-500/20 py-0 h-4">Proc. apenas</Badge>
+                              )}
+                              {!entry.isOrphan && entry.status === 'inactive' && (
                                 <Badge className="text-[9px] bg-white/5 text-muted-foreground border-white/10 py-0 h-4">Inativa</Badge>
                               )}
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-indigo-400 font-semibold">{casa.countMonth}</td>
-                          <td className={`px-4 py-3 font-bold ${casa.profitMonth >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                            {casa.profitMonth >= 0 ? '+' : ''}{casa.profitMonth.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          <td className="px-4 py-3 text-indigo-400 font-semibold">{entry.countMonth}</td>
+                          <td className={`px-4 py-3 font-bold ${entry.profitMonth >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                            {entry.profitMonth >= 0 ? '+' : ''}{entry.profitMonth.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                           </td>
-                          <td className="px-4 py-3 text-muted-foreground font-medium">{casa.countTotal}</td>
-                          <td className={`px-4 py-3 font-semibold ${casa.profitTotal >= 0 ? 'text-emerald-400/70' : 'text-red-400/70'}`}>
-                            {casa.profitTotal >= 0 ? '+' : ''}{casa.profitTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          <td className="px-4 py-3 text-muted-foreground font-medium">{entry.countTotal}</td>
+                          <td className={`px-4 py-3 font-semibold ${entry.profitTotal >= 0 ? 'text-emerald-400/70' : 'text-red-400/70'}`}>
+                            {entry.profitTotal >= 0 ? '+' : ''}{entry.profitTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                           </td>
                         </tr>
                       );
@@ -567,6 +687,7 @@ const EntityManagement = () => {
         {showModal && (
           <BookmakerModal
             bookmaker={editingCasa}
+            initialName={prefillName}
             onClose={handleModalClose}
             onCreate={(data) => createBookmaker.mutate(data)}
             onUpdate={(data) => updateBookmaker.mutate(data)}
