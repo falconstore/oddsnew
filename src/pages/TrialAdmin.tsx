@@ -3,7 +3,8 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
   Gift, Search, Sparkles, Users, CheckCircle2, Clock, Ban, UserMinus,
-  Mail, Phone, Send, ExternalLink, Trash2,
+  Mail, Phone, Send, ExternalLink, Trash2, Eye, MousePointerClick, BellRing,
+  MessageCircle, ShoppingCart, TrendingUp,
 } from 'lucide-react';
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
@@ -14,7 +15,15 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import { useTrialLeads, useKickTrialLead } from '@/hooks/useTrialLeads';
+import { useTrialUpgradeStats, type TrialStatsRange } from '@/hooks/useTrialUpgradeStats';
 import type { TrialLead, TrialStatus } from '@/types/trial';
+
+const RANGE_LABELS: Record<TrialStatsRange, string> = {
+  today: 'Hoje',
+  '7d': 'Últimos 7 dias',
+  '30d': 'Últimos 30 dias',
+  all: 'Todo o período',
+};
 
 const STATUS_META: Record<TrialStatus, { label: string; cls: string }> = {
   pending: { label: 'Aguardando entrada', cls: 'bg-amber-500/15 text-amber-300 border-amber-500/30' },
@@ -41,6 +50,8 @@ export default function TrialAdmin() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | TrialStatus>('all');
   const [confirmKick, setConfirmKick] = useState<TrialLead | null>(null);
+  const [statsRange, setStatsRange] = useState<TrialStatsRange>('7d');
+  const { data: upgradeStats, isLoading: statsLoading } = useTrialUpgradeStats(statsRange);
 
   const stats = useMemo(() => {
     const s = { total: leads.length, active: 0, expired: 0, blocked: 0, pending: 0, removed: 0 };
@@ -110,6 +121,114 @@ export default function TrialAdmin() {
               </Button>
             </a>
           </div>
+        </div>
+
+        {/* Conversão Trial → Assinante */}
+        <div className="glass rounded-3xl border border-white/8 p-5 md:p-6 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <h2 className="text-lg md:text-xl font-bold flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-emerald-400" />
+                Conversão do aviso de 24h
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Avisos enviados, visitas em /trial-upgrade e cliques nos CTAs · {RANGE_LABELS[statsRange]}
+              </p>
+            </div>
+            <Select value={statsRange} onValueChange={v => setStatsRange(v as TrialStatsRange)}>
+              <SelectTrigger
+                className="bg-white/5 border-white/10 h-9 text-sm w-[180px]"
+                data-testid="select-stats-range"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="today">Hoje</SelectItem>
+                <SelectItem value="7d">Últimos 7 dias</SelectItem>
+                <SelectItem value="30d">Últimos 30 dias</SelectItem>
+                <SelectItem value="all">Todo o período</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {statsLoading || !upgradeStats ? (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="rounded-2xl border border-white/5 p-4 h-24 animate-pulse bg-white/2" />
+              ))}
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <MetricCard
+                  icon={<BellRing className="w-5 h-5" />}
+                  label="Avisos enviados"
+                  value={upgradeStats.remindersSent}
+                  hint="Trials que receberam o aviso de 24h"
+                  accent="from-amber-500/20 to-amber-500/5 border-amber-500/25 text-amber-300"
+                  testId="metric-reminders-sent"
+                />
+                <MetricCard
+                  icon={<Eye className="w-5 h-5" />}
+                  label="Visitas /trial-upgrade"
+                  value={upgradeStats.views}
+                  hint="Quantas vezes a página foi aberta"
+                  accent="from-sky-500/20 to-sky-500/5 border-sky-500/25 text-sky-300"
+                  testId="metric-views"
+                />
+                <MetricCard
+                  icon={<MousePointerClick className="w-5 h-5" />}
+                  label="Leads únicos com clique"
+                  value={upgradeStats.uniqueLeadsClicked}
+                  hint={`${upgradeStats.totalClicks} cliques no total`}
+                  accent="from-fuchsia-500/20 to-fuchsia-500/5 border-fuchsia-500/25 text-fuchsia-300"
+                  testId="metric-unique-clicks"
+                />
+                <MetricCard
+                  icon={<TrendingUp className="w-5 h-5" />}
+                  label="Taxa de conversão"
+                  value={`${upgradeStats.conversionRate.toFixed(1)}%`}
+                  hint={
+                    upgradeStats.remindersSent > 0
+                      ? `${upgradeStats.uniqueLeadsClicked} de ${upgradeStats.remindersSent} avisos`
+                      : 'Sem avisos no período'
+                  }
+                  accent="from-emerald-500/20 to-emerald-500/5 border-emerald-500/25 text-emerald-300"
+                  testId="metric-conversion-rate"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <CtaBreakdownCard
+                  icon={<MessageCircle className="w-4 h-4" />}
+                  label="WhatsApp"
+                  value={upgradeStats.clicksWhatsapp}
+                  total={upgradeStats.totalClicks}
+                  accent="text-emerald-300 bg-emerald-500/10 border-emerald-500/25"
+                  bar="bg-emerald-400/70"
+                  testId="metric-cta-whatsapp"
+                />
+                <CtaBreakdownCard
+                  icon={<Send className="w-4 h-4" />}
+                  label="Telegram"
+                  value={upgradeStats.clicksTelegram}
+                  total={upgradeStats.totalClicks}
+                  accent="text-sky-300 bg-sky-500/10 border-sky-500/25"
+                  bar="bg-sky-400/70"
+                  testId="metric-cta-telegram"
+                />
+                <CtaBreakdownCard
+                  icon={<ShoppingCart className="w-4 h-4" />}
+                  label="Checkout"
+                  value={upgradeStats.clicksCheckout}
+                  total={upgradeStats.totalClicks}
+                  accent="text-pink-300 bg-pink-500/10 border-pink-500/25"
+                  bar="bg-pink-400/70"
+                  testId="metric-cta-checkout"
+                />
+              </div>
+            </>
+          )}
         </div>
 
         {/* Stats */}
@@ -289,6 +408,64 @@ function StatCard({
         <div className="opacity-70">{icon}</div>
       </div>
       <p className="text-2xl font-bold">{value}</p>
+    </div>
+  );
+}
+
+function MetricCard({
+  icon, label, value, hint, accent, testId,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: number | string;
+  hint?: string;
+  accent: string;
+  testId?: string;
+}) {
+  return (
+    <div
+      className={`relative rounded-2xl border bg-gradient-to-br p-4 overflow-hidden ${accent}`}
+      data-testid={testId}
+    >
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[10px] font-semibold uppercase tracking-wider opacity-80">{label}</span>
+        <div className="opacity-70">{icon}</div>
+      </div>
+      <p className="text-2xl font-bold" data-testid={testId ? `${testId}-value` : undefined}>{value}</p>
+      {hint && <p className="text-[11px] opacity-70 mt-1 leading-tight">{hint}</p>}
+    </div>
+  );
+}
+
+function CtaBreakdownCard({
+  icon, label, value, total, accent, bar, testId,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: number;
+  total: number;
+  accent: string;
+  bar: string;
+  testId?: string;
+}) {
+  const pct = total > 0 ? (value / total) * 100 : 0;
+  return (
+    <div
+      className="relative rounded-2xl border border-white/8 bg-white/3 p-4 overflow-hidden"
+      data-testid={testId}
+    >
+      <div className="flex items-center justify-between mb-2">
+        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${accent}`}>
+          {icon}
+          {label}
+        </span>
+        <span className="text-xs text-muted-foreground">{pct.toFixed(0)}%</span>
+      </div>
+      <p className="text-2xl font-bold" data-testid={testId ? `${testId}-value` : undefined}>{value}</p>
+      <p className="text-[11px] text-muted-foreground mb-2">cliques no CTA</p>
+      <div className="h-1.5 w-full rounded-full bg-white/5 overflow-hidden">
+        <div className={`h-full ${bar} transition-all`} style={{ width: `${pct}%` }} />
+      </div>
     </div>
   );
 }
