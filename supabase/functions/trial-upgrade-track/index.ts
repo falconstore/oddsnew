@@ -12,6 +12,8 @@ const ALLOWED_EVENTS = new Set([
   "cta_whatsapp",
   "cta_checkout",
   "cta_telegram",
+  "cta_free_group",
+  "cta_open_form",
 ]);
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

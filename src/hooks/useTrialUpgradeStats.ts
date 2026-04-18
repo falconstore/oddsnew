@@ -55,7 +55,12 @@ export const useTrialUpgradeStats = (range: TrialStatsRange) => {
       const events = (eventsRes.data ?? []) as Pick<TrialUpgradeEvent, 'id' | 'lead_id' | 'event_type' | 'created_at'>[];
 
       const counts: Record<TrialUpgradeEventType, number> = {
-        view: 0, cta_whatsapp: 0, cta_telegram: 0, cta_checkout: 0,
+        view: 0,
+        cta_whatsapp: 0,
+        cta_telegram: 0,
+        cta_checkout: 0,
+        cta_free_group: 0,
+        cta_open_form: 0,
       };
       const uniqueLeads = new Set<string>();
       for (const e of events) {

@@ -16,7 +16,13 @@ export interface TrialLead {
   created_at: string;
 }
 
-export type TrialUpgradeEventType = 'view' | 'cta_whatsapp' | 'cta_checkout' | 'cta_telegram';
+export type TrialUpgradeEventType =
+  | 'view'
+  | 'cta_whatsapp'
+  | 'cta_checkout'
+  | 'cta_telegram'
+  | 'cta_free_group'
+  | 'cta_open_form';
 
 export interface TrialUpgradeEvent {
   id: string;

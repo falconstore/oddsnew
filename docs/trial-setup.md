@@ -149,6 +149,20 @@ VITE_TRIAL_UPGRADE_CHECKOUT_URL="https://pay.exemplo.com/betshark"
 VITE_TRIAL_UPGRADE_TELEGRAM_URL="https://t.me/betshark_suporte"
 ```
 
+### Landing pública Shark 100% Green (`/`)
+
+A LP em `trial.sharkgreen.com.br` (`src/pages/TrialLanding.tsx`) tem 3 CTAs principais:
+
+```
+VITE_FREE_GROUPS_URL="https://t.me/sharkgreen_free"          # link do grupo free
+VITE_BUY_NOW_URL="https://pay.exemplo.com/shark-green"       # checkout / WhatsApp comercial
+                                                              # (se vazio, faz fallback p/ VITE_TRIAL_UPGRADE_CHECKOUT_URL)
+```
+
+> Aplique também a migração `supabase/migrations/20260418_trial_upgrade_extra_events.sql`
+> que estende o CHECK do `trial_upgrade_events.event_type` com os novos tipos
+> `cta_free_group` e `cta_open_form` usados pelo tracking da LP.
+
 A página dispara eventos (`view`, `cta_whatsapp`, `cta_checkout`, `cta_telegram`)
 para a função `trial-upgrade-track`, persistidos em `trial_upgrade_events` com
 o `lead_id` (quando o link veio do DM) e UTMs. Para acompanhar a conversão:
