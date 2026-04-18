@@ -95,8 +95,15 @@ export default function TrialLanding() {
     );
   }, []);
 
-  // Tracking de view (uma vez por sessão)
+  // Tracking de view (uma vez por sessão do navegador)
   useEffect(() => {
+    const SESSION_KEY = 'trial-landing:view-tracked';
+    try {
+      if (sessionStorage.getItem(SESSION_KEY)) return;
+      sessionStorage.setItem(SESSION_KEY, '1');
+    } catch {
+      /* sessionStorage indisponível — segue e registra view */
+    }
     track('view', { page: 'trial-landing' });
   }, []);
 
