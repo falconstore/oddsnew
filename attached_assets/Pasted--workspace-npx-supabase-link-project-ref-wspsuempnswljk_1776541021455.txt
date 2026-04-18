@@ -1,0 +1,33 @@
+~/workspace$ npx supabase link --project-ref wspsuempnswljkphatur
+
+npx supabase functions deploy trial-signup        --no-verify-jwt
+npx supabase functions deploy trial-webhook       --no-verify-jwt
+npx supabase functions deploy trial-upgrade-track --no-verify-jwt
+npx supabase functions deploy trial-cron
+npx supabase functions deploy trial-kick
+Finished supabase link.
+WARNING: Docker is not running
+Uploading asset (trial-signup): supabase/functions/trial-signup/index.ts
+Uploading asset (trial-signup): supabase/functions/_shared/cors.ts
+Deployed Functions on project wspsuempnswljkphatur: trial-signup
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/wspsuempnswljkphatur/functions
+WARNING: Docker is not running
+Uploading asset (trial-webhook): supabase/functions/trial-webhook/index.ts
+Uploading asset (trial-webhook): supabase/functions/_shared/cors.ts
+Deployed Functions on project wspsuempnswljkphatur: trial-webhook
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/wspsuempnswljkphatur/functions
+WARNING: Docker is not running
+Uploading asset (trial-upgrade-track): supabase/functions/trial-upgrade-track/index.ts
+Uploading asset (trial-upgrade-track): supabase/functions/_shared/cors.ts
+Deployed Functions on project wspsuempnswljkphatur: trial-upgrade-track
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/wspsuempnswljkphatur/functions
+WARNING: Docker is not running
+Uploading asset (trial-cron): supabase/functions/trial-cron/index.ts
+Uploading asset (trial-cron): supabase/functions/_shared/cors.ts
+Deployed Functions on project wspsuempnswljkphatur: trial-cron
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/wspsuempnswljkphatur/functions
+WARNING: Docker is not running
+Uploading asset (trial-kick): supabase/functions/trial-kick/index.ts
+Uploading asset (trial-kick): supabase/functions/_shared/cors.ts
+Deployed Functions on project wspsuempnswljkphatur: trial-kick
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/wspsuempnswljkphatur/functions
