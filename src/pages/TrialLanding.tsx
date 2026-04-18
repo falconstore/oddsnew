@@ -17,11 +17,11 @@ const SUPABASE_ANON = import.meta.env.VITE_MAIN_SUPABASE_ANON_KEY as string;
 
 const FREE_GROUPS_URL =
   (import.meta.env.VITE_FREE_GROUPS_URL as string | undefined) ||
-  'https://t.me/sharkgreen_free';
+  'https://t.me/+Icv1WXcUHTk1Yjhh';
 const BUY_NOW_URL =
   (import.meta.env.VITE_BUY_NOW_URL as string | undefined) ||
   (import.meta.env.VITE_TRIAL_UPGRADE_CHECKOUT_URL as string | undefined) ||
-  'https://wa.me/5511999999999?text=Quero%20comprar%20o%20Shark%20100%25%20Green';
+  'https://lastlink.com/p/CEAEE6585/checkout-payment/';
 
 type TrackEvent =
   | 'view'
