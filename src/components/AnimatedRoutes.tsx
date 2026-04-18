@@ -44,6 +44,9 @@ function RedirectWithParams({
   return <Navigate to={`${to}${search ? `?${search}` : ''}`} replace />;
 }
 
+// URL pública do subdomínio do trial. Usada para CTAs e redirects do admin.
+export const TRIAL_PUBLIC_URL = 'https://trial.sharkgreen.com.br';
+
 // Detecta se estamos no subdomínio público do trial (ex.: trial.sharkgreen.com.br).
 // Em produção: hostname começa com "trial.".
 // Em dev/Replit: também respeita ?host=trial para conseguirmos testar localmente.
@@ -54,6 +57,16 @@ function isTrialHost(): boolean {
   const params = new URLSearchParams(window.location.search);
   if (params.get('host') === 'trial') return true;
   return false;
+}
+
+// Redireciona externamente para o subdomínio público do trial,
+// preservando o path original (ex.: /trial-upgrade?lead=...).
+function ExternalTrialRedirect({ path }: { path: string }) {
+  const location = useLocation();
+  if (typeof window !== 'undefined') {
+    window.location.replace(`${TRIAL_PUBLIC_URL}${path}${location.search}`);
+  }
+  return null;
 }
 
 export function AnimatedRoutes() {
@@ -96,16 +109,9 @@ export function AnimatedRoutes() {
             <ResetPassword />
           </PageTransition>
         } />
-        <Route path="/trial" element={
-          <PageTransition>
-            <TrialLanding />
-          </PageTransition>
-        } />
-        <Route path="/trial-upgrade" element={
-          <PageTransition>
-            <TrialUpgrade />
-          </PageTransition>
-        } />
+        {/* /trial e /trial-upgrade no domínio do admin redirecionam para o subdomínio público */}
+        <Route path="/trial" element={<ExternalTrialRedirect path="/" />} />
+        <Route path="/trial-upgrade" element={<ExternalTrialRedirect path="/trial-upgrade" />} />
         
         {/* Protected routes with granular permissions */}
         <Route path="/" element={

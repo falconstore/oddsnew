@@ -17,6 +17,7 @@ import {
 import { useTrialLeads, useKickTrialLead } from '@/hooks/useTrialLeads';
 import { useTrialUpgradeStats, type TrialStatsRange } from '@/hooks/useTrialUpgradeStats';
 import type { TrialLead, TrialStatus } from '@/types/trial';
+import { TRIAL_PUBLIC_URL } from '@/components/AnimatedRoutes';
 
 const RANGE_LABELS: Record<TrialStatsRange, string> = {
   today: 'Hoje',
@@ -114,7 +115,7 @@ export default function TrialAdmin() {
                 </div>
               </div>
             </div>
-            <a href="/trial" target="_blank" rel="noopener noreferrer">
+            <a href={`${TRIAL_PUBLIC_URL}/`} target="_blank" rel="noopener noreferrer">
               <Button size="sm" variant="outline" className="border-pink-500/30 text-pink-300 hover:bg-pink-500/10" data-testid="link-trial-landing">
                 <ExternalLink className="w-4 h-4 mr-1.5" />
                 Abrir landing
@@ -287,7 +288,7 @@ export default function TrialAdmin() {
             <p className="text-sm text-muted-foreground">
               {leads.length === 0 ? 'Nenhum lead capturado ainda. Compartilhe ' : 'Nenhum lead com esses filtros.'}
               {leads.length === 0 && (
-                <a href="/trial" target="_blank" rel="noopener noreferrer" className="text-pink-400 hover:text-pink-300 underline">
+                <a href={`${TRIAL_PUBLIC_URL}/`} target="_blank" rel="noopener noreferrer" className="text-pink-400 hover:text-pink-300 underline">
                   o link da landing
                 </a>
               )}
