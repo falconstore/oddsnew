@@ -38,8 +38,12 @@ supabase link --project-ref SEU_REF_DO_PROJETO
 supabase secrets set \
   TELEGRAM_TRIAL_BOT_TOKEN="NOVO_TOKEN_AQUI" \
   TELEGRAM_TRIAL_CHAT_ID="-1001234567890" \
-  TELEGRAM_TRIAL_WEBHOOK_SECRET="$(openssl rand -hex 32)"
+  TELEGRAM_TRIAL_WEBHOOK_SECRET="$(openssl rand -hex 32)" \
+  TRIAL_PUBLIC_SITE_URL="https://app.betsharkpro.com"
 ```
+
+> `TRIAL_PUBLIC_SITE_URL` é o domínio público do app — usado pelo `trial-cron`
+> para montar o link `/trial-upgrade?lead=…` enviado por DM 24h antes da expiração.
 
 - `TELEGRAM_TRIAL_CHAT_ID`: id do supergrupo (negativo, ex.: `-1001234567890`).
 - `TELEGRAM_TRIAL_WEBHOOK_SECRET`: token longo aleatório (32+ chars) — usado para
@@ -53,8 +57,9 @@ supabase secrets set \
 ## 4. Deploy das funções
 
 ```bash
-supabase functions deploy trial-signup --no-verify-jwt
-supabase functions deploy trial-webhook --no-verify-jwt
+supabase functions deploy trial-signup        --no-verify-jwt
+supabase functions deploy trial-webhook       --no-verify-jwt
+supabase functions deploy trial-upgrade-track --no-verify-jwt
 supabase functions deploy trial-cron     # protegida por bearer service-role
 supabase functions deploy trial-kick     # valida JWT do usuário
 ```
@@ -127,6 +132,32 @@ Para rodar 2x ao dia (mais seguro), use `0 3,15 * * *`.
    curl -X POST https://SEU_PROJETO.functions.supabase.co/trial-cron \
      -H "Authorization: Bearer SUA_SERVICE_ROLE_KEY"
    ```
+
+## 9. Página de upsell `/trial-upgrade`
+
+Pública, sem login. Recebe os usuários após o aviso prévio de 24h enviado pelo
+`trial-cron`. Apresenta os planos pagos e CTAs (WhatsApp / Telegram / checkout).
+
+Aplique a migração `supabase/migrations/20260418_trial_upgrade.sql` para criar a
+coluna `reminder_sent_at` em `trial_leads` e a tabela `trial_upgrade_events`.
+
+Variáveis públicas (frontend) opcionais — defina no `.env` para personalizar:
+
+```
+VITE_TRIAL_UPGRADE_WHATSAPP="5511999999999"          # E.164, só dígitos
+VITE_TRIAL_UPGRADE_CHECKOUT_URL="https://pay.exemplo.com/betshark"
+VITE_TRIAL_UPGRADE_TELEGRAM_URL="https://t.me/betshark_suporte"
+```
+
+A página dispara eventos (`view`, `cta_whatsapp`, `cta_checkout`, `cta_telegram`)
+para a função `trial-upgrade-track`, persistidos em `trial_upgrade_events` com
+o `lead_id` (quando o link veio do DM) e UTMs. Para acompanhar a conversão:
+
+```sql
+SELECT event_type, count(*) FROM trial_upgrade_events
+WHERE created_at > now() - interval '30 days'
+GROUP BY event_type ORDER BY 2 DESC;
+```
 
 ## Alternativa sem Edge Functions
 

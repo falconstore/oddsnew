@@ -20,6 +20,7 @@ import Subscriptions from '@/pages/Subscriptions';
 
 import TelegramBot from '@/pages/TelegramBot';
 import TrialLanding from '@/pages/TrialLanding';
+import TrialUpgrade from '@/pages/TrialUpgrade';
 import TrialAdmin from '@/pages/TrialAdmin';
 import NotFound from '@/pages/NotFound';
 
@@ -62,6 +63,11 @@ export function AnimatedRoutes() {
         <Route path="/trial" element={
           <PageTransition>
             <TrialLanding />
+          </PageTransition>
+        } />
+        <Route path="/trial-upgrade" element={
+          <PageTransition>
+            <TrialUpgrade />
           </PageTransition>
         } />
         
