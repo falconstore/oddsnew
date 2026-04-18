@@ -123,23 +123,45 @@ export default function TrialLanding() {
   };
 
   return (
-    <div className="min-h-screen bg-[hsl(150_30%_4%)] text-white relative overflow-hidden">
-      {/* Background neon-green */}
-      <div className="absolute inset-0 pointer-events-none -z-10">
+    <div
+      className="min-h-screen text-white relative"
+      style={{
+        backgroundColor: 'hsl(150 30% 4%)',
+        backgroundImage: `url(${sharkHeroImg})`,
+        backgroundRepeat: 'no-repeat',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center top',
+        backgroundAttachment: 'fixed',
+      }}
+      data-testid="bg-shark-wallpaper"
+    >
+      {/* Overlay escuro / verde para dar legibilidade ao texto.
+          Mais claro no topo (deixa o Shark/Rolls aparecer) e escurece
+          a partir do meio para garantir contraste do conteúdo abaixo. */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background:
+            'linear-gradient(180deg, hsl(150 35% 3% / 0.35) 0%, hsl(150 35% 3% / 0.20) 25%, hsl(150 35% 3% / 0.55) 60%, hsl(150 35% 3% / 0.92) 90%, hsl(150 35% 3% / 0.98) 100%)',
+        }}
+        aria-hidden="true"
+      />
+      {/* Vinheta lateral suave para focar atenção no centro */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background:
+            'radial-gradient(ellipse 70% 60% at 50% 35%, transparent 40%, hsl(150 35% 3% / 0.55) 100%)',
+        }}
+        aria-hidden="true"
+      />
+      {/* Glow neon-green sutil */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1100px] h-[700px] rounded-full bg-emerald-500/15 blur-[160px]" />
-        <div className="absolute top-1/3 -left-32 w-[600px] h-[600px] rounded-full bg-green-500/10 blur-[140px]" />
         <div className="absolute bottom-0 right-0 w-[600px] h-[600px] rounded-full bg-emerald-400/10 blur-[140px]" />
       </div>
-      <div
-        className="absolute inset-0 pointer-events-none -z-10 opacity-25"
-        style={{
-          backgroundImage:
-            'linear-gradient(hsl(145 80% 48% / 0.07) 1px, transparent 1px), linear-gradient(90deg, hsl(145 80% 48% / 0.07) 1px, transparent 1px)',
-          backgroundSize: '52px 52px',
-          maskImage: 'radial-gradient(ellipse 80% 60% at 50% 0%, white 30%, transparent 100%)',
-          WebkitMaskImage: 'radial-gradient(ellipse 80% 60% at 50% 0%, white 30%, transparent 100%)',
-        }}
-      />
+      {/* Wrapper que mantém todo o conteúdo acima dos overlays */}
+      <div className="relative z-10">
 
       {/* HERO */}
       <header className="relative">
@@ -148,26 +170,25 @@ export default function TrialLanding() {
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-400 to-green-600 flex items-center justify-center shadow-lg shadow-emerald-500/30">
               <Crown className="w-5 h-5 text-black" />
             </div>
-            <span className="font-bold tracking-tight text-lg">
+            <span className="font-bold tracking-tight text-lg drop-shadow-lg">
               Shark <span className="text-emerald-400">100% Green</span>
             </span>
           </div>
-          <div className="hidden md:inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-semibold">
+          <div className="hidden md:inline-flex items-center gap-2 px-3 py-1 rounded-full bg-black/50 backdrop-blur border border-emerald-500/30 text-emerald-300 text-xs font-semibold">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
             Acesso VIP por 7 dias · vagas limitadas
           </div>
         </div>
 
-        <section className="relative max-w-7xl mx-auto px-4 pt-6 md:pt-10 pb-16 md:pb-24 grid md:grid-cols-2 gap-10 md:gap-6 items-center">
-          {/* Texto */}
+        <section className="relative max-w-3xl mx-auto px-4 pt-10 md:pt-20 pb-20 md:pb-32 text-center">
           <div className="space-y-6 md:space-y-7 animate-fade-in-up">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-semibold">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-black/50 backdrop-blur border border-emerald-500/30 text-emerald-300 text-xs font-semibold">
               <Sparkles className="w-3 h-3" />
               Método estratégico · sinais antecipados
             </div>
 
             <h1
-              className="text-4xl md:text-6xl font-bold tracking-tight leading-[1.05]"
+              className="text-4xl md:text-6xl font-bold tracking-tight leading-[1.05] drop-shadow-[0_4px_24px_rgba(0,0,0,0.85)]"
               data-testid="text-hero-title"
             >
               Acesso VIP{' '}
@@ -178,7 +199,7 @@ export default function TrialLanding() {
             </h1>
 
             <p
-              className="text-base md:text-lg text-white/70 max-w-xl leading-relaxed"
+              className="text-base md:text-lg text-white/85 max-w-2xl mx-auto leading-relaxed drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)]"
               data-testid="text-hero-subtitle"
             >
               Acesso completo ao método exclusivo de sinais antecipados para
@@ -187,7 +208,7 @@ export default function TrialLanding() {
               Sinais de Valor em tempo real.
             </p>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 max-w-2xl mx-auto">
               <Button
                 onClick={() => openForm('hero-primary')}
                 className="h-12 sm:h-14 bg-gradient-to-r from-emerald-400 to-green-500 hover:from-emerald-300 hover:to-green-400 text-black font-bold text-sm sm:text-base border-0 shadow-lg shadow-emerald-500/40 transition-transform hover:scale-[1.02]"
@@ -199,7 +220,7 @@ export default function TrialLanding() {
               <Button
                 onClick={() => onFreeGroups('hero')}
                 variant="outline"
-                className="h-12 sm:h-14 bg-white/5 border-emerald-500/40 hover:bg-emerald-500/10 hover:border-emerald-400/60 text-white font-semibold"
+                className="h-12 sm:h-14 bg-black/40 backdrop-blur border-emerald-500/40 hover:bg-emerald-500/15 hover:border-emerald-400/60 text-white font-semibold"
                 data-testid="button-hero-free-groups"
               >
                 <Users className="w-5 h-5 mr-2 text-emerald-300" />
@@ -208,7 +229,7 @@ export default function TrialLanding() {
               <Button
                 onClick={() => onBuyNow('hero')}
                 variant="outline"
-                className="h-12 sm:h-14 bg-white/5 border-white/15 hover:bg-white/10 hover:border-white/25 text-white font-semibold"
+                className="h-12 sm:h-14 bg-black/40 backdrop-blur border-white/20 hover:bg-white/10 hover:border-white/30 text-white font-semibold"
                 data-testid="button-hero-buy-now"
               >
                 <ShoppingBag className="w-5 h-5 mr-2" />
@@ -216,33 +237,10 @@ export default function TrialLanding() {
               </Button>
             </div>
 
-            <div className="flex flex-wrap gap-x-5 gap-y-2 text-xs text-white/60 pt-1">
+            <div className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-xs text-white/75 pt-2 drop-shadow-[0_1px_8px_rgba(0,0,0,0.8)]">
               <span className="inline-flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Sem cartão</span>
               <span className="inline-flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Acesso imediato</span>
               <span className="inline-flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Cancele quando quiser</span>
-            </div>
-          </div>
-
-          {/* Imagem do Shark */}
-          <div className="relative animate-fade-in-up">
-            <div className="absolute -inset-6 md:-inset-10 rounded-[2.5rem] bg-gradient-to-br from-emerald-500/20 via-green-400/10 to-transparent blur-2xl pointer-events-none" />
-            <div className="relative rounded-[2rem] overflow-hidden border border-emerald-500/25 shadow-[0_30px_120px_-30px_rgba(16,185,129,0.45)] bg-black/40">
-              <img
-                src={sharkHeroImg}
-                alt="Shark de terno em frente a um Rolls Royce — Shark 100% Green"
-                className="w-full h-auto object-cover"
-                data-testid="img-shark-hero"
-                loading="eager"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-[hsl(150_30%_4%)] via-transparent to-transparent pointer-events-none" />
-              <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-[11px] text-white/70">
-                <span className="px-2 py-1 rounded-full bg-black/50 border border-emerald-500/30">
-                  100% Green · Estratégia & Lucro
-                </span>
-                <span className="hidden sm:inline px-2 py-1 rounded-full bg-black/50 border border-white/10">
-                  Vagas limitadas
-                </span>
-              </div>
             </div>
           </div>
         </section>
@@ -347,6 +345,7 @@ export default function TrialLanding() {
         <span className="md:ml-2">Aposte com responsabilidade.</span>
       </footer>
 
+      </div>
       {/* MODAL DE CAPTURA */}
       <SignupModal open={modalOpen} onOpenChange={setModalOpen} />
     </div>
