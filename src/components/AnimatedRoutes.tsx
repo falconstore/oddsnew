@@ -19,6 +19,8 @@ import BetbraAffiliate from '@/pages/BetbraAffiliate';
 import Subscriptions from '@/pages/Subscriptions';
 
 import TelegramBot from '@/pages/TelegramBot';
+import TrialLanding from '@/pages/TrialLanding';
+import TrialAdmin from '@/pages/TrialAdmin';
 import NotFound from '@/pages/NotFound';
 
 // Componente para redirect que preserva query params
@@ -55,6 +57,11 @@ export function AnimatedRoutes() {
         <Route path="/reset-password" element={
           <PageTransition>
             <ResetPassword />
+          </PageTransition>
+        } />
+        <Route path="/trial" element={
+          <PageTransition>
+            <TrialLanding />
           </PageTransition>
         } />
         
@@ -135,6 +142,13 @@ export function AnimatedRoutes() {
           <RequireAuth pageKey={PAGE_KEYS.TELEGRAM_BOT}>
             <PageTransition>
               <TelegramBot />
+            </PageTransition>
+          </RequireAuth>
+        } />
+        <Route path="/trial-admin" element={
+          <RequireAuth pageKey={PAGE_KEYS.TRIAL}>
+            <PageTransition>
+              <TrialAdmin />
             </PageTransition>
           </RequireAuth>
         } />

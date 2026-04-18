@@ -25,6 +25,7 @@ export interface UserPermissionRow {
   can_view_conta_corrente: boolean;
   can_view_plataformas: boolean;
   can_view_betbra: boolean;
+  can_view_trial: boolean;
   is_super_admin?: boolean;
   created_date: string;
   updated_date: string;
@@ -58,6 +59,7 @@ export const PAGE_KEYS = {
   CONTA_CORRENTE: 'conta_corrente',
   PLATAFORMAS: 'plataformas',
   BETBRA_AFFILIATE: 'betbra_affiliate',
+  TRIAL: 'trial',
   // Aliases para compatibilidade com código existente
   SETTINGS: 'settings',
   ADMIN_USERS: 'admin_users',
@@ -84,6 +86,7 @@ export const PAGE_KEY_TO_COLUMN: Record<string, keyof UserPermissionRow> = {
   admin_logs: 'can_view_admin',
   conta_corrente: 'can_view_conta_corrente',
   betbra_affiliate: 'can_view_betbra',
+  trial: 'can_view_trial',
   settings: 'can_view_dashboard', // settings acessível se tem dashboard
   scraper_status: 'can_view_admin',
   telegram_bot: 'can_view_admin',
@@ -100,6 +103,7 @@ export const PERMISSION_COLUMNS: { column: keyof UserPermissionRow; label: strin
   { column: 'can_view_conta_corrente', label: 'Conta Corrente', description: 'Controle financeiro' },
   { column: 'can_view_plataformas', label: 'Plataformas', description: 'Gerenciar plataformas' },
   { column: 'can_view_betbra', label: 'Betbra', description: 'Dados de afiliação Betbra' },
+  { column: 'can_view_trial', label: 'Trial Telegram', description: 'CRM dos leads de trial do grupo Telegram' },
 ];
 
 // Configuração de páginas com labels e descrições (mantido para sidebar/UI)
@@ -115,6 +119,7 @@ export const PAGE_CONFIG: Record<string, { label: string; description: string }>
   [PAGE_KEYS.CONTA_CORRENTE]: { label: 'Conta Corrente', description: 'Controle financeiro' },
   [PAGE_KEYS.PLATAFORMAS]: { label: 'Plataformas', description: 'Gerenciar plataformas' },
   [PAGE_KEYS.BETBRA_AFFILIATE]: { label: 'Betbra Affiliate', description: 'Dados de afiliação Betbra' },
+  [PAGE_KEYS.TRIAL]: { label: 'Trial Telegram', description: 'CRM dos leads do trial gratuito' },
   [PAGE_KEYS.SETTINGS]: { label: 'Configurações', description: 'Configurações do sistema' },
   [PAGE_KEYS.SCRAPER_STATUS]: { label: 'Status Scrapers', description: 'Monitoramento dos scrapers' },
   [PAGE_KEYS.TELEGRAM_BOT]: { label: 'Bot Telegram', description: 'Configurar bot de Duplo Green' },

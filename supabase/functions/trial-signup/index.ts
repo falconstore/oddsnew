@@ -1,0 +1,120 @@
+// Edge Function: trial-signup
+// Recebe os dados do formulário público, valida duplicidade,
+// gera link único de convite no Telegram e cria o registro como "pending".
+// deno-lint-ignore-file
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { corsHeaders, json } from "../_shared/cors.ts";
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (req.method !== "POST") return json({ error: "Método não permitido" }, { status: 405 });
+
+  try {
+    const body = await req.json().catch(() => ({}));
+    const name = String(body.name ?? "").trim();
+    const email = String(body.email ?? "").trim().toLowerCase();
+    const whatsapp = String(body.whatsapp ?? "").replace(/\D/g, "");
+    const telegram_username = String(body.telegram_username ?? "")
+      .trim().toLowerCase().replace(/^@/, "");
+
+    if (!name || !email || !whatsapp || !telegram_username) {
+      return json({ error: "Todos os campos são obrigatórios." }, { status: 400 });
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return json({ error: "E-mail inválido." }, { status: 400 });
+    }
+    if (whatsapp.length < 10) {
+      return json({ error: "WhatsApp inválido (mínimo 10 dígitos)." }, { status: 400 });
+    }
+    if (!/^[a-z0-9_]{3,32}$/.test(telegram_username)) {
+      return json({ error: "@ do Telegram inválido. Use letras, números e _." }, { status: 400 });
+    }
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const botToken = Deno.env.get("TELEGRAM_TRIAL_BOT_TOKEN");
+    const chatId = Deno.env.get("TELEGRAM_TRIAL_CHAT_ID");
+
+    if (!supabaseUrl || !serviceKey) {
+      return json({ error: "Backend não configurado." }, { status: 500 });
+    }
+    if (!botToken || !chatId) {
+      return json({ error: "Bot do Telegram não configurado. Avise o suporte." }, { status: 500 });
+    }
+
+    const supabase = createClient(supabaseUrl, serviceKey, {
+      auth: { persistSession: false },
+    });
+
+    // Dedup: email OU whatsapp OU telegram
+    const { data: existing, error: dupErr } = await supabase
+      .from("trial_leads")
+      .select("id")
+      .or(
+        `email.eq.${email},whatsapp.eq.${whatsapp},telegram_username.eq.${telegram_username}`
+      )
+      .limit(1);
+    if (dupErr) {
+      console.error("dup check error", dupErr);
+      return json({ error: "Erro ao validar cadastro." }, { status: 500 });
+    }
+    if (existing && existing.length > 0) {
+      return json({
+        error: "Você já utilizou seu trial gratuito. Para continuar, fale com o suporte para uma assinatura.",
+      }, { status: 409 });
+    }
+
+    // Cria invite link no Telegram (24h, 1 uso)
+    const expireDate = Math.floor(Date.now() / 1000) + 24 * 60 * 60;
+    const tgRes = await fetch(
+      `https://api.telegram.org/bot${botToken}/createChatInviteLink`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId,
+          member_limit: 1,
+          expire_date: expireDate,
+          name: `Trial ${telegram_username}`.slice(0, 32),
+          creates_join_request: false,
+        }),
+      },
+    );
+    const tgData = await tgRes.json().catch(() => ({}));
+    if (!tgRes.ok || !tgData?.ok) {
+      console.error("telegram createChatInviteLink failed", tgData);
+      return json({
+        error: "Não foi possível gerar o link do grupo no momento. Tente novamente em instantes.",
+      }, { status: 502 });
+    }
+    const inviteLink: string = tgData.result.invite_link;
+
+    // Insere o lead
+    const { error: insertErr } = await supabase
+      .from("trial_leads")
+      .insert({
+        name,
+        email,
+        whatsapp,
+        telegram_username,
+        invite_link: inviteLink,
+        status: "pending",
+      });
+
+    if (insertErr) {
+      // Race condition em índice único
+      // @ts-ignore PostgrestError tem code
+      if (insertErr.code === "23505") {
+        return json({ error: "Você já utilizou seu trial gratuito." }, { status: 409 });
+      }
+      console.error("insert error", insertErr);
+      return json({ error: "Erro ao salvar cadastro." }, { status: 500 });
+    }
+
+    return json({ invite_link: inviteLink });
+  } catch (err) {
+    console.error("trial-signup unexpected", err);
+    return json({ error: "Erro interno." }, { status: 500 });
+  }
+});

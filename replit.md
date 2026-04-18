@@ -39,6 +39,9 @@ src/
 ## Running
 - Workflow "Start application" runs `npm run dev` on port 5000
 
+## Trial Telegram System
+Public landing at `/trial` (no auth) captures leads (name, email, WhatsApp, @ Telegram) with case-insensitive dedup. Admin CRM at `/trial-admin` (gated by `can_view_trial` permission). Backend in Supabase Edge Functions (`trial-signup`, `trial-webhook`, `trial-cron`, `trial-kick`) using Telegram Bot API to issue 24h/1-use invite links, detect joins via `chat_member` webhook, kick after 7 days via daily `pg_cron`. Schema in `supabase/migrations/20260418_trial_telegram_system.sql`. Setup guide: `docs/trial-setup.md`. Required Edge Function secrets: `TELEGRAM_TRIAL_BOT_TOKEN`, `TELEGRAM_TRIAL_CHAT_ID`.
+
 ## Design System (Rebranded)
 - **Font**: Inter + Space Grotesk (sans), JetBrains Mono (mono)
 - **Primary color**: Neon green (`hsl(145 80% 48%)`)

@@ -16,6 +16,7 @@ import {
   TrendingUp,
   CreditCard,
   Zap,
+  Gift,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -36,6 +37,7 @@ const navigation: NavigationItem[] = [
   { name: 'Betbra Affiliate', href: '/betbra', icon: TrendingUp, pageKey: PAGE_KEYS.BETBRA_AFFILIATE, color: 'text-amber-400' },
   { name: 'Assinaturas', href: '/subscriptions', icon: CreditCard, pageKey: PAGE_KEYS.SUBSCRIPTIONS, color: 'text-purple-400' },
   { name: 'Casas', href: '/cadastros', icon: Building2, pageKey: PAGE_KEYS.LEAGUES, color: 'text-indigo-400' },
+  { name: 'Trial Telegram', href: '/trial-admin', icon: Gift, pageKey: PAGE_KEYS.TRIAL, color: 'text-pink-400' },
   { name: 'Configurações', href: '/settings', icon: Settings, pageKey: PAGE_KEYS.SETTINGS, color: 'text-slate-400' },
   { name: 'Usuários', href: '/admin/users', icon: UserCog, pageKey: PAGE_KEYS.ADMIN_USERS, color: 'text-red-400' },
 ];
