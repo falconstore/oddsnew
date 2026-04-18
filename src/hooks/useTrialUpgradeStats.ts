@@ -35,9 +35,13 @@ export const useTrialUpgradeStats = (range: TrialStatsRange) => {
       const since = sinceFor(range);
       const sinceIso = since?.toISOString();
 
+      // Importante: filtrar por source = 'trial-upgrade-page' para que as
+      // métricas de conversão do funil /trial-upgrade NÃO sejam contaminadas
+      // por eventos disparados na landing pública /trial-landing-hero.
       let eventsQ = supabase
         .from('trial_upgrade_events')
         .select('id, lead_id, event_type, created_at')
+        .eq('source', 'trial-upgrade-page')
         .order('created_at', { ascending: false })
         .limit(10000);
       if (sinceIso) eventsQ = eventsQ.gte('created_at', sinceIso);
