@@ -96,12 +96,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const canViewPage = (pageKey: PageKey): boolean => {
-    if (isAdmin) return true;
-    if (!userPermissions) return false;
-
     const column = PAGE_KEY_TO_COLUMN[pageKey];
     if (!column) return false;
 
+    // Páginas com gating estrito: a permissão específica é obrigatória
+    // (apenas super admin bypassa, NÃO um admin comum com can_view_admin).
+    const STRICT_PAGES: string[] = ['can_view_trial'];
+    const isStrict = STRICT_PAGES.includes(column as string);
+
+    if (!userPermissions) {
+      // Super admin pode ver tudo mesmo sem perms carregadas? Não — sem dados, deny.
+      return false;
+    }
+
+    if (isStrict) {
+      const hasSpecific = (userPermissions as any)[column] === true;
+      const isSuper = !!(userPermissions as any).is_super_admin;
+      return hasSpecific || isSuper;
+    }
+
+    if (isAdmin) return true;
     return (userPermissions as any)[column] === true;
   };
 

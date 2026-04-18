@@ -19,15 +19,15 @@ serve(async (req) => {
     const expectedSecret = Deno.env.get("TELEGRAM_TRIAL_WEBHOOK_SECRET");
     const expectedChatId = Deno.env.get("TELEGRAM_TRIAL_CHAT_ID");
 
-    // Validação de origem (Telegram envia esse header se foi configurado em setWebhook)
-    if (expectedSecret) {
-      const headerSecret = req.headers.get("x-telegram-bot-api-secret-token");
-      if (headerSecret !== expectedSecret) {
-        console.warn("trial-webhook: invalid secret token");
-        return json({ ok: false, error: "forbidden" }, { status: 403 });
-      }
-    } else {
-      console.warn("trial-webhook: TELEGRAM_TRIAL_WEBHOOK_SECRET not set — webhook is unauthenticated");
+    // Fail-closed: o segredo é OBRIGATÓRIO para evitar webhooks forjados.
+    if (!expectedSecret) {
+      console.error("trial-webhook: TELEGRAM_TRIAL_WEBHOOK_SECRET is not configured");
+      return json({ ok: false, error: "webhook secret not configured" }, { status: 500 });
+    }
+    const headerSecret = req.headers.get("x-telegram-bot-api-secret-token");
+    if (headerSecret !== expectedSecret) {
+      console.warn("trial-webhook: invalid secret token");
+      return json({ ok: false, error: "forbidden" }, { status: 403 });
     }
 
     const supabase = createClient(
