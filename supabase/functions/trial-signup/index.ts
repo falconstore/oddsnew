@@ -103,9 +103,9 @@ serve(async (req) => {
       });
 
     if (insertErr) {
-      // Race condition em índice único
-      // @ts-ignore PostgrestError tem code
-      if (insertErr.code === "23505") {
+      // Race condition em índice único (PostgrestError expõe `code`)
+      const pgCode = (insertErr as { code?: string }).code;
+      if (pgCode === "23505") {
         return json({ error: "Você já utilizou seu trial gratuito." }, { status: 409 });
       }
       console.error("insert error", insertErr);

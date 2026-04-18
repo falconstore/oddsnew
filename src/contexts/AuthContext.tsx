@@ -110,13 +110,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     if (isStrict) {
-      const hasSpecific = (userPermissions as any)[column] === true;
-      const isSuper = !!(userPermissions as any).is_super_admin;
+      const hasSpecific = userPermissions[column] === true;
+      const isSuper = userPermissions.is_super_admin === true;
       return hasSpecific || isSuper;
     }
 
     if (isAdmin) return true;
-    return (userPermissions as any)[column] === true;
+    return userPermissions[column] === true;
   };
 
   const canEditPage = (pageKey: PageKey): boolean => {
