@@ -44,8 +44,44 @@ function RedirectWithParams({
   return <Navigate to={`${to}${search ? `?${search}` : ''}`} replace />;
 }
 
+// Detecta se estamos no subdomínio público do trial (ex.: trial.sharkgreen.com.br).
+// Em produção: hostname começa com "trial.".
+// Em dev/Replit: também respeita ?host=trial para conseguirmos testar localmente.
+function isTrialHost(): boolean {
+  if (typeof window === 'undefined') return false;
+  const host = window.location.hostname.toLowerCase();
+  if (host.startsWith('trial.')) return true;
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('host') === 'trial') return true;
+  return false;
+}
+
 export function AnimatedRoutes() {
   const location = useLocation();
+  const trialHost = isTrialHost();
+
+  // Subdomínio público do trial: só expõe a landing e a página de upgrade.
+  // Qualquer outra rota cai na landing.
+  if (trialHost) {
+    return (
+      <AnimatePresence mode="popLayout">
+        <Routes location={location} key={location.pathname}>
+          <Route path="/" element={
+            <PageTransition>
+              <TrialLanding />
+            </PageTransition>
+          } />
+          <Route path="/trial" element={<Navigate to="/" replace />} />
+          <Route path="/trial-upgrade" element={
+            <PageTransition>
+              <TrialUpgrade />
+            </PageTransition>
+          } />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </AnimatePresence>
+    );
+  }
 
   return (
     <AnimatePresence mode="popLayout">
