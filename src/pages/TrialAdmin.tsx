@@ -409,7 +409,19 @@ export default function TrialAdmin() {
           <div className="space-y-2">
             {filtered.map(lead => {
               const meta = STATUS_META[lead.status];
-              const canKick = lead.status === 'active';
+              // Permitimos forçar a expulsão sempre que o lead já tiver entrado
+              // alguma vez no grupo (telegram_user_id preenchido), independente
+              // do status atual. Isso cobre o caso "lead removido voltou para o
+              // grupo" — o admin pode clicar em Remover de novo para forçar
+              // o re-kick imediato.
+              const canKick = !!lead.telegram_user_id;
+              const isAlreadyRemoved = lead.status === 'removed' || lead.status === 'blocked';
+              const kickTitle = !canKick
+                ? 'Lead ainda não entrou no grupo'
+                : isAlreadyRemoved
+                  ? 'Forçar re-expulsão (caso tenha voltado)'
+                  : 'Remover do grupo agora';
+              const kickLabel = isAlreadyRemoved ? 'Re-expulsar' : 'Remover';
               return (
                 <div key={lead.id}
                   className="glass rounded-2xl border border-white/8 p-4 hover:border-pink-500/25 transition-all duration-200 card-hover"
@@ -459,10 +471,10 @@ export default function TrialAdmin() {
                         disabled={!canKick}
                         onClick={() => setConfirmKick(lead)}
                         data-testid={`button-lead-kick-${lead.id}`}
-                        title={canKick ? 'Remover do grupo agora' : 'Disponível apenas para leads ativos'}
+                        title={kickTitle}
                       >
                         <UserMinus className="w-3 h-3 mr-1" />
-                        Remover
+                        {kickLabel}
                       </Button>
                     </div>
                   </div>

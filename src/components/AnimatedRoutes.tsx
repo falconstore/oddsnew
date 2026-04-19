@@ -77,7 +77,7 @@ export function AnimatedRoutes() {
   // Qualquer outra rota cai na landing.
   if (trialHost) {
     return (
-      <AnimatePresence mode="popLayout">
+      <AnimatePresence mode="wait" initial={false}>
         <Routes location={location} key={location.pathname}>
           <Route path="/" element={
             <PageTransition>
@@ -97,7 +97,7 @@ export function AnimatedRoutes() {
   }
 
   return (
-    <AnimatePresence mode="popLayout">
+    <AnimatePresence mode="wait" initial={false}>
       <Routes location={location} key={location.pathname}>
         <Route path="/login" element={
           <PageTransition>
