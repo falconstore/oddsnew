@@ -182,13 +182,23 @@ serve(async (req) => {
           previous_lead_id: prev.id,
         })
         .eq("id", lead.id);
+      // Formata data do trial anterior em DD/MM para a mensagem ficar
+      // mais clara pro admin.
+      let prevDateStr = "";
+      if (prev.created_at) {
+        const d = new Date(prev.created_at);
+        if (!Number.isNaN(d.getTime())) {
+          prevDateStr = ` em ${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+        }
+      }
       return json({
         ok: false,
         action: "blocked-repeat",
         message:
-          `Esse Telegram já teve um trial anterior (status: ${prev.status}). Use "Liberar e ativar" se for caso legítimo.`,
+          `Esse Telegram já teve um trial anterior${prevDateStr} (status: ${prev.status}). Use "Liberar e ativar" se for caso legítimo.`,
         previous_lead_id: prev.id,
         previous_status: prev.status,
+        previous_created_at: prev.created_at,
       }, { status: 409 });
     }
 

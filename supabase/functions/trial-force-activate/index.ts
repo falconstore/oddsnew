@@ -110,7 +110,7 @@ serve(async (req) => {
     try {
       await tg(botToken, "unbanChatMember", {
         chat_id: chatId,
-        user_id: lead.telegram_user_id,
+        user_id: effectiveUserId,
         only_if_banned: true,
       });
     } catch (e) {
@@ -122,7 +122,7 @@ serve(async (req) => {
     // entrar via invite link público antes de tentar de novo.
     const member = await tg(botToken, "getChatMember", {
       chat_id: chatId,
-      user_id: lead.telegram_user_id,
+      user_id: effectiveUserId,
     });
     if (!member?.ok) {
       return json({
@@ -162,7 +162,7 @@ serve(async (req) => {
       event: "force-activated",
       lead_id: lead.id,
       previous_status: lead.status,
-      telegram_user_id: lead.telegram_user_id,
+      telegram_user_id: effectiveUserId,
       telegram_member_status: memberStatus,
       by_admin: email,
     }));
