@@ -380,7 +380,7 @@ export default function TrialAdmin() {
           <StatCard icon={<CheckCircle2 className="w-5 h-5" />} label="Ativos" value={stats.active} accent="from-emerald-500/20 to-emerald-500/5 border-emerald-500/25 text-emerald-300" />
           <StatCard icon={<Clock className="w-5 h-5" />} label="Expirados" value={stats.expired} accent="from-zinc-500/20 to-zinc-500/5 border-zinc-500/25 text-zinc-300" />
           <StatCard icon={<Ban className="w-5 h-5" />} label="Bloqueados" value={stats.blocked} accent="from-purple-500/20 to-purple-500/5 border-purple-500/25 text-purple-300" />
-          <StatCard icon={<ShieldAlert className="w-5 h-5" />} label="Repetidores" value={stats.blockedRepeat} accent="from-orange-500/20 to-orange-500/5 border-orange-500/25 text-orange-300" />
+          <StatCard icon={<ShieldAlert className="w-5 h-5" />} label="Repetidores bloqueados" value={stats.blockedRepeat} accent="from-orange-500/20 to-orange-500/5 border-orange-500/25 text-orange-300" />
           <StatCard icon={<Ban className="w-5 h-5" />} label="Removidos" value={stats.removed} accent="from-red-500/20 to-red-500/5 border-red-500/25 text-red-300" />
         </div>
 

@@ -171,7 +171,7 @@ export const useForceActivate = () => {
         body: JSON.stringify({ lead_id: leadId }),
       });
       const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json?.error || 'Falha ao liberar lead');
+      if (!res.ok) throw new Error(json?.message || json?.error || 'Falha ao liberar lead');
       return json;
     },
     onSuccess: (data) => {
