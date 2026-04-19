@@ -935,7 +935,10 @@ export default function TrialAdmin() {
               disabled={forceActivate.isPending}
               onClick={async () => {
                 if (!forceLead) return;
-                await forceActivate.mutateAsync(forceLead.id).catch(() => {});
+                await forceActivate.mutateAsync({
+                  leadId: forceLead.id,
+                  telegramUserId: forceLead.telegram_user_id,
+                }).catch(() => {});
                 setForceLead(null);
               }}
               data-testid="button-confirm-force-activate"

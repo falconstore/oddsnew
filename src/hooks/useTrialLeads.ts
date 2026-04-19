@@ -157,8 +157,15 @@ export const useLinkManual = () => {
 
 export const useForceActivate = () => {
   const qc = useQueryClient();
-  return useMutation<{ ok: boolean; action: string; message: string }, Error, string>({
-    mutationFn: async (leadId) => {
+  return useMutation<
+    { ok: boolean; action: string; message: string },
+    Error,
+    { leadId: string; telegramUserId?: number | null } | string
+  >({
+    mutationFn: async (input) => {
+      const { leadId, telegramUserId } = typeof input === 'string'
+        ? { leadId: input, telegramUserId: undefined as number | null | undefined }
+        : input;
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData.session?.access_token;
       const url = `${import.meta.env.VITE_MAIN_SUPABASE_URL}/functions/v1/trial-force-activate`;
@@ -168,7 +175,10 @@ export const useForceActivate = () => {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ lead_id: leadId }),
+        body: JSON.stringify({
+          lead_id: leadId,
+          ...(telegramUserId ? { telegram_user_id: telegramUserId } : {}),
+        }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json?.message || json?.error || 'Falha ao liberar lead');
