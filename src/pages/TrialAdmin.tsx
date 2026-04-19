@@ -58,6 +58,7 @@ export default function TrialAdmin() {
   const resetWebhook = useResetWebhook();
   const forceActivate = useForceActivate();
   const [forceLead, setForceLead] = useState<TrialLead | null>(null);
+  const [historyLead, setHistoryLead] = useState<TrialLead | null>(null);
   const [diagOpen, setDiagOpen] = useState(false);
   const diag: TelegramDiagnose | undefined = diagnose.data;
 
@@ -469,14 +470,22 @@ export default function TrialAdmin() {
                         </Badge>
                         {lead.previous_lead_id && (
                           <Badge
-                            className="text-[10px] bg-orange-500/10 text-orange-300 border-orange-500/30 cursor-pointer hover:bg-orange-500/20"
-                            onClick={() => setSearch(lead.previous_lead_id!.slice(0, 8))}
-                            title="Clique para filtrar pelo trial anterior"
+                            className="text-[10px] bg-orange-500/10 text-orange-300 border-orange-500/30"
                             data-testid={`badge-previous-lead-${lead.id}`}
                           >
                             <ShieldAlert className="w-2.5 h-2.5 mr-1" />
-                            Já fez trial antes
+                            Tentou repetir trial
                           </Badge>
+                        )}
+                        {lead.previous_lead_id && (
+                          <button
+                            type="button"
+                            onClick={() => setHistoryLead(lead)}
+                            className="text-[10px] text-orange-300 hover:text-orange-200 underline underline-offset-2"
+                            data-testid={`button-view-previous-${lead.id}`}
+                          >
+                            Ver trial anterior
+                          </button>
                         )}
                       </div>
                       <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
@@ -831,6 +840,73 @@ export default function TrialAdmin() {
                   {manualUserId ? 'Vincular com este ID' : 'Tentar vincular'}
                 </>
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Ver trial anterior — mostra histórico do lead apontado por previous_lead_id */}
+      <Dialog open={!!historyLead} onOpenChange={(open) => { if (!open) setHistoryLead(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShieldAlert className="w-5 h-5 text-orange-400" />
+              Trial anterior
+            </DialogTitle>
+            <DialogDescription>
+              Esse Telegram já tinha um trial registrado antes — abaixo, os dados do lead original.
+            </DialogDescription>
+          </DialogHeader>
+          {(() => {
+            if (!historyLead) return null;
+            const prev = leads.find(l => l.id === historyLead.previous_lead_id);
+            if (!prev) {
+              return (
+                <div className="text-sm text-muted-foreground py-4">
+                  Lead anterior <span className="font-mono text-xs">{historyLead.previous_lead_id}</span> não está na lista carregada.
+                  Pode ter sido removido manualmente do banco.
+                </div>
+              );
+            }
+            const prevMeta = STATUS_META[prev.status];
+            return (
+              <div className="space-y-3 text-sm" data-testid={`history-lead-${prev.id}`}>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h4 className="font-bold">{prev.name}</h4>
+                  <Badge className={`text-[10px] ${prevMeta.cls}`}>{prevMeta.label}</Badge>
+                </div>
+                <div className="grid grid-cols-1 gap-1.5 text-xs text-muted-foreground">
+                  <span className="inline-flex items-center gap-1.5"><Mail className="w-3 h-3" />{prev.email}</span>
+                  <span className="inline-flex items-center gap-1.5"><Phone className="w-3 h-3" />{fmtWhatsapp(prev.whatsapp)}</span>
+                  <span className="inline-flex items-center gap-1.5"><Send className="w-3 h-3" />@{prev.telegram_username}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-3 text-[11px] pt-2 border-t border-white/5">
+                  <div>
+                    <p className="text-muted-foreground/70 uppercase tracking-wider mb-0.5">Cadastro</p>
+                    <p className="font-mono">{fmtDate(prev.created_at)}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground/70 uppercase tracking-wider mb-0.5">Entrou em</p>
+                    <p className="font-mono">{fmtDate(prev.entered_at)}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground/70 uppercase tracking-wider mb-0.5">Expirou em</p>
+                    <p className="font-mono">{fmtDate(prev.expires_at)}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground/70 uppercase tracking-wider mb-0.5">Removido em</p>
+                    <p className="font-mono">{fmtDate(prev.removed_at)}</p>
+                  </div>
+                </div>
+                <div className="text-[11px] text-muted-foreground pt-2 border-t border-white/5">
+                  ID: <span className="font-mono">{prev.id}</span>
+                </div>
+              </div>
+            );
+          })()}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setHistoryLead(null)} data-testid="button-close-history">
+              Fechar
             </Button>
           </DialogFooter>
         </DialogContent>

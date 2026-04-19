@@ -128,10 +128,14 @@ export const useLinkManual = () => {
         },
         body: JSON.stringify(body),
       });
-      const json = (await res.json().catch(() => ({}))) as LinkManualResult;
+      const json = (await res.json().catch(() => ({}))) as LinkManualResult & { message?: string };
       // 200 com need_manual_id é caminho esperado (auto-resolve falhou).
       if (json?.need_manual_id) return json;
-      if (!res.ok) throw new Error(json?.error || 'Falha ao vincular o lead');
+      if (!res.ok) {
+        // Para 409 (blocked-repeat), o backend manda `message` clara.
+        // Caso contrário cai pro `error` ou um fallback genérico.
+        throw new Error(json?.message || json?.error || 'Falha ao vincular o lead');
+      }
       return json;
     },
     onSuccess: (data) => {

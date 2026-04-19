@@ -65,6 +65,14 @@ serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const leadId = String(body.lead_id ?? "");
+    const overrideUserIdRaw = body.telegram_user_id;
+    const overrideUserId =
+      overrideUserIdRaw !== undefined && overrideUserIdRaw !== null && overrideUserIdRaw !== ""
+        ? Number(overrideUserIdRaw)
+        : null;
+    if (overrideUserId !== null && (!Number.isFinite(overrideUserId) || overrideUserId <= 0)) {
+      return json({ error: "telegram_user_id inválido" }, { status: 400 });
+    }
     if (!leadId) return json({ error: "lead_id obrigatório" }, { status: 400 });
 
     const { data: lead } = await admin
@@ -73,10 +81,21 @@ serve(async (req) => {
       .eq("id", leadId)
       .maybeSingle();
     if (!lead) return json({ error: "Lead não encontrado" }, { status: 404 });
-    if (!lead.telegram_user_id) {
+
+    // Se o admin mandou um override, usamos ele; caso contrário o já salvo no lead.
+    const effectiveUserId = overrideUserId ?? lead.telegram_user_id;
+    if (!effectiveUserId) {
       return json({
-        error: "Lead ainda não tem telegram_user_id. Use 'Vincular' antes.",
+        error: "Lead ainda não tem telegram_user_id. Use 'Vincular' antes ou envie telegram_user_id no body.",
       }, { status: 400 });
+    }
+    // Persiste o override caso seja diferente do que tinha
+    if (overrideUserId && overrideUserId !== lead.telegram_user_id) {
+      await admin
+        .from("trial_leads")
+        .update({ telegram_user_id: overrideUserId })
+        .eq("id", lead.id);
+      lead.telegram_user_id = overrideUserId;
     }
 
     const botToken = Deno.env.get("TELEGRAM_TRIAL_BOT_TOKEN");
