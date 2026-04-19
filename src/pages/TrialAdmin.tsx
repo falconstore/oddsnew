@@ -5,6 +5,7 @@ import {
   Gift, Search, Sparkles, Users, CheckCircle2, Clock, Ban, UserMinus,
   Mail, Phone, Send, ExternalLink, Trash2, Eye, MousePointerClick, BellRing,
   MessageCircle, ShoppingCart, TrendingUp, Users2, FileSignature,
+  Stethoscope, AlertTriangle, Loader2, XCircle,
 } from 'lucide-react';
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
@@ -14,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
-import { useTrialLeads, useKickTrialLead } from '@/hooks/useTrialLeads';
+import { useTrialLeads, useKickTrialLead, useDiagnoseTelegram, type TelegramDiagnose } from '@/hooks/useTrialLeads';
 import { useTrialUpgradeStats, type TrialStatsRange } from '@/hooks/useTrialUpgradeStats';
 import type { TrialLead, TrialStatus } from '@/types/trial';
 import { TRIAL_PUBLIC_URL } from '@/components/AnimatedRoutes';
@@ -47,6 +48,9 @@ const fmtWhatsapp = (raw: string) => {
 export default function TrialAdmin() {
   const { data: leads = [], isLoading } = useTrialLeads();
   const kick = useKickTrialLead();
+  const diagnose = useDiagnoseTelegram();
+  const [diagOpen, setDiagOpen] = useState(false);
+  const diag: TelegramDiagnose | undefined = diagnose.data;
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | TrialStatus>('all');
@@ -116,12 +120,24 @@ export default function TrialAdmin() {
                 </div>
               </div>
             </div>
-            <a href={`${TRIAL_PUBLIC_URL}/`} target="_blank" rel="noopener noreferrer">
-              <Button size="sm" variant="outline" className="border-pink-500/30 text-pink-300 hover:bg-pink-500/10" data-testid="link-trial-landing">
-                <ExternalLink className="w-4 h-4 mr-1.5" />
-                Abrir landing
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-amber-500/30 text-amber-300 hover:bg-amber-500/10"
+                onClick={() => { setDiagOpen(true); diagnose.mutate(); }}
+                data-testid="button-diagnose-telegram"
+              >
+                <Stethoscope className="w-4 h-4 mr-1.5" />
+                Diagnosticar Telegram
               </Button>
-            </a>
+              <a href={`${TRIAL_PUBLIC_URL}/`} target="_blank" rel="noopener noreferrer">
+                <Button size="sm" variant="outline" className="border-pink-500/30 text-pink-300 hover:bg-pink-500/10" data-testid="link-trial-landing">
+                  <ExternalLink className="w-4 h-4 mr-1.5" />
+                  Abrir landing
+                </Button>
+              </a>
+            </div>
           </div>
         </div>
 
@@ -517,7 +533,128 @@ export default function TrialAdmin() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Diagnóstico Telegram dialog */}
+      <Dialog open={diagOpen} onOpenChange={setDiagOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Stethoscope className="w-5 h-5 text-amber-400" />
+              Diagnóstico do Telegram
+            </DialogTitle>
+            <DialogDescription>
+              Verifica em tempo real o estado do bot, do webhook e das permissões no grupo.
+            </DialogDescription>
+          </DialogHeader>
+
+          {diagnose.isPending && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground py-8 justify-center">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Consultando o Telegram…
+            </div>
+          )}
+
+          {diagnose.isError && (
+            <div className="text-sm text-red-300 bg-red-500/10 border border-red-500/30 rounded-xl p-4">
+              {(diagnose.error as Error)?.message || 'Falha ao rodar o diagnóstico.'}
+            </div>
+          )}
+
+          {diag && (
+            <div className="space-y-4 text-sm">
+              {/* Banner global */}
+              <div className={`rounded-xl border p-3 flex items-start gap-2 ${
+                diag.ok
+                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-200'
+                  : 'bg-red-500/10 border-red-500/30 text-red-200'
+              }`}>
+                {diag.ok
+                  ? <CheckCircle2 className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                  : <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />}
+                <div>
+                  <div className="font-semibold">
+                    {diag.ok ? 'Tudo certo — entradas e saídas devem ser detectadas.' : `${diag.issues.length} problema(s) encontrado(s).`}
+                  </div>
+                  {!diag.ok && (
+                    <ul className="mt-2 space-y-1 list-disc list-inside text-xs">
+                      {diag.issues.map((iss, i) => <li key={i}>{iss}</li>)}
+                    </ul>
+                  )}
+                </div>
+              </div>
+
+              {/* Cards de checagens */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <DiagRow ok={diag.summary.bot_alive} label="Bot online" value={diag.summary.bot_username ? `@${diag.summary.bot_username}` : '—'} />
+                <DiagRow ok={diag.summary.webhook_registered && diag.summary.webhook_url_ok} label="Webhook registrado" value={diag.summary.webhook_url ?? 'não registrado'} />
+                <DiagRow
+                  ok={diag.summary.webhook_has_chat_member_subscription}
+                  label="Assinatura de chat_member"
+                  value={diag.summary.webhook_allowed_updates.length > 0 ? diag.summary.webhook_allowed_updates.join(', ') : 'lista vazia (= apenas defaults)'}
+                />
+                <DiagRow ok={diag.summary.bot_in_chat} label="Bot dentro do grupo" value={diag.summary.chat_title ?? '—'} />
+                <DiagRow
+                  ok={diag.summary.bot_status_in_chat === 'administrator' || diag.summary.bot_status_in_chat === 'creator'}
+                  label="Bot é admin"
+                  value={diag.summary.bot_status_in_chat ?? '—'}
+                />
+                <DiagRow ok={!!diag.summary.bot_can_restrict_members} label="Permissão Banir usuários" value={diag.summary.bot_can_restrict_members ? 'sim' : 'não'} />
+                <DiagRow ok={!diag.summary.webhook_last_error_message} label="Sem erros recentes do webhook" value={diag.summary.webhook_last_error_message ?? 'nenhum'} />
+                <DiagRow
+                  ok={(diag.summary.webhook_pending_update_count ?? 0) === 0}
+                  label="Updates pendentes"
+                  value={String(diag.summary.webhook_pending_update_count ?? 0)}
+                />
+              </div>
+
+              {!diag.summary.webhook_has_chat_member_subscription && (
+                <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 text-xs text-amber-100 space-y-2">
+                  <div className="font-semibold flex items-center gap-1.5">
+                    <AlertTriangle className="w-4 h-4" /> Como religar o webhook (causa mais comum)
+                  </div>
+                  <p>Rode no terminal trocando <code className="bg-black/40 px-1 rounded">SEU_TOKEN</code>, <code className="bg-black/40 px-1 rounded">SEU_PROJETO</code> e <code className="bg-black/40 px-1 rounded">SEU_SECRET</code>:</p>
+                  <pre className="bg-black/50 rounded p-2 overflow-x-auto whitespace-pre-wrap">{`curl "https://api.telegram.org/botSEU_TOKEN/setWebhook" \\
+  -H "Content-Type: application/json" \\
+  -d '{"url":"https://SEU_PROJETO.functions.supabase.co/trial-webhook","secret_token":"SEU_SECRET","allowed_updates":["chat_member","my_chat_member"]}'`}</pre>
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDiagOpen(false)} data-testid="button-close-diag">
+              Fechar
+            </Button>
+            <Button
+              variant="outline"
+              className="border-amber-500/30 text-amber-300 hover:bg-amber-500/10"
+              onClick={() => diagnose.mutate()}
+              disabled={diagnose.isPending}
+              data-testid="button-rerun-diag"
+            >
+              {diagnose.isPending ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Stethoscope className="w-4 h-4 mr-1.5" />}
+              Rodar de novo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Layout>
+  );
+}
+
+function DiagRow({ ok, label, value }: { ok: boolean; label: string; value: string }) {
+  return (
+    <div className={`rounded-xl border p-2.5 flex items-start gap-2 ${
+      ok ? 'border-emerald-500/20 bg-emerald-500/5' : 'border-red-500/25 bg-red-500/5'
+    }`}>
+      {ok
+        ? <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+        : <XCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />}
+      <div className="min-w-0 flex-1">
+        <div className="text-xs font-semibold">{label}</div>
+        <div className="text-[11px] text-muted-foreground break-all">{value}</div>
+      </div>
+    </div>
   );
 }
 
