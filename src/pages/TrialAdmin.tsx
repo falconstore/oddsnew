@@ -4,7 +4,7 @@ import { ptBR } from 'date-fns/locale';
 import {
   Gift, Search, Sparkles, Users, CheckCircle2, Clock, Ban, UserMinus,
   Mail, Phone, Send, ExternalLink, Trash2, Eye, MousePointerClick, BellRing,
-  MessageCircle, ShoppingCart, TrendingUp,
+  MessageCircle, ShoppingCart, TrendingUp, Users2, FileSignature,
 } from 'lucide-react';
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
@@ -52,7 +52,8 @@ export default function TrialAdmin() {
   const [statusFilter, setStatusFilter] = useState<'all' | TrialStatus>('all');
   const [confirmKick, setConfirmKick] = useState<TrialLead | null>(null);
   const [statsRange, setStatsRange] = useState<TrialStatsRange>('7d');
-  const { data: upgradeStats, isLoading: statsLoading } = useTrialUpgradeStats(statsRange);
+  const { data: upgradeStats, isLoading: statsLoading } = useTrialUpgradeStats(statsRange, 'trial-upgrade-page');
+  const { data: landingStats, isLoading: landingLoading } = useTrialUpgradeStats(statsRange, 'trial-landing-hero');
 
   const stats = useMemo(() => {
     const s = { total: leads.length, active: 0, expired: 0, blocked: 0, pending: 0, removed: 0 };
@@ -226,6 +227,115 @@ export default function TrialAdmin() {
                   accent="text-pink-300 bg-pink-500/10 border-pink-500/25"
                   bar="bg-pink-400/70"
                   testId="metric-cta-checkout"
+                />
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Conversão LP Shark 100% Green */}
+        <div className="glass rounded-3xl border border-white/8 p-5 md:p-6 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <h2 className="text-lg md:text-xl font-bold flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-emerald-400" />
+                LP Shark 100% Green
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Visitas e cliques nos 3 CTAs da landing pública · {RANGE_LABELS[statsRange]}
+              </p>
+            </div>
+            <a href={`${TRIAL_PUBLIC_URL}/`} target="_blank" rel="noopener noreferrer">
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10"
+                data-testid="link-trial-landing-stats"
+              >
+                <ExternalLink className="w-4 h-4 mr-1.5" />
+                Abrir LP
+              </Button>
+            </a>
+          </div>
+
+          {landingLoading || !landingStats ? (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="rounded-2xl border border-white/5 p-4 h-24 animate-pulse bg-white/2" />
+              ))}
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <MetricCard
+                  icon={<Eye className="w-5 h-5" />}
+                  label="Visitas na LP"
+                  value={landingStats.views}
+                  hint="Quantas vezes a landing foi aberta"
+                  accent="from-sky-500/20 to-sky-500/5 border-sky-500/25 text-sky-300"
+                  testId="metric-lp-views"
+                />
+                <MetricCard
+                  icon={<MousePointerClick className="w-5 h-5" />}
+                  label="Total de cliques"
+                  value={landingStats.totalClicks}
+                  hint="Soma dos 3 botões"
+                  accent="from-fuchsia-500/20 to-fuchsia-500/5 border-fuchsia-500/25 text-fuchsia-300"
+                  testId="metric-lp-total-clicks"
+                />
+                <MetricCard
+                  icon={<TrendingUp className="w-5 h-5" />}
+                  label="Taxa de clique"
+                  value={
+                    landingStats.views > 0
+                      ? `${((landingStats.totalClicks / landingStats.views) * 100).toFixed(1)}%`
+                      : '0%'
+                  }
+                  hint={
+                    landingStats.views > 0
+                      ? `${landingStats.totalClicks} de ${landingStats.views} visitas`
+                      : 'Sem visitas no período'
+                  }
+                  accent="from-emerald-500/20 to-emerald-500/5 border-emerald-500/25 text-emerald-300"
+                  testId="metric-lp-ctr"
+                />
+                <MetricCard
+                  icon={<FileSignature className="w-5 h-5" />}
+                  label="Abriu form trial"
+                  value={landingStats.clicksOpenForm}
+                  hint='Cliques em "Quero testar 7 Dias"'
+                  accent="from-amber-500/20 to-amber-500/5 border-amber-500/25 text-amber-300"
+                  testId="metric-lp-open-form"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <CtaBreakdownCard
+                  icon={<FileSignature className="w-4 h-4" />}
+                  label="Quero testar 7 Dias"
+                  value={landingStats.clicksOpenForm}
+                  total={landingStats.totalClicks}
+                  accent="text-amber-300 bg-amber-500/10 border-amber-500/25"
+                  bar="bg-amber-400/70"
+                  testId="metric-lp-cta-form"
+                />
+                <CtaBreakdownCard
+                  icon={<Users2 className="w-4 h-4" />}
+                  label="Acessar Grupos Free"
+                  value={landingStats.clicksFreeGroup}
+                  total={landingStats.totalClicks}
+                  accent="text-sky-300 bg-sky-500/10 border-sky-500/25"
+                  bar="bg-sky-400/70"
+                  testId="metric-lp-cta-free-group"
+                />
+                <CtaBreakdownCard
+                  icon={<ShoppingCart className="w-4 h-4" />}
+                  label="Compre Agora"
+                  value={landingStats.clicksCheckout}
+                  total={landingStats.totalClicks}
+                  accent="text-pink-300 bg-pink-500/10 border-pink-500/25"
+                  bar="bg-pink-400/70"
+                  testId="metric-lp-cta-checkout"
                 />
               </div>
             </>
