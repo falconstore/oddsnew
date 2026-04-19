@@ -641,6 +641,7 @@ export default function TrialAdmin() {
                   return (
                     <DiagRow
                       ok={!errMsg || isHistorical}
+                      tone={isHistorical ? 'info' : undefined}
                       label={isHistorical ? 'Erro do webhook (histórico)' : 'Sem erros recentes do webhook'}
                       value={value}
                     />
@@ -805,14 +806,21 @@ export default function TrialAdmin() {
   );
 }
 
-function DiagRow({ ok, label, value }: { ok: boolean; label: string; value: string }) {
+function DiagRow({
+  ok, label, value, tone,
+}: { ok: boolean; label: string; value: string; tone?: 'info' }) {
+  const cls = tone === 'info'
+    ? 'border-amber-500/30 bg-amber-500/5'
+    : ok
+      ? 'border-emerald-500/20 bg-emerald-500/5'
+      : 'border-red-500/25 bg-red-500/5';
+  const Icon = tone === 'info' ? AlertTriangle : ok ? CheckCircle2 : XCircle;
+  const iconCls = tone === 'info'
+    ? 'text-amber-400'
+    : ok ? 'text-emerald-400' : 'text-red-400';
   return (
-    <div className={`rounded-xl border p-2.5 flex items-start gap-2 ${
-      ok ? 'border-emerald-500/20 bg-emerald-500/5' : 'border-red-500/25 bg-red-500/5'
-    }`}>
-      {ok
-        ? <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
-        : <XCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />}
+    <div className={`rounded-xl border p-2.5 flex items-start gap-2 ${cls}`}>
+      <Icon className={`w-4 h-4 flex-shrink-0 mt-0.5 ${iconCls}`} />
       <div className="min-w-0 flex-1">
         <div className="text-xs font-semibold">{label}</div>
         <div className="text-[11px] text-muted-foreground break-all">{value}</div>
