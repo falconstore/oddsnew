@@ -15,6 +15,12 @@
 //  - Valida o cabeçalho `X-Telegram-Bot-Api-Secret-Token` contra o segredo
 //    `TELEGRAM_TRIAL_WEBHOOK_SECRET` (configurado no setWebhook).
 //  - Valida que o `chat.id` do update bate com `TELEGRAM_TRIAL_CHAT_ID`.
+//
+// OBSERVABILIDADE:
+//  - Cada decisão (ignored / activated / re-kicked / marked-removed) emite
+//    um console.log JSON estruturado com tag [trial-webhook] para facilitar
+//    busca nos logs da Edge Function. Quando um update for descartado por
+//    mismatch de invite_link, loga os dois links lado a lado.
 // deno-lint-ignore-file
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -23,6 +29,10 @@ import { corsHeaders, json } from "../_shared/cors.ts";
 const ACTIVE_STATUSES = new Set(["member", "restricted", "administrator", "creator"]);
 const INACTIVE_STATUSES = new Set(["left", "kicked"]);
 const BLOCKED_LEAD_STATUSES = new Set(["removed", "blocked", "expired"]);
+
+const log = (event: string, data: Record<string, unknown>) => {
+  console.log(JSON.stringify({ tag: "trial-webhook", event, ...data }));
+};
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -38,7 +48,7 @@ serve(async (req) => {
     }
     const headerSecret = req.headers.get("x-telegram-bot-api-secret-token");
     if (headerSecret !== expectedSecret) {
-      console.warn("trial-webhook: invalid secret token");
+      log("invalid-secret", { has_header: !!headerSecret });
       return json({ ok: false, error: "forbidden" }, { status: 403 });
     }
 
@@ -49,11 +59,19 @@ serve(async (req) => {
     );
 
     const update = await req.json().catch(() => ({}));
+    const updateId = update?.update_id ?? null;
+    const cmKind = update.chat_member ? "chat_member"
+      : update.my_chat_member ? "my_chat_member"
+      : null;
     const cm = update.chat_member ?? update.my_chat_member;
-    if (!cm) return json({ ok: true, ignored: "no chat_member" });
+    if (!cm) {
+      log("ignored", { reason: "no chat_member", update_id: updateId, keys: Object.keys(update ?? {}) });
+      return json({ ok: true, ignored: "no chat_member" });
+    }
 
     const updateChatId = String(cm.chat?.id ?? "");
     if (expectedChatId && updateChatId !== String(expectedChatId)) {
+      log("ignored", { reason: "wrong chat", update_id: updateId, got_chat: updateChatId, expected_chat: String(expectedChatId) });
       return json({ ok: true, ignored: "wrong chat" });
     }
 
@@ -61,8 +79,20 @@ serve(async (req) => {
     const newStatus: string | undefined = cm.new_chat_member?.status;
     const oldStatus: string | undefined = cm.old_chat_member?.status;
     const userId: number | undefined = cm.new_chat_member?.user?.id;
+    const username: string | undefined = cm.new_chat_member?.user?.username;
+
+    log("received", {
+      update_id: updateId,
+      kind: cmKind,
+      user_id: userId ?? null,
+      username: username ?? null,
+      old_status: oldStatus ?? null,
+      new_status: newStatus ?? null,
+      invite_link: inviteLink ?? null,
+    });
 
     if (!userId) {
+      log("ignored", { reason: "no user id", update_id: updateId });
       return json({ ok: true, ignored: "no user id" });
     }
 
@@ -87,6 +117,7 @@ serve(async (req) => {
         status: string;
         invite_link: string | null;
       };
+      let foundVia: string | null = null;
       const { data: byUser, error: byUserErr } = await supabase
         .from("trial_leads")
         .select("id, status, invite_link")
@@ -95,7 +126,10 @@ serve(async (req) => {
         .limit(1)
         .maybeSingle();
       if (byUserErr) console.error("lookup by user_id failed", byUserErr);
-      if (byUser) lead = byUser;
+      if (byUser) {
+        lead = byUser;
+        foundVia = "user_id";
+      }
 
       // 1b) fallback: lookup pelo invite_link rastreado
       if (!lead && inviteLink) {
@@ -105,11 +139,40 @@ serve(async (req) => {
           .eq("invite_link", inviteLink)
           .maybeSingle();
         if (byLinkErr) console.error("lookup by invite_link failed", byLinkErr);
-        if (byLink) lead = byLink;
+        if (byLink) {
+          lead = byLink;
+          foundVia = "invite_link";
+        }
       }
 
       if (!lead) {
-        // Usuário entrou por outro caminho e não temos lead — nada a fazer
+        // Tenta diagnóstico extra: existe algum lead com esse @username pendente
+        // mas com invite_link diferente do recebido? Ajuda muito a debug.
+        let mismatch: { lead_id: string; saved: string | null; received: string } | null = null;
+        if (username && inviteLink) {
+          const { data: byUsername } = await supabase
+            .from("trial_leads")
+            .select("id, invite_link, status")
+            .ilike("telegram_username", username)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (byUsername && byUsername.invite_link !== inviteLink) {
+            mismatch = {
+              lead_id: byUsername.id,
+              saved: byUsername.invite_link,
+              received: inviteLink,
+            };
+          }
+        }
+        log("ignored", {
+          reason: "no matching lead on join",
+          update_id: updateId,
+          user_id: userId,
+          username,
+          invite_link_received: inviteLink ?? null,
+          invite_link_mismatch: mismatch,
+        });
         return json({ ok: true, ignored: "no matching lead on join" });
       }
 
@@ -159,6 +222,7 @@ serve(async (req) => {
           .update({ telegram_user_id: userId })
           .eq("id", lead.id)
           .is("telegram_user_id", null);
+        log("re-kicked", { update_id: updateId, lead_id: lead.id, lead_status: lead.status, found_via: foundVia });
         return json({ ok: true, action: "re-kicked", lead_id: lead.id });
       }
 
@@ -169,6 +233,7 @@ serve(async (req) => {
           .update({ telegram_user_id: userId })
           .eq("id", lead.id)
           .is("telegram_user_id", null);
+        log("already-active", { update_id: updateId, lead_id: lead.id, found_via: foundVia });
         return json({ ok: true, action: "already-active", lead_id: lead.id });
       }
 
@@ -190,9 +255,11 @@ serve(async (req) => {
           console.error("activate update failed", updErr);
           return json({ ok: false, error: "update failed" }, { status: 500 });
         }
+        log("activated", { update_id: updateId, lead_id: lead.id, found_via: foundVia, user_id: userId });
         return json({ ok: true, action: "activated", lead_id: lead.id });
       }
 
+      log("ignored", { reason: `unhandled status ${lead.status}`, update_id: updateId, lead_id: lead.id });
       return json({ ok: true, ignored: `unhandled status ${lead.status}` });
     }
 
@@ -207,7 +274,10 @@ serve(async (req) => {
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
-      if (!lead) return json({ ok: true, ignored: "no lead for leaver" });
+      if (!lead) {
+        log("ignored", { reason: "no lead for leaver", update_id: updateId, user_id: userId });
+        return json({ ok: true, ignored: "no lead for leaver" });
+      }
 
       // Só atualiza para 'removed' se ainda estava 'active' — preserva 'expired',
       // 'removed', 'blocked' como estão.
@@ -220,11 +290,18 @@ serve(async (req) => {
           })
           .eq("id", lead.id)
           .eq("status", "active");
+        log("marked-removed", { update_id: updateId, lead_id: lead.id, user_id: userId });
         return json({ ok: true, action: "marked-removed", lead_id: lead.id });
       }
+      log("ignored", { reason: `lead already ${lead.status}`, update_id: updateId, lead_id: lead.id });
       return json({ ok: true, ignored: `lead already ${lead.status}` });
     }
 
+    log("ignored", {
+      reason: `status transition ${oldStatus} -> ${newStatus}`,
+      update_id: updateId,
+      user_id: userId,
+    });
     return json({ ok: true, ignored: `status ${oldStatus} -> ${newStatus}` });
   } catch (err) {
     console.error("trial-webhook error", err);

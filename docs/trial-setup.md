@@ -60,12 +60,24 @@ supabase secrets set \
 supabase functions deploy trial-signup        --no-verify-jwt
 supabase functions deploy trial-webhook       --no-verify-jwt
 supabase functions deploy trial-upgrade-track --no-verify-jwt
-supabase functions deploy trial-cron     # protegida por bearer service-role
-supabase functions deploy trial-kick     # valida JWT do usuário
+supabase functions deploy trial-cron          # protegida por bearer service-role
+supabase functions deploy trial-kick          # valida JWT do usuário
+supabase functions deploy trial-diagnose      # valida JWT do usuário
+supabase functions deploy trial-link-manual   # valida JWT do usuário
+supabase functions deploy trial-webhook-reset # valida JWT do usuário
 ```
 
-`trial-signup` e `trial-webhook` ficam abertas (`--no-verify-jwt`) porque são chamadas
-pelo formulário público e pelo Telegram, respectivamente.
+`trial-signup`, `trial-webhook` e `trial-upgrade-track` ficam abertas
+(`--no-verify-jwt`) porque são chamadas pelo formulário público, pelo Telegram
+e pelo navegador anônimo, respectivamente. As demais ficam atrás de JWT.
+
+> ⚠️ **Atenção: nunca redeploye `trial-signup`, `trial-webhook` ou
+> `trial-upgrade-track` sem o `--no-verify-jwt`.** Se isso acontecer, o gateway
+> do Supabase passa a devolver 401 para o Telegram e os updates de
+> `chat_member` (entradas no grupo) **são descartados de forma permanente**
+> depois das tentativas de reentrega — leads ficam presos em "Aguardando
+> entrada" mesmo já tendo entrado. Para recuperá-los manualmente, use o
+> botão **"Vincular ao Telegram"** em `/trial-admin` (chama `trial-link-manual`).
 
 ## 5. Registrar o webhook do Telegram
 

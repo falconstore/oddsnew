@@ -99,3 +99,81 @@ export const useDiagnoseTelegram = () => {
     },
   });
 };
+
+export type LinkManualResult = {
+  ok?: boolean;
+  action?: 'activated' | 'already-active' | 'not-in-group';
+  message?: string;
+  need_manual_id?: boolean;
+  error?: string;
+  telegram_error?: string | null;
+  telegram_user_id?: number;
+  telegram_member_status?: string;
+};
+
+export const useLinkManual = () => {
+  const qc = useQueryClient();
+  return useMutation<LinkManualResult, Error, { leadId: string; manualUserId?: string }>({
+    mutationFn: async ({ leadId, manualUserId }) => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      const url = `${import.meta.env.VITE_MAIN_SUPABASE_URL}/functions/v1/trial-link-manual`;
+      const body: Record<string, unknown> = { lead_id: leadId };
+      if (manualUserId && manualUserId.trim()) body.manual_user_id = manualUserId.trim();
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(body),
+      });
+      const json = (await res.json().catch(() => ({}))) as LinkManualResult;
+      // 200 com need_manual_id é caminho esperado (auto-resolve falhou).
+      if (json?.need_manual_id) return json;
+      if (!res.ok) throw new Error(json?.error || 'Falha ao vincular o lead');
+      return json;
+    },
+    onSuccess: (data) => {
+      if (data?.action === 'activated') {
+        qc.invalidateQueries({ queryKey: ['trial_leads'] });
+        toast({ title: 'Lead vinculado!', description: data.message });
+      } else if (data?.action === 'already-active') {
+        qc.invalidateQueries({ queryKey: ['trial_leads'] });
+        toast({ title: 'Já estava ativo', description: data.message });
+      } else if (data?.action === 'not-in-group') {
+        toast({ title: 'Usuário fora do grupo', description: data.message, variant: 'destructive' });
+      }
+    },
+    onError: (err: Error) => {
+      toast({ title: 'Erro ao vincular', description: err.message, variant: 'destructive' });
+    },
+  });
+};
+
+export const useResetWebhook = () => {
+  return useMutation<{ ok: boolean; message: string; webhook_url: string }>({
+    mutationFn: async () => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      const url = `${import.meta.env.VITE_MAIN_SUPABASE_URL}/functions/v1/trial-webhook-reset`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: '{}',
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error || 'Falha ao resetar webhook');
+      return json;
+    },
+    onSuccess: (data) => {
+      toast({ title: 'Webhook reinstalado', description: data.message });
+    },
+    onError: (err: Error) => {
+      toast({ title: 'Erro ao resetar webhook', description: err.message, variant: 'destructive' });
+    },
+  });
+};

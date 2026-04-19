@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react';
-import { format } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
   Gift, Search, Sparkles, Users, CheckCircle2, Clock, Ban, UserMinus,
   Mail, Phone, Send, ExternalLink, Trash2, Eye, MousePointerClick, BellRing,
   MessageCircle, ShoppingCart, TrendingUp, Users2, FileSignature,
-  Stethoscope, AlertTriangle, Loader2, XCircle,
+  Stethoscope, AlertTriangle, Loader2, XCircle, Link2, RotateCw,
 } from 'lucide-react';
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
@@ -15,7 +15,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
-import { useTrialLeads, useKickTrialLead, useDiagnoseTelegram, type TelegramDiagnose } from '@/hooks/useTrialLeads';
+import {
+  useTrialLeads, useKickTrialLead, useDiagnoseTelegram,
+  useLinkManual, useResetWebhook, type TelegramDiagnose,
+} from '@/hooks/useTrialLeads';
 import { useTrialUpgradeStats, type TrialStatsRange } from '@/hooks/useTrialUpgradeStats';
 import type { TrialLead, TrialStatus } from '@/types/trial';
 import { TRIAL_PUBLIC_URL } from '@/components/AnimatedRoutes';
@@ -49,12 +52,17 @@ export default function TrialAdmin() {
   const { data: leads = [], isLoading } = useTrialLeads();
   const kick = useKickTrialLead();
   const diagnose = useDiagnoseTelegram();
+  const linkManual = useLinkManual();
+  const resetWebhook = useResetWebhook();
   const [diagOpen, setDiagOpen] = useState(false);
   const diag: TelegramDiagnose | undefined = diagnose.data;
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | TrialStatus>('all');
   const [confirmKick, setConfirmKick] = useState<TrialLead | null>(null);
+  const [linkLead, setLinkLead] = useState<TrialLead | null>(null);
+  const [manualUserId, setManualUserId] = useState('');
+  const [linkResult, setLinkResult] = useState<{ message?: string; needManual?: boolean } | null>(null);
   const [statsRange, setStatsRange] = useState<TrialStatsRange>('7d');
   const { data: upgradeStats, isLoading: statsLoading } = useTrialUpgradeStats(statsRange, 'trial-upgrade-page');
   const { data: landingStats, isLoading: landingLoading } = useTrialUpgradeStats(statsRange, 'trial-landing-hero');
@@ -480,6 +488,24 @@ export default function TrialAdmin() {
                           </Button>
                         </a>
                       )}
+                      {!lead.telegram_user_id && lead.status !== 'blocked' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 text-xs border-sky-500/30 text-sky-300 hover:bg-sky-500/10"
+                          onClick={() => {
+                            setLinkLead(lead);
+                            setManualUserId('');
+                            setLinkResult(null);
+                            linkManual.reset();
+                          }}
+                          data-testid={`button-lead-link-manual-${lead.id}`}
+                          title="Vincular ao Telegram (caso já tenha entrado mas o webhook perdeu o evento)"
+                        >
+                          <Link2 className="w-3 h-3 mr-1" />
+                          Vincular
+                        </Button>
+                      )}
                       <Button
                         size="sm"
                         variant="outline"
@@ -599,7 +625,27 @@ export default function TrialAdmin() {
                   value={diag.summary.bot_status_in_chat ?? '—'}
                 />
                 <DiagRow ok={!!diag.summary.bot_can_restrict_members} label="Permissão Banir usuários" value={diag.summary.bot_can_restrict_members ? 'sim' : 'não'} />
-                <DiagRow ok={!diag.summary.webhook_last_error_message} label="Sem erros recentes do webhook" value={diag.summary.webhook_last_error_message ?? 'nenhum'} />
+                {(() => {
+                  const errMsg = diag.summary.webhook_last_error_message;
+                  const errDate = diag.summary.webhook_last_error_date;
+                  const pending = diag.summary.webhook_pending_update_count ?? 0;
+                  const isHistorical = !!errMsg && pending === 0;
+                  const ageStr = errDate
+                    ? formatDistanceToNow(new Date(errDate * 1000), { addSuffix: true, locale: ptBR })
+                    : null;
+                  const value = !errMsg
+                    ? 'nenhum'
+                    : `${errMsg}${ageStr ? ` (${ageStr})` : ''}${
+                        isHistorical ? ' — histórico, sem novos erros' : ''
+                      }`;
+                  return (
+                    <DiagRow
+                      ok={!errMsg || isHistorical}
+                      label={isHistorical ? 'Erro do webhook (histórico)' : 'Sem erros recentes do webhook'}
+                      value={value}
+                    />
+                  );
+                })()}
                 <DiagRow
                   ok={(diag.summary.webhook_pending_update_count ?? 0) === 0}
                   label="Updates pendentes"
@@ -621,9 +667,23 @@ export default function TrialAdmin() {
             </div>
           )}
 
-          <DialogFooter className="gap-2">
+          <DialogFooter className="gap-2 flex-wrap">
             <Button variant="outline" onClick={() => setDiagOpen(false)} data-testid="button-close-diag">
               Fechar
+            </Button>
+            <Button
+              variant="outline"
+              className="border-sky-500/30 text-sky-300 hover:bg-sky-500/10"
+              onClick={async () => {
+                await resetWebhook.mutateAsync().catch(() => {});
+                diagnose.mutate();
+              }}
+              disabled={resetWebhook.isPending || diagnose.isPending}
+              data-testid="button-reset-webhook"
+              title="Re-instala o webhook no Telegram com URL, secret e allowed_updates corretos"
+            >
+              {resetWebhook.isPending ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <RotateCw className="w-4 h-4 mr-1.5" />}
+              Resetar webhook
             </Button>
             <Button
               variant="outline"
@@ -634,6 +694,109 @@ export default function TrialAdmin() {
             >
               {diagnose.isPending ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Stethoscope className="w-4 h-4 mr-1.5" />}
               Rodar de novo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Vincular ao Telegram dialog */}
+      <Dialog
+        open={!!linkLead}
+        onOpenChange={(open) => {
+          if (!open) {
+            setLinkLead(null);
+            setManualUserId('');
+            setLinkResult(null);
+            linkManual.reset();
+          }
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Link2 className="w-5 h-5 text-sky-400" />
+              Vincular ao Telegram
+            </DialogTitle>
+            <DialogDescription>
+              Marca <b>{linkLead?.name}</b> (@{linkLead?.telegram_username}) como ativo
+              caso ele já esteja dentro do grupo. Use isso quando o webhook perdeu o
+              evento de entrada.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 text-sm">
+            {linkResult?.needManual && (
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-100 space-y-2">
+                <div className="font-semibold flex items-center gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5" /> ID numérico necessário
+                </div>
+                <p>{linkResult.message}</p>
+              </div>
+            )}
+            {linkResult?.needManual !== undefined && (
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground mb-1 block">
+                  ID numérico do Telegram (opcional na 1ª tentativa)
+                </label>
+                <Input
+                  value={manualUserId}
+                  onChange={(e) => setManualUserId(e.target.value.replace(/\D/g, ''))}
+                  placeholder="ex: 123456789"
+                  className="bg-white/5 border-white/10"
+                  inputMode="numeric"
+                  data-testid="input-manual-user-id"
+                />
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Peça para o usuário abrir <b>@userinfobot</b> no Telegram e enviar /start.
+                  O bot devolve o "Id" — cole aqui.
+                </p>
+              </div>
+            )}
+            {linkManual.isError && (
+              <div className="text-xs text-red-300 bg-red-500/10 border border-red-500/30 rounded-xl p-3">
+                {(linkManual.error as Error)?.message}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setLinkLead(null)}
+              disabled={linkManual.isPending}
+            >
+              Cancelar
+            </Button>
+            <Button
+              className="bg-sky-500 hover:bg-sky-400 text-white"
+              disabled={linkManual.isPending}
+              onClick={async () => {
+                if (!linkLead) return;
+                const result = await linkManual
+                  .mutateAsync({ leadId: linkLead.id, manualUserId })
+                  .catch(() => null);
+                if (result?.need_manual_id) {
+                  setLinkResult({ message: result.error, needManual: true });
+                  return;
+                }
+                if (result?.action === 'activated' || result?.action === 'already-active') {
+                  setLinkLead(null);
+                  setManualUserId('');
+                  setLinkResult(null);
+                }
+              }}
+              data-testid="button-confirm-link-manual"
+            >
+              {linkManual.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Vinculando…
+                </>
+              ) : (
+                <>
+                  <Link2 className="w-4 h-4 mr-1.5" />
+                  {manualUserId ? 'Vincular com este ID' : 'Tentar vincular'}
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
