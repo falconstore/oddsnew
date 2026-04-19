@@ -19,6 +19,35 @@ export const useTrialLeads = () => {
   });
 };
 
+export const usePurgeTrialLead = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (leadId: string) => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      const url = `${import.meta.env.VITE_MAIN_SUPABASE_URL}/functions/v1/trial-purge`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ lead_id: leadId }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.message || json?.error || 'Falha ao apagar do banco');
+      return json;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['trial_leads'] });
+      toast({ title: 'Lead apagado do banco' });
+    },
+    onError: (err: Error) => {
+      toast({ title: 'Erro ao apagar', description: err.message, variant: 'destructive' });
+    },
+  });
+};
+
 export const useKickTrialLead = () => {
   const qc = useQueryClient();
   return useMutation({

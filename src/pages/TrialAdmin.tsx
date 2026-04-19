@@ -17,7 +17,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import {
-  useTrialLeads, useKickTrialLead, useDiagnoseTelegram,
+  useTrialLeads, useKickTrialLead, usePurgeTrialLead, useDiagnoseTelegram,
   useLinkManual, useResetWebhook, useForceActivate, type TelegramDiagnose,
 } from '@/hooks/useTrialLeads';
 import { useTrialUpgradeStats, type TrialStatsRange } from '@/hooks/useTrialUpgradeStats';
@@ -53,6 +53,8 @@ const fmtWhatsapp = (raw: string) => {
 export default function TrialAdmin() {
   const { data: leads = [], isLoading } = useTrialLeads();
   const kick = useKickTrialLead();
+  const purge = usePurgeTrialLead();
+  const [confirmPurge, setConfirmPurge] = useState<TrialLead | null>(null);
   const diagnose = useDiagnoseTelegram();
   const linkManual = useLinkManual();
   const resetWebhook = useResetWebhook();
@@ -560,6 +562,17 @@ export default function TrialAdmin() {
                         <UserMinus className="w-3 h-3 mr-1" />
                         {kickLabel}
                       </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 text-xs border-red-700/40 text-red-400 hover:bg-red-700/15"
+                        onClick={() => setConfirmPurge(lead)}
+                        data-testid={`button-lead-purge-${lead.id}`}
+                        title="Apagar definitivamente do banco — libera email/whatsapp/@ pra um novo trial"
+                      >
+                        <Trash2 className="w-3 h-3 mr-1" />
+                        Apagar do banco
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -840,6 +853,46 @@ export default function TrialAdmin() {
                   {manualUserId ? 'Vincular com este ID' : 'Tentar vincular'}
                 </>
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm purge dialog — apaga DEFINITIVAMENTE do banco */}
+      <Dialog open={!!confirmPurge} onOpenChange={() => setConfirmPurge(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Trash2 className="w-5 h-5 text-red-500" />
+              Apagar do banco
+            </DialogTitle>
+            <DialogDescription className="space-y-2">
+              <span className="block">
+                Você está prestes a <b>apagar definitivamente</b> o lead <b>{confirmPurge?.name}</b>{' '}
+                (@{confirmPurge?.telegram_username}) do banco de dados.
+              </span>
+              <span className="block text-amber-300/90 text-xs">
+                ⚠️ Essa ação <b>não pode ser desfeita</b>. Se o usuário ainda estiver
+                no grupo, ele será removido antes. O email, WhatsApp e @ ficam livres
+                para um novo cadastro.
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setConfirmPurge(null)} disabled={purge.isPending}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={purge.isPending}
+              onClick={async () => {
+                if (!confirmPurge) return;
+                await purge.mutateAsync(confirmPurge.id).catch(() => {});
+                setConfirmPurge(null);
+              }}
+              data-testid="button-confirm-purge"
+            >
+              {purge.isPending ? 'Apagando…' : 'Apagar do banco'}
             </Button>
           </DialogFooter>
         </DialogContent>
