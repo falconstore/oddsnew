@@ -1,0 +1,368 @@
+~/workspace$ You need to provide a personal access token. Get one from https://supabase.com/dashboard/account/tokens
+bash: You: command not found
+~/workspace$ y
+y: command not installed, but was located via Nix.
+package: yakut  0.13.0  Simple CLI tool for diagnostics and debugging of Cyphal networks
+Would you like to run y from Nix and add it to your project? [Yn]: y
+yakut  0.13.0  Simple CLI tool for diagnostics and debugging of Cyphal networks
+Adding yakut to .replit
+Usage: yakut [OPTIONS] COMMAND [ARGS]...
+
+         ____                   ______            __          __
+        / __ `____  ___  ____  / ____/_  ______  / /_  ____  / /
+       / / / / __ `/ _ `/ __ `/ /   / / / / __ `/ __ `/ __ `/ /
+      / /_/ / /_/ /  __/ / / / /___/ /_/ / /_/ / / / / /_/ / /
+      `____/ .___/`___/_/ /_/`____/`__, / .___/_/ /_/`__,_/_/
+          /_/                     /____/_/
+
+  Yakut is a cross-platform command-line utility
+  for diagnostics and management of Cyphal
+  networks. It is designed for use either directly
+  by humans or from automation scripts. Ask
+  questions at https://forum.opencyphal.org
+
+  Any long option can be provided via environment
+  variable prefixed with `YAKUT_` such that an
+  option `--foo-bar` for command `baz`, if not
+  provided as a command-line argument, will be
+  read from `YAKUT_BAZ_FOO_BAR`.
+
+Options:
+  --version                       Show the version
+                                  and exit.
+  -v, --verbose                   Emit verbose log
+                                  messages.
+                                  Specify twice
+                                  for extra
+                                  verbosity.
+  -P, --path PATH                 In order to use
+                                  compiled DSDL
+                                  namespaces, the
+                                  directories that
+                                  contain
+                                  compilation
+                                  outputs need to
+                                  be specified
+                                  using this
+                                  option.
+                                  
+                                  Examples:
+                                  
+                                      yakut  --path ../public_regulated_data_types  --path ~/my_namespaces  pub ...
+                                  
+                                      export YAKUT_PATH="../public_regulated_data_types:~/my_namespaces"
+                                      yakut pub ...
+  -t, --tsvh                      Same as
+                                  --format=tsvh
+  -j, --json                      Same as
+                                  --format=json
+  -y, --yaml                      Same as
+                                  --format=yaml
+  -F, --format [AUTO|YAML|JSON|TSV|TSVH|TSVFC]
+                                  The format of
+                                  data printed to
+                                  stdout. This
+                                  option is only
+                                  relevant for
+                                  commands that
+                                  produce data
+                                  (sub, call,
+                                  etc.).
+                                  
+                                  The final
+                                  representation
+                                  of the output
+                                  data is
+                                  constructed from
+                                  an intermediate
+                                  "builtin-based"
+                                  representation,
+                                  which is a
+                                  simplified form
+                                  that is stripped
+                                  of the detailed
+                                  DSDL type
+                                  information,
+                                  like JSON. For
+                                  more info please
+                                  read the
+                                  PyCyphal
+                                  documentation on
+                                  builtin-based
+                                  representations.
+                                  
+                                  Option "auto"
+                                  (default)
+                                  selects YAML if
+                                  the output is
+                                  shown on the
+                                  terminal for the
+                                  benefit of the
+                                  user; if the
+                                  output is
+                                  redirected
+                                  (e.g., piped to
+                                  another command
+                                  or to a file),
+                                  JSON is selected
+                                  to enable
+                                  compatibility
+                                  with jq and
+                                  other 3rd-party
+                                  stream
+                                  processing
+                                  tools. It helps
+                                  to remember that
+                                  JSON is a subset
+                                  of YAML.
+                                  
+                                  YAML separates
+                                  objects with
+                                  `---`. JSON and
+                                  TSV (tab
+                                  separated
+                                  values) keep
+                                  exactly one
+                                  object per line.
+                                  
+                                  TSV is intended
+                                  for use with
+                                  third-party
+                                  software such as
+                                  computer algebra
+                                  systems or
+                                  spreadsheet
+                                  processors.
+                                  
+                                  TSVH is just TSV
+                                  with the header
+                                  included.
+                                  
+                                  TSVFC is TSVH
+                                  with extra
+                                  column for curly
+                                  braces and
+                                  square brackets.
+                                  These are extra
+                                  format columns
+                                  that help the
+                                  reader
+                                  understand the
+                                  structure of the
+                                  data without
+                                  looking at the
+                                  headers.
+                                  [default: AUTO]
+  -i, --transport EXPRESSION      Override the
+                                  network
+                                  interface
+                                  configuration,
+                                  including the
+                                  local node-ID.
+                                  This option is
+                                  only relevant
+                                  for commands
+                                  that access the
+                                  network, like pu
+                                  b/sub/call/etc.;
+                                  other commands
+                                  ignore it.
+                                  
+                                  By default, if
+                                  this option is
+                                  not given
+                                  (neither via
+                                  --transport nor Y
+                                  AKUT_TRANSPORT),
+                                  commands that
+                                  access the
+                                  network deduce
+                                  the transport
+                                  configuration
+                                  from standard
+                                  registers passed
+                                  via environment
+                                  variables, such
+                                  as UAVCAN__NODE_
+                                  _ID, UAVCAN__UDP
+                                  __IFACE, UAVCAN_
+                                  _SERIAL__IFACE,
+                                  and so on. The
+                                  full list of
+                                  registers that
+                                  configure the
+                                  transport is
+                                  available in the
+                                  definition of
+                                  the standard
+                                  RPC-service "uav
+                                  can.register.Acc
+                                  ess", and in the
+                                  documentation
+                                  for PyCyphal: ht
+                                  tps://pycyphal.r
+                                  eadthedocs.io
+                                  (see "make_trans
+                                  port()"). This
+                                  method requires
+                                  that the
+                                  standard DSDL
+                                  namespace
+                                  "uavcan" is
+                                  compiled (see
+                                  command "yakut
+                                  compile")!
+                                  
+                                  If this
+                                  expression is
+                                  given, the
+                                  registers are
+                                  ignored, and the
+                                  transport
+                                  instance is
+                                  constructed by
+                                  evaluating it.
+                                  Upon evaluation,
+                                  the expression
+                                  should yield
+                                  either a single
+                                  transport
+                                  instance or a
+                                  sequence
+                                  thereof. In the
+                                  latter case, the
+                                  multiple
+                                  transports will
+                                  be joined under
+                                  the same
+                                  redundant
+                                  transport
+                                  instance, which
+                                  may be
+                                  heterogeneous
+                                  (e.g.,
+                                  UDP+Serial).
+                                  This method does
+                                  not require any
+                                  DSDL to be
+                                  compiled at all.
+                                  To see supported
+                                  transports and
+                                  how they should
+                                  be initialized,
+                                  refer to https:/
+                                  /pycyphal.readth
+                                  edocs.io.
+                                  
+                                  The expression
+                                  does not need to
+                                  explicitly
+                                  reference the `p
+                                  ycyphal.transpor
+                                  t` module
+                                  because its
+                                  contents are
+                                  wildcard-
+                                  imported for
+                                  convenience.
+                                  Further, when
+                                  specifying a
+                                  transport class,
+                                  the suffix
+                                  `Transport` may
+                                  be omitted;
+                                  e.g.,
+                                  `UDPTransport`
+                                  and `UDP` are
+                                  equivalent.
+                                  
+                                  Examples
+                                  showcasing
+                                  loopback, CAN,
+                                  and
+                                  heterogeneous
+                                  UDP+Serial:
+                                  
+                                      Loopback(None)
+                                      CAN(can.media.socketcan.SocketCANMedia('vcan0',64),42)
+                                      UDP('127.42.0.123',None),Serial("/dev/ttyUSB0",None)
+                                  
+                                  To avoid issues
+                                  caused by
+                                  resetting the
+                                  transfer-ID
+                                  counters between
+                                  invocations, the
+                                  tool stores the
+                                  output transfer-
+                                  ID map on disk
+                                  keyed by the
+                                  node-ID. On this
+                                  computer, the
+                                  path is `/home/r
+                                  unner/workspace/
+                                  .config/yakut/v0
+                                  .13/output-
+                                  transfer-id-
+                                  maps`. The map
+                                  files can be
+                                  removed to reset
+                                  all transfer-ID
+                                  counters to
+                                  zero. Files that
+                                  are more than
+                                  60.0 seconds old
+                                  are not used.
+  --node-info YAML                Override the
+                                  default values
+                                  of the uavcan.no
+                                  de.GetInfo
+                                  response
+                                  returned by the
+                                  local node. The
+                                  protocol version
+                                  cannot be
+                                  overridden.
+  --heartbeat-priority [EXCEPTIONAL|IMMEDIATE|FAST|HIGH|NOMINAL|LOW|SLOW|OPTIONAL]
+                                  Heartbeat
+                                  publication
+                                  priority.
+  --heartbeat-period SECONDS      Heartbeat
+                                  publication
+                                  interval.
+  --heartbeat-vssc, --vssc INTEGER
+                                  The vendor-
+                                  specific status
+                                  code (VSSC) of
+                                  the local node.
+                                  The default is
+                                  (PID % 100) of
+                                  the current
+                                  process.
+  --help                          Show this
+                                  message and
+                                  exit.
+
+Commands (with aliases):
+  accommodate,acmd        Automatically find a...
+  call,q                  Invoke an RPC-service...
+  compile,co              Compile DSDL
+                          namespaces...
+  execute-command,cmd     Invoke...
+  file-server,fsrv        Run a standard Cyphal
+                          file...
+  joystick,joy            Show the state of all...
+  monitor,mon             Display information
+                          about...
+  orchestrate,orc         Manage configuration
+                          of...
+  publish,p,pub           Publish messages on
+                          the...
+  register-access,r,reg   Read or modify a
+                          register...
+  register-batch,rb,rbat  Read/write multiple...
+  register-list,rl        List registers
+                          available...
+  subscribe,s,sub         Subscribe to
+                          specified...
+~/workspace$ You need to provide a personal access token. Get one from https://supabase.
