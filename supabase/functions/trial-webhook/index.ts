@@ -125,6 +125,14 @@ serve(async (req) => {
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
+      log("lookup_user_id", {
+        update_id: updateId,
+        user_id: userId,
+        result: byUserErr ? "error" : byUser ? "hit" : "miss",
+        lead_id: byUser?.id ?? null,
+        lead_status: byUser?.status ?? null,
+        error: byUserErr?.message ?? null,
+      });
       if (byUserErr) console.error("lookup by user_id failed", byUserErr);
       if (byUser) {
         lead = byUser;
@@ -138,11 +146,25 @@ serve(async (req) => {
           .select("id, status, invite_link")
           .eq("invite_link", inviteLink)
           .maybeSingle();
+        log("lookup_invite_link", {
+          update_id: updateId,
+          invite_link: inviteLink,
+          result: byLinkErr ? "error" : byLink ? "hit" : "miss",
+          lead_id: byLink?.id ?? null,
+          lead_status: byLink?.status ?? null,
+          error: byLinkErr?.message ?? null,
+        });
         if (byLinkErr) console.error("lookup by invite_link failed", byLinkErr);
         if (byLink) {
           lead = byLink;
           foundVia = "invite_link";
         }
+      } else if (!lead) {
+        log("lookup_invite_link", {
+          update_id: updateId,
+          result: "skipped",
+          reason: "no invite_link in update",
+        });
       }
 
       if (!lead) {

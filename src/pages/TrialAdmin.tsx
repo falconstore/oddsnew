@@ -488,7 +488,7 @@ export default function TrialAdmin() {
                           </Button>
                         </a>
                       )}
-                      {!lead.telegram_user_id && lead.status !== 'blocked' && (
+                      {!lead.telegram_user_id && (
                         <Button
                           size="sm"
                           variant="outline"

@@ -91,7 +91,12 @@ serve(async (req) => {
   if (summary.webhook_registered && !summary.webhook_url_ok) issues.push(`Webhook aponta para URL inesperada: ${summary.webhook_url}`);
   if (summary.webhook_registered && !summary.webhook_has_chat_member_subscription)
     issues.push("Webhook está registrado SEM 'chat_member' nas allowed_updates — re-rode setWebhook com allowed_updates=[\"chat_member\",\"my_chat_member\"]. Sem isso o Telegram NÃO envia updates de entrada/saída de membros.");
-  if (summary.webhook_last_error_message)
+  // Só trata o último erro do webhook como problema ATUAL se ainda há
+  // updates pendentes — caso contrário é histórico (Telegram só sobrescreve
+  // last_error_message quando há um erro novo, então o campo pode ficar
+  // mostrando um erro de horas atrás mesmo com tudo funcionando).
+  const pendingCount = summary.webhook_pending_update_count ?? 0;
+  if (summary.webhook_last_error_message && pendingCount > 0)
     issues.push(`Último erro entregando ao webhook: ${summary.webhook_last_error_message} (provavelmente segredo errado ou função fora do ar)`);
   if (chatId && !summary.bot_in_chat)
     issues.push(`Bot não consegue ler o grupo ${chatId} (não foi adicionado, ou chat_id errado).`);
