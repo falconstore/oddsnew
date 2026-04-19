@@ -1,6 +1,15 @@
 // Edge Function: trial-kick
 // Remove manualmente um lead do grupo (botão "Remover" no admin).
 // Requer JWT de usuário com can_view_trial = true OU is_super_admin.
+//
+// Garantias:
+//  - Bana o usuário no Telegram (ban + unban -> efetivamente "expulsa" sem
+//    deixar banido permanente, então admin pode reverter se quiser).
+//  - REVOGA o invite link original para impedir que o mesmo link seja
+//    reutilizado (Telegram aceita revogar mesmo links de 1 uso já consumidos
+//    por garantia / não-op se já invalidado).
+//  - Marca o lead como `removed` com timestamp para o painel e para a dedup
+//    do trial-signup continuar bloqueando uma nova inscrição.
 // deno-lint-ignore-file
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -18,7 +27,6 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    // Cliente como usuário (valida JWT)
     const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
       global: { headers: { Authorization: auth } },
       auth: { persistSession: false },
@@ -47,7 +55,7 @@ serve(async (req) => {
 
     const { data: lead } = await admin
       .from("trial_leads")
-      .select("id, telegram_user_id, status")
+      .select("id, telegram_user_id, status, invite_link")
       .eq("id", leadId)
       .maybeSingle();
     if (!lead) return json({ error: "Lead não encontrado" }, { status: 404 });
@@ -56,6 +64,7 @@ serve(async (req) => {
     const chatId = Deno.env.get("TELEGRAM_TRIAL_CHAT_ID");
     if (!botToken || !chatId) return json({ error: "Bot não configurado" }, { status: 500 });
 
+    // 1) Expulsar do grupo (se já entrou)
     if (lead.telegram_user_id) {
       const banRes = await fetch(`https://api.telegram.org/bot${botToken}/banChatMember`, {
         method: "POST",
@@ -67,6 +76,9 @@ serve(async (req) => {
         console.error("ban failed", banData);
         return json({ error: banData?.description ?? "Falha no Telegram" }, { status: 502 });
       }
+      // unban imediato para o usuário não ficar banido para sempre
+      // (re-entrada futura é bloqueada pelo trial-webhook que re-kicka
+      // qualquer rejoin de lead com status 'removed').
       await fetch(`https://api.telegram.org/bot${botToken}/unbanChatMember`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -74,6 +86,20 @@ serve(async (req) => {
       });
     }
 
+    // 2) Revogar o invite link original para que ele não possa mais ser usado
+    if (lead.invite_link) {
+      try {
+        await fetch(`https://api.telegram.org/bot${botToken}/revokeChatInviteLink`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chat_id: chatId, invite_link: lead.invite_link }),
+        });
+      } catch (e) {
+        console.warn("revoke invite link failed (continuando)", e);
+      }
+    }
+
+    // 3) Marcar como removed
     await admin.from("trial_leads").update({
       status: "removed",
       removed_at: new Date().toISOString(),
