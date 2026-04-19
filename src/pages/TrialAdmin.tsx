@@ -93,7 +93,9 @@ export default function TrialAdmin() {
         l.name.toLowerCase().includes(q) ||
         l.email.toLowerCase().includes(q) ||
         l.whatsapp.includes(q.replace(/\D/g, '')) ||
-        l.telegram_username.toLowerCase().includes(q)
+        l.telegram_username.toLowerCase().includes(q) ||
+        l.id.toLowerCase().includes(q) ||
+        (l.previous_lead_id?.toLowerCase().includes(q) ?? false)
       );
     }
     return list;

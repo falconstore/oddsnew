@@ -198,6 +198,92 @@ serve(async (req) => {
         return json({ ok: true, ignored: "no matching lead on join" });
       }
 
+      // 1b.1) ANTI-REPETIDOR (caminho principal):
+      // Se achamos um lead pelo user_id (telegram_user_id é IMUTÁVEL) E o
+      // invite_link recebido NESTE join aponta para OUTRO lead pending, isso
+      // é uma 2ª inscrição do mesmo Telegram via novo email/WhatsApp/@.
+      // Marcamos o lead NOVO como blocked_repeat (com previous_lead_id) e
+      // re-kickamos antes de qualquer outra coisa.
+      if (
+        lead &&
+        foundVia === "user_id" &&
+        inviteLink &&
+        lead.invite_link !== inviteLink
+      ) {
+        const { data: byLinkRepeat, error: byLinkRepeatErr } = await supabase
+          .from("trial_leads")
+          .select("id, status, invite_link")
+          .eq("invite_link", inviteLink)
+          .neq("id", lead.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (byLinkRepeatErr) console.error("repeat lookup by invite_link failed", byLinkRepeatErr);
+
+        if (byLinkRepeat && byLinkRepeat.status === "pending") {
+          const previousLeadId = lead.id;
+          const previousLeadStatus = lead.status;
+
+          await supabase
+            .from("trial_leads")
+            .update({
+              status: "blocked_repeat",
+              telegram_user_id: userId,
+              previous_lead_id: previousLeadId,
+            })
+            .eq("id", byLinkRepeat.id)
+            .eq("status", "pending");
+
+          if (botToken && expectedChatId) {
+            try {
+              await fetch(`https://api.telegram.org/bot${botToken}/banChatMember`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ chat_id: expectedChatId, user_id: userId }),
+              });
+              await fetch(`https://api.telegram.org/bot${botToken}/unbanChatMember`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  chat_id: expectedChatId,
+                  user_id: userId,
+                  only_if_banned: true,
+                }),
+              });
+            } catch (e) {
+              console.error("repeat re-kick failed", e);
+            }
+            if (byLinkRepeat.invite_link) {
+              try {
+                await fetch(
+                  `https://api.telegram.org/bot${botToken}/revokeChatInviteLink`,
+                  {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      chat_id: expectedChatId,
+                      invite_link: byLinkRepeat.invite_link,
+                    }),
+                  },
+                );
+              } catch (e) {
+                console.warn("repeat revoke link failed", e);
+              }
+            }
+          }
+
+          log("blocked-repeat", {
+            update_id: updateId,
+            lead_id: byLinkRepeat.id,
+            user_id: userId,
+            prev_lead_id: previousLeadId,
+            prev_status: previousLeadStatus,
+            via: "user_id_then_invite_link",
+          });
+          return json({ ok: true, action: "blocked-repeat", lead_id: byLinkRepeat.id });
+        }
+      }
+
       // 1c) Se o lead já foi removido/bloqueado/expirado → re-kick imediato
       if (BLOCKED_LEAD_STATUSES.has(lead.status)) {
         if (botToken && expectedChatId) {

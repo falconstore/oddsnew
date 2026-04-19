@@ -98,14 +98,29 @@ serve(async (req) => {
       console.warn("trial-force-activate unban failed", e);
     }
 
-    // Confirma a presença atual no grupo. Se ele já saiu (ex: foi banido
-    // e ainda não voltou), a ativação acontece mesmo assim — ele entrará
-    // pelo invite_link público. Apenas logamos.
+    // Exige que o usuário esteja FISICAMENTE no grupo agora — caso
+    // contrário a ativação não tem efeito útil. Admin pode pedir pra ele
+    // entrar via invite link público antes de tentar de novo.
     const member = await tg(botToken, "getChatMember", {
       chat_id: chatId,
       user_id: lead.telegram_user_id,
     });
+    if (!member?.ok) {
+      return json({
+        ok: false,
+        error: `Não foi possível confirmar a presença no grupo: ${member?.description ?? "erro desconhecido"}.`,
+      }, { status: 502 });
+    }
     const memberStatus: string = member?.result?.status ?? "unknown";
+    const ACTIVE = new Set(["member", "restricted", "administrator", "creator"]);
+    if (!ACTIVE.has(memberStatus)) {
+      return json({
+        ok: false,
+        action: "not-in-group",
+        message: `Esse usuário não está no grupo (status: ${memberStatus}). Peça pra ele entrar via link público e tente de novo.`,
+        telegram_member_status: memberStatus,
+      }, { status: 409 });
+    }
 
     const now = new Date();
     const expires = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
