@@ -1,4 +1,10 @@
-export type TrialStatus = 'pending' | 'active' | 'expired' | 'removed' | 'blocked';
+export type TrialStatus =
+  | 'pending'
+  | 'active'
+  | 'expired'
+  | 'removed'
+  | 'blocked'
+  | 'blocked_repeat';
 
 export interface TrialLead {
   id: string;
@@ -13,6 +19,7 @@ export interface TrialLead {
   expires_at: string | null;
   removed_at: string | null;
   reminder_sent_at: string | null;
+  previous_lead_id: string | null;
   created_at: string;
 }
 

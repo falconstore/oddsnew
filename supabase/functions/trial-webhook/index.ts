@@ -28,7 +28,7 @@ import { corsHeaders, json } from "../_shared/cors.ts";
 
 const ACTIVE_STATUSES = new Set(["member", "restricted", "administrator", "creator"]);
 const INACTIVE_STATUSES = new Set(["left", "kicked"]);
-const BLOCKED_LEAD_STATUSES = new Set(["removed", "blocked", "expired"]);
+const BLOCKED_LEAD_STATUSES = new Set(["removed", "blocked", "expired", "blocked_repeat"]);
 
 const log = (event: string, data: Record<string, unknown>) => {
   console.log(JSON.stringify({ tag: "trial-webhook", event, ...data }));
@@ -261,6 +261,84 @@ serve(async (req) => {
 
       // 1e) Lead pending → ativa pelo prazo de 7 dias
       if (lead.status === "pending") {
+        // 1e.1) Anti-repetidor: o telegram_user_id é imutável no Telegram,
+        // então se ele já aparece em outro lead (qualquer status que não
+        // 'pending'), bloqueamos esse 2º trial e re-kickamos na hora.
+        // Apenas pulamos a checagem se foundVia === "user_id" (significa
+        // que o lead encontrado JÁ é desse user_id — não há repetição).
+        if (foundVia !== "user_id") {
+          const { data: prev, error: prevErr } = await supabase
+            .from("trial_leads")
+            .select("id, status, created_at")
+            .eq("telegram_user_id", userId)
+            .neq("id", lead.id)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (prevErr) console.error("repeat check failed", prevErr);
+
+          if (prev) {
+            // Marca o lead novo como blocked_repeat + revoga + re-kicka.
+            const { error: updErr } = await supabase
+              .from("trial_leads")
+              .update({
+                status: "blocked_repeat",
+                telegram_user_id: userId,
+                previous_lead_id: prev.id,
+              })
+              .eq("id", lead.id)
+              .eq("status", "pending"); // guard de concorrência
+            if (updErr) console.error("block-repeat update failed", updErr);
+
+            if (botToken && expectedChatId) {
+              try {
+                await fetch(`https://api.telegram.org/bot${botToken}/banChatMember`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ chat_id: expectedChatId, user_id: userId }),
+                });
+                await fetch(`https://api.telegram.org/bot${botToken}/unbanChatMember`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    chat_id: expectedChatId,
+                    user_id: userId,
+                    only_if_banned: true,
+                  }),
+                });
+              } catch (e) {
+                console.error("block-repeat re-kick failed", e);
+              }
+              if (lead.invite_link) {
+                try {
+                  await fetch(
+                    `https://api.telegram.org/bot${botToken}/revokeChatInviteLink`,
+                    {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        chat_id: expectedChatId,
+                        invite_link: lead.invite_link,
+                      }),
+                    },
+                  );
+                } catch (e) {
+                  console.warn("block-repeat revoke link failed", e);
+                }
+              }
+            }
+
+            log("blocked-repeat", {
+              update_id: updateId,
+              lead_id: lead.id,
+              user_id: userId,
+              prev_lead_id: prev.id,
+              prev_status: prev.status,
+            });
+            return json({ ok: true, action: "blocked-repeat", lead_id: lead.id });
+          }
+        }
+
         const now = new Date();
         const expires = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
         const { error: updErr } = await supabase

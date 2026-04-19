@@ -162,6 +162,36 @@ serve(async (req) => {
       });
     }
 
+    // Passo 2.5 — Anti-repetidor: bloqueia se esse telegram_user_id já
+    // teve outro lead. Admin pode forçar via "Liberar e ativar" depois.
+    const { data: prev } = await admin
+      .from("trial_leads")
+      .select("id, status, created_at")
+      .eq("telegram_user_id", userId)
+      .neq("id", lead.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (prev) {
+      // Marca como blocked_repeat para o admin ver no painel
+      await admin
+        .from("trial_leads")
+        .update({
+          status: "blocked_repeat",
+          telegram_user_id: userId,
+          previous_lead_id: prev.id,
+        })
+        .eq("id", lead.id);
+      return json({
+        ok: false,
+        action: "blocked-repeat",
+        message:
+          `Esse Telegram já teve um trial anterior (status: ${prev.status}). Use "Liberar e ativar" se for caso legítimo.`,
+        previous_lead_id: prev.id,
+        previous_status: prev.status,
+      }, { status: 409 });
+    }
+
     // Passo 3 — ativar o lead
     const now = new Date();
     const expires = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);

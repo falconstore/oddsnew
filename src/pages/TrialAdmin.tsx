@@ -6,6 +6,7 @@ import {
   Mail, Phone, Send, ExternalLink, Trash2, Eye, MousePointerClick, BellRing,
   MessageCircle, ShoppingCart, TrendingUp, Users2, FileSignature,
   Stethoscope, AlertTriangle, Loader2, XCircle, Link2, RotateCw,
+  ShieldAlert, Unlock,
 } from 'lucide-react';
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
@@ -17,7 +18,7 @@ import {
 } from '@/components/ui/dialog';
 import {
   useTrialLeads, useKickTrialLead, useDiagnoseTelegram,
-  useLinkManual, useResetWebhook, type TelegramDiagnose,
+  useLinkManual, useResetWebhook, useForceActivate, type TelegramDiagnose,
 } from '@/hooks/useTrialLeads';
 import { useTrialUpgradeStats, type TrialStatsRange } from '@/hooks/useTrialUpgradeStats';
 import type { TrialLead, TrialStatus } from '@/types/trial';
@@ -36,6 +37,7 @@ const STATUS_META: Record<TrialStatus, { label: string; cls: string }> = {
   expired: { label: 'Expirado', cls: 'bg-zinc-500/15 text-zinc-300 border-zinc-500/30' },
   removed: { label: 'Removido', cls: 'bg-red-500/15 text-red-300 border-red-500/30' },
   blocked: { label: 'Bloqueado', cls: 'bg-purple-500/15 text-purple-300 border-purple-500/30' },
+  blocked_repeat: { label: 'Repetidor bloqueado', cls: 'bg-orange-500/15 text-orange-300 border-orange-500/30' },
 };
 
 const fmtDate = (iso: string | null) =>
@@ -54,6 +56,8 @@ export default function TrialAdmin() {
   const diagnose = useDiagnoseTelegram();
   const linkManual = useLinkManual();
   const resetWebhook = useResetWebhook();
+  const forceActivate = useForceActivate();
+  const [forceLead, setForceLead] = useState<TrialLead | null>(null);
   const [diagOpen, setDiagOpen] = useState(false);
   const diag: TelegramDiagnose | undefined = diagnose.data;
 
@@ -68,13 +72,14 @@ export default function TrialAdmin() {
   const { data: landingStats, isLoading: landingLoading } = useTrialUpgradeStats(statsRange, 'trial-landing-hero');
 
   const stats = useMemo(() => {
-    const s = { total: leads.length, active: 0, expired: 0, blocked: 0, pending: 0, removed: 0 };
+    const s = { total: leads.length, active: 0, expired: 0, blocked: 0, pending: 0, removed: 0, blockedRepeat: 0 };
     for (const l of leads) {
       if (l.status === 'active') s.active++;
       else if (l.status === 'expired') s.expired++;
       else if (l.status === 'blocked') s.blocked++;
       else if (l.status === 'pending') s.pending++;
       else if (l.status === 'removed') s.removed++;
+      else if (l.status === 'blocked_repeat') s.blockedRepeat++;
     }
     return s;
   }, [leads]);
@@ -367,11 +372,12 @@ export default function TrialAdmin() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-3 md:gap-4">
           <StatCard icon={<Users className="w-5 h-5" />} label="Total leads" value={stats.total} accent="from-pink-500/20 to-pink-500/5 border-pink-500/25 text-pink-300" />
           <StatCard icon={<CheckCircle2 className="w-5 h-5" />} label="Ativos" value={stats.active} accent="from-emerald-500/20 to-emerald-500/5 border-emerald-500/25 text-emerald-300" />
           <StatCard icon={<Clock className="w-5 h-5" />} label="Expirados" value={stats.expired} accent="from-zinc-500/20 to-zinc-500/5 border-zinc-500/25 text-zinc-300" />
           <StatCard icon={<Ban className="w-5 h-5" />} label="Bloqueados" value={stats.blocked} accent="from-purple-500/20 to-purple-500/5 border-purple-500/25 text-purple-300" />
+          <StatCard icon={<ShieldAlert className="w-5 h-5" />} label="Repetidores" value={stats.blockedRepeat} accent="from-orange-500/20 to-orange-500/5 border-orange-500/25 text-orange-300" />
           <StatCard icon={<Ban className="w-5 h-5" />} label="Removidos" value={stats.removed} accent="from-red-500/20 to-red-500/5 border-red-500/25 text-red-300" />
         </div>
 
@@ -398,6 +404,7 @@ export default function TrialAdmin() {
               <SelectItem value="expired">Expirados</SelectItem>
               <SelectItem value="removed">Removidos</SelectItem>
               <SelectItem value="blocked">Bloqueados</SelectItem>
+              <SelectItem value="blocked_repeat">Repetidores bloqueados</SelectItem>
             </SelectContent>
           </Select>
           {(search || statusFilter !== 'all') && (
@@ -453,11 +460,22 @@ export default function TrialAdmin() {
                   <div className="flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-4">
                     {/* Identity */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1.5">
+                      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                         <h3 className="font-bold text-sm truncate" data-testid={`text-lead-name-${lead.id}`}>{lead.name}</h3>
                         <Badge className={`text-[10px] ${meta.cls}`} data-testid={`badge-lead-status-${lead.id}`}>
                           {meta.label}
                         </Badge>
+                        {lead.previous_lead_id && (
+                          <Badge
+                            className="text-[10px] bg-orange-500/10 text-orange-300 border-orange-500/30 cursor-pointer hover:bg-orange-500/20"
+                            onClick={() => setSearch(lead.previous_lead_id!.slice(0, 8))}
+                            title="Clique para filtrar pelo trial anterior"
+                            data-testid={`badge-previous-lead-${lead.id}`}
+                          >
+                            <ShieldAlert className="w-2.5 h-2.5 mr-1" />
+                            Já fez trial antes
+                          </Badge>
+                        )}
                       </div>
                       <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
                         <span className="inline-flex items-center gap-1"><Mail className="w-3 h-3" />{lead.email}</span>
@@ -504,6 +522,19 @@ export default function TrialAdmin() {
                         >
                           <Link2 className="w-3 h-3 mr-1" />
                           Vincular
+                        </Button>
+                      )}
+                      {lead.status === 'blocked_repeat' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 text-xs border-orange-500/30 text-orange-300 hover:bg-orange-500/10"
+                          onClick={() => setForceLead(lead)}
+                          data-testid={`button-lead-force-activate-${lead.id}`}
+                          title="Forçar a ativação por 7 dias mesmo sendo um Telegram repetido"
+                        >
+                          <Unlock className="w-3 h-3 mr-1" />
+                          Liberar e ativar
                         </Button>
                       )}
                       <Button
@@ -797,6 +828,44 @@ export default function TrialAdmin() {
                   <Link2 className="w-4 h-4 mr-1.5" />
                   {manualUserId ? 'Vincular com este ID' : 'Tentar vincular'}
                 </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Liberar e ativar (override anti-repetidor) */}
+      <Dialog open={!!forceLead} onOpenChange={(open) => { if (!open) setForceLead(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Unlock className="w-5 h-5 text-orange-400" />
+              Liberar e ativar trial
+            </DialogTitle>
+            <DialogDescription>
+              <b>{forceLead?.name}</b> (@{forceLead?.telegram_username}) foi marcado como <b>repetidor</b> porque
+              esse Telegram já fez trial antes. Liberar e ativar concede mais 7 dias de acesso. Use somente se
+              for cliente legítimo (ex: pagou e perdeu acesso).
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setForceLead(null)} disabled={forceActivate.isPending}>
+              Cancelar
+            </Button>
+            <Button
+              className="bg-orange-500 hover:bg-orange-400 text-white"
+              disabled={forceActivate.isPending}
+              onClick={async () => {
+                if (!forceLead) return;
+                await forceActivate.mutateAsync(forceLead.id).catch(() => {});
+                setForceLead(null);
+              }}
+              data-testid="button-confirm-force-activate"
+            >
+              {forceActivate.isPending ? (
+                <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Liberando…</>
+              ) : (
+                <><Unlock className="w-4 h-4 mr-1.5" /> Liberar e ativar 7 dias</>
               )}
             </Button>
           </DialogFooter>

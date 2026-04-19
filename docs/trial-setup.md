@@ -65,7 +65,15 @@ supabase functions deploy trial-kick          # valida JWT do usuário
 supabase functions deploy trial-diagnose      # valida JWT do usuário
 supabase functions deploy trial-link-manual   # valida JWT do usuário
 supabase functions deploy trial-webhook-reset # valida JWT do usuário
+supabase functions deploy trial-force-activate # valida JWT do usuário (override anti-repetidor)
 ```
+
+> Antes de fazer o deploy do `trial-webhook` (com a checagem anti-repetidor) e
+> do `trial-force-activate`, aplique a migração
+> `supabase/migrations/20260419_trial_block_repeat.sql` no SQL Editor — ela
+> adiciona o status `blocked_repeat`, a coluna `previous_lead_id` e o índice
+> em `telegram_user_id`. Sem isso, o webhook devolve erro ao tentar
+> escrever o novo status.
 
 `trial-signup`, `trial-webhook` e `trial-upgrade-track` ficam abertas
 (`--no-verify-jwt`) porque são chamadas pelo formulário público, pelo Telegram

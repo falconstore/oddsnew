@@ -151,6 +151,35 @@ export const useLinkManual = () => {
   });
 };
 
+export const useForceActivate = () => {
+  const qc = useQueryClient();
+  return useMutation<{ ok: boolean; action: string; message: string }, Error, string>({
+    mutationFn: async (leadId) => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      const url = `${import.meta.env.VITE_MAIN_SUPABASE_URL}/functions/v1/trial-force-activate`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ lead_id: leadId }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error || 'Falha ao liberar lead');
+      return json;
+    },
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['trial_leads'] });
+      toast({ title: 'Lead liberado e ativado', description: data.message });
+    },
+    onError: (err: Error) => {
+      toast({ title: 'Erro ao liberar', description: err.message, variant: 'destructive' });
+    },
+  });
+};
+
 export const useResetWebhook = () => {
   return useMutation<{ ok: boolean; message: string; webhook_url: string }>({
     mutationFn: async () => {
