@@ -100,6 +100,15 @@ serve(async (req) => {
     }
 
     const publicSiteUrl = (Deno.env.get("TRIAL_PUBLIC_SITE_URL") ?? "").replace(/\/+$/, "");
+    // Configuração do CTA do aviso de 24h (com fallback hardcoded para
+    // não depender de env vars novas).
+    const reminderCheckoutUrl = (
+      Deno.env.get("TRIAL_REMINDER_CHECKOUT_URL")
+        ?? "https://lastlink.com/p/CEAEE6585/checkout-payment/"
+    ).trim();
+    const reminderCoupon = (
+      Deno.env.get("TRIAL_REMINDER_COUPON") ?? "PODPROMO"
+    ).trim();
 
     // ===== 1) Avisos prévios (24h antes da expiração) =====
     let remindersSent = 0;
@@ -128,9 +137,20 @@ serve(async (req) => {
             continue;
           }
 
-          const upgradeUrl = publicSiteUrl
-            ? `${publicSiteUrl}/trial-upgrade?lead=${lead.id}&utm_source=telegram&utm_medium=dm&utm_campaign=trial_reminder`
-            : null;
+          // Monta a URL do checkout com UTMs para rastreio no Lastlink.
+          const ctaUrl = (() => {
+            try {
+              const u = new URL(reminderCheckoutUrl);
+              u.searchParams.set("utm_source", "telegram");
+              u.searchParams.set("utm_medium", "dm");
+              u.searchParams.set("utm_campaign", "trial_reminder");
+              u.searchParams.set("coupon", reminderCoupon);
+              u.searchParams.set("lead_id", lead.id);
+              return u.toString();
+            } catch {
+              return reminderCheckoutUrl;
+            }
+          })();
 
           const firstName = escapeHtml(
             (lead.name ?? "").split(/\s+/)[0] || "tudo bem?",
@@ -138,21 +158,20 @@ serve(async (req) => {
           const text = [
             `Oi, <b>${firstName}</b> 👋`,
             ``,
-            `Seu acesso gratuito ao grupo VIP da <b>BetShark Pro</b> termina em <b>24 horas</b>.`,
+            `Seu acesso gratuito no grupo VIP da <b>SHARK 100% GREEN</b> termina em <b>24 horas</b>.`,
             ``,
-            `Se quiser continuar recebendo os sinais de Duplo Green, garanta sua assinatura agora:`,
-            upgradeUrl ? `\n👉 ${upgradeUrl}` : ``,
+            `Pra não perder os sinais de Duplo Green, garanta sua assinatura agora com desconto exclusivo de quem já testou:`,
             ``,
-            `Qualquer dúvida é só responder esta mensagem.`,
-          ].filter(Boolean).join("\n");
+            `🎁 Use o cupom <b>${escapeHtml(reminderCoupon)}</b> no checkout`,
+            ``,
+            `É só clicar no botão abaixo 👇`,
+          ].join("\n");
 
-          const replyMarkup = upgradeUrl
-            ? {
-                inline_keyboard: [[
-                  { text: "🚀 Quero virar assinante", url: upgradeUrl },
-                ]],
-              }
-            : undefined;
+          const replyMarkup = {
+            inline_keyboard: [[
+              { text: `🛒 Assinar com cupom ${reminderCoupon}`, url: ctaUrl },
+            ]],
+          };
 
           const sent = await tgSendDM(botToken, lead.telegram_user_id, text, replyMarkup);
           if (!sent.ok) {

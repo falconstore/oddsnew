@@ -41,6 +41,9 @@ src/
 
 ## Trial Telegram System
 
+### DM de aviso 24h (desde 2026-04-23)
+A mensagem do `trial-cron` agora aponta direto pro checkout do Lastlink (ao invés do `/trial-upgrade`) e destaca o cupom promocional. Defaults hardcoded em `trial-cron/index.ts`: `TRIAL_REMINDER_CHECKOUT_URL=https://lastlink.com/p/CEAEE6585/checkout-payment/` e `TRIAL_REMINDER_COUPON=PODPROMO`. Pode sobrescrever por env vars de mesmo nome no Supabase. UTMs adicionados ao link: `utm_source=telegram`, `utm_medium=dm`, `utm_campaign=trial_reminder`, `coupon=<cupom>`, `lead_id=<id>` — útil pra rastrear no Lastlink/Google Analytics quem chegou via DM. Botão inline tem texto `🛒 Assinar com cupom <cupom>`.
+
 ### Cohorts v1/v2 (desde 2026-04-23)
 O grupo Telegram original foi excluído sem querer e os 40 leads existentes ficaram órfãos. Para preservar os dados sem disparar avisos/kicks errados, `trial_leads` ganhou a coluna `cohort` ('v1' | 'v2', default 'v2'). Migração `supabase/migrations/20260423_trial_cohort.sql` faz backfill de tudo que existia para 'v1' e seta `reminder_sent_at=now()` como defesa em profundidade. `trial-cron` filtra TANTO o aviso de 24h QUANTO a expiração/kick por `cohort='v2'`, então leads v1 nunca são tocados pelo Telegram. Novos cadastros via `trial-signup` herdam 'v2' do default da coluna (não precisou mexer no signup). Painel `/trial-admin` tem filtro "Todas as turmas / v2 / v1" e badge cinza "v1 (grupo antigo)" no card. Stats totais continuam contando v1+v2.
 
