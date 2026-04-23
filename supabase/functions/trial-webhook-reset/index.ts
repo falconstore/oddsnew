@@ -61,7 +61,7 @@ serve(async (req) => {
       body: JSON.stringify({
         url: webhookUrl,
         secret_token: webhookSecret,
-        allowed_updates: ["chat_member", "my_chat_member"],
+        allowed_updates: ["chat_member", "my_chat_member", "message"],
         drop_pending_updates: false,
       }),
     });

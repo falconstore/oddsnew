@@ -60,6 +60,160 @@ serve(async (req) => {
 
     const update = await req.json().catch(() => ({}));
     const updateId = update?.update_id ?? null;
+
+    // ============================================================
+    // Caso 0 — DM com /start (vindo do deep-link do trial-signup)
+    // ============================================================
+    // O fluxo público manda o lead pra t.me/<bot>?start=lead_<UUID>
+    // O Telegram entrega isso como uma mensagem comum "/start lead_<UUID>".
+    // Aqui resolvemos o lead, garantimos que o telegram_user_id está
+    // gravado (essencial pro cron poder mandar DMs depois) e respondemos
+    // com o invite_link como botão.
+    if (update.message && typeof update.message.text === "string") {
+      const msg = update.message;
+      const text: string = msg.text.trim();
+      const chatType: string | undefined = msg.chat?.type;
+      const fromId: number | undefined = msg.from?.id;
+      const fromUsername: string | undefined = msg.from?.username;
+
+      if (chatType === "private" && /^\/start(\s|@|$)/i.test(text)) {
+        const payload = text.replace(/^\/start(?:@\S+)?\s*/i, "").trim();
+        const m = payload.match(/^lead_([0-9a-f-]{36})$/i);
+        const leadId = m ? m[1] : null;
+
+        if (!leadId || !fromId) {
+          // /start sem payload válido — manda mensagem genérica
+          if (botToken && fromId) {
+            try {
+              await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  chat_id: fromId,
+                  text: "Olá! Para liberar seu acesso, faça o cadastro pelo site oficial primeiro.",
+                  parse_mode: "HTML",
+                }),
+              });
+            } catch (e) { console.warn("start no-payload reply failed", e); }
+          }
+          log("start-no-payload", { update_id: updateId, from_id: fromId ?? null, payload });
+          return json({ ok: true, action: "start-no-payload" });
+        }
+
+        const { data: lead, error: leadErr } = await supabase
+          .from("trial_leads")
+          .select("id, name, status, invite_link, telegram_user_id")
+          .eq("id", leadId)
+          .maybeSingle();
+        if (leadErr) console.error("start lookup failed", leadErr);
+
+        if (!lead) {
+          if (botToken) {
+            try {
+              await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  chat_id: fromId,
+                  text: "Cadastro não encontrado. Refaça o cadastro pelo site.",
+                }),
+              });
+            } catch (e) { console.warn("start lead-not-found reply failed", e); }
+          }
+          log("start-lead-not-found", { update_id: updateId, lead_id: leadId, from_id: fromId });
+          return json({ ok: true, action: "start-lead-not-found" });
+        }
+
+        // Anti-repetidor preventivo: se este Telegram já está vinculado a
+        // outro lead que NÃO seja este, bloqueia.
+        if (lead.telegram_user_id && lead.telegram_user_id !== fromId) {
+          if (botToken) {
+            try {
+              await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  chat_id: fromId,
+                  text: "Este cadastro já está associado a outro Telegram. Entre em contato com o suporte.",
+                }),
+              });
+            } catch (e) { console.warn("start mismatch reply failed", e); }
+          }
+          log("start-telegram-mismatch", {
+            update_id: updateId, lead_id: leadId, lead_user_id: lead.telegram_user_id, from_id: fromId,
+          });
+          return json({ ok: true, action: "start-telegram-mismatch" });
+        }
+
+        // Vincula o telegram_user_id se ainda não tinha (peça-chave do anti-spam:
+        // a partir daqui o cron consegue mandar DMs de 24h e 1h pra esse user).
+        if (!lead.telegram_user_id) {
+          await supabase
+            .from("trial_leads")
+            .update({
+              telegram_user_id: fromId,
+              telegram_username: fromUsername ? fromUsername.toLowerCase() : undefined,
+            })
+            .eq("id", leadId)
+            .is("telegram_user_id", null);
+        }
+
+        if (BLOCKED_LEAD_STATUSES.has(lead.status)) {
+          if (botToken) {
+            try {
+              await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  chat_id: fromId,
+                  text: "Seu trial já foi encerrado. Para continuar, fale com o suporte.",
+                }),
+              });
+            } catch (e) { console.warn("start blocked reply failed", e); }
+          }
+          log("start-blocked", { update_id: updateId, lead_id: leadId, status: lead.status });
+          return json({ ok: true, action: "start-blocked", status: lead.status });
+        }
+
+        // Manda o invite link como botão. O lead clica e cai no chat_member
+        // handler (Caso 1) que ativa o status e zera o expires_at.
+        if (botToken && lead.invite_link) {
+          const firstName = (lead.name ?? "").split(/\s+/)[0] || "tudo bem?";
+          try {
+            await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                chat_id: fromId,
+                text: [
+                  `Oi, <b>${firstName.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</b>! 👋`,
+                  ``,
+                  `Seu acesso ao grupo VIP da <b>SHARK 100% GREEN</b> está liberado por 7 dias.`,
+                  ``,
+                  `Toque no botão abaixo pra entrar agora 👇`,
+                ].join("\n"),
+                parse_mode: "HTML",
+                reply_markup: {
+                  inline_keyboard: [[
+                    { text: "🚀 Entrar no grupo VIP", url: lead.invite_link },
+                  ]],
+                },
+              }),
+            });
+          } catch (e) {
+            console.error("start invite reply failed", e);
+          }
+        }
+
+        log("start-handled", { update_id: updateId, lead_id: leadId, from_id: fromId, status: lead.status });
+        return json({ ok: true, action: "start-handled", lead_id: leadId });
+      }
+
+      // Outras mensagens privadas — ignora silenciosamente.
+      log("ignored", { reason: "non-/start message", update_id: updateId, chat_type: chatType });
+      return json({ ok: true, ignored: "non-/start message" });
+    }
+
     const cmKind = update.chat_member ? "chat_member"
       : update.my_chat_member ? "my_chat_member"
       : null;

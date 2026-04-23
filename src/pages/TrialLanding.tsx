@@ -366,7 +366,7 @@ function SignupModal({
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<{ link: string } | null>(null);
+  const [success, setSuccess] = useState<{ botStartUrl: string; inviteLink: string; botUsername: string } | null>(null);
   const firstInputRef = useRef<HTMLInputElement | null>(null);
 
   // Foca o primeiro campo ao abrir
@@ -428,7 +428,11 @@ function SignupModal({
         setServerError(json?.error || 'Não foi possível processar sua solicitação. Tente novamente.');
         return;
       }
-      setSuccess({ link: json.invite_link });
+      setSuccess({
+        botStartUrl: json.bot_start_url,
+        inviteLink: json.invite_link,
+        botUsername: json.bot_username,
+      });
     } catch {
       setServerError('Erro de conexão. Verifique sua internet e tente novamente.');
     } finally {
@@ -467,37 +471,51 @@ function SignupModal({
                 <CheckCircle2 className="w-8 h-8 text-emerald-400" />
               </div>
               <div className="space-y-2">
-                <h2 className="text-2xl font-bold">Tudo pronto! 🎉</h2>
-                <p className="text-white/60 text-sm">
-                  Seu link de convite está abaixo. Clique para entrar no grupo VIP.
+                <h2 className="text-2xl font-bold">Quase lá! 🎉</h2>
+                <p className="text-white/70 text-sm">
+                  <b>Passo 1:</b> abra o nosso bot no Telegram e toque em <b>Iniciar</b>. Ele vai te mandar o link do grupo VIP em segundos.
                 </p>
               </div>
               <a
-                href={success.link}
+                href={success.botStartUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-full"
-                data-testid="link-telegram-invite"
+                data-testid="link-bot-start"
               >
                 <Button className="w-full h-12 bg-gradient-to-r from-emerald-400 to-green-500 hover:from-emerald-300 hover:to-green-400 text-black font-bold text-base border-0 shadow-lg shadow-emerald-500/40">
-                  <ExternalLink className="w-5 h-5 mr-2" />
-                  Abrir no Telegram
+                  <Send className="w-5 h-5 mr-2" />
+                  Abrir bot no Telegram
                 </Button>
               </a>
-              <div className="bg-amber-500/10 border border-amber-500/25 rounded-xl p-4 w-full text-left">
+              <div className="bg-emerald-500/10 border border-emerald-500/25 rounded-xl p-4 w-full text-left">
                 <div className="flex gap-3">
-                  <Clock className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
                   <div className="space-y-1.5 text-xs">
-                    <p className="font-semibold text-amber-200">Link válido por 24h, 1 uso</p>
+                    <p className="font-semibold text-emerald-200">Por que esse passo?</p>
                     <p className="text-white/60">
-                      Entre no grupo agora — após o join, seu acesso de 7 dias é ativado automaticamente.
+                      Sem apertar Iniciar, o Telegram não permite que o bot te mande mensagens — e você perderia os avisos importantes durante o trial.
                     </p>
                   </div>
                 </div>
               </div>
-              <p className="text-[11px] text-white/50 break-all">
-                Link: <span className="font-mono">{success.link}</span>
-              </p>
+              <details className="w-full text-left">
+                <summary className="text-[11px] text-white/50 cursor-pointer hover:text-white/70">
+                  Não consegue abrir o bot? Use o link direto do grupo
+                </summary>
+                <a
+                  href={success.inviteLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2 inline-block text-xs text-emerald-300 underline break-all"
+                  data-testid="link-telegram-invite-fallback"
+                >
+                  {success.inviteLink}
+                </a>
+                <p className="text-[10px] text-white/40 mt-1">
+                  Atenção: usando o link direto, você não recebe os avisos automáticos do bot.
+                </p>
+              </details>
             </div>
           ) : (
             <form onSubmit={submit} className="space-y-4" data-testid="form-trial-signup">

@@ -41,6 +41,29 @@ src/
 
 ## Trial Telegram System
 
+### Fluxo "Abrir bot primeiro" (desde 2026-04-23)
+**Problema resolvido**: Telegram só permite o bot mandar DM se o usuário tiver dado `/start` no DM dele primeiro. No fluxo antigo, o lead pegava o invite_link direto e entrava no grupo sem nunca falar com o bot — por isso as DMs de 24h/1h falhavam com 403 pra praticamente todo mundo. Solução: força o lead a passar pelo bot antes de receber o invite link.
+
+**Fluxo novo**:
+1. Lead preenche o form em `/trial`.
+2. `trial-signup` cria invite_link no grupo + insere o lead com `id` UUID + retorna `{ lead_id, bot_start_url, bot_username, invite_link }`. `bot_start_url = https://t.me/<bot>?start=lead_<UUID>`. Username default hardcoded `sharkinhogreen_bot` (override via env `TELEGRAM_TRIAL_BOT_USERNAME`).
+3. Modal de sucesso na `TrialLanding.tsx` mostra botão grande **"Abrir bot no Telegram"** (`bot_start_url`) como CTA principal. Invite_link fica escondido em `<details>` como fallback "se não conseguir abrir o bot".
+4. Lead toca Iniciar/Start no DM do bot → Telegram envia `update.message` com `text="/start lead_<UUID>"` pro `trial-webhook`.
+5. `trial-webhook` (Caso 0, novo): valida `chat.type=='private'` + regex `/^\/start lead_<uuid>$/`, busca o lead, **grava `telegram_user_id` e `telegram_username` na hora** (peça-chave: a partir daqui o cron consegue mandar DMs sem 403), responde com mensagem HTML + botão inline `🚀 Entrar no grupo VIP` apontando pro `invite_link`.
+6. Lead clica no botão, entra no grupo, dispara `chat_member` que ativa o trial (Caso 1, fluxo já existente).
+
+**Mudanças necessárias**:
+- `trial-webhook-reset` agora registra `allowed_updates: [chat_member, my_chat_member, message]`. Após deploy, o admin precisa clicar em **"Resetar webhook"** em `/trial-admin` pra essa mudança valer.
+- `trial-signup` precisa redeploy com `--no-verify-jwt`.
+- `trial-webhook` precisa redeploy com `--no-verify-jwt`.
+
+**Tratamentos de borda no `/start`**:
+- `/start` sem payload → mensagem genérica pedindo cadastro pelo site.
+- payload com lead_id que não existe → "Cadastro não encontrado, refaça pelo site".
+- lead já tem `telegram_user_id` diferente do `from.id` → bloqueia, pede contato com suporte (anti-repeat preventivo).
+- lead já em status bloqueado/expirado → "Trial encerrado, fale com suporte".
+- Mensagens privadas que não sejam `/start` são ignoradas silenciosamente.
+
 ### DMs de aviso 24h + 1h (desde 2026-04-23)
 O `trial-cron` envia DUAS DMs antes da expiração: uma 24h antes (`reminder_sent_at`) e outra ~1h antes (`reminder_1h_sent_at`, coluna nova em `trial_leads` via migração `20260423_trial_reminder_extras.sql`). Ambas levam direto pro checkout do Lastlink com cupom destacado. URL hardcoded `TRIAL_REMINDER_CHECKOUT_URL=https://lastlink.com/p/CEAEE6585/checkout-payment/` (override por env). UTMs: `utm_source=telegram`, `utm_medium=dm`, `utm_campaign=trial_reminder_24h|trial_reminder_1h`, `coupon=<cupom>`, `lead_id=<id>`. Reply markup tem 2 linhas de botões: `🛒 Assinar com cupom <cupom>` + `💬 Falar com Suporte` (link `https://t.me/SuporteSharkGreen_financeiro`, hardcoded).
 

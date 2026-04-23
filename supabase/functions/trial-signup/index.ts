@@ -90,8 +90,8 @@ serve(async (req) => {
     }
     const inviteLink: string = tgData.result.invite_link;
 
-    // Insere o lead
-    const { error: insertErr } = await supabase
+    // Insere o lead (retorna o id pra montar o deep-link do bot)
+    const { data: inserted, error: insertErr } = await supabase
       .from("trial_leads")
       .insert({
         name,
@@ -100,11 +100,13 @@ serve(async (req) => {
         telegram_username,
         invite_link: inviteLink,
         status: "pending",
-      });
+      })
+      .select("id")
+      .single();
 
-    if (insertErr) {
+    if (insertErr || !inserted) {
       // Race condition em índice único (PostgrestError expõe `code`)
-      const pgCode = (insertErr as { code?: string }).code;
+      const pgCode = (insertErr as { code?: string } | null)?.code;
       if (pgCode === "23505") {
         return json({ error: "Você já utilizou seu trial gratuito." }, { status: 409 });
       }
@@ -112,7 +114,23 @@ serve(async (req) => {
       return json({ error: "Erro ao salvar cadastro." }, { status: 500 });
     }
 
-    return json({ invite_link: inviteLink });
+    // Deep-link do bot: força o lead a apertar Start no DM antes de receber
+    // o invite_link via DM. Isso garante que o cron consiga mandar as DMs
+    // de aviso (24h e 1h) — caso contrário o Telegram bloqueia (403).
+    // O payload `lead_<id>` é lido pelo handler /start em trial-webhook.
+    const botUsername = (
+      Deno.env.get("TELEGRAM_TRIAL_BOT_USERNAME") ?? "sharkinhogreen_bot"
+    ).replace(/^@+/, "");
+    const botStartUrl = `https://t.me/${botUsername}?start=lead_${inserted.id}`;
+
+    return json({
+      lead_id: inserted.id,
+      bot_start_url: botStartUrl,
+      bot_username: botUsername,
+      // invite_link mantido por compatibilidade / fallback se o usuário
+      // ignorar o passo do bot. O bot tb manda esse mesmo link via DM.
+      invite_link: inviteLink,
+    });
   } catch (err) {
     console.error("trial-signup unexpected", err);
     return json({ error: "Erro interno." }, { status: 500 });
