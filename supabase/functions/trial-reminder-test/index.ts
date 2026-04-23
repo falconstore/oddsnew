@@ -28,6 +28,7 @@ function escapeHtml(s: string): string {
 function buildCtaUrl(checkoutUrl: string, coupon: string, leadId: string, campaign: string): string {
   try {
     const u = new URL(checkoutUrl);
+    u.searchParams.set("cp", coupon);
     u.searchParams.set("utm_source", "telegram");
     u.searchParams.set("utm_medium", "dm");
     u.searchParams.set("utm_campaign", campaign);
@@ -45,9 +46,11 @@ function build24hMessage(firstName: string, coupon: string): string {
     ``,
     `Seu acesso gratuito no grupo VIP da <b>SHARK 100% GREEN</b> termina em <b>24 horas</b>.`,
     ``,
-    `Pra não perder os sinais de Duplo Green, garanta sua assinatura agora com desconto exclusivo de quem já testou:`,
+    `Pra não perder os sinais, garanta sua assinatura agora com desconto exclusivo de quem já testou:`,
     ``,
     `🎁 Use o cupom <b>${escapeHtml(coupon)}</b> no checkout`,
+    ``,
+    `Essa promoção é exclusiva e você terá um super desconto: de <s>R$ 148,90</s> por apenas <b>R$ 99,90</b> usando o cupom. Não perca essa oportunidade.`,
     ``,
     `É só clicar no botão abaixo 👇`,
     ``,
@@ -63,7 +66,7 @@ function build1hMessage(firstName: string, coupon: string): string {
     ``,
     `Esta é sua <b>última chance</b> de garantir o desconto:`,
     ``,
-    `🎁 Cupom <b>${escapeHtml(coupon)}</b> ainda está valendo`,
+    `🎁 Cupom <b>${escapeHtml(coupon)}</b> ainda está valendo: de <s>R$ 148,90</s> por apenas <b>R$ 99,90</b>.`,
     ``,
     `Não perca os próximos Duplos Green 🦈`,
     ``,
