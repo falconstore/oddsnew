@@ -223,6 +223,93 @@ export const useForceActivate = () => {
   });
 };
 
+export type TrialSettings = {
+  reminder_coupon: string;
+  updated_at: string;
+  updated_by: string | null;
+};
+
+export const useTrialSettings = () => {
+  return useQuery({
+    queryKey: ['trial_settings'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('trial_settings')
+        .select('reminder_coupon, updated_at, updated_by')
+        .eq('id', true)
+        .maybeSingle();
+      if (error) throw error;
+      return (data ?? { reminder_coupon: 'PODPROMO', updated_at: '', updated_by: null }) as TrialSettings;
+    },
+    staleTime: 30_000,
+  });
+};
+
+export const useUpdateTrialSettings = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ coupon }: { coupon: string }) => {
+      const trimmed = coupon.trim();
+      if (!trimmed) throw new Error('Cupom não pode ficar em branco');
+      const { data: sessionData } = await supabase.auth.getSession();
+      const email = sessionData.session?.user?.email ?? null;
+      const { data, error } = await supabase
+        .from('trial_settings')
+        .update({ reminder_coupon: trimmed, updated_at: new Date().toISOString(), updated_by: email })
+        .eq('id', true)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['trial_settings'] });
+      toast({ title: 'Cupom atualizado', description: 'O próximo aviso já vai usar o novo valor.' });
+    },
+    onError: (err: Error) => {
+      toast({ title: 'Erro ao atualizar cupom', description: err.message, variant: 'destructive' });
+    },
+  });
+};
+
+export type ReminderTestInput = {
+  variant: '24h' | '1h';
+  telegramUserId?: string;
+  telegramUsername?: string;
+  name?: string;
+};
+
+export const useSendReminderTest = () => {
+  return useMutation<{ ok: boolean; message: string; variant: string }, Error, ReminderTestInput>({
+    mutationFn: async ({ variant, telegramUserId, telegramUsername, name }) => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      const url = `${import.meta.env.VITE_MAIN_SUPABASE_URL}/functions/v1/trial-reminder-test`;
+      const body: Record<string, unknown> = { variant };
+      if (telegramUserId && telegramUserId.trim()) body.telegram_user_id = telegramUserId.trim();
+      if (telegramUsername && telegramUsername.trim()) body.telegram_username = telegramUsername.trim();
+      if (name && name.trim()) body.name = name.trim();
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(body),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.hint || json?.error || 'Falha ao enviar teste');
+      return json;
+    },
+    onSuccess: (data) => {
+      toast({ title: 'Teste enviado', description: data.message });
+    },
+    onError: (err: Error) => {
+      toast({ title: 'Erro no teste', description: err.message, variant: 'destructive' });
+    },
+  });
+};
+
 export const useResetWebhook = () => {
   return useMutation<{ ok: boolean; message: string; webhook_url: string }>({
     mutationFn: async () => {

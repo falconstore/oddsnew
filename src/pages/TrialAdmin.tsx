@@ -19,6 +19,7 @@ import {
 import {
   useTrialLeads, useKickTrialLead, usePurgeTrialLead, useDiagnoseTelegram,
   useLinkManual, useResetWebhook, useForceActivate, type TelegramDiagnose,
+  useTrialSettings, useUpdateTrialSettings, useSendReminderTest,
 } from '@/hooks/useTrialLeads';
 import { useTrialUpgradeStats, type TrialStatsRange } from '@/hooks/useTrialUpgradeStats';
 import type { TrialLead, TrialStatus } from '@/types/trial';
@@ -63,6 +64,13 @@ export default function TrialAdmin() {
   const [historyLead, setHistoryLead] = useState<TrialLead | null>(null);
   const [diagOpen, setDiagOpen] = useState(false);
   const diag: TelegramDiagnose | undefined = diagnose.data;
+
+  const settings = useTrialSettings();
+  const updateSettings = useUpdateTrialSettings();
+  const sendTest = useSendReminderTest();
+  const [couponDraft, setCouponDraft] = useState<string>('');
+  const [testOpen, setTestOpen] = useState(false);
+  const [testForm, setTestForm] = useState({ variant: '24h' as '24h' | '1h', userId: '', username: '', name: '' });
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | TrialStatus>('all');
@@ -153,12 +161,74 @@ export default function TrialAdmin() {
                 <Stethoscope className="w-4 h-4 mr-1.5" />
                 Diagnosticar Telegram
               </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10"
+                onClick={() => setTestOpen(true)}
+                data-testid="button-open-test-dm"
+              >
+                <Send className="w-4 h-4 mr-1.5" />
+                Enviar DM teste
+              </Button>
               <a href={`${TRIAL_PUBLIC_URL}/`} target="_blank" rel="noopener noreferrer">
                 <Button size="sm" variant="outline" className="border-pink-500/30 text-pink-300 hover:bg-pink-500/10" data-testid="link-trial-landing">
                   <ExternalLink className="w-4 h-4 mr-1.5" />
                   Abrir landing
                 </Button>
               </a>
+            </div>
+          </div>
+        </div>
+
+        {/* Configurações dos avisos (cupom editável sem redeploy) */}
+        <div className="glass rounded-3xl border border-white/8 p-5 md:p-6">
+          <div className="flex flex-col md:flex-row md:items-end gap-4">
+            <div className="flex-1 min-w-0">
+              <h2 className="text-lg md:text-xl font-bold flex items-center gap-2">
+                <ShoppingCart className="w-5 h-5 text-pink-400" />
+                Cupom dos avisos (24h e 1h)
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Esse cupom aparece nas DMs automáticas e no botão "Assinar com cupom".
+                {settings.data?.updated_at && (
+                  <> Última alteração: {fmtDate(settings.data.updated_at)}{settings.data.updated_by ? ` por ${settings.data.updated_by}` : ''}.</>
+                )}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-end gap-2">
+              <div className="flex flex-col gap-1">
+                <label className="text-[11px] uppercase tracking-wider text-muted-foreground">Cupom</label>
+                <Input
+                  value={couponDraft || settings.data?.reminder_coupon || ''}
+                  placeholder={settings.isLoading ? 'Carregando…' : 'PODPROMO'}
+                  onChange={(e) => setCouponDraft(e.target.value.toUpperCase())}
+                  disabled={settings.isLoading}
+                  className="bg-white/5 border-white/10 h-9 text-sm uppercase font-mono w-[200px]"
+                  data-testid="input-reminder-coupon"
+                />
+              </div>
+              <Button
+                size="sm"
+                onClick={() => {
+                  const next = (couponDraft || settings.data?.reminder_coupon || '').trim();
+                  if (!next) return;
+                  if (next === settings.data?.reminder_coupon) return;
+                  updateSettings.mutate({ coupon: next }, {
+                    onSuccess: () => setCouponDraft(''),
+                  });
+                }}
+                disabled={
+                  updateSettings.isPending
+                  || !couponDraft.trim()
+                  || couponDraft.trim() === settings.data?.reminder_coupon
+                }
+                className="bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-500/30 h-9"
+                data-testid="button-save-coupon"
+              >
+                {updateSettings.isPending ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-1.5" />}
+                Salvar cupom
+              </Button>
             </div>
           </div>
         </div>
@@ -1024,6 +1094,92 @@ export default function TrialAdmin() {
               ) : (
                 <><Unlock className="w-4 h-4 mr-1.5" /> Liberar e ativar 7 dias</>
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Enviar DM de teste */}
+      <Dialog open={testOpen} onOpenChange={(o) => { setTestOpen(o); if (!o) setTestForm({ variant: '24h', userId: '', username: '', name: '' }); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Send className="w-5 h-5 text-emerald-400" />
+              Enviar DM de teste
+            </DialogTitle>
+            <DialogDescription>
+              Manda a mensagem real (24h ou 1h antes da expiração) para um Telegram qualquer. O cupom usado é o que está salvo acima.
+              <br />
+              <span className="text-amber-300/80 text-xs">Importante: o destinatário precisa ter iniciado conversa com o bot pelo menos uma vez (mandar /start).</span>
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2">
+            <div className="space-y-1">
+              <label className="text-[11px] uppercase tracking-wider text-muted-foreground">Variante</label>
+              <Select value={testForm.variant} onValueChange={(v) => setTestForm(f => ({ ...f, variant: v as '24h' | '1h' }))}>
+                <SelectTrigger className="bg-white/5 border-white/10 h-9 text-sm" data-testid="select-test-variant">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="24h">DM de 24h antes</SelectItem>
+                  <SelectItem value="1h">DM de 1h antes (última chance)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-[11px] uppercase tracking-wider text-muted-foreground">Telegram user ID (numérico)</label>
+              <Input
+                value={testForm.userId}
+                onChange={(e) => setTestForm(f => ({ ...f, userId: e.target.value.replace(/\D/g, '') }))}
+                placeholder="ex: 123456789"
+                className="bg-white/5 border-white/10 h-9 text-sm font-mono"
+                data-testid="input-test-user-id"
+              />
+              <p className="text-[11px] text-muted-foreground">Peça pra pessoa rodar @userinfobot no Telegram pra descobrir o ID.</p>
+            </div>
+            <div className="space-y-1">
+              <label className="text-[11px] uppercase tracking-wider text-muted-foreground">— ou — @username</label>
+              <Input
+                value={testForm.username}
+                onChange={(e) => setTestForm(f => ({ ...f, username: e.target.value.replace(/^@+/, '') }))}
+                placeholder="ex: joaosilva"
+                className="bg-white/5 border-white/10 h-9 text-sm font-mono"
+                data-testid="input-test-username"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[11px] uppercase tracking-wider text-muted-foreground">Nome (opcional)</label>
+              <Input
+                value={testForm.name}
+                onChange={(e) => setTestForm(f => ({ ...f, name: e.target.value }))}
+                placeholder="ex: João"
+                className="bg-white/5 border-white/10 h-9 text-sm"
+                data-testid="input-test-name"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTestOpen(false)} data-testid="button-cancel-test">
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                sendTest.mutate({
+                  variant: testForm.variant,
+                  telegramUserId: testForm.userId || undefined,
+                  telegramUsername: testForm.username || undefined,
+                  name: testForm.name || undefined,
+                }, {
+                  onSuccess: () => setTestOpen(false),
+                });
+              }}
+              disabled={sendTest.isPending || (!testForm.userId.trim() && !testForm.username.trim())}
+              className="bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-500/30"
+              data-testid="button-confirm-test"
+            >
+              {sendTest.isPending ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Enviando…</> : <><Send className="w-4 h-4 mr-1.5" /> Enviar DM teste</>}
             </Button>
           </DialogFooter>
         </DialogContent>

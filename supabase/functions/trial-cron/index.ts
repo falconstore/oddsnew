@@ -53,6 +53,57 @@ function isPermanentTelegramError(status: number, description?: string): boolean
   return false;
 }
 
+function buildCtaUrl(checkoutUrl: string, coupon: string, leadId: string, campaign: string): string {
+  try {
+    const u = new URL(checkoutUrl);
+    u.searchParams.set("utm_source", "telegram");
+    u.searchParams.set("utm_medium", "dm");
+    u.searchParams.set("utm_campaign", campaign);
+    u.searchParams.set("coupon", coupon);
+    u.searchParams.set("lead_id", leadId);
+    return u.toString();
+  } catch {
+    return checkoutUrl;
+  }
+}
+
+function build24hMessage(firstName: string, coupon: string): string {
+  return [
+    `Oi, <b>${firstName}</b> 👋`,
+    ``,
+    `Seu acesso gratuito no grupo VIP da <b>SHARK 100% GREEN</b> termina em <b>24 horas</b>.`,
+    ``,
+    `Pra não perder os sinais de Duplo Green, garanta sua assinatura agora com desconto exclusivo de quem já testou:`,
+    ``,
+    `🎁 Use o cupom <b>${escapeHtml(coupon)}</b> no checkout`,
+    ``,
+    `É só clicar no botão abaixo 👇`,
+  ].join("\n");
+}
+
+function build1hMessage(firstName: string, coupon: string): string {
+  return [
+    `⏰ <b>${firstName}</b>, falta só <b>1 hora</b>!`,
+    ``,
+    `Em 1h seu acesso ao grupo VIP da <b>SHARK 100% GREEN</b> expira e você sai automaticamente.`,
+    ``,
+    `Esta é sua <b>última chance</b> de garantir o desconto:`,
+    ``,
+    `🎁 Cupom <b>${escapeHtml(coupon)}</b> ainda está valendo`,
+    ``,
+    `Não perca os próximos Duplos Green 🦈`,
+  ].join("\n");
+}
+
+function buildReplyMarkup(ctaUrl: string, coupon: string, supportUrl: string) {
+  return {
+    inline_keyboard: [
+      [{ text: `🛒 Assinar com cupom ${coupon}`, url: ctaUrl }],
+      [{ text: "💬 Falar com Suporte", url: supportUrl }],
+    ],
+  };
+}
+
 async function tgSendDM(botToken: string, userId: number, text: string, replyMarkup?: unknown) {
   const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
     method: "POST",
@@ -100,15 +151,24 @@ serve(async (req) => {
     }
 
     const publicSiteUrl = (Deno.env.get("TRIAL_PUBLIC_SITE_URL") ?? "").replace(/\/+$/, "");
-    // Configuração do CTA do aviso de 24h (com fallback hardcoded para
-    // não depender de env vars novas).
+    // URL do checkout: hardcoded com override por env var (raramente muda).
     const reminderCheckoutUrl = (
       Deno.env.get("TRIAL_REMINDER_CHECKOUT_URL")
         ?? "https://lastlink.com/p/CEAEE6585/checkout-payment/"
     ).trim();
+    // Cupom: lê do banco (trial_settings), com fallback env e hardcoded.
+    // Admin troca pelo painel sem precisar redeploy.
+    const { data: settingsRow } = await supabase
+      .from("trial_settings")
+      .select("reminder_coupon")
+      .eq("id", true)
+      .maybeSingle();
     const reminderCoupon = (
-      Deno.env.get("TRIAL_REMINDER_COUPON") ?? "PODPROMO"
+      settingsRow?.reminder_coupon
+        ?? Deno.env.get("TRIAL_REMINDER_COUPON")
+        ?? "PODPROMO"
     ).trim();
+    const supportUrl = "https://t.me/SuporteSharkGreen_financeiro";
 
     // ===== 1) Avisos prévios (24h antes da expiração) =====
     let remindersSent = 0;
@@ -137,41 +197,12 @@ serve(async (req) => {
             continue;
           }
 
-          // Monta a URL do checkout com UTMs para rastreio no Lastlink.
-          const ctaUrl = (() => {
-            try {
-              const u = new URL(reminderCheckoutUrl);
-              u.searchParams.set("utm_source", "telegram");
-              u.searchParams.set("utm_medium", "dm");
-              u.searchParams.set("utm_campaign", "trial_reminder");
-              u.searchParams.set("coupon", reminderCoupon);
-              u.searchParams.set("lead_id", lead.id);
-              return u.toString();
-            } catch {
-              return reminderCheckoutUrl;
-            }
-          })();
-
+          const ctaUrl = buildCtaUrl(reminderCheckoutUrl, reminderCoupon, lead.id, "trial_reminder_24h");
           const firstName = escapeHtml(
             (lead.name ?? "").split(/\s+/)[0] || "tudo bem?",
           );
-          const text = [
-            `Oi, <b>${firstName}</b> 👋`,
-            ``,
-            `Seu acesso gratuito no grupo VIP da <b>SHARK 100% GREEN</b> termina em <b>24 horas</b>.`,
-            ``,
-            `Pra não perder os sinais de Duplo Green, garanta sua assinatura agora com desconto exclusivo de quem já testou:`,
-            ``,
-            `🎁 Use o cupom <b>${escapeHtml(reminderCoupon)}</b> no checkout`,
-            ``,
-            `É só clicar no botão abaixo 👇`,
-          ].join("\n");
-
-          const replyMarkup = {
-            inline_keyboard: [[
-              { text: `🛒 Assinar com cupom ${reminderCoupon}`, url: ctaUrl },
-            ]],
-          };
+          const text = build24hMessage(firstName, reminderCoupon);
+          const replyMarkup = buildReplyMarkup(ctaUrl, reminderCoupon, supportUrl);
 
           const sent = await tgSendDM(botToken, lead.telegram_user_id, text, replyMarkup);
           if (!sent.ok) {
@@ -192,6 +223,62 @@ serve(async (req) => {
             .update({ reminder_sent_at: new Date().toISOString() })
             .eq("id", lead.id);
           remindersSent++;
+        }
+      }
+    }
+
+    // ===== 1b) Avisos de última hora (~1h antes da expiração) =====
+    // Independente do aviso de 24h: empurrão final pra quem não converteu.
+    // IMPORTANTE: pra esse bloco funcionar bem, o pg_cron deve rodar ao menos
+    // a cada 90 minutos. Em cron diário, a janela [now, now+90min] só captura
+    // ~6% dos leads que expiram naquele dia. A janela é maior que 1h pra dar
+    // folga em cron horário e evitar perder leads por offsets de fuso.
+    let remindersSent1h = 0;
+    let remindersFailed1h = 0;
+    {
+      const now = new Date();
+      const in1h = new Date(now.getTime() + 90 * 60 * 1000);
+      const { data: dueReminders1h, error: rem1hErr } = await supabase
+        .from("trial_leads")
+        .select("id, name, telegram_user_id, expires_at")
+        .eq("status", "active")
+        .eq("cohort", "v2")
+        .is("reminder_1h_sent_at", null)
+        .gt("expires_at", now.toISOString())
+        .lte("expires_at", in1h.toISOString())
+        .limit(500);
+      if (rem1hErr) {
+        console.error("reminder 1h query error", rem1hErr);
+      } else {
+        for (const lead of dueReminders1h ?? []) {
+          if (!lead.telegram_user_id) {
+            await supabase.from("trial_leads")
+              .update({ reminder_1h_sent_at: new Date().toISOString() })
+              .eq("id", lead.id);
+            continue;
+          }
+          const ctaUrl = buildCtaUrl(reminderCheckoutUrl, reminderCoupon, lead.id, "trial_reminder_1h");
+          const firstName = escapeHtml(
+            (lead.name ?? "").split(/\s+/)[0] || "tudo bem?",
+          );
+          const text = build1hMessage(firstName, reminderCoupon);
+          const replyMarkup = buildReplyMarkup(ctaUrl, reminderCoupon, supportUrl);
+
+          const sent = await tgSendDM(botToken, lead.telegram_user_id, text, replyMarkup);
+          if (!sent.ok) {
+            console.error("reminder 1h DM failed", lead.id, sent.error, "permanent:", sent.permanent);
+            remindersFailed1h++;
+            if (sent.permanent) {
+              await supabase.from("trial_leads")
+                .update({ reminder_1h_sent_at: new Date().toISOString() })
+                .eq("id", lead.id);
+            }
+            continue;
+          }
+          await supabase.from("trial_leads")
+            .update({ reminder_1h_sent_at: new Date().toISOString() })
+            .eq("id", lead.id);
+          remindersSent1h++;
         }
       }
     }
