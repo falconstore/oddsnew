@@ -646,6 +646,26 @@ export default function TrialAdmin() {
                       <Button
                         size="sm"
                         variant="outline"
+                        className="h-8 w-8 p-0 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-40"
+                        disabled={!lead.telegram_user_id || sendTest.isPending}
+                        onClick={() => sendTest.mutate({
+                          variant: '24h',
+                          telegramUserId: lead.telegram_user_id ? String(lead.telegram_user_id) : undefined,
+                          telegramUsername: !lead.telegram_user_id ? (lead.telegram_username ?? undefined) : undefined,
+                          name: lead.name,
+                        })}
+                        data-testid={`button-lead-test-dm-${lead.id}`}
+                        title={lead.telegram_user_id
+                          ? 'Enviar DM teste (variante 24h) para este lead'
+                          : 'Lead ainda sem Telegram ID — vincule primeiro'}
+                      >
+                        {sendTest.isPending && sendTest.variables?.telegramUserId === String(lead.telegram_user_id ?? '')
+                          ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          : <Send className="w-3.5 h-3.5" />}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
                         className="h-8 text-xs border-red-500/30 text-red-300 hover:bg-red-500/10 disabled:opacity-40"
                         disabled={!canKick}
                         onClick={() => setConfirmKick(lead)}
