@@ -616,7 +616,7 @@ export default function TrialAdmin() {
                             title={`Entrou no bônus em ${fmtDate(lead.bonus_entered_at)}`}
                           >
                             <CheckCircle2 className="w-2.5 h-2.5 mr-1" />
-                            Bônus · {fmtDate(lead.bonus_entered_at)}
+                            Área do Aluno · {fmtDate(lead.bonus_entered_at)}
                           </Badge>
                         ) : lead.bonus_invite_link ? (
                           <Badge
@@ -625,7 +625,7 @@ export default function TrialAdmin() {
                             title="Não entrou no grupo bônus (Área do Aluno)"
                           >
                             <XCircle className="w-2.5 h-2.5 mr-1" />
-                            Bônus pendente
+                            Área do Aluno pendente
                           </Badge>
                         ) : (
                           <Badge
@@ -633,7 +633,7 @@ export default function TrialAdmin() {
                             data-testid={`badge-bonus-unavailable-${lead.id}`}
                             title="Grupo bônus não estava configurado quando este lead se cadastrou"
                           >
-                            Bônus indisponível
+                            Área do Aluno indisponível
                           </Badge>
                         )}
                       </div>
