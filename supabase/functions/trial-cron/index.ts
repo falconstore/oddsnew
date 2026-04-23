@@ -111,6 +111,7 @@ serve(async (req) => {
         .from("trial_leads")
         .select("id, name, telegram_user_id, expires_at")
         .eq("status", "active")
+        .eq("cohort", "v2")
         .is("reminder_sent_at", null)
         .gt("expires_at", now.toISOString())
         .lte("expires_at", in24h.toISOString())
@@ -181,6 +182,7 @@ serve(async (req) => {
       .from("trial_leads")
       .select("id, telegram_user_id")
       .eq("status", "active")
+      .eq("cohort", "v2")
       .lte("expires_at", new Date().toISOString())
       .limit(500);
     if (error) {

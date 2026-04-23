@@ -20,6 +20,7 @@ export interface TrialLead {
   removed_at: string | null;
   reminder_sent_at: string | null;
   previous_lead_id: string | null;
+  cohort: 'v1' | 'v2';
   created_at: string;
 }
 

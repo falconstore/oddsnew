@@ -66,6 +66,7 @@ export default function TrialAdmin() {
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | TrialStatus>('all');
+  const [cohortFilter, setCohortFilter] = useState<'all' | 'v1' | 'v2'>('all');
   const [confirmKick, setConfirmKick] = useState<TrialLead | null>(null);
   const [linkLead, setLinkLead] = useState<TrialLead | null>(null);
   const [manualUserId, setManualUserId] = useState('');
@@ -75,7 +76,7 @@ export default function TrialAdmin() {
   const { data: landingStats, isLoading: landingLoading } = useTrialUpgradeStats(statsRange, 'trial-landing-hero');
 
   const stats = useMemo(() => {
-    const s = { total: leads.length, active: 0, expired: 0, blocked: 0, pending: 0, removed: 0, blockedRepeat: 0 };
+    const s = { total: leads.length, active: 0, expired: 0, blocked: 0, pending: 0, removed: 0, blockedRepeat: 0, v1: 0, v2: 0 };
     for (const l of leads) {
       if (l.status === 'active') s.active++;
       else if (l.status === 'expired') s.expired++;
@@ -83,6 +84,8 @@ export default function TrialAdmin() {
       else if (l.status === 'pending') s.pending++;
       else if (l.status === 'removed') s.removed++;
       else if (l.status === 'blocked_repeat') s.blockedRepeat++;
+      if (l.cohort === 'v1') s.v1++;
+      else if (l.cohort === 'v2') s.v2++;
     }
     return s;
   }, [leads]);
@@ -90,6 +93,7 @@ export default function TrialAdmin() {
   const filtered = useMemo(() => {
     let list = leads;
     if (statusFilter !== 'all') list = list.filter(l => l.status === statusFilter);
+    if (cohortFilter !== 'all') list = list.filter(l => l.cohort === cohortFilter);
     if (search) {
       const q = search.toLowerCase();
       list = list.filter(l =>
@@ -102,7 +106,7 @@ export default function TrialAdmin() {
       );
     }
     return list;
-  }, [leads, statusFilter, search]);
+  }, [leads, statusFilter, cohortFilter, search]);
 
   return (
     <Layout>
@@ -412,9 +416,19 @@ export default function TrialAdmin() {
               <SelectItem value="blocked_repeat">Repetidores bloqueados</SelectItem>
             </SelectContent>
           </Select>
-          {(search || statusFilter !== 'all') && (
+          <Select value={cohortFilter} onValueChange={v => setCohortFilter(v as 'all' | 'v1' | 'v2')}>
+            <SelectTrigger className="bg-white/5 border-white/10 h-9 text-sm w-[180px]" data-testid="select-trial-cohort-filter">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as turmas</SelectItem>
+              <SelectItem value="v2">v2 — grupo atual ({stats.v2})</SelectItem>
+              <SelectItem value="v1">v1 — grupo antigo ({stats.v1})</SelectItem>
+            </SelectContent>
+          </Select>
+          {(search || statusFilter !== 'all' || cohortFilter !== 'all') && (
             <Button variant="ghost" size="sm" className="h-9 text-xs text-muted-foreground hover:text-foreground"
-              onClick={() => { setSearch(''); setStatusFilter('all'); }}
+              onClick={() => { setSearch(''); setStatusFilter('all'); setCohortFilter('all'); }}
               data-testid="button-trial-clear-filters">
               Limpar filtros
             </Button>
@@ -470,6 +484,15 @@ export default function TrialAdmin() {
                         <Badge className={`text-[10px] ${meta.cls}`} data-testid={`badge-lead-status-${lead.id}`}>
                           {meta.label}
                         </Badge>
+                        {lead.cohort === 'v1' && (
+                          <Badge
+                            className="text-[10px] bg-zinc-500/10 text-zinc-300 border-zinc-500/30"
+                            data-testid={`badge-cohort-v1-${lead.id}`}
+                            title="Lead do grupo antigo (v1) — não recebe DM nem é kickado"
+                          >
+                            v1 (grupo antigo)
+                          </Badge>
+                        )}
                         {lead.previous_lead_id && (
                           <Badge
                             className="text-[10px] bg-orange-500/10 text-orange-300 border-orange-500/30"
