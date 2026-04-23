@@ -90,6 +90,40 @@ serve(async (req) => {
     }
     const inviteLink: string = tgData.result.invite_link;
 
+    // (Opcional) Cria invite link no grupo bônus "Área do Aluno".
+    // Backward-compatible: se TELEGRAM_TRIAL_BONUS_CHAT_ID não estiver setado,
+    // ou se a criação falhar (ex: bot ainda não é admin no grupo bônus), o
+    // fluxo continua normalmente com só o VIP — a coluna `bonus_invite_link`
+    // fica null e o painel mostra "Bônus indisponível" para esse lead.
+    const bonusChatId = Deno.env.get("TELEGRAM_TRIAL_BONUS_CHAT_ID");
+    let bonusInviteLink: string | null = null;
+    if (bonusChatId) {
+      try {
+        const bonusRes = await fetch(
+          `https://api.telegram.org/bot${botToken}/createChatInviteLink`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: bonusChatId,
+              member_limit: 1,
+              expire_date: expireDate,
+              name: `Trial ${telegram_username} bonus`.slice(0, 32),
+              creates_join_request: false,
+            }),
+          },
+        );
+        const bonusData = await bonusRes.json().catch(() => ({}));
+        if (bonusRes.ok && bonusData?.ok && bonusData.result?.invite_link) {
+          bonusInviteLink = bonusData.result.invite_link as string;
+        } else {
+          console.warn("trial-signup: bonus createChatInviteLink failed", bonusData);
+        }
+      } catch (e) {
+        console.warn("trial-signup: bonus invite link error", e);
+      }
+    }
+
     // Insere o lead (retorna o id pra montar o deep-link do bot)
     const { data: inserted, error: insertErr } = await supabase
       .from("trial_leads")
@@ -99,6 +133,7 @@ serve(async (req) => {
         whatsapp,
         telegram_username,
         invite_link: inviteLink,
+        bonus_invite_link: bonusInviteLink,
         status: "pending",
       })
       .select("id")
@@ -130,6 +165,9 @@ serve(async (req) => {
       // invite_link mantido por compatibilidade / fallback se o usuário
       // ignorar o passo do bot. O bot tb manda esse mesmo link via DM.
       invite_link: inviteLink,
+      // Link do grupo bônus "Área do Aluno". A LP atual ignora — só o bot
+      // renderiza esse botão na DM. null quando bonus não está configurado.
+      bonus_invite_link: bonusInviteLink,
     });
   } catch (err) {
     console.error("trial-signup unexpected", err);

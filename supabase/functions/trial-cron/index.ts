@@ -150,6 +150,7 @@ serve(async (req) => {
     );
     const botToken = Deno.env.get("TELEGRAM_TRIAL_BOT_TOKEN");
     const chatId = Deno.env.get("TELEGRAM_TRIAL_CHAT_ID");
+    const bonusChatId = Deno.env.get("TELEGRAM_TRIAL_BONUS_CHAT_ID") ?? null;
     if (!botToken || !chatId) {
       return json({ error: "Bot não configurado" }, { status: 500 });
     }
@@ -300,7 +301,7 @@ serve(async (req) => {
       return json({ error: "query failed" }, { status: 500 });
     }
 
-    let processed = 0, failed = 0;
+    let processed = 0, failed = 0, bonusKicked = 0, bonusFailed = 0;
     for (const lead of expired ?? []) {
       if (!lead.telegram_user_id) {
         // Sem ID → marca como expirado mesmo sem kick
@@ -316,6 +317,20 @@ serve(async (req) => {
         failed++;
         continue;
       }
+      // Kick também do grupo bônus (best-effort — não bloqueia a expiração
+      // mesmo se falhar, ex: lead nunca entrou no bônus, ou bot não é admin lá).
+      if (bonusChatId) {
+        const bRes = await tgKick(botToken, bonusChatId, lead.telegram_user_id);
+        if (bRes.ok) {
+          bonusKicked++;
+          await supabase.from("trial_leads")
+            .update({ bonus_removed_at: new Date().toISOString() })
+            .eq("id", lead.id);
+        } else {
+          console.warn("bonus kick failed", lead.id, bRes.error);
+          bonusFailed++;
+        }
+      }
       await supabase.from("trial_leads")
         .update({ status: "expired", removed_at: new Date().toISOString() })
         .eq("id", lead.id);
@@ -326,8 +341,12 @@ serve(async (req) => {
       ok: true,
       reminders_sent: remindersSent,
       reminders_failed: remindersFailed,
+      reminders_sent_1h: remindersSent1h,
+      reminders_failed_1h: remindersFailed1h,
       processed,
       failed,
+      bonus_kicked: bonusKicked,
+      bonus_failed: bonusFailed,
       total: expired?.length ?? 0,
     });
   } catch (err) {

@@ -24,13 +24,16 @@ serve(async (req) => {
 
   const botToken = Deno.env.get("TELEGRAM_TRIAL_BOT_TOKEN");
   const chatId = Deno.env.get("TELEGRAM_TRIAL_CHAT_ID");
+  const bonusChatId = Deno.env.get("TELEGRAM_TRIAL_BONUS_CHAT_ID") ?? null;
   const webhookSecret = Deno.env.get("TELEGRAM_TRIAL_WEBHOOK_SECRET");
 
   const env = {
     has_bot_token: !!botToken,
     has_chat_id: !!chatId,
+    has_bonus_chat_id: !!bonusChatId,
     has_webhook_secret: !!webhookSecret,
     chat_id_value: chatId ?? null,
+    bonus_chat_id_value: bonusChatId,
   };
 
   if (!botToken) {
@@ -59,6 +62,17 @@ serve(async (req) => {
     });
   }
 
+  // 3b. Mesma checagem para o grupo bônus (se configurado)
+  let bonusChatMember: any = null;
+  let bonusChatInfo: any = null;
+  if (bonusChatId && me?.result?.id) {
+    bonusChatInfo = await tg(botToken, "getChat", { chat_id: bonusChatId });
+    bonusChatMember = await tg(botToken, "getChatMember", {
+      chat_id: bonusChatId,
+      user_id: me.result.id,
+    });
+  }
+
   const expectedWebhookSuffix = "/trial-webhook";
   const webhookUrlOk = typeof wh?.result?.url === "string" &&
     wh.result.url.endsWith(expectedWebhookSuffix);
@@ -82,6 +96,16 @@ serve(async (req) => {
       chatMember?.result?.status === "creator",
     chat_title: chatInfo?.result?.title ?? null,
     chat_type: chatInfo?.result?.type ?? null,
+    // Grupo bônus (opcional). null em todos os campos se BONUS_CHAT_ID não setado.
+    bonus_configured: !!bonusChatId,
+    bonus_in_chat: bonusChatId ? !!bonusChatMember?.ok : null,
+    bonus_status_in_chat: bonusChatMember?.result?.status ?? null,
+    bonus_can_restrict_members: bonusChatId
+      ? (bonusChatMember?.result?.can_restrict_members ??
+         bonusChatMember?.result?.status === "creator")
+      : null,
+    bonus_chat_title: bonusChatInfo?.result?.title ?? null,
+    bonus_chat_type: bonusChatInfo?.result?.type ?? null,
   };
 
   // Sugestões de correção
@@ -105,11 +129,21 @@ serve(async (req) => {
   if (summary.bot_in_chat && (summary.bot_status_in_chat === "administrator" || summary.bot_status_in_chat === "creator") && !summary.bot_can_restrict_members)
     issues.push("Bot é admin mas SEM permissão 'Ban users' — habilite-a para o trial-kick funcionar.");
 
+  // Checks do grupo bônus (só se BONUS_CHAT_ID estiver setado)
+  if (summary.bonus_configured) {
+    if (!summary.bonus_in_chat)
+      issues.push(`Bot não consegue ler o grupo bônus ${bonusChatId} — não foi adicionado, ou TELEGRAM_TRIAL_BONUS_CHAT_ID está errado.`);
+    else if (summary.bonus_status_in_chat !== "administrator" && summary.bonus_status_in_chat !== "creator")
+      issues.push(`Bot NÃO é administrador do grupo bônus (status: ${summary.bonus_status_in_chat}). Sem isso o invite link do bônus não é criado e a expulsão na expiração falha. Promova o bot a admin com permissão de banir usuários.`);
+    else if (!summary.bonus_can_restrict_members)
+      issues.push("Bot é admin no grupo bônus mas SEM permissão 'Ban users' — kick na expiração não vai funcionar lá.");
+  }
+
   return json({
     ok: issues.length === 0,
     env,
     summary,
     issues,
-    raw: { me, webhook: wh, chatMember, chatInfo },
+    raw: { me, webhook: wh, chatMember, chatInfo, bonusChatMember, bonusChatInfo },
   });
 });

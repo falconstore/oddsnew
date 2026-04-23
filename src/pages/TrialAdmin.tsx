@@ -588,6 +588,55 @@ export default function TrialAdmin() {
                         <span className="inline-flex items-center gap-1"><Phone className="w-3 h-3" />{fmtWhatsapp(lead.whatsapp)}</span>
                         <span className="inline-flex items-center gap-1"><Send className="w-3 h-3" />@{lead.telegram_username}</span>
                       </div>
+                      {/* Badges de presença em cada grupo (VIP + Área do Aluno bônus) */}
+                      <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                        {lead.entered_at ? (
+                          <Badge
+                            className="text-[10px] bg-emerald-500/10 text-emerald-300 border-emerald-500/30"
+                            data-testid={`badge-vip-${lead.id}`}
+                            title={`Entrou no VIP em ${fmtDate(lead.entered_at)}`}
+                          >
+                            <CheckCircle2 className="w-2.5 h-2.5 mr-1" />
+                            VIP · {fmtDate(lead.entered_at)}
+                          </Badge>
+                        ) : (
+                          <Badge
+                            className="text-[10px] bg-zinc-500/10 text-zinc-400 border-zinc-500/30"
+                            data-testid={`badge-vip-pending-${lead.id}`}
+                            title="Ainda não entrou no grupo VIP"
+                          >
+                            <XCircle className="w-2.5 h-2.5 mr-1" />
+                            VIP pendente
+                          </Badge>
+                        )}
+                        {lead.bonus_entered_at ? (
+                          <Badge
+                            className="text-[10px] bg-amber-500/10 text-amber-300 border-amber-500/30"
+                            data-testid={`badge-bonus-${lead.id}`}
+                            title={`Entrou no bônus em ${fmtDate(lead.bonus_entered_at)}`}
+                          >
+                            <CheckCircle2 className="w-2.5 h-2.5 mr-1" />
+                            Bônus · {fmtDate(lead.bonus_entered_at)}
+                          </Badge>
+                        ) : lead.bonus_invite_link ? (
+                          <Badge
+                            className="text-[10px] bg-zinc-500/10 text-zinc-400 border-zinc-500/30"
+                            data-testid={`badge-bonus-pending-${lead.id}`}
+                            title="Não entrou no grupo bônus (Área do Aluno)"
+                          >
+                            <XCircle className="w-2.5 h-2.5 mr-1" />
+                            Bônus pendente
+                          </Badge>
+                        ) : (
+                          <Badge
+                            className="text-[10px] bg-white/5 text-muted-foreground border-white/10"
+                            data-testid={`badge-bonus-unavailable-${lead.id}`}
+                            title="Grupo bônus não estava configurado quando este lead se cadastrou"
+                          >
+                            Bônus indisponível
+                          </Badge>
+                        )}
+                      </div>
                     </div>
 
                     {/* Dates */}

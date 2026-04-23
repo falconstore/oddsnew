@@ -40,6 +40,7 @@ serve(async (req) => {
   try {
     const expectedSecret = Deno.env.get("TELEGRAM_TRIAL_WEBHOOK_SECRET");
     const expectedChatId = Deno.env.get("TELEGRAM_TRIAL_CHAT_ID");
+    const bonusChatId = Deno.env.get("TELEGRAM_TRIAL_BONUS_CHAT_ID") ?? null;
     const botToken = Deno.env.get("TELEGRAM_TRIAL_BOT_TOKEN");
 
     if (!expectedSecret) {
@@ -102,7 +103,7 @@ serve(async (req) => {
 
         const { data: lead, error: leadErr } = await supabase
           .from("trial_leads")
-          .select("id, name, status, invite_link, telegram_user_id")
+          .select("id, name, status, invite_link, bonus_invite_link, telegram_user_id")
           .eq("id", leadId)
           .maybeSingle();
         if (leadErr) console.error("start lookup failed", leadErr);
@@ -175,29 +176,46 @@ serve(async (req) => {
           return json({ ok: true, action: "start-blocked", status: lead.status });
         }
 
-        // Manda o invite link como botão. O lead clica e cai no chat_member
-        // handler (Caso 1) que ativa o status e zera o expires_at.
+        // Manda os invite links como botões. O grupo VIP é o principal — só
+        // o JOIN nele ativa o trial (Caso 1). O grupo bônus "Área do Aluno"
+        // é opcional: se o lead tiver `bonus_invite_link`, mostra o segundo
+        // botão. Entrar nele só seta `bonus_entered_at`, sem mexer em status.
         if (botToken && lead.invite_link) {
           const firstName = (lead.name ?? "").split(/\s+/)[0] || "tudo bem?";
+          const safeName = firstName.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+          const buttons: { text: string; url: string }[][] = [
+            [{ text: "🚀 Entrar no grupo VIP", url: lead.invite_link }],
+          ];
+          if (lead.bonus_invite_link) {
+            buttons.push([{
+              text: "🎁 Entrar na Área do Aluno (bônus)",
+              url: lead.bonus_invite_link,
+            }]);
+          }
+          const lines = [
+            `Oi, <b>${safeName}</b>! 👋`,
+            ``,
+            `Seu acesso ao grupo VIP da <b>SHARK 100% GREEN</b> está liberado por 7 dias.`,
+          ];
+          if (lead.bonus_invite_link) {
+            lines.push(
+              ``,
+              `🎁 Como bônus, você também ganhou acesso à <b>Área do Aluno</b>.`,
+              ``,
+              `Toque nos botões abaixo pra entrar nos dois grupos 👇`,
+            );
+          } else {
+            lines.push(``, `Toque no botão abaixo pra entrar agora 👇`);
+          }
           try {
             await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 chat_id: fromId,
-                text: [
-                  `Oi, <b>${firstName.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</b>! 👋`,
-                  ``,
-                  `Seu acesso ao grupo VIP da <b>SHARK 100% GREEN</b> está liberado por 7 dias.`,
-                  ``,
-                  `Toque no botão abaixo pra entrar agora 👇`,
-                ].join("\n"),
+                text: lines.join("\n"),
                 parse_mode: "HTML",
-                reply_markup: {
-                  inline_keyboard: [[
-                    { text: "🚀 Entrar no grupo VIP", url: lead.invite_link },
-                  ]],
-                },
+                reply_markup: { inline_keyboard: buttons },
               }),
             });
           } catch (e) {
@@ -224,8 +242,14 @@ serve(async (req) => {
     }
 
     const updateChatId = String(cm.chat?.id ?? "");
-    if (expectedChatId && updateChatId !== String(expectedChatId)) {
-      log("ignored", { reason: "wrong chat", update_id: updateId, got_chat: updateChatId, expected_chat: String(expectedChatId) });
+    const isVipChat = !!expectedChatId && updateChatId === String(expectedChatId);
+    const isBonusChat = !!bonusChatId && updateChatId === String(bonusChatId);
+    if (!isVipChat && !isBonusChat) {
+      log("ignored", {
+        reason: "wrong chat", update_id: updateId, got_chat: updateChatId,
+        expected_vip: expectedChatId ? String(expectedChatId) : null,
+        expected_bonus: bonusChatId ?? null,
+      });
       return json({ ok: true, ignored: "wrong chat" });
     }
 
@@ -238,6 +262,7 @@ serve(async (req) => {
     log("received", {
       update_id: updateId,
       kind: cmKind,
+      chat: isBonusChat ? "bonus" : "vip",
       user_id: userId ?? null,
       username: username ?? null,
       old_status: oldStatus ?? null,
@@ -250,6 +275,190 @@ serve(async (req) => {
       return json({ ok: true, ignored: "no user id" });
     }
 
+    const becameActiveTmp =
+      newStatus !== undefined &&
+      ACTIVE_STATUSES.has(newStatus) &&
+      (!oldStatus || INACTIVE_STATUSES.has(oldStatus));
+    const becameInactiveTmp =
+      newStatus !== undefined &&
+      INACTIVE_STATUSES.has(newStatus) &&
+      oldStatus !== undefined &&
+      ACTIVE_STATUSES.has(oldStatus);
+
+    // ============================================================
+    // Caso BONUS — eventos no grupo "Área do Aluno"
+    // ============================================================
+    // Esse grupo é OPCIONAL e não controla o trial: só registramos quando
+    // o lead entrou (bonus_entered_at) e quando saiu (bonus_removed_at).
+    // Anti-repetidor: se o telegram_user_id já pertence a OUTRO lead, ou
+    // se o lead já está em status bloqueado/expirado, kicka do bônus e
+    // revoga o link rastreado.
+    // ============================================================
+    if (isBonusChat && bonusChatId) {
+      if (becameActiveTmp) {
+        let bLead: {
+          id: string; status: string; telegram_user_id: number | null;
+          bonus_invite_link: string | null;
+        } | null = null;
+        let bFoundVia: string | null = null;
+
+        const { data: byUserB } = await supabase
+          .from("trial_leads")
+          .select("id, status, telegram_user_id, bonus_invite_link")
+          .eq("telegram_user_id", userId)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (byUserB) { bLead = byUserB; bFoundVia = "user_id"; }
+
+        if (!bLead && inviteLink) {
+          const { data: byLinkB } = await supabase
+            .from("trial_leads")
+            .select("id, status, telegram_user_id, bonus_invite_link")
+            .eq("bonus_invite_link", inviteLink)
+            .maybeSingle();
+          if (byLinkB) { bLead = byLinkB; bFoundVia = "bonus_invite_link"; }
+        }
+
+        const kickFromBonus = async () => {
+          if (!botToken) return;
+          try {
+            await fetch(`https://api.telegram.org/bot${botToken}/banChatMember`, {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ chat_id: bonusChatId, user_id: userId }),
+            });
+            await fetch(`https://api.telegram.org/bot${botToken}/unbanChatMember`, {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ chat_id: bonusChatId, user_id: userId, only_if_banned: true }),
+            });
+          } catch (e) { console.warn("bonus kick failed", e); }
+        };
+
+        if (!bLead) {
+          await kickFromBonus();
+          log("bonus-stranger-kicked", { update_id: updateId, user_id: userId, invite_link: inviteLink ?? null });
+          return json({ ok: true, action: "bonus-stranger-kicked" });
+        }
+
+        // Anti-repeat A: invite_link bônus pertence a um lead cujo
+        // telegram_user_id é OUTRO usuário. Kicka esse intruso e revoga o link.
+        if (
+          bFoundVia === "bonus_invite_link" &&
+          bLead.telegram_user_id &&
+          bLead.telegram_user_id !== userId
+        ) {
+          await kickFromBonus();
+          if (botToken && bLead.bonus_invite_link) {
+            try {
+              await fetch(`https://api.telegram.org/bot${botToken}/revokeChatInviteLink`, {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ chat_id: bonusChatId, invite_link: bLead.bonus_invite_link }),
+              });
+            } catch (e) { console.warn("bonus repeat revoke failed", e); }
+          }
+          log("bonus-repeat-kick", {
+            update_id: updateId, lead_id: bLead.id,
+            user_id: userId, owner_user_id: bLead.telegram_user_id,
+          });
+          return json({ ok: true, action: "bonus-repeat-kick", lead_id: bLead.id });
+        }
+
+        // Anti-repeat B (simétrico ao VIP, linha 517): achamos o lead pelo
+        // user_id (registro mais recente daquele Telegram) MAS o invite_link
+        // recebido não bate com o `bonus_invite_link` salvo nele — significa
+        // que o user já tem cadastro e está entrando pelo link bônus de OUTRO
+        // lead novo. Marca esse lead novo como blocked_repeat e kicka.
+        if (
+          bFoundVia === "user_id" &&
+          inviteLink &&
+          bLead.bonus_invite_link !== inviteLink
+        ) {
+          const { data: byLinkRepeatB } = await supabase
+            .from("trial_leads")
+            .select("id, status, bonus_invite_link")
+            .eq("bonus_invite_link", inviteLink)
+            .neq("id", bLead.id)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (byLinkRepeatB && byLinkRepeatB.status === "pending") {
+            await supabase
+              .from("trial_leads")
+              .update({
+                status: "blocked_repeat",
+                telegram_user_id: userId,
+                previous_lead_id: bLead.id,
+              })
+              .eq("id", byLinkRepeatB.id)
+              .eq("status", "pending");
+
+            await kickFromBonus();
+            if (botToken && byLinkRepeatB.bonus_invite_link) {
+              try {
+                await fetch(`https://api.telegram.org/bot${botToken}/revokeChatInviteLink`, {
+                  method: "POST", headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    chat_id: bonusChatId,
+                    invite_link: byLinkRepeatB.bonus_invite_link,
+                  }),
+                });
+              } catch (e) { console.warn("bonus repeat-B revoke failed", e); }
+            }
+            log("bonus-blocked-repeat", {
+              update_id: updateId,
+              lead_id: byLinkRepeatB.id,
+              user_id: userId,
+              prev_lead_id: bLead.id,
+              via: "user_id_then_bonus_invite_link",
+            });
+            return json({ ok: true, action: "bonus-blocked-repeat", lead_id: byLinkRepeatB.id });
+          }
+        }
+
+        if (BLOCKED_LEAD_STATUSES.has(bLead.status)) {
+          await kickFromBonus();
+          log("bonus-blocked-kick", { update_id: updateId, lead_id: bLead.id, status: bLead.status });
+          return json({ ok: true, action: "bonus-blocked-kick", lead_id: bLead.id });
+        }
+
+        const updates: Record<string, unknown> = {
+          bonus_entered_at: new Date().toISOString(),
+          bonus_removed_at: null,
+        };
+        if (!bLead.telegram_user_id) updates.telegram_user_id = userId;
+        await supabase.from("trial_leads").update(updates).eq("id", bLead.id);
+        log("bonus-joined", { update_id: updateId, lead_id: bLead.id, user_id: userId, found_via: bFoundVia });
+        return json({ ok: true, action: "bonus-joined", lead_id: bLead.id });
+      }
+
+      if (becameInactiveTmp) {
+        const { data: bLead } = await supabase
+          .from("trial_leads")
+          .select("id")
+          .eq("telegram_user_id", userId)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (bLead) {
+          await supabase
+            .from("trial_leads")
+            .update({ bonus_removed_at: new Date().toISOString() })
+            .eq("id", bLead.id);
+          log("bonus-left", { update_id: updateId, lead_id: bLead.id, user_id: userId });
+          return json({ ok: true, action: "bonus-left", lead_id: bLead.id });
+        }
+        log("ignored", { reason: "bonus left no lead", update_id: updateId, user_id: userId });
+        return json({ ok: true, ignored: "bonus left no lead" });
+      }
+
+      log("ignored", { reason: `bonus ${oldStatus} -> ${newStatus}`, update_id: updateId });
+      return json({ ok: true, ignored: `bonus ${oldStatus} -> ${newStatus}` });
+    }
+
+    // ============================================================
+    // VIP — fluxo principal (controla o trial)
+    // ============================================================
     const becameActive =
       newStatus !== undefined &&
       ACTIVE_STATUSES.has(newStatus) &&

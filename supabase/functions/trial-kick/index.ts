@@ -55,16 +55,17 @@ serve(async (req) => {
 
     const { data: lead } = await admin
       .from("trial_leads")
-      .select("id, telegram_user_id, status, invite_link")
+      .select("id, telegram_user_id, status, invite_link, bonus_invite_link")
       .eq("id", leadId)
       .maybeSingle();
     if (!lead) return json({ error: "Lead não encontrado" }, { status: 404 });
 
     const botToken = Deno.env.get("TELEGRAM_TRIAL_BOT_TOKEN");
     const chatId = Deno.env.get("TELEGRAM_TRIAL_CHAT_ID");
+    const bonusChatId = Deno.env.get("TELEGRAM_TRIAL_BONUS_CHAT_ID") ?? null;
     if (!botToken || !chatId) return json({ error: "Bot não configurado" }, { status: 500 });
 
-    // 1) Expulsar do grupo (se já entrou)
+    // 1) Expulsar do grupo VIP (se já entrou)
     if (lead.telegram_user_id) {
       const banRes = await fetch(`https://api.telegram.org/bot${botToken}/banChatMember`, {
         method: "POST",
@@ -84,9 +85,30 @@ serve(async (req) => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ chat_id: chatId, user_id: lead.telegram_user_id, only_if_banned: true }),
       });
+
+      // 1b) Expulsar TAMBÉM do grupo bônus (best-effort — não falha o
+      // request mesmo se o lead nunca entrou no bônus ou o bot não é
+      // admin lá). Sem isso o lead ficaria com acesso à Área do Aluno
+      // mesmo depois do admin remover do VIP.
+      if (bonusChatId) {
+        try {
+          await fetch(`https://api.telegram.org/bot${botToken}/banChatMember`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ chat_id: bonusChatId, user_id: lead.telegram_user_id }),
+          });
+          await fetch(`https://api.telegram.org/bot${botToken}/unbanChatMember`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ chat_id: bonusChatId, user_id: lead.telegram_user_id, only_if_banned: true }),
+          });
+        } catch (e) {
+          console.warn("bonus kick failed (continuando)", e);
+        }
+      }
     }
 
-    // 2) Revogar o invite link original para que ele não possa mais ser usado
+    // 2) Revogar invite links (VIP + bônus) para que não possam ser reutilizados
     if (lead.invite_link) {
       try {
         await fetch(`https://api.telegram.org/bot${botToken}/revokeChatInviteLink`, {
@@ -98,11 +120,23 @@ serve(async (req) => {
         console.warn("revoke invite link failed (continuando)", e);
       }
     }
+    if (bonusChatId && lead.bonus_invite_link) {
+      try {
+        await fetch(`https://api.telegram.org/bot${botToken}/revokeChatInviteLink`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chat_id: bonusChatId, invite_link: lead.bonus_invite_link }),
+        });
+      } catch (e) {
+        console.warn("revoke bonus invite link failed (continuando)", e);
+      }
+    }
 
-    // 3) Marcar como removed
+    // 3) Marcar como removed (também zera bonus_entered_at via bonus_removed_at)
     await admin.from("trial_leads").update({
       status: "removed",
       removed_at: new Date().toISOString(),
+      ...(bonusChatId ? { bonus_removed_at: new Date().toISOString() } : {}),
     }).eq("id", leadId);
 
     return json({ ok: true });

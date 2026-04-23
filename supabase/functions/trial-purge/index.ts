@@ -63,33 +63,39 @@ serve(async (req) => {
 
     const { data: lead } = await admin
       .from("trial_leads")
-      .select("id, telegram_user_id, status, invite_link, name, email")
+      .select("id, telegram_user_id, status, invite_link, bonus_invite_link, name, email")
       .eq("id", leadId)
       .maybeSingle();
     if (!lead) return json({ error: "Lead não encontrado" }, { status: 404 });
 
     const botToken = Deno.env.get("TELEGRAM_TRIAL_BOT_TOKEN");
     const chatId = Deno.env.get("TELEGRAM_TRIAL_CHAT_ID");
+    const bonusChatId = Deno.env.get("TELEGRAM_TRIAL_BONUS_CHAT_ID") ?? null;
 
-    // 1) Tira do grupo (best-effort) — não falha o purge se Telegram der erro
-    if (botToken && chatId && lead.telegram_user_id) {
-      try {
-        await fetch(`https://api.telegram.org/bot${botToken}/banChatMember`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ chat_id: chatId, user_id: lead.telegram_user_id }),
-        });
-        await fetch(`https://api.telegram.org/bot${botToken}/unbanChatMember`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ chat_id: chatId, user_id: lead.telegram_user_id, only_if_banned: true }),
-        });
-      } catch (e) {
-        console.warn("trial-purge ban failed (continuando)", e);
+    // 1) Tira do(s) grupo(s) (best-effort) — não falha o purge se Telegram der erro
+    if (botToken && lead.telegram_user_id) {
+      const targets: string[] = [];
+      if (chatId) targets.push(chatId);
+      if (bonusChatId) targets.push(bonusChatId);
+      for (const target of targets) {
+        try {
+          await fetch(`https://api.telegram.org/bot${botToken}/banChatMember`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ chat_id: target, user_id: lead.telegram_user_id }),
+          });
+          await fetch(`https://api.telegram.org/bot${botToken}/unbanChatMember`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ chat_id: target, user_id: lead.telegram_user_id, only_if_banned: true }),
+          });
+        } catch (e) {
+          console.warn("trial-purge ban failed (continuando)", target, e);
+        }
       }
     }
 
-    // 2) Revoga link rastreado
+    // 2) Revoga links rastreados (VIP + bônus)
     if (botToken && chatId && lead.invite_link) {
       try {
         await fetch(`https://api.telegram.org/bot${botToken}/revokeChatInviteLink`, {
@@ -99,6 +105,17 @@ serve(async (req) => {
         });
       } catch (e) {
         console.warn("trial-purge revoke failed (continuando)", e);
+      }
+    }
+    if (botToken && bonusChatId && lead.bonus_invite_link) {
+      try {
+        await fetch(`https://api.telegram.org/bot${botToken}/revokeChatInviteLink`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chat_id: bonusChatId, invite_link: lead.bonus_invite_link }),
+        });
+      } catch (e) {
+        console.warn("trial-purge revoke bonus failed (continuando)", e);
       }
     }
 
