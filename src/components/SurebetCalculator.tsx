@@ -117,15 +117,9 @@ export function SurebetCalculator({
   }
 
   const sportIcon = isBasketball ? '🏀' : '⚽';
-  // Cabeçalho: futebol sempre "DUPLO GREEN – OPORTUNIDADE" (3-way + lógica
-  // de PA recuperando perdas dá pra gerar duplo green); basquete é só
-  // "OPORTUNIDADE" (2-way não tem PA recuperando outro lado).
   const headerLabel = isBasketball ? 'OPORTUNIDADE' : 'DUPLO GREEN – OPORTUNIDADE';
-  // Retorno signed: positivo quando é arbitragem real (lucro), negativo
-  // quando é uma posição de leve perda recuperável via PA.
-  // Ex.: arb=1.0491 (perde) -> -4.68% ; arb=0.9746 (ganha) -> +2.61%.
   const custoPct = (1 / arbitrageValue - 1) * 100;
-  const custoPer1k = custoPct * 10; // valor em R$ por 1k stake
+  const custoPer1k = custoPct * 10;
   const matchUrl =
     matchId && typeof window !== 'undefined'
       ? `${window.location.origin}/match/${matchId}`
@@ -153,7 +147,7 @@ export function SurebetCalculator({
     const sign = custoPct >= 0 ? '+' : '';
     const pctBR = custoPct.toFixed(2).replace('.', ',');
     const per1kBR = formatBRL(custoPer1k);
-    lines.push(`💰 Custo: ${sign}${pctBR}% (${per1kBR} a cada 1k)`);
+    lines.push(`💰Custo: ${sign}${pctBR}% (${per1kBR} a cada 1k)`);
     lines.push('');
     lines.push('📊 Odds:');
     const homeLabel = isBasketball ? 'Time 1' : 'Casa';
