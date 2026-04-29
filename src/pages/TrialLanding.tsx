@@ -43,14 +43,78 @@ declare global {
   }
 }
 
-function trackPixel(event: 'PageView' | 'Lead' | 'InitiateCheckout', params?: Record<string, unknown>) {
+// Gera um event_id único para deduplicação browser↔server na Meta
+// (Conversions API). Compatível com navegadores antigos que não têm
+// crypto.randomUUID.
+function makeEventId(): string {
+  try {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID();
+    }
+  } catch {
+    /* fallback abaixo */
+  }
+  return `evt-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+// Lê cookie por nome (usado pra capturar _fbp/_fbc da Meta — melhora o
+// match-rate do CAPI quando o user voltou via anúncio).
+function readCookie(name: string): string | null {
+  if (typeof document === 'undefined') return null;
+  const m = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]+)`));
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
+type PixelEventName = 'PageView' | 'Lead' | 'InitiateCheckout' | 'ViewContent';
+
+function trackPixel(
+  event: PixelEventName,
+  params?: Record<string, unknown>,
+  eventId?: string,
+) {
   if (typeof window === 'undefined') return;
   try {
     if (typeof window.fbq === 'function') {
-      window.fbq('track', event, params);
+      if (eventId) {
+        window.fbq('track', event, params ?? {}, { eventID: eventId });
+      } else {
+        window.fbq('track', event, params);
+      }
     }
   } catch {
     /* adblock / pixel não carregado — ignora */
+  }
+}
+
+// Envia evento server-side via CAPI (paralelo ao pixel do browser).
+// Usa keepalive pra não perder eventos em navegação. O event_id casa
+// com o do pixel pra Meta deduplicar e não contar em dobro.
+function trackCapi(
+  eventName: 'PageView' | 'ViewContent',
+  eventId: string,
+  customData?: Record<string, unknown>,
+) {
+  if (!SUPABASE_URL || !SUPABASE_ANON) return;
+  try {
+    fetch(`${SUPABASE_URL}/functions/v1/trial-pixel-track`, {
+      method: 'POST',
+      keepalive: true,
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: SUPABASE_ANON,
+      },
+      body: JSON.stringify({
+        event_name: eventName,
+        event_id: eventId,
+        event_source_url: typeof window !== 'undefined' ? window.location.href : null,
+        source: 'trial-landing-hero',
+        fbp: readCookie('_fbp'),
+        fbc: readCookie('_fbc'),
+        custom_data: customData,
+      }),
+    }).catch(() => {});
+  } catch {
+    /* noop */
   }
 }
 
@@ -172,7 +236,12 @@ export default function TrialLanding() {
       first?.parentNode?.insertBefore(script, first);
       window.fbq('init', PIXEL_ID);
     }
-    window.fbq?.('track', 'PageView');
+    // Mesmo event_id no pixel e no server-side garante dedupe da Meta.
+    // Espera 1 frame pro fbevents.js terminar de inicializar (sem isso o
+    // browser pode disparar o PageView antes do init).
+    const pageviewEventId = makeEventId();
+    window.fbq?.('track', 'PageView', {}, { eventID: pageviewEventId });
+    trackCapi('PageView', pageviewEventId);
 
     return () => {
       // Remove apenas o script taggeado por este componente — não mexe em
@@ -505,6 +574,10 @@ function SignupModal({
     }
 
     setSubmitting(true);
+    // event_id único pra esse Lead. Usamos o MESMO id no pixel do
+    // browser e no CAPI server-side pra Meta deduplicar (sem isso,
+    // toda conversão rastreada nos dois lados conta em dobro).
+    const leadEventId = makeEventId();
     try {
       const url = `${SUPABASE_URL}/functions/v1/trial-signup`;
       const res = await fetch(url, {
@@ -518,6 +591,10 @@ function SignupModal({
           email: parsed.data.email,
           whatsapp: parsed.data.whatsapp.replace(/\D/g, ''),
           telegram_username: parsed.data.telegram_username,
+          event_id: leadEventId,
+          event_source_url: typeof window !== 'undefined' ? window.location.href : null,
+          fbp: readCookie('_fbp'),
+          fbc: readCookie('_fbc'),
         }),
       });
       const json = await res.json().catch(() => ({}));
@@ -530,7 +607,7 @@ function SignupModal({
         inviteLink: json.invite_link,
         botUsername: json.bot_username,
       });
-      trackPixel('Lead', { content_name: 'trial-7d' });
+      trackPixel('Lead', { content_name: 'trial-7d' }, leadEventId);
     } catch {
       setServerError('Erro de conexão. Verifique sua internet e tente novamente.');
     } finally {

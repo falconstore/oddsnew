@@ -6,7 +6,7 @@ import {
   Mail, Phone, Send, ExternalLink, Trash2, Eye, MousePointerClick, BellRing,
   MessageCircle, ShoppingCart, TrendingUp, Users2, FileSignature,
   Stethoscope, AlertTriangle, Loader2, XCircle, Link2, RotateCw,
-  ShieldAlert, Unlock,
+  ShieldAlert, Unlock, Radio, ServerCog,
 } from 'lucide-react';
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,7 @@ import {
   useTrialSettings, useUpdateTrialSettings, useSendReminderTest,
 } from '@/hooks/useTrialLeads';
 import { useTrialUpgradeStats, type TrialStatsRange } from '@/hooks/useTrialUpgradeStats';
+import { useTrialCapiStats } from '@/hooks/useTrialCapiStats';
 import type { TrialLead, TrialStatus } from '@/types/trial';
 import { TRIAL_PUBLIC_URL } from '@/components/AnimatedRoutes';
 
@@ -82,6 +83,7 @@ export default function TrialAdmin() {
   const [statsRange, setStatsRange] = useState<TrialStatsRange>('7d');
   const { data: upgradeStats, isLoading: statsLoading } = useTrialUpgradeStats(statsRange, 'trial-upgrade-page');
   const { data: landingStats, isLoading: landingLoading } = useTrialUpgradeStats(statsRange, 'trial-landing-hero');
+  const { data: capiStats, isLoading: capiLoading } = useTrialCapiStats();
 
   const stats = useMemo(() => {
     const s = { total: leads.length, active: 0, expired: 0, blocked: 0, pending: 0, removed: 0, blockedRepeat: 0, v1: 0, v2: 0 };
@@ -446,6 +448,135 @@ export default function TrialAdmin() {
                   testId="metric-lp-cta-checkout"
                 />
               </div>
+            </>
+          )}
+        </div>
+
+        {/* Conversions API (server-side) — últimas 24h */}
+        <div className="glass rounded-3xl border border-white/8 p-5 md:p-6 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <h2 className="text-lg md:text-xl font-bold flex items-center gap-2">
+                <Radio className="w-5 h-5 text-emerald-400" />
+                Conversions API · últimas 24h
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Eventos enviados pra Meta direto da Edge Function (PageView e Lead). Casa com o pixel via <code className="text-emerald-300">event_id</code> pra deduplicar.
+              </p>
+            </div>
+          </div>
+
+          {capiLoading || !capiStats ? (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="rounded-2xl border border-white/5 p-4 h-24 animate-pulse bg-white/2" />
+              ))}
+            </div>
+          ) : capiStats.total === 0 ? (
+            <div
+              className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 text-sm text-muted-foreground flex items-center gap-3"
+              data-testid="capi-empty-state"
+            >
+              <ServerCog className="w-5 h-5 text-white/40 flex-shrink-0" />
+              <div>
+                Nenhum evento server-side enviado nas últimas 24h. Confira se a secret <code className="text-emerald-300">META_CAPI_ACCESS_TOKEN</code> está configurada no Supabase.
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <MetricCard
+                  icon={<ServerCog className="w-5 h-5" />}
+                  label="Eventos enviados"
+                  value={capiStats.total}
+                  hint="Total de tentativas (sucesso + erro)"
+                  accent="from-sky-500/20 to-sky-500/5 border-sky-500/25 text-sky-300"
+                  testId="metric-capi-total"
+                />
+                <MetricCard
+                  icon={<CheckCircle2 className="w-5 h-5" />}
+                  label="Sucessos"
+                  value={capiStats.success}
+                  hint="Aceitos pela Meta (HTTP 200)"
+                  accent="from-emerald-500/20 to-emerald-500/5 border-emerald-500/25 text-emerald-300"
+                  testId="metric-capi-success"
+                />
+                <MetricCard
+                  icon={<XCircle className="w-5 h-5" />}
+                  label="Erros"
+                  value={capiStats.errors}
+                  hint={
+                    capiStats.lastError
+                      ? `Último: ${capiStats.lastError.error_message ?? 'falha desconhecida'}`
+                      : 'Nenhum erro registrado'
+                  }
+                  accent="from-red-500/20 to-red-500/5 border-red-500/25 text-red-300"
+                  testId="metric-capi-errors"
+                />
+                <MetricCard
+                  icon={<TrendingUp className="w-5 h-5" />}
+                  label="Taxa de sucesso"
+                  value={`${capiStats.successRate.toFixed(1)}%`}
+                  hint={`${capiStats.success} de ${capiStats.total}`}
+                  accent="from-fuchsia-500/20 to-fuchsia-500/5 border-fuchsia-500/25 text-fuchsia-300"
+                  testId="metric-capi-success-rate"
+                />
+              </div>
+
+              {Object.keys(capiStats.byEventName).length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {Object.entries(capiStats.byEventName).map(([name, b]) => {
+                    const total = b.success + b.errors;
+                    const rate = total > 0 ? (b.success / total) * 100 : 0;
+                    return (
+                      <div
+                        key={name}
+                        className="rounded-2xl border border-white/10 bg-white/[0.02] p-4"
+                        data-testid={`capi-event-${name}`}
+                      >
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <span className="text-sm font-semibold flex items-center gap-1.5">
+                            <Radio className="w-3.5 h-3.5 text-emerald-300" />
+                            {name}
+                          </span>
+                          <span className="text-xs font-mono text-emerald-300">
+                            {rate.toFixed(0)}% ok
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs">
+                          <span className="inline-flex items-center gap-1 text-emerald-300">
+                            <CheckCircle2 className="w-3 h-3" /> {b.success}
+                          </span>
+                          <span className="inline-flex items-center gap-1 text-red-300">
+                            <XCircle className="w-3 h-3" /> {b.errors}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {capiStats.lastError && (
+                <div
+                  className="rounded-2xl border border-red-500/30 bg-red-500/5 p-4 text-xs text-red-200 space-y-1"
+                  data-testid="capi-last-error"
+                >
+                  <div className="font-semibold flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    Último erro: {capiStats.lastError.event_name}
+                  </div>
+                  <div className="font-mono text-red-300/90 break-words">
+                    {capiStats.lastError.error_message ?? 'falha desconhecida'}
+                    {capiStats.lastError.http_status
+                      ? ` · HTTP ${capiStats.lastError.http_status}`
+                      : ''}
+                  </div>
+                  <div className="text-[11px] text-red-300/60">
+                    {fmtDate(capiStats.lastError.created_at)}
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>

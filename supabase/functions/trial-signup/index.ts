@@ -5,6 +5,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders, json } from "../_shared/cors.ts";
+import { getClientIp, sendMetaCapiEvent } from "../_shared/meta-capi.ts";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -17,6 +18,15 @@ serve(async (req) => {
     const whatsapp = String(body.whatsapp ?? "").replace(/\D/g, "");
     const telegram_username = String(body.telegram_username ?? "")
       .trim().toLowerCase().replace(/^@/, "");
+    // event_id gerado no front (mesmo que o pixel disparou) pra Meta
+    // deduplicar Lead entre browser e server. Opcional pra manter
+    // backward-compat caso o pixel esteja completamente bloqueado.
+    const eventIdRaw = typeof body.event_id === "string" ? body.event_id.trim() : "";
+    const leadEventId = eventIdRaw && eventIdRaw.length <= 128 ? eventIdRaw : null;
+    const eventSourceUrl = typeof body.event_source_url === "string"
+      ? body.event_source_url.slice(0, 512) : null;
+    const fbp = typeof body.fbp === "string" ? body.fbp.slice(0, 256) : null;
+    const fbc = typeof body.fbc === "string" ? body.fbc.slice(0, 256) : null;
 
     if (!name || !email || !whatsapp || !telegram_username) {
       return json({ error: "Todos os campos são obrigatórios." }, { status: 400 });
@@ -157,6 +167,36 @@ serve(async (req) => {
       Deno.env.get("TELEGRAM_TRIAL_BOT_USERNAME") ?? "sharkinhogreen_bot"
     ).replace(/^@+/, "");
     const botStartUrl = `https://t.me/${botUsername}?start=lead_${inserted.id}`;
+
+    // Conversions API: dispara Lead server-side em paralelo ao pixel do
+    // browser, deduplicando pelo mesmo event_id. Fire-and-forget pra não
+    // adicionar latência na resposta — qualquer erro fica registrado em
+    // `trial_capi_events` pro admin via o helper. Em Supabase Edge usamos
+    // EdgeRuntime.waitUntil quando disponível pra garantir que o runtime
+    // não mata o request antes do envio terminar; fallback é só não-awaited.
+    if (leadEventId) {
+      const capiPromise = sendMetaCapiEvent({
+        eventName: "Lead",
+        eventId: leadEventId,
+        eventSourceUrl,
+        source: "trial-signup",
+        leadId: inserted.id,
+        customData: { content_name: "trial-7d" },
+        userData: {
+          email,
+          phone: whatsapp,
+          client_ip: getClientIp(req),
+          client_user_agent: req.headers.get("user-agent")?.slice(0, 512) ?? null,
+          fbp,
+          fbc,
+        },
+      }).catch((e) => {
+        console.warn("trial-signup: CAPI Lead falhou", e);
+      });
+      // @ts-ignore — EdgeRuntime existe em Supabase Edge / Deno Deploy
+      const er = (globalThis as { EdgeRuntime?: { waitUntil: (p: Promise<unknown>) => void } }).EdgeRuntime;
+      if (er && typeof er.waitUntil === "function") er.waitUntil(capiPromise);
+    }
 
     return json({
       lead_id: inserted.id,
