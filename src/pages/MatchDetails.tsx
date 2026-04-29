@@ -790,6 +790,11 @@ const MatchDetails = () => {
                     drawBookmaker={bestDrawBookmaker}
                     awayBookmaker={bestAwayBookmaker}
                     isBasketball={isBasketball}
+                    matchId={matchId}
+                    homeTeam={match.home_team}
+                    awayTeam={match.away_team}
+                    leagueName={match.league_name}
+                    matchDate={matchDate}
                   />
                 </CardContent>
               </Card>
