@@ -175,14 +175,12 @@ export default function TrialLanding() {
     window.fbq?.('track', 'PageView');
 
     return () => {
-      // Remove o script injetado (e qualquer <script> da Meta carregado em
-      // sequência pelo bootstrap), zera o estado global e força o helper da
-      // Meta a não detectar mais o pixel fora de /trial.
+      // Remove apenas o script taggeado por este componente — não mexe em
+      // outros SDKs da Meta caso venham a ser carregados em outras rotas no
+      // futuro. Zera window.fbq pra que o Meta Pixel Helper marque "no pixel
+      // detected" depois de uma navegação SPA pra fora de /trial.
       document
         .querySelectorAll(`script[${PIXEL_SCRIPT_DATA_ATTR}]`)
-        .forEach((el) => el.parentNode?.removeChild(el));
-      document
-        .querySelectorAll(`script[src*="connect.facebook.net"]`)
         .forEach((el) => el.parentNode?.removeChild(el));
       try {
         delete window.fbq;
