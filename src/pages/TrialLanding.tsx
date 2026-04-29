@@ -24,11 +24,22 @@ const BUY_NOW_URL =
   'https://lastlink.com/p/CEAEE6585/checkout-payment/';
 
 const PIXEL_ID = '1295449168383975';
+const PIXEL_SCRIPT_SRC = 'https://connect.facebook.net/en_US/fbevents.js';
+const PIXEL_SCRIPT_DATA_ATTR = 'data-trial-pixel';
+
+interface FbqStub {
+  (...args: unknown[]): void;
+  callMethod?: (...args: unknown[]) => void;
+  queue: unknown[][];
+  push: FbqStub;
+  loaded: boolean;
+  version: string;
+}
 
 declare global {
   interface Window {
-    fbq?: ((...args: unknown[]) => void) & { callMethod?: unknown; queue?: unknown[]; loaded?: boolean; version?: string; push?: unknown };
-    _fbq?: unknown;
+    fbq?: FbqStub;
+    _fbq?: FbqStub;
   }
 }
 
@@ -127,33 +138,60 @@ export default function TrialLanding() {
     track('view', { page: 'trial-landing' });
   }, []);
 
-  // Meta Pixel — carrega só na rota /trial. Idempotente: se já foi injetado
-  // (ex: usuário navegou pra outra rota e voltou), só dispara PageView de novo.
+  // Meta Pixel — carrega só enquanto a rota /trial está montada. Ao sair da
+  // rota (SPA navigation), o cleanup remove o script injetado e zera
+  // window.fbq pra que o Meta Pixel Helper marque "no pixel detected" em
+  // outras rotas (admin, dashboards etc).
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    if (typeof window.fbq === 'function') {
-      window.fbq('track', 'PageView');
-      return;
+
+    const initStub = (): FbqStub => {
+      const stub = function (...args: unknown[]) {
+        if (stub.callMethod) {
+          stub.callMethod.apply(stub, args);
+        } else {
+          stub.queue.push(args);
+        }
+      } as unknown as FbqStub;
+      stub.queue = [];
+      stub.loaded = true;
+      stub.version = '2.0';
+      stub.push = stub;
+      return stub;
+    };
+
+    if (typeof window.fbq !== 'function') {
+      const stub = initStub();
+      window.fbq = stub;
+      if (!window._fbq) window._fbq = stub;
+      const script = document.createElement('script');
+      script.async = true;
+      script.src = PIXEL_SCRIPT_SRC;
+      script.setAttribute(PIXEL_SCRIPT_DATA_ATTR, '1');
+      const first = document.getElementsByTagName('script')[0];
+      first?.parentNode?.insertBefore(script, first);
+      window.fbq('init', PIXEL_ID);
     }
-    (function (f: Window & typeof globalThis, b: Document, e: string, v: string) {
-      if (f.fbq) return;
-      const n: any = function (...args: unknown[]) {
-        n.callMethod ? n.callMethod.apply(n, args) : n.queue.push(args);
-      };
-      f.fbq = n;
-      if (!f._fbq) f._fbq = n;
-      n.push = n;
-      n.loaded = true;
-      n.version = '2.0';
-      n.queue = [];
-      const t = b.createElement(e) as HTMLScriptElement;
-      t.async = true;
-      t.src = v;
-      const s = b.getElementsByTagName(e)[0];
-      s.parentNode?.insertBefore(t, s);
-    })(window, document, 'script', 'https://connect.facebook.net/en_US/fbevents.js');
-    window.fbq?.('init', PIXEL_ID);
     window.fbq?.('track', 'PageView');
+
+    return () => {
+      // Remove o script injetado (e qualquer <script> da Meta carregado em
+      // sequência pelo bootstrap), zera o estado global e força o helper da
+      // Meta a não detectar mais o pixel fora de /trial.
+      document
+        .querySelectorAll(`script[${PIXEL_SCRIPT_DATA_ATTR}]`)
+        .forEach((el) => el.parentNode?.removeChild(el));
+      document
+        .querySelectorAll(`script[src*="connect.facebook.net"]`)
+        .forEach((el) => el.parentNode?.removeChild(el));
+      try {
+        delete window.fbq;
+        delete window._fbq;
+      } catch {
+        window.fbq = undefined;
+        window._fbq = undefined;
+      }
+    };
   }, []);
 
   const openForm = (where: string) => {
