@@ -23,6 +23,26 @@ const BUY_NOW_URL =
   (import.meta.env.VITE_TRIAL_UPGRADE_CHECKOUT_URL as string | undefined) ||
   'https://lastlink.com/p/CEAEE6585/checkout-payment/';
 
+const PIXEL_ID = '1295449168383975';
+
+declare global {
+  interface Window {
+    fbq?: ((...args: unknown[]) => void) & { callMethod?: unknown; queue?: unknown[]; loaded?: boolean; version?: string; push?: unknown };
+    _fbq?: unknown;
+  }
+}
+
+function trackPixel(event: 'PageView' | 'Lead' | 'InitiateCheckout', params?: Record<string, unknown>) {
+  if (typeof window === 'undefined') return;
+  try {
+    if (typeof window.fbq === 'function') {
+      window.fbq('track', event, params);
+    }
+  } catch {
+    /* adblock / pixel não carregado — ignora */
+  }
+}
+
 type TrackEvent =
   | 'view'
   | 'cta_open_form'
@@ -107,6 +127,35 @@ export default function TrialLanding() {
     track('view', { page: 'trial-landing' });
   }, []);
 
+  // Meta Pixel — carrega só na rota /trial. Idempotente: se já foi injetado
+  // (ex: usuário navegou pra outra rota e voltou), só dispara PageView de novo.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (typeof window.fbq === 'function') {
+      window.fbq('track', 'PageView');
+      return;
+    }
+    (function (f: Window & typeof globalThis, b: Document, e: string, v: string) {
+      if (f.fbq) return;
+      const n: any = function (...args: unknown[]) {
+        n.callMethod ? n.callMethod.apply(n, args) : n.queue.push(args);
+      };
+      f.fbq = n;
+      if (!f._fbq) f._fbq = n;
+      n.push = n;
+      n.loaded = true;
+      n.version = '2.0';
+      n.queue = [];
+      const t = b.createElement(e) as HTMLScriptElement;
+      t.async = true;
+      t.src = v;
+      const s = b.getElementsByTagName(e)[0];
+      s.parentNode?.insertBefore(t, s);
+    })(window, document, 'script', 'https://connect.facebook.net/en_US/fbevents.js');
+    window.fbq?.('init', PIXEL_ID);
+    window.fbq?.('track', 'PageView');
+  }, []);
+
   const openForm = (where: string) => {
     track('cta_open_form', { button: where });
     setModalOpen(true);
@@ -119,6 +168,7 @@ export default function TrialLanding() {
 
   const onBuyNow = (where: string) => {
     track('cta_checkout', { button: where, source: 'trial-landing' });
+    trackPixel('InitiateCheckout', { content_name: 'shark-100-green' });
     window.open(BUY_NOW_URL, '_blank', 'noopener,noreferrer');
   };
 
@@ -348,6 +398,17 @@ export default function TrialLanding() {
       </div>
       {/* MODAL DE CAPTURA */}
       <SignupModal open={modalOpen} onOpenChange={setModalOpen} />
+
+      {/* Meta Pixel — fallback noscript */}
+      <noscript>
+        <img
+          height="1"
+          width="1"
+          style={{ display: 'none' }}
+          src={`https://www.facebook.com/tr?id=${PIXEL_ID}&ev=PageView&noscript=1`}
+          alt=""
+        />
+      </noscript>
     </div>
   );
 }
@@ -433,6 +494,7 @@ function SignupModal({
         inviteLink: json.invite_link,
         botUsername: json.bot_username,
       });
+      trackPixel('Lead', { content_name: 'trial-7d' });
     } catch {
       setServerError('Erro de conexão. Verifique sua internet e tente novamente.');
     } finally {
