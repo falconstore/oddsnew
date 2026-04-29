@@ -156,8 +156,10 @@ export function SurebetCalculator({
     lines.push(`💰 Custo: ${sign}${pctBR}% (${per1kBR} a cada 1k)`);
     lines.push('');
     lines.push('📊 Odds:');
+    const homeLabel = isBasketball ? 'Time 1' : 'Casa';
+    const awayLabel = isBasketball ? 'Time 2' : 'Fora';
     lines.push(
-      `* Casa: ${homeOdd.toFixed(2)}${homeBookmaker ? ` (${homeBookmaker})` : ''}`,
+      `* ${homeLabel}: ${homeOdd.toFixed(2)}${homeBookmaker ? ` (${homeBookmaker})` : ''}`,
     );
     if (!isBasketball && drawOdd !== null && drawOdd > 0) {
       lines.push(
@@ -165,7 +167,7 @@ export function SurebetCalculator({
       );
     }
     lines.push(
-      `* Fora: ${awayOdd.toFixed(2)}${awayBookmaker ? ` (${awayBookmaker})` : ''}`,
+      `* ${awayLabel}: ${awayOdd.toFixed(2)}${awayBookmaker ? ` (${awayBookmaker})` : ''}`,
     );
     if (matchUrl) {
       lines.push('');
@@ -243,29 +245,31 @@ export function SurebetCalculator({
                     Compartilhar
                   </span>
                 </div>
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
                   onClick={() => copyToClipboard(buildShareText(), 'Texto')}
-                  className="mb-1 flex w-full items-center gap-2.5 rounded-md p-2 text-left text-sm transition-colors hover:bg-accent"
+                  className="mb-1 h-auto w-full justify-start gap-2.5 px-2 py-2 text-sm font-normal"
                   data-testid="button-copy-text"
                 >
-                  <span className="flex h-7 w-7 items-center justify-center rounded-md bg-green-500 text-white">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-green-500 text-white">
                     <Copy className="h-3.5 w-3.5" />
                   </span>
                   Copiar texto
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
+                  variant="ghost"
                   onClick={() => copyToClipboard(matchUrl, 'Link')}
                   disabled={!matchUrl}
-                  className="flex w-full items-center gap-2.5 rounded-md p-2 text-left text-sm transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                  className="h-auto w-full justify-start gap-2.5 px-2 py-2 text-sm font-normal"
                   data-testid="button-copy-link"
                 >
-                  <span className="flex h-7 w-7 items-center justify-center rounded-md bg-sky-500 text-white">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-sky-500 text-white">
                     <LinkIcon className="h-3.5 w-3.5" />
                   </span>
                   Copiar Link
-                </button>
+                </Button>
               </PopoverContent>
             </Popover>
           </div>
