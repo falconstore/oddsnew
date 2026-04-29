@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Calculadora Surebet – Mockup</title>
+<style>
+  .card { position: relative; }
+
+  /* ── Share bar ── */
+  .share-bar {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px 0;
+  }
+  .share-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: #2a2a2a;
+    border: 1px solid #3a3a3a;
+    border-radius: 20px;
+    color: #ccc;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 7px 14px;
+    cursor: pointer;
+    transition: background .15s;
+  }
+  .share-btn:hover { background: #333; }
+  .close-btn {
+    background: none;
+    border: none;
+    color: #555;
+    font-size: 16px;
+    cursor: pointer;
+    padding: 4px;
+    line-height: 1;
+  }
+  .close-btn:hover { color: #aaa; }
+
+  /* ── Duplo Green card ── */
+  .duplo-green-card {
+    margin: 0 16px 20px;
+    background: linear-gradient(135deg, #0d2a1a 0%, #0a1f14 100%);
+    border: 1px solid #1a4a2a;
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .dg-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #e0e0e0;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .dg-icon { font-size: 15px; }
+  .dg-desc {
+    font-size: 12px;
+    color: #888;
+    line-height: 1.5;
+    margin-bottom: 12px;
+  }
+  .dg-label {
+    font-size: 11px;
+    color: #555;
+    margin-bottom: 4px;
+    text-align: center;
+  }
+  .dg-value {
+    font-size: 22px;
+    font-weight: 700;
+    color: #4ade80;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+
+
+
+  body {
+    background: #0e0e0e;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: 100vh;
+    padding: 24px 12px 48px;
+  }
+
+  .card {
+    background: #1a1a1a;
+    border-radius: 16px;
+    width: 100%;
+    max-width: 400px;
+    overflow: hidden;
+    border: 1px solid #2a2a2a;
+  }
+
+  /* ── Header ── */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid #2a2a2a;
+  }
+  .header-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #fff;
+  }
+  .header-title svg { color: #4ade80; }
+  .retorno-badge {
+    background: #2a1212;
+    color: #f87171;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid #7f1d1d44;
+  }
+  .retorno-badge.positivo {
+    background: #0a2a14;
+    color: #4ade80;
+    border-color: #16653444;
+  }
+
+  /* ── Arredondar ── */
+  .section { padding: 14px 20px; border-bottom: 1px solid #2a2a2a; }
+  .section-label {
+    font-size: 11px;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 8px;
+  }
+  .round-group {
+    display: flex;
+    gap: 6px;
+  }
+  .round-btn {
+    background: #242424;
+    border: 1px solid #333;
+    border-radius: 8px;
+    color: #aaa;
+    font-size: 12px;
+    padding: 5px 10px;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .round-btn.active {
+    background: #1a3a28;
+    border-color: #4ade80;
+    color: #4ade80;
+    font-weight: 600;
+  }
+
+  /* ── Tabela de apostas ── */
+  .table-header {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1.2fr 1.1fr;
+    padding: 8px 20px 6px;
+    gap: 8px;
+  }
+  .table-header span {
+    font-size: 10px;
+    font-weight: 600;
+    color: #555;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+  }
+  .table-header span:not(:first-child) { text-align: right; }
+
+  .bet-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1.2fr 1.1fr;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border-top: 1px solid #242424;
+    transition: background .1s;
+  }
+  .bet-row:hover { background: #1f1f1f; }
+
+  .house-info { display: flex; align-items: center; gap: 8px; }
+
+  .logo {
+    width: 30px; height: 30px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; flex-shrink: 0;
+    letter-spacing: -0.03em;
+  }
+  .logo.superbet  { background: #b91c1c; color: #fff; }
+  .logo.bet365    { background: #15803d; color: #fff; }
+  .logo.betano    { background: #ea580c; color: #fff; }
+  .logo.aposta1   { background: #1d4ed8; color: #fff; }
+  .logo.sportingbet { background: #7c3aed; color: #fff; }
+
+  .house-name {
+    font-size: 12px;
+    color: #bbb;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .market-tag {
+    font-size: 9px;
+    color: #555;
+    margin-top: 1px;
+  }
+
+  .odd-input {
+    background: #252525;
+    border: 1px solid #333;
+    border-radius: 8px;
+    color: #f0f0f0;
+    font-size: 13px;
+    font-weight: 600;
+    text-align: right;
+    padding: 6px 8px;
+    width: 100%;
+    outline: none;
+    transition: border-color .15s;
+  }
+  .odd-input:focus { border-color: #4ade80; }
+  .odd-input.destaque { border-color: #4ade80; color: #4ade80; }
+
+  .aposta-val {
+    font-size: 12px;
+    color: #e0e0e0;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .aposta-sub { font-size: 10px; color: #555; text-align: right; }
+
+  .lucro-val {
+    font-size: 12px;
+    font-weight: 600;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .lucro-val.neg { color: #f87171; }
+  .lucro-val.pos { color: #4ade80; }
+
+  /* ── Stake fixa ── */
+  .stake-section { padding: 12px 20px; border-bottom: 1px solid #2a2a2a; }
+  .stake-input-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .stake-input-label {
+    font-size: 13px;
+    color: #777;
+    white-space: nowrap;
+  }
+  .stake-input-wrap {
+    display: flex;
+    align-items: center;
+    background: #252525;
+    border: 1px solid #4ade80;
+    border-radius: 10px;
+    overflow: hidden;
+    gap: 0;
+    flex: 1;
+    max-width: 180px;
+  }
+  .stake-currency {
+    font-size: 13px;
+    color: #888;
+    padding: 0 8px 0 12px;
+    user-select: none;
+  }
+  .stake-input {
+    background: transparent;
+    border: none;
+    color: #f0f0f0;
+    font-size: 16px;
+    font-weight: 700;
+    text-align: right;
+    padding: 10px 6px;
+    outline: none;
+    width: 100%;
+    font-variant-numeric: tabular-nums;
+  }
+  .stake-input::-webkit-inner-spin-button,
+  .stake-input::-webkit-outer-spin-button { -webkit-appearance: none; }
+  .stake-lock {
+    background: none;
+    border: none;
+    border-left: 1px solid #333;
+    color: #4ade80;
+    padding: 0 10px;
+    cursor: pointer;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    align-self: stretch;
+    transition: background .15s;
+  }
+  .stake-lock:hover { background: #1a3a28; }
+
+  /* ── Totais ── */
+  .totals-section { padding: 16px 20px; border-bottom: 1px solid #2a2a2a; }
+  .total-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .total-row:last-child { margin-bottom: 0; }
+  .total-label { font-size: 13px; color: #777; }
+  .total-val { font-size: 13px; color: #e0e0e0; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .total-val.neg { color: #f87171; }
+  .total-val.pos { color: #4ade80; }
+
+  .roi-badge {
+    display: inline-block;
+    background: #2a1212;
+    color: #f87171;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 2px 8px;
+  }
+  .roi-badge.pos { background: #0a2a14; color: #4ade80; }
+
+  /* ── Cenários ── */
+  .scenarios-section { padding: 14px 20px; border-bottom: 1px solid #2a2a2a; }
+  .scenarios-title {
+    font-size: 11px;
+    color: #555;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 10px;
+  }
+  .scenario-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+    padding: 7px 10px;
+    background: #202020;
+    border-radius: 8px;
+    border: 1px solid #2a2a2a;
+  }
+  .scenario-row:last-child { margin-bottom: 0; }
+  .scenario-label { font-size: 12px; color: #888; }
+  .scenario-val { font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .scenario-val.neg { color: #f87171; }
+  .scenario-val.pos { color: #4ade80; }
+
+  /* ── Botões ── */
+  .buttons-section { padding: 14px 20px; display: flex; flex-direction: column; gap: 8px; }
+  .action-btn {
+    width: 100%;
+    padding: 13px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    border: none;
+    letter-spacing: 0.02em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: opacity .15s, transform .1s;
+  }
+  .action-btn:hover { opacity: .9; }
+  .action-btn:active { transform: scale(.98); }
+  .btn-missoes  { background: #4ade80; color: #052e12; }
+  .btn-arb      { background: #38bdf8; color: #041b29; }
+  .btn-multi    { background: #818cf8; color: #0d0e2b; }
+</style>
+</head>
+<body>
+<div class="card">
+
+  <!-- Compartilhar bar -->
+  <div class="share-bar">
+    <button class="share-btn" onclick="document.getElementById('share-popup').style.display='flex'">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+        <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+        <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+      </svg>
+      Compartilhar
+    </button>
+    <button class="close-btn" title="Fechar">✕</button>
+  </div>
+
+  <!-- Popup compartilhar -->
+  <div id="share-popup" style="display:none; position:absolute; top:44px; left:50%; transform:translateX(-50%); z-index:99; background:#1e1e1e; border:1px solid #333; border-radius:12px; padding:10px; min-width:200px; box-shadow:0 8px 32px #0008;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; padding:0 4px;">
+      <span style="display:flex;align-items:center;gap:6px;font-size:13px;color:#ccc;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+        Compartilhar
+      </span>
+      <button onclick="document.getElementById('share-popup').style.display='none'" style="background:none;border:none;color:#666;cursor:pointer;font-size:14px;">✕</button>
+    </div>
+    <button style="width:100%;display:flex;align-items:center;gap:10px;background:#2a2a2a;border:none;border-radius:8px;padding:10px 12px;color:#ddd;font-size:13px;cursor:pointer;margin-bottom:6px;">
+      <span style="width:28px;height:28px;background:#3b3;border-radius:6px;display:flex;align-items:center;justify-content:center;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      </span>
+      Copiar texto
+    </button>
+    <button style="width:100%;display:flex;align-items:center;gap:10px;background:#2a2a2a;border:none;border-radius:8px;padding:10px 12px;color:#ddd;font-size:13px;cursor:pointer;">
+      <span style="width:28px;height:28px;background:#38bdf8;border-radius:6px;display:flex;align-items:center;justify-content:center;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+      </span>
+      Copiar Link
+    </button>
+  </div>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-title">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+        <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+        <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+      </svg>
+      Calculadora Surebet
+    </div>
+    <span class="retorno-badge" id="retorno-badge">Retorno: -2,54%</span>
+  </div>
+
+  <!-- Arredondar -->
+  <div class="section">
+    <div class="section-label">Arredondar</div>
+    <div class="round-group">
+      <button class="round-btn active">0,01</button>
+      <button class="round-btn">0,10</button>
+      <button class="round-btn">0,50</button>
+      <button class="round-btn">1,00</button>
+    </div>
+  </div>
+
+  <!-- Cabeçalho da tabela -->
+  <div class="table-header">
+    <span>Casa</span>
+    <span>Odd</span>
+    <span>Aposta</span>
+    <span>Lucro</span>
+  </div>
+
+  <!-- Linha Casa -->
+  <div class="bet-row">
+    <div class="house-info">
+      <div class="logo superbet">SB</div>
+      <div>
+        <div class="house-name">Superbet</div>
+        <div class="market-tag">Casa</div>
+      </div>
+    </div>
+    <input class="odd-input destaque" type="number" value="2.92" step="0.01" />
+    <div>
+      <div class="aposta-val">R$ 100,00</div>
+    </div>
+    <div class="lucro-val neg">-R$ 7,61</div>
+  </div>
+
+  <!-- Linha Empate -->
+  <div class="bet-row">
+    <div class="house-info">
+      <div class="logo bet365">B3</div>
+      <div>
+        <div class="house-name">Bet365</div>
+        <div class="market-tag">Empate</div>
+      </div>
+    </div>
+    <input class="odd-input destaque" type="number" value="3.10" step="0.01" />
+    <div>
+      <div class="aposta-val">R$ 94,19</div>
+    </div>
+    <div class="lucro-val neg">-R$ 7,62</div>
+  </div>
+
+  <!-- Linha Fora -->
+  <div class="bet-row">
+    <div class="house-info">
+      <div class="logo betano">BT</div>
+      <div>
+        <div class="house-name">Betano</div>
+        <div class="market-tag">Fora</div>
+      </div>
+    </div>
+    <input class="odd-input destaque" type="number" value="2.77" step="0.01" />
+    <div>
+      <div class="aposta-val">R$ 105,42</div>
+    </div>
+    <div class="lucro-val neg">-R$ 7,60</div>
+  </div>
+
+  <!-- Stake Total input -->
+  <div class="stake-section">
+    <div class="stake-input-row">
+      <span class="stake-input-label">Stake Total</span>
+      <div class="stake-input-wrap">
+        <span class="stake-currency">R$</span>
+        <input class="stake-input" type="number" value="1000" min="0" step="1" />
+        <button class="stake-lock" title="Travar stake">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Totais -->
+  <div class="totals-section">
+    <div class="total-row">
+      <span class="total-label">Stake total</span>
+      <span class="total-val">R$ 299,61</span>
+    </div>
+    <div class="total-row">
+      <span class="total-label">Retorno garantido</span>
+      <span class="total-val">R$ 291,99</span>
+    </div>
+    <div class="total-row">
+      <span class="total-label">Lucro</span>
+      <span class="total-val neg">R$ -7,62</span>
+    </div>
+    <div class="total-row">
+      <span class="total-label">ROI</span>
+      <span class="roi-badge" id="roi-badge">-2,54%</span>
+    </div>
+  </div>
+
+  <!-- Cenários -->
+  <div class="scenarios-section">
+    <div class="scenarios-title">Cenários</div>
+    <div class="scenario-row">
+      <span class="scenario-label">Se Casa ganha</span>
+      <span class="scenario-val neg">R$ -7,61</span>
+    </div>
+    <div class="scenario-row">
+      <span class="scenario-label">Se Empate ganha</span>
+      <span class="scenario-val neg">R$ -7,62</span>
+    </div>
+    <div class="scenario-row">
+      <span class="scenario-label">Se Fora ganha</span>
+      <span class="scenario-val neg">R$ -7,60</span>
+    </div>
+  </div>
+
+  <!-- Botões de ação -->
+  <div class="buttons-section">
+    <button class="action-btn btn-missoes">⚙ Registrar Missões</button>
+    <button class="action-btn btn-arb">⚖ Registrar Arbitragem</button>
+    <button class="action-btn btn-multi">👥 Registrar Multi</button>
+  </div>
+
+  <!-- Card Duplo Green -->
+  <div class="duplo-green-card">
+    <div class="dg-title"><span class="dg-icon">⚡</span> Cenários Duplo Green</div>
+    <p class="dg-desc">Se um time abrir vantagem de 2 gols (Pagamento Antecipado) e depois empatar OU virar:</p>
+    <div class="dg-label">Valor Duplo Green (investimento − 1 perda)</div>
+    <div class="dg-value">R$ 953,21</div>
+  </div>
+
+</div>
+
+<script>
+  // Arredondar buttons
+  document.querySelectorAll('.round-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.round-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+
+  // Stake buttons
+  document.querySelectorAll('.stake-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.stake-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+</script>
+</body>
+</html>
