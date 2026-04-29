@@ -151,9 +151,9 @@ export function SurebetCalculator({
       lines.push(`📅 ${formatDateShort(matchDateObj)}`);
     }
     const sign = custoPct >= 0 ? '+' : '';
-    lines.push(
-      `💰 Custo: ${sign}${custoPct.toFixed(2)}% (${custoPer1k.toFixed(2)} a cada 1k)`,
-    );
+    const pctBR = custoPct.toFixed(2).replace('.', ',');
+    const per1kBR = formatBRL(custoPer1k);
+    lines.push(`💰 Custo: ${sign}${pctBR}% (${per1kBR} a cada 1k)`);
     lines.push('');
     lines.push('📊 Odds:');
     lines.push(
