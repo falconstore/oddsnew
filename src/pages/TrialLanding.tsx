@@ -36,10 +36,16 @@ interface FbqStub {
   version: string;
 }
 
+type Track4YouFn = (eventName: string, params?: Record<string, unknown>) => void;
+
 declare global {
   interface Window {
     fbq?: FbqStub;
     _fbq?: FbqStub;
+    // Globais que diferentes versões do pixel track4you costumam expor
+    t4y?: Track4YouFn;
+    track4you?: Track4YouFn;
+    T4Y?: { track?: Track4YouFn } | Track4YouFn;
   }
 }
 
@@ -83,6 +89,38 @@ function trackPixel(
     }
   } catch {
     /* adblock / pixel não carregado — ignora */
+  }
+}
+
+// Notifica o pixel da track4you (carregado via index.html). Como o
+// script é `defer`, o global pode não existir no momento do clique;
+// neste caso o helper faz no-op silencioso pra nunca bloquear o redirect.
+// Tenta múltiplos nomes globais conhecidos + dispara um CustomEvent que
+// versões mais novas do script ouvem via addEventListener.
+function trackT4Y(eventName: string, params: Record<string, unknown> = {}) {
+  if (typeof window === 'undefined') return;
+  try {
+    const w = window;
+    if (typeof w.t4y === 'function') {
+      w.t4y(eventName, params);
+    } else if (typeof w.track4you === 'function') {
+      w.track4you(eventName, params);
+    } else if (typeof w.T4Y === 'function') {
+      (w.T4Y as Track4YouFn)(eventName, params);
+    } else if (w.T4Y && typeof (w.T4Y as { track?: Track4YouFn }).track === 'function') {
+      (w.T4Y as { track: Track4YouFn }).track(eventName, params);
+    }
+    // Sinal extra: CustomEvent que o script da track4you pode escutar.
+    // Tem um nome próprio (não conflita com o `track()` interno do app).
+    try {
+      window.dispatchEvent(
+        new CustomEvent('t4y:event', { detail: { name: eventName, params } }),
+      );
+    } catch {
+      /* CustomEvent indisponível em browsers muito antigos — ignora */
+    }
+  } catch {
+    /* nunca propaga — clique tem que continuar funcionando */
   }
 }
 
@@ -268,6 +306,11 @@ export default function TrialLanding() {
 
   const onFreeGroups = (where: string) => {
     track('cta_free_group', { button: where });
+    trackT4Y('cta_telegram', {
+      button: where,
+      destination: 'free_groups',
+      url: FREE_GROUPS_URL,
+    });
     window.open(FREE_GROUPS_URL, '_blank', 'noopener,noreferrer');
   };
 
@@ -657,6 +700,13 @@ function SignupModal({
                 rel="noopener noreferrer"
                 className="w-full"
                 data-testid="link-bot-start"
+                onClick={() =>
+                  trackT4Y('cta_telegram', {
+                    button: 'bot_start',
+                    destination: 'trial_bot',
+                    url: success.botStartUrl,
+                  })
+                }
               >
                 <Button className="w-full h-12 bg-gradient-to-r from-emerald-400 to-green-500 hover:from-emerald-300 hover:to-green-400 text-black font-bold text-base border-0 shadow-lg shadow-emerald-500/40">
                   <Send className="w-5 h-5 mr-2" />
@@ -684,6 +734,13 @@ function SignupModal({
                   rel="noopener noreferrer"
                   className="mt-2 inline-block text-xs text-emerald-300 underline break-all"
                   data-testid="link-telegram-invite-fallback"
+                  onClick={() =>
+                    trackT4Y('cta_telegram', {
+                      button: 'invite_fallback',
+                      destination: 'vip_invite',
+                      url: success.inviteLink,
+                    })
+                  }
                 >
                   {success.inviteLink}
                 </a>

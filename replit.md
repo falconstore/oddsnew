@@ -29,6 +29,9 @@ BetShark Pro is a real-time odds monitoring application for sports betting. It f
     - Incorporates structured logging for all critical webhook decisions.
     - **Scheduling**: `pg_cron` + `pg_net` extensions on Supabase invoke the `trial-cron` Edge Function every 30 minutes (job `trial-cron-every-30min`). The function accepts two bearer tokens (defense-in-depth): the auto-injected `SUPABASE_SERVICE_ROLE_KEY` and a custom `TRIAL_CRON_SECRET` Edge Function secret. The custom secret is stored in Supabase Vault as `trial_cron_secret` and read by the cron at runtime via `vault.decrypted_secrets` — this decoupling keeps the cron working even if the platform silently rotates the auto-injected service role key. Migration: `supabase/migrations/20260501_trial_cron_schedule.sql`. The cron only processes leads with `cohort='v2'`; legacy `v1` leads are intentionally excluded.
 - **Landing Page (LP Shark 100% Green)**: A rebranded landing page (`/trial`) with a luxury dark-green aesthetic, multiple CTAs for trial signup, free groups, and direct purchase, all tracking events for conversion analytics.
+- **Performance tracking pixels**: Two pixels load on every page (configured in `index.html` `<head>`):
+    - **Meta Pixel** (`fbq`, ID `1295449168383975`) — initialized on the LP via `TrialLanding.tsx` with CAPI deduplication.
+    - **track4you** (`https://track4you.app/9fdc319a-0e6e-4feb-b4a4-471c0293465c.js`, deferred) — for Arthur (gestor de performance). Click events are dispatched on the 3 Telegram-bound CTAs of the LP via the `trackT4Y()` helper in `TrialLanding.tsx` (event name `cta_telegram`). The helper is defensive: it tries multiple known global names (`window.t4y`, `window.track4you`, `window.T4Y`) and also dispatches a `t4y:event` `CustomEvent`, falling back to no-op if the SDK hasn't loaded yet — so it never blocks the redirect.
 - **Data Cohorting**: Implements a 'v1'/'v2' cohort system to manage distinct user groups, particularly for handling legacy data without affecting active trial flows.
 
 ## External Dependencies
@@ -42,3 +45,4 @@ BetShark Pro is a real-time odds monitoring application for sports betting. It f
 - **@tanstack/react-query**: Data fetching and caching library.
 - **date-fns**: JavaScript date utility library.
 - **Lastlink**: External checkout platform integrated for subscription payments and coupon application.
+- **track4you**: 3rd-party performance/conversion tracking pixel (script loaded in `index.html`).
