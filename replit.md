@@ -26,6 +26,7 @@ BetShark Pro is a real-time odds monitoring application for sports betting. It f
     - Features a robust anti-repeater mechanism based on `telegram_user_id` to prevent duplicate trials.
     - Provides an admin panel (`/trial-admin`) for lead management, diagnostics, and manual interventions.
     - Incorporates structured logging for all critical webhook decisions.
+    - **Scheduling**: `pg_cron` + `pg_net` extensions on Supabase invoke the `trial-cron` Edge Function every 30 minutes (job `trial-cron-every-30min`). Service role JWT is stored in Supabase Vault as `trial_cron_service_role` (never committed). Migration: `supabase/migrations/20260501_trial_cron_schedule.sql`. The cron only processes leads with `cohort='v2'`; legacy `v1` leads are intentionally excluded.
 - **Landing Page (LP Shark 100% Green)**: A rebranded landing page (`/trial`) with a luxury dark-green aesthetic, multiple CTAs for trial signup, free groups, and direct purchase, all tracking events for conversion analytics.
 - **Data Cohorting**: Implements a 'v1'/'v2' cohort system to manage distinct user groups, particularly for handling legacy data without affecting active trial flows.
 
