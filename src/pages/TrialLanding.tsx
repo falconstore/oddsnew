@@ -17,13 +17,13 @@ const SUPABASE_ANON = import.meta.env.VITE_MAIN_SUPABASE_ANON_KEY as string;
 
 const FREE_GROUPS_URL =
   (import.meta.env.VITE_FREE_GROUPS_URL as string | undefined) ||
-  'https://t.me/+Icv1WXcUHTk1Yjhh';
+  'https://t.me/+uxaDoyMx845kMGUx';
 const BUY_NOW_URL =
   (import.meta.env.VITE_BUY_NOW_URL as string | undefined) ||
   (import.meta.env.VITE_TRIAL_UPGRADE_CHECKOUT_URL as string | undefined) ||
   'https://lastlink.com/p/CEAEE6585/checkout-payment/';
 
-const PIXEL_ID = '1295449168383975';
+const PIXEL_ID = '1486249896237184';
 const PIXEL_SCRIPT_SRC = 'https://connect.facebook.net/en_US/fbevents.js';
 const PIXEL_SCRIPT_DATA_ATTR = 'data-trial-pixel';
 
