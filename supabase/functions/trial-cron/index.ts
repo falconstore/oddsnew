@@ -7,6 +7,18 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders, json } from "../_shared/cors.ts";
 
+function constantTimeEqual(a: string, b: string): boolean {
+  const enc = new TextEncoder();
+  const ab = enc.encode(a);
+  const bb = enc.encode(b);
+  const len = Math.max(ab.length, bb.length);
+  let diff = ab.length ^ bb.length;
+  for (let i = 0; i < len; i++) {
+    diff |= (ab[i] ?? 0) ^ (bb[i] ?? 0);
+  }
+  return diff === 0;
+}
+
 async function tgKick(botToken: string, chatId: string, userId: number) {
   const banRes = await fetch(`https://api.telegram.org/bot${botToken}/banChatMember`, {
     method: "POST",
@@ -134,11 +146,20 @@ async function tgSendDM(botToken: string, userId: number, text: string, replyMar
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
-  // Defesa em profundidade: exige Authorization: Bearer <SERVICE_ROLE_KEY>.
-  // Mesmo se a função for deployada sem --verify-jwt, callers públicos são bloqueados.
+  // Defesa em profundidade: aceita Authorization: Bearer <SERVICE_ROLE_KEY>
+  // OU Bearer <TRIAL_CRON_SECRET>. O segundo permite que o pg_cron interno
+  // continue funcionando mesmo se o SUPABASE_SERVICE_ROLE_KEY auto-injetado
+  // for rotacionado pela plataforma sem que o cron seja atualizado.
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const trialCronSecret = Deno.env.get("TRIAL_CRON_SECRET") ?? "";
   const auth = req.headers.get("Authorization") ?? "";
-  if (!auth.startsWith("Bearer ") || auth.slice(7).trim() !== serviceKey) {
+  if (!auth.startsWith("Bearer ")) {
+    return json({ error: "forbidden" }, { status: 403 });
+  }
+  const presented = auth.slice(7).trim();
+  const matchesService = constantTimeEqual(presented, serviceKey);
+  const matchesCron = trialCronSecret.length > 0 && constantTimeEqual(presented, trialCronSecret);
+  if (!matchesService && !matchesCron) {
     return json({ error: "forbidden" }, { status: 403 });
   }
 

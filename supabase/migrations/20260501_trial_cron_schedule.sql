@@ -5,15 +5,22 @@
 --   * 1h reminder DMs
 --   * Auto-expire (banChatMember + unbanChatMember) of expired v2 leads
 --
--- Pre-requisite (manual, ONE-TIME, do NOT commit the value):
---   The service_role JWT must already be stored in Supabase Vault under
---   the name 'trial_cron_service_role'. Create it once via SQL editor:
+-- Pre-requisites (manual, ONE-TIME, do NOT commit the value):
 --
---     SELECT vault.create_secret(
---       '<SERVICE_ROLE_JWT>',
---       'trial_cron_service_role',
---       'Service role JWT used by trial-cron pg_cron job'
---     );
+-- 1. Generate a strong random shared secret and set it as an Edge Function
+--    secret named TRIAL_CRON_SECRET (via Supabase dashboard or Mgmt API).
+--    The trial-cron Edge Function accepts this value as Bearer token in
+--    addition to the auto-injected SUPABASE_SERVICE_ROLE_KEY. Decoupling
+--    from SUPABASE_SERVICE_ROLE_KEY protects this job from silent breakage
+--    when the platform rotates the auto-injected key.
+--
+-- 2. Store the same value in Supabase Vault under the name 'trial_cron_secret':
+--
+--      SELECT vault.create_secret(
+--        '<TRIAL_CRON_SECRET_VALUE>',
+--        'trial_cron_secret',
+--        'Custom shared secret for trial-cron pg_cron job'
+--      );
 --
 -- The schedule below reads the secret at runtime via vault.decrypted_secrets,
 -- so the value never leaves the database.
@@ -45,12 +52,12 @@ SELECT cron.schedule(
       'Authorization', 'Bearer ' || (
         SELECT decrypted_secret
         FROM vault.decrypted_secrets
-        WHERE name = 'trial_cron_service_role'
+        WHERE name = 'trial_cron_secret'
         LIMIT 1
       )
     ),
     body := '{}'::jsonb,
-    timeout_milliseconds := 60000
+    timeout_milliseconds := 90000
   ) AS request_id;
   $cmd$
 );
