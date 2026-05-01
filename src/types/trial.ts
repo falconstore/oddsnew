@@ -4,7 +4,8 @@ export type TrialStatus =
   | 'expired'
   | 'removed'
   | 'blocked'
-  | 'blocked_repeat';
+  | 'blocked_repeat'
+  | 'converted';
 
 export interface TrialLead {
   id: string;

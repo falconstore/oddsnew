@@ -40,6 +40,7 @@ const STATUS_META: Record<TrialStatus, { label: string; cls: string }> = {
   removed: { label: 'Removido', cls: 'bg-red-500/15 text-red-300 border-red-500/30' },
   blocked: { label: 'Bloqueado', cls: 'bg-purple-500/15 text-purple-300 border-purple-500/30' },
   blocked_repeat: { label: 'Repetidor bloqueado', cls: 'bg-orange-500/15 text-orange-300 border-orange-500/30' },
+  converted: { label: 'Convertido (pago)', cls: 'bg-emerald-600/20 text-emerald-200 border-emerald-500/40' },
 };
 
 const fmtDate = (iso: string | null) =>
@@ -86,7 +87,7 @@ export default function TrialAdmin() {
   const { data: capiStats, isLoading: capiLoading } = useTrialCapiStats();
 
   const stats = useMemo(() => {
-    const s = { total: leads.length, active: 0, expired: 0, blocked: 0, pending: 0, removed: 0, blockedRepeat: 0, v1: 0, v2: 0 };
+    const s = { total: leads.length, active: 0, expired: 0, blocked: 0, pending: 0, removed: 0, blockedRepeat: 0, converted: 0, v1: 0, v2: 0 };
     for (const l of leads) {
       if (l.status === 'active') s.active++;
       else if (l.status === 'expired') s.expired++;
@@ -94,6 +95,7 @@ export default function TrialAdmin() {
       else if (l.status === 'pending') s.pending++;
       else if (l.status === 'removed') s.removed++;
       else if (l.status === 'blocked_repeat') s.blockedRepeat++;
+      else if (l.status === 'converted') s.converted++;
       if (l.cohort === 'v1') s.v1++;
       else if (l.cohort === 'v2') s.v2++;
     }
@@ -588,6 +590,7 @@ export default function TrialAdmin() {
           <StatCard icon={<Clock className="w-5 h-5" />} label="Expirados" value={stats.expired} accent="from-zinc-500/20 to-zinc-500/5 border-zinc-500/25 text-zinc-300" />
           <StatCard icon={<Ban className="w-5 h-5" />} label="Bloqueados" value={stats.blocked} accent="from-purple-500/20 to-purple-500/5 border-purple-500/25 text-purple-300" />
           <StatCard icon={<ShieldAlert className="w-5 h-5" />} label="Repetidores bloqueados" value={stats.blockedRepeat} accent="from-orange-500/20 to-orange-500/5 border-orange-500/25 text-orange-300" />
+          <StatCard icon={<CheckCircle2 className="w-5 h-5" />} label="Convertidos (pagos)" value={stats.converted} accent="from-emerald-600/25 to-emerald-600/5 border-emerald-500/30 text-emerald-200" />
           <StatCard icon={<Ban className="w-5 h-5" />} label="Removidos" value={stats.removed} accent="from-red-500/20 to-red-500/5 border-red-500/25 text-red-300" />
         </div>
 
@@ -615,6 +618,7 @@ export default function TrialAdmin() {
               <SelectItem value="removed">Removidos</SelectItem>
               <SelectItem value="blocked">Bloqueados</SelectItem>
               <SelectItem value="blocked_repeat">Repetidores bloqueados</SelectItem>
+              <SelectItem value="converted">Convertidos (pagos)</SelectItem>
             </SelectContent>
           </Select>
           <Select value={cohortFilter} onValueChange={v => setCohortFilter(v as 'all' | 'v1' | 'v2')}>

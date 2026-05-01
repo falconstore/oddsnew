@@ -258,6 +258,12 @@ serve(async (req) => {
     const oldStatus: string | undefined = cm.old_chat_member?.status;
     const userId: number | undefined = cm.new_chat_member?.user?.id;
     const username: string | undefined = cm.new_chat_member?.user?.username;
+    // Quem disparou o evento. Quando um admin/bot externo (ex.: bot da
+    // Lastlink) adiciona o usuário ao grupo via addChatMember, `from.id`
+    // é diferente do `new_chat_member.user.id`. Quando o próprio usuário
+    // entra clicando num invite_link, eles são iguais.
+    const actorUserId: number | undefined = cm.from?.id;
+    const wasAddedByOther = !!actorUserId && !!userId && actorUserId !== userId;
 
     log("received", {
       update_id: updateId,
@@ -268,6 +274,8 @@ serve(async (req) => {
       old_status: oldStatus ?? null,
       new_status: newStatus ?? null,
       invite_link: inviteLink ?? null,
+      actor_user_id: actorUserId ?? null,
+      added_by_other: wasAddedByOther,
     });
 
     if (!userId) {
@@ -479,11 +487,12 @@ serve(async (req) => {
         id: string;
         status: string;
         invite_link: string | null;
+        bonus_invite_link: string | null;
       };
       let foundVia: string | null = null;
       const { data: byUser, error: byUserErr } = await supabase
         .from("trial_leads")
-        .select("id, status, invite_link")
+        .select("id, status, invite_link, bonus_invite_link")
         .eq("telegram_user_id", userId)
         .order("created_at", { ascending: false })
         .limit(1)
@@ -506,7 +515,7 @@ serve(async (req) => {
       if (!lead && inviteLink) {
         const { data: byLink, error: byLinkErr } = await supabase
           .from("trial_leads")
-          .select("id, status, invite_link")
+          .select("id, status, invite_link, bonus_invite_link")
           .eq("invite_link", inviteLink)
           .maybeSingle();
         log("lookup_invite_link", {
@@ -645,6 +654,39 @@ serve(async (req) => {
           });
           return json({ ok: true, action: "blocked-repeat", lead_id: byLinkRepeat.id });
         }
+      }
+
+      // 1c.0) CONVERSÃO PAGA: se o lead estava bloqueado/expirado mas o
+      // join atual veio por um caminho EXTERNO ao nosso sistema (ex.: o
+      // bot da Lastlink adicionou o usuário, ou ele entrou por um
+      // invite_link que não é nem o trial nem o bônus que geramos),
+      // então é uma compra. NÃO re-kickar e marcar o lead como
+      // 'converted' para que tentativas futuras de rejoin também passem.
+      const usedExternalInviteLink =
+        !!inviteLink &&
+        inviteLink !== lead.invite_link &&
+        inviteLink !== lead.bonus_invite_link;
+      if (
+        BLOCKED_LEAD_STATUSES.has(lead.status) &&
+        (usedExternalInviteLink || wasAddedByOther)
+      ) {
+        await supabase
+          .from("trial_leads")
+          .update({
+            status: "converted",
+            telegram_user_id: userId,
+          })
+          .eq("id", lead.id);
+        log("converted-paid-rejoin", {
+          update_id: updateId,
+          lead_id: lead.id,
+          prev_status: lead.status,
+          via: usedExternalInviteLink ? "external_invite_link" : "added_by_other",
+          invite_link_used: inviteLink ?? null,
+          actor_user_id: actorUserId ?? null,
+          found_via: foundVia,
+        });
+        return json({ ok: true, action: "converted-paid-rejoin", lead_id: lead.id });
       }
 
       // 1c) Se o lead já foi removido/bloqueado/expirado → re-kick imediato
