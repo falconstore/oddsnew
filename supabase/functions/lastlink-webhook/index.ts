@@ -1,25 +1,24 @@
-// Edge Function: lastlink-webhook
+// Edge Function: lastlink-webhook  (v2)
 // Recebe os webhooks da Lastlink (Postback / Notifications) e:
-//   1) Salva o payload bruto em `lastlink_events` (auditoria).
-//   2) Faz match do lead pelo email do comprador (campo mais confiável).
-//   3) Atualiza trial_leads com order_id, valor, plano, cupom, etc.
-//   4) Em compras confirmadas → força status='converted' (impede re-kick
-//      pelo trial-webhook caso o cliente seja re-adicionado depois).
-//   5) Em cancelamento/refund → atualiza subscription_status mas NÃO
-//      kicka — o operador decide manualmente no painel.
+//   1) Salva o payload bruto em `lastlink_events` (auditoria + flag is_test).
+//   2) Faz match do lead pelo email do comprador.
+//   3) Atualiza trial_leads com TODOS os campos úteis: pagamento, comprador,
+//      oferta, afiliado, UTMs, link de fatura, próxima cobrança, etc.
+//   4) Em compras confirmadas → força status='converted' (impede re-kick).
+//   5) Em cancelamento/refund → atualiza subscription_status (não kicka).
 //
 // SEGURANÇA:
-//   - Valida o `?token=` da query contra o secret `LASTLINK_WEBHOOK_TOKEN`
-//     configurado nas Edge Function secrets do projeto.
+//   - Valida `?token=` da query contra o secret `LASTLINK_WEBHOOK_TOKEN`.
 //
 // COMO CONFIGURAR NO PAINEL DA LASTLINK:
-//   URL do webhook:
-//     https://wspsuempnswljkphatur.supabase.co/functions/v1/lastlink-webhook?token=<TOKEN>
-//   Eventos a habilitar:
-//     - Purchase_Order_Confirmed
-//     - Recurrent_Payment
-//     - Purchase_Refund / Purchase_Chargeback
-//     - Subscription_Canceled / Subscription_Expired
+//   URL: https://wspsuempnswljkphatur.supabase.co/functions/v1/lastlink-webhook?token=<TOKEN>
+//   Eventos: marcar TODOS (17 eventos) — o handler ignora os irrelevantes.
+//
+// V2 (02/05/2026): payload da Lastlink inspecionado em produção.
+//   - PaymentMethod corrigido p/ Data.Purchase.Payment.PaymentMethod
+//   - Eventos REAIS de refund: Payment_Refund / Payment_Chargeback
+//   - Captura: CPF, telefone, nome, endereço, oferta, afiliado, parcelas,
+//     próxima cobrança, link da fatura, UTMs, flag is_test.
 //
 // deno-lint-ignore-file
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -31,19 +30,24 @@ const log = (event: string, data: Record<string, unknown>) => {
 };
 
 const PAID_EVENTS = new Set([
-  "Purchase_Order_Confirmed",
-  "Purchase_Request_Confirmed",
-  "Recurrent_Payment",
+  "Purchase_Order_Confirmed",     // cartão aprovado
+  "Purchase_Request_Confirmed",   // pix/boleto pago
+  "Recurrent_Payment",            // renovação cobrada
 ]);
 
 const CANCELED_EVENTS = new Set([
   "Subscription_Canceled",
   "Subscription_Expired",
+  "Product_Access_Ended",
 ]);
 
 const REFUNDED_EVENTS = new Set([
-  "Purchase_Refund",
-  "Purchase_Chargeback",
+  "Payment_Refund",
+  "Payment_Chargeback",
+]);
+
+const REFUND_REQUESTED_EVENTS = new Set([
+  "Refund_Requested",
 ]);
 
 function pick<T = unknown>(obj: any, ...paths: string[]): T | undefined {
@@ -62,6 +66,18 @@ function normalizeEmail(s: unknown): string | null {
   if (typeof s !== "string") return null;
   const v = s.trim().toLowerCase();
   return v && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? v : null;
+}
+
+function toIsoOrNull(s: unknown): string | null {
+  if (typeof s !== "string" || !s) return null;
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : d.toISOString();
+}
+
+function toNumberOrNull(v: unknown): number | null {
+  if (v === null || v === undefined || v === "") return null;
+  const n = typeof v === "string" ? Number(v.replace(",", ".")) : Number(v);
+  return Number.isFinite(n) ? n : null;
 }
 
 serve(async (req) => {
@@ -89,80 +105,96 @@ serve(async (req) => {
 
     const payload = await req.json().catch(() => ({}));
 
-    // A Lastlink envia o payload em duas convenções:
-    //   { Event: "...", Data: { ... } }      (formato moderno)
-    //   { event: "...", data: { ... } }     (formato legacy)
-    // Tratamos os dois normalizando para minúsculo na hora de ler.
+    // ===== Parse =====
     const eventType: string =
       pick<string>(payload, "Event", "event", "EventType", "type") ?? "Unknown";
+    const eventId = pick<string>(payload, "Id", "id");
+    const isTest = Boolean(pick<boolean>(payload, "IsTest", "isTest"));
     const data: any = pick(payload, "Data", "data") ?? payload;
 
+    // Buyer
     const buyerEmail = normalizeEmail(
       pick(data, "Buyer.Email", "buyer.email", "Customer.Email", "customer.email", "Email"),
     );
+    const buyerName = pick<string>(data, "Buyer.Name", "buyer.name", "Customer.Name");
+    const buyerDocument = pick<string>(data, "Buyer.Document", "buyer.document");
+    const buyerPhone = pick<string>(data, "Buyer.PhoneNumber", "buyer.phoneNumber", "Buyer.Phone");
+    const buyerAddress = pick<unknown>(data, "Buyer.Address", "buyer.address");
 
+    // Identifiers
     const orderId = pick<string>(
       data,
       "Purchase.OrderId", "purchase.orderId",
       "Purchase.Id", "purchase.id",
-      "OrderId", "orderId", "Id", "id",
+      "OrderId", "orderId",
     );
-
     const subscriptionId = pick<string>(
       data,
       "Subscriptions.0.Id", "subscriptions.0.id",
       "Subscription.Id", "subscription.id",
-      "SubscriptionId", "subscriptionId",
+      "SubscriptionId",
     );
-
     const productId = pick<string>(
       data,
       "Products.0.Id", "products.0.id",
-      "Product.Id", "product.id",
-      "ProductId", "productId",
+      "Subscriptions.0.ProductId", "subscriptions.0.productId",
+      "Product.Id", "ProductId",
     );
-
     const productName = pick<string>(
       data,
       "Products.0.Name", "products.0.name",
-      "Product.Name", "product.name",
-      "ProductName", "productName",
+      "Product.Name", "ProductName",
     );
 
-    const priceValue = pick<number | string>(
+    // Offer
+    const offerId = pick<string>(data, "Offer.Id", "offer.id");
+    const offerName = pick<string>(data, "Offer.Name", "offer.name");
+    const offerUrl = pick<string>(data, "Offer.Url", "offer.url");
+
+    // Purchase / Payment
+    const paymentId = pick<string>(data, "Purchase.PaymentId", "purchase.paymentId");
+    const paymentMethod = pick<string>(
+      data,
+      "Purchase.Payment.PaymentMethod", "purchase.payment.paymentMethod",  // V2: caminho REAL da Lastlink
+      "Purchase.PaymentMethod", "purchase.paymentMethod",                   // fallback legacy
+      "PaymentMethod",
+    );
+    const installments = pick<number>(
+      data,
+      "Purchase.Payment.NumberOfInstallments", "purchase.payment.numberOfInstallments",
+    );
+    const priceValue = toNumberOrNull(pick(
       data,
       "Purchase.Price.Value", "purchase.price.value",
-      "Purchase.Total", "purchase.total",
-      "Price.Value", "price.value",
-      "Price", "price", "Amount", "amount",
-    );
+      "Price.Value", "price.value", "Price", "price", "Amount", "amount",
+    ));
     const priceCurrency = pick<string>(
       data,
       "Purchase.Price.Currency", "purchase.price.currency",
-      "Price.Currency", "price.currency",
-      "Currency", "currency",
+      "Price.Currency", "Currency",
     ) ?? "BRL";
-
-    const paymentMethod = pick<string>(
+    const originalPrice = toNumberOrNull(pick(
       data,
-      "Purchase.PaymentMethod", "purchase.paymentMethod",
-      "PaymentMethod", "paymentMethod",
+      "Purchase.OriginalPrice.Value", "purchase.originalPrice.value",
+    ));
+    const recurrency = pick<number>(data, "Purchase.Recurrency", "purchase.recurrency");
+    const nextBilling = toIsoOrNull(pick(data, "Purchase.NextBilling", "purchase.nextBilling"));
+    const invoiceUrl = pick<string>(data, "Purchase.InvoiceUrl", "purchase.invoiceUrl");
+    const originUrl = pick<string>(data, "Purchase.OriginUrl", "purchase.originUrl");
+    const affiliateEmail = pick<string>(
+      data,
+      "Purchase.Affiliate.Email", "purchase.affiliate.email",
     );
-
     const couponCode = pick<string>(
       data,
       "Purchase.Coupon.Code", "purchase.coupon.code",
-      "Coupon.Code", "coupon.code",
-      "Coupon", "coupon",
+      "Coupon.Code", "coupon.code", "Coupon", "coupon",
     );
+    const utm = pick<unknown>(data, "Utm", "utm");
 
-    const paymentDateRaw = pick<string>(
-      data,
-      "Purchase.PaymentDate", "purchase.paymentDate",
-      "PaymentDate", "paymentDate",
-      "Purchase.CreatedDate", "purchase.createdDate",
-    );
-    const paidAt = paymentDateRaw ? new Date(paymentDateRaw).toISOString() : new Date().toISOString();
+    const paidAt = toIsoOrNull(
+      pick(data, "Purchase.PaymentDate", "purchase.paymentDate", "PaymentDate"),
+    ) ?? new Date().toISOString();
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -170,11 +202,11 @@ serve(async (req) => {
       { auth: { persistSession: false } },
     );
 
-    // ===== 1) Tenta achar o lead =====
+    // ===== Match do lead =====
     let leadId: string | null = null;
     let matchedVia: string | null = null;
 
-    if (buyerEmail) {
+    if (buyerEmail && !isTest) {
       const { data: byEmail } = await supabase
         .from("trial_leads")
         .select("id")
@@ -184,8 +216,6 @@ serve(async (req) => {
         .maybeSingle();
       if (byEmail) { leadId = byEmail.id; matchedVia = "email"; }
     }
-
-    // Fallback: se já temos lastlink_order_id de evento anterior, casa por aí.
     if (!leadId && orderId) {
       const { data: byOrder } = await supabase
         .from("trial_leads")
@@ -195,7 +225,6 @@ serve(async (req) => {
         .maybeSingle();
       if (byOrder) { leadId = byOrder.id; matchedVia = "order_id"; }
     }
-
     if (!leadId && subscriptionId) {
       const { data: bySub } = await supabase
         .from("trial_leads")
@@ -206,35 +235,50 @@ serve(async (req) => {
       if (bySub) { leadId = bySub.id; matchedVia = "subscription_id"; }
     }
 
-    // ===== 2) Salva sempre o evento bruto (auditoria) =====
+    // ===== Auditoria (sempre) =====
     await supabase.from("lastlink_events").insert({
       event_type: eventType,
       order_id: orderId ?? null,
       buyer_email: buyerEmail ?? null,
       matched_lead: leadId,
+      is_test: isTest,
       payload,
     });
 
-    // ===== 3) Atualiza o lead se achamos =====
+    // ===== Update do lead se achamos =====
     if (leadId) {
       const updates: Record<string, unknown> = {
         lastlink_last_event: eventType,
         lastlink_last_event_at: new Date().toISOString(),
+        lastlink_event_id: eventId ?? null,
+        lastlink_is_test: isTest,
         lastlink_raw: payload,
       };
+
       if (orderId) updates.lastlink_order_id = orderId;
       if (subscriptionId) updates.lastlink_subscription_id = subscriptionId;
       if (productId) updates.lastlink_product_id = productId;
       if (productName) updates.plan_name = productName;
-      if (priceValue !== undefined) {
-        const numeric = typeof priceValue === "string"
-          ? Number(priceValue.replace(",", "."))
-          : Number(priceValue);
-        if (Number.isFinite(numeric)) updates.paid_amount = numeric;
-      }
-      if (priceCurrency) updates.paid_currency = priceCurrency;
+      if (paymentId) updates.lastlink_payment_id = paymentId;
       if (paymentMethod) updates.payment_method = paymentMethod;
+      if (installments != null) updates.installments = installments;
+      if (priceValue != null) updates.paid_amount = priceValue;
+      if (priceCurrency) updates.paid_currency = priceCurrency;
+      if (originalPrice != null) updates.original_price = originalPrice;
+      if (recurrency != null) updates.recurrency_months = recurrency;
+      if (nextBilling) updates.next_billing_at = nextBilling;
+      if (invoiceUrl) updates.lastlink_invoice_url = invoiceUrl;
+      if (originUrl) updates.lastlink_origin_url = originUrl;
+      if (affiliateEmail) updates.lastlink_affiliate_email = affiliateEmail;
       if (couponCode) updates.coupon_code = couponCode;
+      if (utm) updates.lastlink_utm = utm;
+      if (offerId) updates.lastlink_offer_id = offerId;
+      if (offerName) updates.lastlink_offer_name = offerName;
+      if (offerUrl) updates.lastlink_offer_url = offerUrl;
+      if (buyerName) updates.buyer_name = buyerName;
+      if (buyerDocument) updates.buyer_document = buyerDocument;
+      if (buyerPhone) updates.buyer_phone = buyerPhone;
+      if (buyerAddress) updates.buyer_address = buyerAddress;
 
       if (PAID_EVENTS.has(eventType)) {
         updates.paid_at = paidAt;
@@ -246,6 +290,8 @@ serve(async (req) => {
       } else if (REFUNDED_EVENTS.has(eventType)) {
         updates.subscription_status = "refunded";
         updates.refunded_at = new Date().toISOString();
+      } else if (REFUND_REQUESTED_EVENTS.has(eventType)) {
+        updates.subscription_status = "refund_requested";
       }
 
       const { error: upErr } = await supabase
@@ -256,23 +302,26 @@ serve(async (req) => {
 
       log("matched", {
         event: eventType,
+        is_test: isTest,
         lead_id: leadId,
         matched_via: matchedVia,
         order_id: orderId ?? null,
         subscription_id: subscriptionId ?? null,
-        amount: updates.paid_amount ?? null,
+        amount: priceValue,
         plan: productName ?? null,
         coupon: couponCode ?? null,
+        affiliate: affiliateEmail ?? null,
       });
-      return json({ ok: true, action: "matched", event: eventType, lead_id: leadId });
+      return json({ ok: true, action: "matched", event: eventType, lead_id: leadId, is_test: isTest });
     }
 
     log("no-match", {
       event: eventType,
+      is_test: isTest,
       order_id: orderId ?? null,
       buyer_email: buyerEmail ?? null,
     });
-    return json({ ok: true, action: "no-match", event: eventType });
+    return json({ ok: true, action: "no-match", event: eventType, is_test: isTest });
   } catch (err) {
     console.error("lastlink-webhook unexpected", err);
     return json({ ok: false, error: "internal error" }, { status: 500 });
