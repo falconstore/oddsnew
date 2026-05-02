@@ -33,6 +33,9 @@ export const useLastlinkPayments = () => {
     },
     staleTime: 15_000,
     refetchInterval: 30_000,
+    // Mantém os pagantes antigos visíveis durante refetch — sem isso a tabela
+    // pisca pro skeleton e o drawer aberto fecha sozinho.
+    placeholderData: (prev) => prev,
   });
 };
 
@@ -51,6 +54,7 @@ export const useLastlinkEvents = (limit = 200) => {
     },
     staleTime: 15_000,
     refetchInterval: 30_000,
+    placeholderData: (prev) => prev,
   });
 };
 
@@ -70,5 +74,6 @@ export const useLastlinkLeadEvents = (leadId: string | null | undefined) => {
       return (data ?? []) as LastlinkEvent[];
     },
     staleTime: 10_000,
+    placeholderData: (prev) => prev,
   });
 };

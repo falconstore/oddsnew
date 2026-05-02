@@ -40,7 +40,7 @@ BetShark Pro is a real-time odds monitoring application for sports betting. It f
 
 ## Realtime & UI Stability
 - **Debounce no `useRealtimeSubscription`** (`src/hooks/useRealtimeSubscription.ts`): coalesce de 400ms (default) nas invalidações. Sem isso, um burst de eventos (cron, webhook em lote, admin editando várias linhas) disparava N refetches simultâneos e cada cliente conectado piscava várias vezes seguidas.
-- **`placeholderData: (prev) => prev` global no QueryClient** (`src/App.tsx`): TODA query mantém os dados antigos visíveis durante refetch. Sem isso, todo refresh (intervalo, realtime, invalidate) jogava a UI pro estado de loading e perdia scroll, drawer aberto, foco de input etc — sintoma reportado pelo usuário como "o sistema pisca e reseta tudo que estou fazendo".
+- **`placeholderData: (prev) => prev` por hook (NÃO global)**: aplicado apenas em `useTrialLeads`, `useLastlinkPayments`, `useLastlinkEvents`, `useLastlinkLeadEvents` — as listas grandes que rebuscam por interval/realtime. Mantém os dados antigos visíveis durante refetch pra UI não piscar pro skeleton e o usuário não perder scroll/drawer/foco. **Importante**: tentamos fazer isso como default global no QueryClient (`src/App.tsx`) e quebrou filtros client-side de forma sutil (input de busca do TrialAdmin parou de funcionar). A regra é: aplicar local nas queries pesadas, nunca global.
 
 ## External Dependencies
 - **Supabase**: Primary database, authentication, and realtime services. Utilizes multiple Supabase instances for different data domains (main data, procedures).

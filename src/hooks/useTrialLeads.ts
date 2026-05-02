@@ -4,7 +4,7 @@ import { toast } from '@/hooks/use-toast';
 import type { TrialLead } from '@/types/trial';
 
 export const useTrialLeads = () => {
-  return useQuery({
+  return useQuery<TrialLead[]>({
     queryKey: ['trial_leads'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -16,6 +16,9 @@ export const useTrialLeads = () => {
     },
     staleTime: 15_000,
     refetchInterval: 30_000,
+    // Mantém os leads antigos visíveis durante refetch (interval/realtime),
+    // pra UI não piscar pro skeleton e o usuário não perder scroll.
+    placeholderData: (prev) => prev,
   });
 };
 
