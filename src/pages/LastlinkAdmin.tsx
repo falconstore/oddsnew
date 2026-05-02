@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -169,8 +169,64 @@ export default function LastlinkAdmin() {
   const initialLead = searchParams.get('lead');
 
   const { data: payments = [], isLoading } = useLastlinkPayments();
-  const [tab, setTab] = useState<'pagantes' | 'eventos'>('pagantes');
+
+  // ─── filter state — TUDO espelhado na URL pra ser linkável/compartilhável ──
+  const [tab, setTab] = useState<'pagantes' | 'eventos'>(() =>
+    searchParams.get('tab') === 'eventos' ? 'eventos' : 'pagantes',
+  );
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(initialLead);
+  const [range, setRange] = useState<RangeKey>(() => {
+    const v = searchParams.get('range') as RangeKey | null;
+    return v && ['today', '7d', '30d', 'all', 'custom'].includes(v) ? v : '30d';
+  });
+  const [customFrom, setCustomFrom] = useState<Date | undefined>(() => {
+    const v = searchParams.get('from');
+    return v ? new Date(`${v}T00:00:00`) : undefined;
+  });
+  const [customTo, setCustomTo] = useState<Date | undefined>(() => {
+    const v = searchParams.get('to');
+    return v ? new Date(`${v}T23:59:59`) : undefined;
+  });
+  const [statusFilter, setStatusFilter] = useState<string>(() => searchParams.get('status') || 'all');
+  const [methodFilter, setMethodFilter] = useState<string>(() => searchParams.get('method') || 'all');
+  const [coupons, setCoupons] = useState<string[]>(() =>
+    searchParams.get('coupons')?.split(',').filter(Boolean) || [],
+  );
+  const [affiliates, setAffiliates] = useState<string[]>(() =>
+    searchParams.get('affiliates')?.split(',').filter(Boolean) || [],
+  );
+  const [plans, setPlans] = useState<string[]>(() =>
+    searchParams.get('plans')?.split(',').filter(Boolean) || [],
+  );
+  const [utmSources, setUtmSources] = useState<string[]>(() =>
+    searchParams.get('utm')?.split(',').filter(Boolean) || [],
+  );
+  const [hideTest, setHideTest] = useState(() => searchParams.get('hideTest') !== '0');
+  const [search, setSearch] = useState(() => searchParams.get('q') || '');
+
+  // Sincroniza estado → URL (replace, sem poluir histórico) sempre que mudar.
+  useEffect(() => {
+    const next = new URLSearchParams();
+    const setIf = (k: string, v: string | null | undefined) => {
+      if (v != null && v !== '') next.set(k, v);
+    };
+    if (tab !== 'pagantes') setIf('tab', tab);
+    setIf('lead', selectedLeadId);
+    if (range !== '30d') setIf('range', range);
+    if (customFrom) setIf('from', format(customFrom, 'yyyy-MM-dd'));
+    if (customTo) setIf('to', format(customTo, 'yyyy-MM-dd'));
+    if (statusFilter !== 'all') setIf('status', statusFilter);
+    if (methodFilter !== 'all') setIf('method', methodFilter);
+    if (coupons.length) setIf('coupons', coupons.join(','));
+    if (affiliates.length) setIf('affiliates', affiliates.join(','));
+    if (plans.length) setIf('plans', plans.join(','));
+    if (utmSources.length) setIf('utm', utmSources.join(','));
+    if (!hideTest) setIf('hideTest', '0');
+    setIf('q', search.trim() || undefined);
+    if (next.toString() !== searchParams.toString()) {
+      setSearchParams(next, { replace: true });
+    }
+  }, [tab, selectedLeadId, range, customFrom, customTo, statusFilter, methodFilter, coupons, affiliates, plans, utmSources, hideTest, search, searchParams, setSearchParams]);
 
   // Realtime — atualiza tabela e drawer (timeline) quando chegar pagamento/evento novo
   useRealtimeSubscription({
@@ -185,19 +241,6 @@ export default function LastlinkAdmin() {
       : [['lastlink_events']],
     event: 'INSERT',
   });
-
-  // ─── filter state ──────────────────────────────────────────────────────
-  const [range, setRange] = useState<RangeKey>('30d');
-  const [customFrom, setCustomFrom] = useState<Date | undefined>(undefined);
-  const [customTo, setCustomTo] = useState<Date | undefined>(undefined);
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [methodFilter, setMethodFilter] = useState<string>('all');
-  const [coupons, setCoupons] = useState<string[]>([]);
-  const [affiliates, setAffiliates] = useState<string[]>([]);
-  const [plans, setPlans] = useState<string[]>([]);
-  const [utmSources, setUtmSources] = useState<string[]>([]);
-  const [hideTest, setHideTest] = useState(true);
-  const [search, setSearch] = useState('');
 
   const { from: rangeFrom, to: rangeTo } = useMemo(
     () => rangeBounds(range, customFrom, customTo),
@@ -288,23 +331,8 @@ export default function LastlinkAdmin() {
     [payments, selectedLeadId],
   );
 
-  const openLead = (id: string) => {
-    setSelectedLeadId(id);
-    setSearchParams(prev => {
-      const next = new URLSearchParams(prev);
-      next.set('lead', id);
-      return next;
-    }, { replace: true });
-  };
-
-  const closeLead = () => {
-    setSelectedLeadId(null);
-    setSearchParams(prev => {
-      const next = new URLSearchParams(prev);
-      next.delete('lead');
-      return next;
-    }, { replace: true });
-  };
+  const openLead = (id: string) => setSelectedLeadId(id);
+  const closeLead = () => setSelectedLeadId(null);
 
   const clearFilters = () => {
     setRange('30d');
@@ -592,13 +620,7 @@ export default function LastlinkAdmin() {
           </TabsContent>
 
           <TabsContent value="eventos" className="mt-0">
-            <EventsPanel
-              hideTest={hideTest}
-              rangeFrom={rangeFrom}
-              rangeTo={rangeTo}
-              search={search}
-              onLeadClick={openLead}
-            />
+            <EventsPanel onLeadClick={openLead} />
           </TabsContent>
         </Tabs>
       </div>
@@ -732,7 +754,8 @@ function PaymentsTable({
               <TableHead className="text-[10px] uppercase tracking-wider">Pagamento</TableHead>
               <TableHead className="text-[10px] uppercase tracking-wider">Status</TableHead>
               <TableHead className="text-[10px] uppercase tracking-wider">Próx. cobrança</TableHead>
-              <TableHead className="text-[10px] uppercase tracking-wider">Origem</TableHead>
+              <TableHead className="text-[10px] uppercase tracking-wider">Afiliado</TableHead>
+              <TableHead className="text-[10px] uppercase tracking-wider">UTM source</TableHead>
               <TableHead className="text-right text-[10px] uppercase tracking-wider">Ações</TableHead>
             </TableRow>
           </TableHeader>
@@ -787,9 +810,19 @@ function PaymentsTable({
                     {fmtDate(p.next_billing_at, false)}
                   </TableCell>
                   <TableCell className="py-3 text-xs">
-                    <p className="text-muted-foreground truncate max-w-[140px]">
-                      {p.lastlink_utm?.source || p.lastlink_affiliate_email || '—'}
+                    <p className="text-muted-foreground truncate max-w-[160px]" title={p.lastlink_affiliate_email ?? undefined}>
+                      {p.lastlink_affiliate_email || '—'}
                     </p>
+                  </TableCell>
+                  <TableCell className="py-3 text-xs">
+                    <p className="text-muted-foreground truncate max-w-[120px]" title={p.lastlink_utm?.source ?? undefined}>
+                      {p.lastlink_utm?.source || '—'}
+                    </p>
+                    {p.lastlink_utm?.campaign && (
+                      <p className="text-[10px] text-muted-foreground/60 truncate max-w-[120px]" title={p.lastlink_utm.campaign}>
+                        {p.lastlink_utm.campaign}
+                      </p>
+                    )}
                   </TableCell>
                   <TableCell className="py-3 text-right">
                     <Button
@@ -1123,16 +1156,21 @@ function Field({
 
 // ─── Eventos brutos panel ─────────────────────────────────────────────────
 
-function EventsPanel({
-  hideTest, rangeFrom, rangeTo, search, onLeadClick,
-}: {
-  hideTest: boolean; rangeFrom: Date | null; rangeTo: Date | null;
-  search: string;
-  onLeadClick: (id: string) => void;
-}) {
+function EventsPanel({ onLeadClick }: { onLeadClick: (id: string) => void }) {
+  // Filtros 100% próprios da aba — independentes do bar global da Pagantes.
   const [eventTypeFilter, setEventTypeFilter] = useState<string>('all');
   const [matchedFilter, setMatchedFilter] = useState<'all' | 'matched' | 'unmatched'>('all');
+  const [evRange, setEvRange] = useState<RangeKey>('30d');
+  const [evCustomFrom, setEvCustomFrom] = useState<Date | undefined>(undefined);
+  const [evCustomTo, setEvCustomTo] = useState<Date | undefined>(undefined);
+  const [evHideTest, setEvHideTest] = useState(true);
+  const [evSearch, setEvSearch] = useState('');
   const [eventLimit, setEventLimit] = useState(200);
+
+  const { from: evFrom, to: evTo } = useMemo(
+    () => rangeBounds(evRange, evCustomFrom, evCustomTo),
+    [evRange, evCustomFrom, evCustomTo],
+  );
 
   const { data: events = [], isLoading } = useLastlinkEvents(eventLimit);
 
@@ -1144,22 +1182,23 @@ function EventsPanel({
 
   const filtered = useMemo(() => {
     return events.filter(e => {
-      if (hideTest && e.is_test) return false;
+      if (evHideTest && e.is_test) return false;
       if (eventTypeFilter !== 'all' && e.event_type !== eventTypeFilter) return false;
       if (matchedFilter === 'matched' && !e.matched_lead) return false;
       if (matchedFilter === 'unmatched' && e.matched_lead) return false;
-      if ((rangeFrom || rangeTo) && !inRange(e.received_at, rangeFrom, rangeTo)) return false;
-      if (search) {
-        const q = search.toLowerCase();
+      if ((evFrom || evTo) && !inRange(e.received_at, evFrom, evTo)) return false;
+      if (evSearch) {
+        const q = evSearch.toLowerCase();
         const haystack = [e.buyer_email, e.order_id, e.event_type].filter(Boolean).join(' ').toLowerCase();
         if (!haystack.includes(q)) return false;
       }
       return true;
     });
-  }, [events, hideTest, eventTypeFilter, matchedFilter, rangeFrom, rangeTo, search]);
+  }, [events, evHideTest, eventTypeFilter, matchedFilter, evFrom, evTo, evSearch]);
 
   return (
     <div className="space-y-3">
+      {/* Linha 1 — tipo, matched, período próprio */}
       <div className="glass rounded-2xl border border-white/8 p-3 flex items-center gap-2 flex-wrap">
         <Select value={eventTypeFilter} onValueChange={setEventTypeFilter}>
           <SelectTrigger className="bg-white/5 border-white/10 h-8 text-xs w-[220px]" data-testid="filter-event-type">
@@ -1182,6 +1221,29 @@ function EventsPanel({
             <SelectItem value="unmatched">Sem lead casado</SelectItem>
           </SelectContent>
         </Select>
+        <Select value={evRange} onValueChange={v => setEvRange(v as RangeKey)}>
+          <SelectTrigger className="bg-white/5 border-white/10 h-8 text-xs w-[180px]" data-testid="filter-event-range">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="today">Hoje</SelectItem>
+            <SelectItem value="7d">Últimos 7 dias</SelectItem>
+            <SelectItem value="30d">Últimos 30 dias</SelectItem>
+            <SelectItem value="all">Todo o período</SelectItem>
+            <SelectItem value="custom">Personalizado</SelectItem>
+          </SelectContent>
+        </Select>
+        {evRange === 'custom' && (
+          <>
+            <DatePickerButton value={evCustomFrom} onChange={setEvCustomFrom} placeholder="De" testId="filter-event-from" />
+            <DatePickerButton value={evCustomTo} onChange={setEvCustomTo} placeholder="Até" testId="filter-event-to" />
+          </>
+        )}
+        <div className="flex items-center gap-2 px-3 h-8 rounded-md border border-white/10 bg-white/5">
+          <FlaskConical className="w-3 h-3 text-muted-foreground" />
+          <span className="text-xs text-muted-foreground">Esconder testes</span>
+          <Switch checked={evHideTest} onCheckedChange={setEvHideTest} data-testid="filter-event-hide-test" />
+        </div>
         <div className="ml-auto text-xs text-muted-foreground">
           {filtered.length} de {events.length} eventos
         </div>
@@ -1194,6 +1256,18 @@ function EventsPanel({
         >
           Carregar mais
         </Button>
+      </div>
+
+      {/* Linha 2 — busca dedicada */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Input
+          value={evSearch}
+          onChange={e => setEvSearch(e.target.value)}
+          placeholder="Buscar evento por email, order ID, tipo…"
+          className="pl-10 bg-white/5 border-white/10 h-9"
+          data-testid="filter-event-search"
+        />
       </div>
 
       {isLoading ? (
