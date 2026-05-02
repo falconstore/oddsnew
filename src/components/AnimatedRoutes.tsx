@@ -208,7 +208,7 @@ export function AnimatedRoutes() {
           </RequireAuth>
         } />
         <Route path="/lastlink-admin" element={
-          <RequireAuth pageKey={PAGE_KEYS.TRIAL}>
+          <RequireAuth pageKey={PAGE_KEYS.LASTLINK}>
             <PageTransition>
               <LastlinkAdmin />
             </PageTransition>

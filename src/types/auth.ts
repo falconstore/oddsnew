@@ -26,6 +26,7 @@ export interface UserPermissionRow {
   can_view_plataformas: boolean;
   can_view_betbra: boolean;
   can_view_trial: boolean;
+  can_view_lastlink: boolean;
   is_super_admin?: boolean;
   created_date: string;
   updated_date: string;
@@ -60,6 +61,7 @@ export const PAGE_KEYS = {
   PLATAFORMAS: 'plataformas',
   BETBRA_AFFILIATE: 'betbra_affiliate',
   TRIAL: 'trial',
+  LASTLINK: 'lastlink',
   // Aliases para compatibilidade com código existente
   SETTINGS: 'settings',
   ADMIN_USERS: 'admin_users',
@@ -87,6 +89,7 @@ export const PAGE_KEY_TO_COLUMN: Record<string, keyof UserPermissionRow> = {
   conta_corrente: 'can_view_conta_corrente',
   betbra_affiliate: 'can_view_betbra',
   trial: 'can_view_trial',
+  lastlink: 'can_view_lastlink',
   settings: 'can_view_dashboard', // settings acessível se tem dashboard
   scraper_status: 'can_view_admin',
   telegram_bot: 'can_view_admin',
@@ -104,6 +107,7 @@ export const PERMISSION_COLUMNS: { column: keyof UserPermissionRow; label: strin
   { column: 'can_view_plataformas', label: 'Plataformas', description: 'Gerenciar plataformas' },
   { column: 'can_view_betbra', label: 'Betbra', description: 'Dados de afiliação Betbra' },
   { column: 'can_view_trial', label: 'Trial Telegram', description: 'CRM dos leads de trial do grupo Telegram' },
+  { column: 'can_view_lastlink', label: 'Pagamentos Lastlink', description: 'Painel de pagamentos e assinaturas via Lastlink' },
 ];
 
 // Configuração de páginas com labels e descrições (mantido para sidebar/UI)
@@ -120,6 +124,7 @@ export const PAGE_CONFIG: Record<string, { label: string; description: string }>
   [PAGE_KEYS.PLATAFORMAS]: { label: 'Plataformas', description: 'Gerenciar plataformas' },
   [PAGE_KEYS.BETBRA_AFFILIATE]: { label: 'Betbra Affiliate', description: 'Dados de afiliação Betbra' },
   [PAGE_KEYS.TRIAL]: { label: 'Trial Telegram', description: 'CRM dos leads do trial gratuito' },
+  [PAGE_KEYS.LASTLINK]: { label: 'Pagamentos Lastlink', description: 'Painel de pagamentos e assinaturas via Lastlink' },
   [PAGE_KEYS.SETTINGS]: { label: 'Configurações', description: 'Configurações do sistema' },
   [PAGE_KEYS.SCRAPER_STATUS]: { label: 'Status Scrapers', description: 'Monitoramento dos scrapers' },
   [PAGE_KEYS.TELEGRAM_BOT]: { label: 'Bot Telegram', description: 'Configurar bot de Duplo Green' },
