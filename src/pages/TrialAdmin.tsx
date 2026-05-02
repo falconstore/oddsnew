@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Link as RouterLink } from 'react-router-dom';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
@@ -6,7 +7,7 @@ import {
   Mail, Phone, Send, ExternalLink, Trash2, Eye, MousePointerClick, BellRing,
   MessageCircle, ShoppingCart, TrendingUp, Users2, FileSignature,
   Stethoscope, AlertTriangle, Loader2, XCircle, Link2, RotateCw,
-  ShieldAlert, Unlock, Radio, ServerCog,
+  ShieldAlert, Unlock, Radio, ServerCog, Receipt,
 } from 'lucide-react';
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
@@ -716,6 +717,17 @@ export default function TrialAdmin() {
                           >
                             Ver trial anterior
                           </button>
+                        )}
+                        {(lead.status === 'converted' || lead.paid_at) && (
+                          <RouterLink
+                            to={`/lastlink-admin?lead=${lead.id}`}
+                            className="inline-flex items-center gap-1 text-[10px] text-emerald-300 hover:text-emerald-200 underline underline-offset-2"
+                            data-testid={`link-lastlink-detail-${lead.id}`}
+                            title="Ver detalhes do pagamento na Lastlink"
+                          >
+                            <Receipt className="w-2.5 h-2.5" />
+                            Detalhes do pagamento
+                          </RouterLink>
                         )}
                       </div>
                       <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">

@@ -22,6 +22,7 @@ import TelegramBot from '@/pages/TelegramBot';
 import TrialLanding from '@/pages/TrialLanding';
 import TrialUpgrade from '@/pages/TrialUpgrade';
 import TrialAdmin from '@/pages/TrialAdmin';
+import LastlinkAdmin from '@/pages/LastlinkAdmin';
 import NotFound from '@/pages/NotFound';
 
 // Componente para redirect que preserva query params
@@ -197,6 +198,13 @@ export function AnimatedRoutes() {
           <RequireAuth pageKey={PAGE_KEYS.TRIAL}>
             <PageTransition>
               <TrialAdmin />
+            </PageTransition>
+          </RequireAuth>
+        } />
+        <Route path="/lastlink-admin" element={
+          <RequireAuth pageKey={PAGE_KEYS.TRIAL}>
+            <PageTransition>
+              <LastlinkAdmin />
             </PageTransition>
           </RequireAuth>
         } />
