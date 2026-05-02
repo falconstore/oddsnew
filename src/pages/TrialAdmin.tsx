@@ -7,7 +7,7 @@ import {
   Mail, Phone, Send, ExternalLink, Trash2, Eye, MousePointerClick, BellRing,
   MessageCircle, ShoppingCart, TrendingUp, Users2, FileSignature,
   Stethoscope, AlertTriangle, Loader2, XCircle, Link2, RotateCw,
-  ShieldAlert, Unlock, Radio, ServerCog, Receipt,
+  ShieldAlert, Unlock, Radio, ServerCog, Receipt, Eraser,
 } from 'lucide-react';
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/dialog';
 import {
   useTrialLeads, useKickTrialLead, usePurgeTrialLead, useDiagnoseTelegram,
-  useLinkManual, useResetWebhook, useForceActivate, type TelegramDiagnose,
+  useLinkManual, useResetWebhook, useForceActivate, useLinkGc, type TelegramDiagnose,
   useTrialSettings, useUpdateTrialSettings, useSendReminderTest,
 } from '@/hooks/useTrialLeads';
 import { useTrialUpgradeStats, type TrialStatsRange } from '@/hooks/useTrialUpgradeStats';
@@ -60,6 +60,7 @@ export default function TrialAdmin() {
   const purge = usePurgeTrialLead();
   const [confirmPurge, setConfirmPurge] = useState<TrialLead | null>(null);
   const diagnose = useDiagnoseTelegram();
+  const linkGc = useLinkGc();
   const linkManual = useLinkManual();
   const resetWebhook = useResetWebhook();
   const forceActivate = useForceActivate();
@@ -1035,6 +1036,17 @@ export default function TrialAdmin() {
           <DialogFooter className="gap-2 flex-wrap">
             <Button variant="outline" onClick={() => setDiagOpen(false)} data-testid="button-close-diag">
               Fechar
+            </Button>
+            <Button
+              variant="outline"
+              className="border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10"
+              onClick={() => linkGc.mutate()}
+              disabled={linkGc.isPending}
+              data-testid="button-link-gc"
+              title="Revoga no Telegram todos os invite links de leads com mais de 24h e libera vagas no teto do bot. Use se a LP parar de gerar links."
+            >
+              {linkGc.isPending ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Eraser className="w-4 h-4 mr-1.5" />}
+              Limpar links antigos
             </Button>
             <Button
               variant="outline"

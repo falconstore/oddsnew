@@ -6,6 +6,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders, json } from "../_shared/cors.ts";
+import { runLinkGc } from "../_shared/link-gc.ts";
 
 function constantTimeEqual(a: string, b: string): boolean {
   const enc = new TextEncoder();
@@ -358,6 +359,24 @@ serve(async (req) => {
       processed++;
     }
 
+    // ===== 3) GC dos invite_links com mais de 24h =====
+    // O Telegram tem teto de "invite_links ativos por chat por bot". O
+    // trial-signup cria 1 link novo por cadastro com expire_date=now+24h,
+    // mas links expirados continuam contando pra cota até serem REVOGADOS.
+    // Sem esse passo, depois de algum volume a LP para de gerar links e
+    // ninguém consegue mais entrar no trial.
+    let gcResult = null as Awaited<ReturnType<typeof runLinkGc>> | null;
+    try {
+      gcResult = await runLinkGc({
+        supabase, botToken, chatId, bonusChatId,
+        batchSize: 500,
+        olderThanMs: 24 * 60 * 60 * 1000,
+      });
+    } catch (e) {
+      // Best-effort — não derruba o cron se a limpeza falhar; só loga.
+      console.error("trial-cron link-gc failed", e);
+    }
+
     return json({
       ok: true,
       reminders_sent: remindersSent,
@@ -369,6 +388,7 @@ serve(async (req) => {
       bonus_kicked: bonusKicked,
       bonus_failed: bonusFailed,
       total: expired?.length ?? 0,
+      link_gc: gcResult,
     });
   } catch (err) {
     console.error("trial-cron error", err);

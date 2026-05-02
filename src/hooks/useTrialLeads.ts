@@ -313,6 +313,46 @@ export const useSendReminderTest = () => {
   });
 };
 
+export type LinkGcResult = {
+  ok: boolean;
+  message: string;
+  scanned: number;
+  vip_revoked: number;
+  vip_failed: number;
+  bonus_revoked: number;
+  bonus_failed: number;
+  cleared_rows: number;
+};
+
+export const useLinkGc = () => {
+  const qc = useQueryClient();
+  return useMutation<LinkGcResult>({
+    mutationFn: async () => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      const url = `${import.meta.env.VITE_MAIN_SUPABASE_URL}/functions/v1/trial-link-gc`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: '{}',
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error || 'Falha ao limpar links antigos');
+      return json as LinkGcResult;
+    },
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['trial_leads'] });
+      toast({ title: 'Limpeza concluída', description: data.message });
+    },
+    onError: (err: Error) => {
+      toast({ title: 'Erro na limpeza', description: err.message, variant: 'destructive' });
+    },
+  });
+};
+
 export const useResetWebhook = () => {
   return useMutation<{ ok: boolean; message: string; webhook_url: string }>({
     mutationFn: async () => {
