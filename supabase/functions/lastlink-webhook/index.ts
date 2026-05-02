@@ -80,6 +80,111 @@ function toNumberOrNull(v: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+const CRITICAL_ALERT_EVENTS = new Set<string>([
+  "Subscription_Canceled",
+  "Payment_Refund",
+  "Payment_Chargeback",
+  "Refund_Requested",
+]);
+
+const ALERT_EVENT_LABELS: Record<string, string> = {
+  Subscription_Canceled: "🛑 Assinatura cancelada",
+  Payment_Refund: "↩️ Reembolso processado",
+  Payment_Chargeback: "⚠️ Chargeback recebido",
+  Refund_Requested: "📩 Reembolso solicitado",
+};
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+/**
+ * Manda DM/aviso pro chat de alertas configurado, se houver.
+ * Best-effort: nunca quebra o webhook em caso de erro.
+ */
+async function sendAlertTelegramDM(args: {
+  eventType: string;
+  buyerName: string | null;
+  buyerEmail: string | null;
+  amount: number | null;
+  currency: string;
+  reason: string | null;
+  leadId: string | null;
+  isTest: boolean;
+}): Promise<void> {
+  if (!CRITICAL_ALERT_EVENTS.has(args.eventType)) return;
+  if (args.isTest) return;
+  const botToken =
+    Deno.env.get("TELEGRAM_LASTLINK_ALERT_BOT_TOKEN") ??
+    Deno.env.get("TELEGRAM_TRIAL_BOT_TOKEN");
+  const chatId = Deno.env.get("TELEGRAM_LASTLINK_ALERT_CHAT_ID");
+  if (!botToken || !chatId) {
+    log("alert-telegram-skipped", {
+      reason: "missing-config",
+      has_token: !!botToken,
+      has_chat: !!chatId,
+    });
+    return;
+  }
+
+  const label = ALERT_EVENT_LABELS[args.eventType] ?? args.eventType;
+  const lines: string[] = [`<b>${escapeHtml(label)}</b>`];
+  const who = args.buyerName ?? args.buyerEmail ?? "Cliente desconhecido";
+  lines.push(`👤 ${escapeHtml(who)}`);
+  if (args.buyerEmail && args.buyerEmail !== who) lines.push(`✉️ ${escapeHtml(args.buyerEmail)}`);
+  if (args.amount != null) {
+    try {
+      const fmt = new Intl.NumberFormat("pt-BR", {
+        style: "currency",
+        currency: (args.currency || "BRL").toUpperCase(),
+        maximumFractionDigits: 2,
+      }).format(args.amount);
+      lines.push(`💰 ${escapeHtml(fmt)}`);
+    } catch {
+      lines.push(`💰 ${args.amount.toFixed(2)} ${escapeHtml(args.currency)}`);
+    }
+  }
+  if (args.reason) lines.push(`📝 Motivo: ${escapeHtml(args.reason)}`);
+
+  const baseUrl = (Deno.env.get("APP_BASE_URL") ?? Deno.env.get("ADMIN_BASE_URL") ?? "")
+    .replace(/\/+$/, "");
+  const adminUrl = baseUrl
+    ? (args.leadId
+        ? `${baseUrl}/lastlink-admin?lead=${encodeURIComponent(args.leadId)}`
+        : `${baseUrl}/lastlink-admin`)
+    : null;
+
+  try {
+    const body: Record<string, unknown> = {
+      chat_id: chatId,
+      text: lines.join("\n"),
+      parse_mode: "HTML",
+      disable_web_page_preview: true,
+    };
+    if (adminUrl) {
+      body.reply_markup = {
+        inline_keyboard: [[{ text: "Ver no Lastlink Admin", url: adminUrl }]],
+      };
+    }
+    const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      log("alert-telegram-failed", { status: res.status, body: txt.slice(0, 300) });
+    } else {
+      log("alert-telegram-sent", { event: args.eventType, lead_id: args.leadId });
+    }
+  } catch (err) {
+    log("alert-telegram-error", { error: String(err) });
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "method not allowed" }, { status: 405 });
@@ -191,6 +296,18 @@ serve(async (req) => {
       "Coupon.Code", "coupon.code", "Coupon", "coupon",
     );
     const utm = pick<unknown>(data, "Utm", "utm");
+
+    const cancelOrRefundReason = pick<string>(
+      data,
+      "Reason", "reason",
+      "RefundReason", "refundReason",
+      "CancelReason", "cancelReason",
+      "CancellationReason", "cancellationReason",
+      "Subscription.CancelReason", "subscription.cancelReason",
+      "Subscriptions.0.CancelReason", "subscriptions.0.cancelReason",
+      "Purchase.CancelReason", "purchase.cancelReason",
+      "Purchase.RefundReason", "purchase.refundReason",
+    ) ?? null;
 
     const paidAt = toIsoOrNull(
       pick(data, "Purchase.PaymentDate", "purchase.paymentDate", "PaymentDate"),
@@ -312,6 +429,19 @@ serve(async (req) => {
         coupon: couponCode ?? null,
         affiliate: affiliateEmail ?? null,
       });
+
+      // Alerta best-effort no Telegram (eventos críticos). Nunca quebra a resposta.
+      await sendAlertTelegramDM({
+        eventType,
+        buyerName: buyerName ?? null,
+        buyerEmail: buyerEmail ?? null,
+        amount: priceValue,
+        currency: priceCurrency,
+        reason: cancelOrRefundReason,
+        leadId,
+        isTest,
+      }).catch((err) => log("alert-telegram-throw", { error: String(err) }));
+
       return json({ ok: true, action: "matched", event: eventType, lead_id: leadId, is_test: isTest });
     }
 
@@ -321,6 +451,19 @@ serve(async (req) => {
       order_id: orderId ?? null,
       buyer_email: buyerEmail ?? null,
     });
+
+    // Mesmo sem match, eventos críticos merecem alerta no Telegram.
+    await sendAlertTelegramDM({
+      eventType,
+      buyerName: buyerName ?? null,
+      buyerEmail: buyerEmail ?? null,
+      amount: priceValue,
+      currency: priceCurrency,
+      reason: cancelOrRefundReason,
+      leadId: null,
+      isTest,
+    }).catch((err) => log("alert-telegram-throw", { error: String(err) }));
+
     return json({ ok: true, action: "no-match", event: eventType, is_test: isTest });
   } catch (err) {
     console.error("lastlink-webhook unexpected", err);

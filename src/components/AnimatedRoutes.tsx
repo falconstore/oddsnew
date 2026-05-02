@@ -3,6 +3,7 @@ import { AnimatePresence } from 'framer-motion';
 import { PageTransition } from './PageTransition';
 import { RequireAuth } from './RequireAuth';
 import { PAGE_KEYS } from '@/types/auth';
+import { useLastlinkAlerts } from '@/hooks/useLastlinkAlerts';
 
 // Pages
 import Dashboard from '@/pages/Dashboard';
@@ -73,6 +74,11 @@ function ExternalTrialRedirect({ path }: { path: string }) {
 export function AnimatedRoutes() {
   const location = useLocation();
   const trialHost = isTrialHost();
+
+  // Listener global de alertas críticos (cancel/refund/chargeback). Mantém-se
+  // montado durante toda a navegação interna — só desativa no host público
+  // do trial, onde o usuário não está logado no admin.
+  useLastlinkAlerts({ enabled: !trialHost });
 
   // Subdomínio público do trial: só expõe a landing e a página de upgrade.
   // Qualquer outra rota cai na landing.
