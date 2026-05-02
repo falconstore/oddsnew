@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/collapsible';
 import { useLastlinkPayments, useLastlinkEvents, useLastlinkLeadEvents } from '@/hooks/useLastlinkData';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
+import { RevenueChart } from '@/components/lastlink/RevenueChart';
 import type { TrialLead, LastlinkEvent, LastlinkBuyerAddress, LastlinkUtm } from '@/types/trial';
 
 // ─── helpers ──────────────────────────────────────────────────────────────
@@ -449,6 +450,14 @@ export default function LastlinkAdmin() {
             testId="kpi-top-affiliates"
           />
         </div>
+
+        {/* Gráfico de receita ao longo do tempo */}
+        <RevenueChart
+          payments={filtered}
+          rangeFrom={rangeFrom}
+          rangeTo={rangeTo}
+          rangeLabel={RANGE_LABELS[range]}
+        />
 
         {/* Filtros */}
         <div className="glass rounded-3xl border border-white/8 p-4 md:p-5 space-y-3">
