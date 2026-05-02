@@ -162,6 +162,16 @@ function inRange(iso: string | null | undefined, from: Date | null, to: Date | n
   return true;
 }
 
+/** Debounce simples — evita re-filtrar a cada tecla digitada. */
+function useDebouncedValue<T>(value: T, delay = 300): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(t);
+  }, [value, delay]);
+  return debounced;
+}
+
 // ─── main page ─────────────────────────────────────────────────────────────
 
 export default function LastlinkAdmin() {
@@ -203,6 +213,7 @@ export default function LastlinkAdmin() {
   );
   const [hideTest, setHideTest] = useState(() => searchParams.get('hideTest') !== '0');
   const [search, setSearch] = useState(() => searchParams.get('q') || '');
+  const debouncedSearch = useDebouncedValue(search, 300);
 
   // Sincroniza estado → URL (replace, sem poluir histórico) sempre que mudar.
   useEffect(() => {
@@ -285,8 +296,8 @@ export default function LastlinkAdmin() {
       // Período: usa paid_at, fallback pra lastlink_last_event_at, fallback pra created_at
       const refDate = p.paid_at ?? p.lastlink_last_event_at ?? p.created_at;
       if ((rangeFrom || rangeTo) && !inRange(refDate, rangeFrom, rangeTo)) return false;
-      if (search) {
-        const q = search.toLowerCase().trim();
+      if (debouncedSearch) {
+        const q = debouncedSearch.toLowerCase().trim();
         const haystack = [
           p.name, p.email, p.whatsapp, p.buyer_name,
           p.buyer_phone, p.buyer_document, p.lastlink_order_id,
@@ -296,7 +307,7 @@ export default function LastlinkAdmin() {
       }
       return true;
     });
-  }, [payments, hideTest, statusFilter, methodFilter, coupons, affiliates, plans, utmSources, rangeFrom, rangeTo, search]);
+  }, [payments, hideTest, statusFilter, methodFilter, coupons, affiliates, plans, utmSources, rangeFrom, rangeTo, debouncedSearch]);
 
   // KPIs
   const kpis = useMemo(() => {
@@ -1165,6 +1176,7 @@ function EventsPanel({ onLeadClick }: { onLeadClick: (id: string) => void }) {
   const [evCustomTo, setEvCustomTo] = useState<Date | undefined>(undefined);
   const [evHideTest, setEvHideTest] = useState(true);
   const [evSearch, setEvSearch] = useState('');
+  const debouncedEvSearch = useDebouncedValue(evSearch, 300);
   const [eventLimit, setEventLimit] = useState(200);
 
   const { from: evFrom, to: evTo } = useMemo(
@@ -1187,14 +1199,14 @@ function EventsPanel({ onLeadClick }: { onLeadClick: (id: string) => void }) {
       if (matchedFilter === 'matched' && !e.matched_lead) return false;
       if (matchedFilter === 'unmatched' && e.matched_lead) return false;
       if ((evFrom || evTo) && !inRange(e.received_at, evFrom, evTo)) return false;
-      if (evSearch) {
-        const q = evSearch.toLowerCase();
+      if (debouncedEvSearch) {
+        const q = debouncedEvSearch.toLowerCase();
         const haystack = [e.buyer_email, e.order_id, e.event_type].filter(Boolean).join(' ').toLowerCase();
         if (!haystack.includes(q)) return false;
       }
       return true;
     });
-  }, [events, evHideTest, eventTypeFilter, matchedFilter, evFrom, evTo, evSearch]);
+  }, [events, evHideTest, eventTypeFilter, matchedFilter, evFrom, evTo, debouncedEvSearch]);
 
   return (
     <div className="space-y-3">
