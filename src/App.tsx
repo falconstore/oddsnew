@@ -15,6 +15,10 @@ const queryClient = new QueryClient({
       retry: 2,
       refetchOnWindowFocus: false, // Evita reset ao trocar de aba
       refetchOnReconnect: true,
+      // Mantém dados antigos visíveis durante refetch — sem isso, todo refresh
+      // (intervalo, realtime, invalidate) faz a UI piscar pro skeleton e perder
+      // estado visual (scroll, drawer, foco). Hooks individuais podem sobrescrever.
+      placeholderData: (prev: unknown) => prev,
     },
   },
 });

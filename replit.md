@@ -34,6 +34,14 @@ BetShark Pro is a real-time odds monitoring application for sports betting. It f
     - **track4you** (`https://track4you.app/9fdc319a-0e6e-4feb-b4a4-471c0293465c.js`, deferred) — for Arthur (gestor de performance). Click events are dispatched on the 3 Telegram-bound CTAs of the LP via the `trackT4Y()` helper in `TrialLanding.tsx` (event name `cta_telegram`). The helper is defensive: it tries multiple known global names (`window.t4y`, `window.track4you`, `window.T4Y`) and also dispatches a `t4y:event` `CustomEvent`, falling back to no-op if the SDK hasn't loaded yet — so it never blocks the redirect.
 - **Data Cohorting**: Implements a 'v1'/'v2' cohort system to manage distinct user groups, particularly for handling legacy data without affecting active trial flows.
 
+## Production Hosting
+- **Deployment**: `autoscale` (mudado de `static` em mai/2026 pra suportar SPA fallback). Build: `npm run build` → `dist/`. Run: `node server.cjs`.
+- **`server.cjs`**: Servidor estático minimalista em Node puro (zero deps). Serve `dist/` e faz fallback pra `dist/index.html` em qualquer rota desconhecida — sem isso, `Ctrl+F5` em deep links como `/lastlink-admin` retornava 404 no app publicado. HTML é servido com `Cache-Control: no-store` (deploy reflete na hora) e assets hashados com `immutable` (cache forte). Bloqueia path traversal.
+
+## Realtime & UI Stability
+- **Debounce no `useRealtimeSubscription`** (`src/hooks/useRealtimeSubscription.ts`): coalesce de 400ms (default) nas invalidações. Sem isso, um burst de eventos (cron, webhook em lote, admin editando várias linhas) disparava N refetches simultâneos e cada cliente conectado piscava várias vezes seguidas.
+- **`placeholderData: (prev) => prev` global no QueryClient** (`src/App.tsx`): TODA query mantém os dados antigos visíveis durante refetch. Sem isso, todo refresh (intervalo, realtime, invalidate) jogava a UI pro estado de loading e perdia scroll, drawer aberto, foco de input etc — sintoma reportado pelo usuário como "o sistema pisca e reseta tudo que estou fazendo".
+
 ## External Dependencies
 - **Supabase**: Primary database, authentication, and realtime services. Utilizes multiple Supabase instances for different data domains (main data, procedures).
 - **Telegram Bot API**: For managing trial leads, sending direct messages, handling group invites, and processing `chat_member` webhooks.

@@ -8,8 +8,8 @@ channel = "stable-25_05"
 packages = ["supabase-cli", "yakut"]
 
 [deployment]
-deploymentTarget = "static"
-run = ["node", "./dist/index.cjs"]
+deploymentTarget = "autoscale"
+run = ["node", "server.cjs"]
 build = ["npm", "run", "build"]
 publicDir = "dist"
 
