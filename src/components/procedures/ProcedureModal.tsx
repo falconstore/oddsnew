@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { X, Star, FileText, Calendar, Building2, Tag, TrendingUp, Link, Hash, Ticket, Zap, Trophy, Clock, Activity, Shield } from 'lucide-react';
+import { X, Star, FileText, Calendar, Building2, Tag, TrendingUp, Link, Hash, Ticket, Zap, Trophy, Clock, Activity } from 'lucide-react';
 import { TagManager } from './TagManager';
 import { EventoAutocomplete } from './EventoAutocomplete';
 import { OrigemFreebetAutocomplete } from './OrigemFreebetAutocomplete';
@@ -466,9 +466,10 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
 
               {showFreebetFields && (
                 <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <FieldLabel icon={Ticket} label={formData.tipo === 'QUEIMAR_FB' ? 'Origem da Freebet' : 'Referência Freebet'} required={formData.tipo === 'QUEIMAR_FB'} />
-                    {formData.tipo === 'QUEIMAR_FB' ? (
+                  {/* Referência só pra QUEIMAR_FB (vínculo com a FB de origem) — GANHAR_FB não precisa */}
+                  {formData.tipo === 'QUEIMAR_FB' && (
+                    <div>
+                      <FieldLabel icon={Ticket} label="Origem da Freebet" required />
                       <OrigemFreebetAutocomplete
                         procedures={allProcedures}
                         currentId={procedure?.id ?? null}
@@ -481,16 +482,8 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
                         })}
                         inputClassName="bg-purple-500/5 border-purple-500/20 focus:border-purple-500/50 h-9 text-sm pr-8"
                       />
-                    ) : (
-                      <Input
-                        value={formData.freebet_reference}
-                        onChange={(e) => setFormData({ ...formData, freebet_reference: e.target.value })}
-                        data-testid="input-freebet-reference"
-                        placeholder="Referência..."
-                        className="bg-purple-500/5 border-purple-500/20 focus:border-purple-500/50 h-9 text-sm"
-                      />
-                    )}
-                  </div>
+                    </div>
+                  )}
                   <div>
                     <FieldLabel icon={Ticket} label="Valor Freebet (previsto)" />
                     <Input
@@ -503,22 +496,6 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
                       className="bg-purple-500/5 border-purple-500/20 focus:border-purple-500/50 h-9 text-sm"
                     />
                   </div>
-                </div>
-              )}
-
-              {/* Cenário B (cash) — só faz sentido pra GANHAR_FB com hedge (paridade doc 01) */}
-              {formData.tipo === 'GANHAR_FB' && (
-                <div className="mt-3">
-                  <FieldLabel icon={Shield} label="Cenário B — cash do hedge (opcional)" />
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={formData.cenario_b_cash}
-                    onChange={(e) => setFormData({ ...formData, cenario_b_cash: e.target.value })}
-                    data-testid="input-cenario-b-cash"
-                    placeholder="Ex: 25.00 (lucro/prejuízo no cenário em que NÃO ganha a FB)"
-                    className="bg-purple-500/5 border-purple-500/20 focus:border-purple-500/50 h-9 text-sm"
-                  />
                 </div>
               )}
             </div>
