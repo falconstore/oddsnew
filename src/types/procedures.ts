@@ -67,6 +67,7 @@ export interface Procedure {
   cenario_b_cash: number | null;
   // Paridade FreeBet PRO doc 05 §2.5 — botões inline Tachar + Reenviar na coluna STATUS
   tachado: boolean;
+  tachado_em: string | null;
   reenviado_em: string | null;
   reenviado_count: number;
   // Paridade FreeBet PRO doc 06 — bloco DG (Duplo Green) do modal Definir Resultados

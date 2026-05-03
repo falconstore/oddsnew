@@ -283,9 +283,11 @@ export function useToggleTachado() {
       if (!isProceduresSupabaseConfigured()) {
         throw new Error('Procedures Supabase not configured');
       }
+      const now = new Date().toISOString();
+      // doc 05 §2.5 — captura `tachado_em` no momento da marcação (limpa quando desmarcar)
       const { data, error } = await supabaseProcedures
         .from('procedures')
-        .update({ tachado, updated_date: new Date().toISOString() })
+        .update({ tachado, tachado_em: tachado ? now : null, updated_date: now })
         .eq('id', id)
         .select()
         .single();
@@ -296,10 +298,11 @@ export function useToggleTachado() {
       // Optimistic update — reflete instantâneo na lista
       await queryClient.cancelQueries({ queryKey: PROCEDURES_KEY });
       const prev = queryClient.getQueryData<Procedure[]>(PROCEDURES_KEY);
+      const now = new Date().toISOString();
       if (prev) {
         queryClient.setQueryData<Procedure[]>(
           PROCEDURES_KEY,
-          prev.map((p) => (p.id === id ? { ...p, tachado } : p)),
+          prev.map((p) => (p.id === id ? { ...p, tachado, tachado_em: tachado ? now : null } : p)),
         );
       }
       return { prev };

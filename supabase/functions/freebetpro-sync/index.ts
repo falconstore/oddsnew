@@ -6,7 +6,7 @@
 // Atualiza `procedures.freebetpro_*` com o resultado.
 //
 // AÇÕES:
-//   - "upsert"   → POST /procedimentos (idempotente por external_id)
+//   - "upsert"   → POST /procedimentos (na 1ª sync) | PATCH /procedimentos/:external_id (atualizações)
 //   - "result"   → POST /procedimentos/:id/resultado
 //   - "archive"  → POST /procedimentos/:id/arquivar { arquivado: bool }
 //   - "health"   → GET  /health (validação de auth)
@@ -93,12 +93,40 @@ serve(async (req) => {
     let res;
     if (action === "upsert") {
       const payload = buildUpsertPayload(proc as any);
-      res = await callFreebetPro({
-        method: "POST",
-        path: "/procedimentos",
-        body: payload,
-        idempotencyKey: `${proc.id}:${proc.updated_date ?? proc.created_date ?? ""}`,
-      });
+      // 1ª sync → POST /procedimentos (cria); demais → PATCH /procedimentos/:external_id (atualiza).
+      // FreeBet PRO retorna `created: false` em POST repetido, mas só PATCH propaga
+      // alterações em campos como tachado, reenviado_*, duplo_green_*, fixture_id, etc.
+      const alreadySynced = !!proc.freebetpro_external_id;
+      if (alreadySynced) {
+        // PATCH: removemos `external_id` (422 invalid_field) e os campos que o
+        // schema do validator deles ainda não reconhece (`tachado_em`, `reenviado_em`,
+        // `reenviado_count`, `duplo_green_*`). Quando publicarem essas chaves,
+        // basta tirar do blocklist abaixo.
+        const PATCH_BLOCKLIST = new Set([
+          "external_id",
+          "tachado_em",
+          "reenviado_em",
+          "reenviado_count",
+          "duplo_green_confirmado",
+          "duplo_green_lucro",
+        ]);
+        const patchBody: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(payload as Record<string, unknown>)) {
+          if (!PATCH_BLOCKLIST.has(k)) patchBody[k] = v;
+        }
+        res = await callFreebetPro({
+          method: "PATCH",
+          path: `/procedimentos/${encodeURIComponent(proc.id)}`,
+          body: patchBody,
+        });
+      } else {
+        res = await callFreebetPro({
+          method: "POST",
+          path: "/procedimentos",
+          body: payload,
+          idempotencyKey: `${proc.id}:${proc.created_date ?? ""}`,
+        });
+      }
     } else if (action === "result") {
       const payload = buildResultPayload({
         resultado_lucro: proc.resultado_lucro,

@@ -40,6 +40,13 @@ type ProcRow = Record<string, unknown> & {
   fixture_id: number | null;
   esporte: string | null;
   cenario_b_cash: number | null;
+  // Paridade doc 05 §2.5 / doc 06 — campos atualizados via PATCH
+  tachado: boolean | null;
+  tachado_em: string | null;
+  reenviado_em: string | null;
+  reenviado_count: number | null;
+  duplo_green_confirmado: boolean | null;
+  duplo_green_lucro: number | null;
 };
 
 const CATEGORIA_MAP: Record<string, string> = {
@@ -93,6 +100,14 @@ export function buildUpsertPayload(p: ProcRow) {
     fixture_id: p.fixture_id,                  // API-Football id (link bidirecional)
     esporte: p.esporte || "futebol",
     cenario_b_cash: dec(p.cenario_b_cash),     // hedge cash do cenário B (GANHAR_FB c/ proteção)
+    // doc 05 §2.5 — botões inline Tachar / Reenviar
+    tachado: !!p.tachado,
+    tachado_em: p.tachado_em,
+    reenviado_em: p.reenviado_em,
+    reenviado_count: p.reenviado_count ?? 0,
+    // doc 06 — bloco DG do modal Definir Resultados
+    duplo_green_confirmado: !!p.duplo_green_confirmado,
+    duplo_green_lucro: dec(p.duplo_green_lucro),
   };
 }
 
