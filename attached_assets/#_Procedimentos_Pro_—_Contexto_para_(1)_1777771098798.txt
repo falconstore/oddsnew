@@ -1,0 +1,429 @@
+# Procedimentos Pro — Contexto para a integração BetShark Pro
+
+> **Para quem é este documento:** equipe técnico-funcional do **Grupo Shark 100% Green / BetShark Pro**.
+> **Objetivo:** explicar de ponta a ponta como funciona hoje, dentro do **FreeBet Pro**, todo o fluxo de **Procedimentos Pro** (visão do cliente assinante) e de **Painel de Envios** (visão do gerente/admin), de forma que vocês entendam exatamente o que acontece quando um gerente nosso cadastra um procedimento e ele aparece para os clientes Pro.
+>
+> Este é o **passo 1** do trabalho de integração. Aqui só descrevemos o sistema atual. A especificação do endpoint público que vocês irão chamar a partir do BetShark Pro será assunto de uma próxima etapa, e será desenhada **em cima** deste contexto.
+>
+> **Convenções:** tudo o que aparece como `código` é nome real de campo, rota, status ou tabela existente no sistema. Onde algum detalhe não pôde ser confirmado lendo o código-fonte, deixamos uma nota `> ⚠️ A confirmar:`.
+
+---
+
+## 1. Visão geral do produto
+
+O **FreeBet Pro** é uma plataforma SaaS para apostadores profissionais e suas equipes. Entre várias ferramentas (caixa, calculadoras, controle de operações, gestão de freebets, etc.), existe uma chamada **Procedimentos Pro**.
+
+A ideia é simples:
+
+- Existe um **catálogo único e centralizado** de "procedimentos" (promoções, cashbacks, freebets, superodds, duplos green, etc.).
+- Esse catálogo é alimentado por **gerentes** internos (ou pelo Super Admin) através de uma tela operacional chamada **Painel de Envios**.
+- Todo cliente assinante do plano **Pro** (mensal, trimestral, anual ou Start Pro), com status ativo, vê esse catálogo na sua área logada, na página **Procedimentos Pro**.
+
+A relação é **1-para-N**:
+
+```
+        Painel de Envios (gerente)                 Procedimentos Pro (cliente Pro)
+        ──────────────────────────                 ───────────────────────────────
+                                                   ┌─► Cliente Pro 1 (vê o card)
+        Cria #123 "Promo Bet365 jogo X"  ──────►   ├─► Cliente Pro 2 (vê o card)
+                                                   ├─► Cliente Pro 3 (vê o card)
+                                                   └─► Cliente Pro N (vê o card)
+```
+
+Um único cadastro do gerente fica visível, em tempo real, para **todos** os clientes Pro elegíveis. Cada cliente mantém o seu próprio **status pessoal** sobre aquele procedimento (ainda não fiz, vou fazer, já fiz, dispensei) — esses estados são **por cliente**, não interferem no que os outros veem.
+
+Há também um conceito menor, fora do escopo desta integração mas importante para evitar confusão:
+
+- **Procedimento "Próprio" (`origem='PROPRIO'`):** um pequeno grupo de usuários autorizados pode criar procedimentos privados que aparecem **só para eles** dentro de uma aba "Meu Painel". Esses **nunca** entram no catálogo público e **não** são alvo da integração com a BetShark Pro.
+
+A integração com a BetShark Pro vai trabalhar exclusivamente com procedimentos do **catálogo público** (`origem='CATALOGO'`, `publico=true`).
+
+---
+
+## 2. Atores e permissões
+
+Três papéis interagem com o sistema:
+
+| Papel | Como é identificado | O que pode fazer em Procedimentos Pro |
+|---|---|---|
+| **Super Admin** | `users.role = 'SUPER_ADMIN'` | Tudo. É o "owner" do catálogo (ver §3). |
+| **Gerente de Procedimentos** | `users.pode_gerenciar_procedimentos = true` | Acessa o **Painel de Envios**, cria/edita/arquiva procedimentos no catálogo do owner, marca resultados, envia para o Telegram. |
+| **Cliente Pro** | Pertence a um `clients` com `plano IN (PRO_MENSAL, PRO_TRIMESTRAL, PRO_ANUAL, START_PRO)` e `status` ativo. | Vê o catálogo na página Procedimentos Pro, marca o status pessoal de cada item, importa para o "Meu Painel" se quiser uma cópia editável. **Não** cria nem edita itens do catálogo. |
+
+**Como gerentes são cadastrados hoje:** o Super Admin acessa a página **Admin → Gerentes de Procedimentos** (`src/pages/AdminGerentesProcedimentos.jsx`), pesquisa um usuário existente que pertença a um cliente Pro ativo, e clica em "Cadastrar". Isso só liga a flag `users.pode_gerenciar_procedimentos = true`. Para revogar, basta clicar em "Revogar" na lista de gerentes ativos. O Super Admin sempre aparece nessa lista como "Acesso total" e não pode ser revogado por aí.
+
+**Controle de acesso (resumo do `server/utils/permissoes.ts`):**
+
+- `userPodeGerenciarProcedimentos(user)` retorna `true` se o usuário é `SUPER_ADMIN` ou tem a flag.
+- Todas as rotas administrativas (criar, editar, marcar resultado, etc.) exigem essa permissão.
+- Rotas de leitura/escrita do "estado pessoal" (`PATCH /api/procedimentos-pro/:id/status`) exigem apenas plano Pro ativo.
+- Existe ainda um middleware (`resolveProcedimentosClientId`) que garante que, quando um gerente que não é Super Admin opera o catálogo, ele é tratado como atuando **no `client_id` do owner** — assim o catálogo permanece único e visível a todos os Pros.
+
+---
+
+## 3. Fluxo do gerente — Painel de Envios
+
+A tela é o `src/pages/PainelDeEnvios.jsx` (sidebar interna do gerente).
+
+### 3.1 Cabeçalho com KPIs
+
+No topo da tela há indicadores agregados do catálogo ativo (rota `GET /api/procedimentos-tarefas/stats/resumo`):
+
+- Total de procedimentos não arquivados
+- Greens, Reds, Duplos Green, Freebets ganhadas
+- Freebet Pendente, Falta Girar FB, Aposta Sem Risco, Referência Faltando
+- Total apostado e total de lucro acumulado
+- Quantidade do dia, enviados, partida em aberto
+
+### 3.2 Filtros
+
+A barra de filtros tem:
+
+- **Busca textual** (título, partida, casa, número)
+- **Status operacional** (8 valores — ver tabela abaixo)
+- **Categoria** (6+1 valores — ver tabela abaixo)
+- **Prioridade**, **tipo**, etc.
+
+### 3.3 Visões disponíveis
+
+A tela hoje opera em **modo Lista** (tabela densa, uma linha por procedimento, ideal para revisão em massa e edição rápida de campos). Há também uma aba auxiliar **"FreeBets"** focada na visualização das FBs em aberto.
+
+> O modo Kanban (4 colunas por `status_kanban` — `RECEBIDO`/`PARA_HOJE`/`PARA_AMANHA`/`CONCLUIDO`) está marcado como **legado** no código atual: o estado inicial sempre cai em `lista` (`src/pages/PainelDeEnvios.jsx` ~5149). A coluna `status_kanban` continua existindo no banco por compatibilidade, mas não é mais o modo principal de operação.
+
+### 3.4 `status_operacao` — os 8 valores
+
+Esse campo descreve o **estado operacional** do procedimento (o que está acontecendo com ele agora). É o "semáforo" central:
+
+| Valor | Rótulo | Cor | Quando se usa |
+|---|---|---|---|
+| `ENVIADO` | Enviado | amarelo | Acabou de ser publicado, aguardando o cliente operar. |
+| `PARTIDA_ABERTO` | Partida em Aberto | amarelo | Jogo já começou e o resultado ainda não fechou. |
+| `CONCLUIDO` | Concluído | verde | Operação encerrada com sucesso (sem necessariamente lucro direto). |
+| `LUCRO_DIRETO` | Lucro Direto | verde-esmeralda | Encerrou em lucro positivo em cash. |
+| `FREEBET_PENDENTE` | Freebet Pendente | roxo | Procedimento gerou direito a uma FB que ainda não foi creditada pela casa. |
+| `APOSTA_SEM_RISCO` | Aposta Sem Risco | ciano | Procedimento configurado de forma que não há perda possível. |
+| `REFERENCIA_FALTANDO` | Referência Faltando | laranja | Falta vincular o procedimento de origem (cadeia FB). |
+| `FALTA_GIRAR_FB` | Falta Girar Freebet | rosa | A FB foi creditada mas o cliente ainda não a usou. |
+
+### 3.5 Categorias
+
+O campo `categoria` agrupa o procedimento por natureza da promoção:
+
+`PROMOCAO`, `CASHBACK`, `FREEBET`, `SUPERODD`, `EXTRA`, `GIROS_GRATIS`, `DUPLO_GREEN`.
+
+A categoria é só agrupador visual (cor uniforme violeta na UI). A cor "semântica" do card vem do `status_operacao`.
+
+### 3.6 Ações disponíveis no card / linha
+
+Para cada procedimento, o gerente pode:
+
+- Mudar o `status_operacao` (chip dropdown).
+- Marcar como **Tachado** (`tachado=true`) — indica "passou da hora; quem pegou pegou". O procedimento continua visível para o cliente Pro mas com aparência cinza tachada.
+- Marcar como **Reenviado** (`reenviado_em`, `reenviado_count`) — sinaliza que o procedimento foi atualizado depois de já publicado. Quem já marcou "Feito" no Pro vê um badge laranja "Atualizado depois que você fez".
+- **Definir Resultados** (modal) — ver §5.
+- **Arquivar** (`arquivado=true`).
+- **Enviar para Telegram** (publica no canal e guarda `telegram_message_id`).
+- **Editar campo a campo** via `PATCH /api/procedimentos-tarefas/:id/campo` (whitelist server-side).
+
+---
+
+## 4. Modal "Novo Procedimento" — Etapa 1 (Identificação / Promoção)
+
+O modal central de cadastro (`ModalNovoProcedimentoProprio.jsx` e o `ProcedimentoForm` exportado por `PainelDeEnvios.jsx`) é dividido em etapas. A primeira identifica **o que** é o procedimento.
+
+### 4.1 Campos da Etapa 1
+
+| Campo | Tipo / Valores | Obrigatório? | Observações |
+|---|---|---|---|
+| `titulo` | texto livre | **Sim** (validado client-side) | Aparece no card. Ex: `"Bet365 — SuperOdd Real x Barça"`. |
+| `casa_aposta` | texto / select | **Sim** (validado client-side) | Nome da casa de apostas. Sem casa, o card fica sem identidade visual. Ex: `"Bet365"`. |
+| `categoria` | enum (ver §3.5) | Recomendado | Agrupador visual. |
+| `prioridade` | `ALTA` \| `MEDIA` \| `BAIXA` | Não (default `MEDIA`) | `ALTA`=urgente (queima de FB), `MEDIA`=importante (possível duplo), `BAIXA`=normal. |
+| `tipo` | `NORMAL` \| `GANHAR_FB` \| `QUEIMAR_FB` \| `DUPLO` | Não (default `NORMAL`) | Modela o objetivo da operação. |
+| `descricao_promocao` | texto livre longo | Não | Descrição comercial da promoção. |
+| `link_promocao` | URL (http/https) | Não | Link da página da casa. Sanitizado server-side. |
+| `imagens_banner` | array de URLs | Não | Até N banners da promoção. |
+
+### 4.2 Exemplo realista preenchido (Etapa 1)
+
+```text
+titulo:              "SuperOdd Bet365 — Real Madrid vence o Barcelona"
+casa_aposta:         "Bet365"
+categoria:           "SUPERODD"
+prioridade:          "ALTA"
+tipo:                "NORMAL"
+descricao_promocao:  "Aposte até R$50 no Real Madrid vencer e receba odd
+                      turbinada de 5.00 (cota normal 2.10)."
+link_promocao:       "https://www.bet365.com/superodds/..."
+```
+
+---
+
+## 5. Modal "Novo Procedimento" — Etapa 2 (Jogo / FreeBet / Resultado)
+
+A segunda parte do modal cobre **a partida** associada (quando há) e **o desfecho financeiro**.
+
+### 5.1 Campos do jogo / partida
+
+| Campo | Tipo | Observações |
+|---|---|---|
+| `esporte` | texto (`FUTEBOL`, etc.) | Default `FUTEBOL`. |
+| `partida_descricao` | texto livre | "Flamengo x Palmeiras". |
+| `data_partida` | `YYYY-MM-DD` (wall-clock SP) | Data do jogo. |
+| `horario_partida` | `HH:MM` | Hora local SP. |
+| `fixture_id` | inteiro | ID do jogo na **API Futebol** (ver §6). Preenchido automaticamente quando o gerente seleciona um jogo no autocomplete. |
+| `kickoff_at` | timestamp ISO (UTC) | Horário de início real, vindo da API Futebol. |
+| `procedimento_referencia` | inteiro (FK para `procedimentos_tarefas.id`) | Quando este procedimento **queima** uma FB ganha em outro procedimento, aponta para a origem da cadeia FB. |
+
+### 5.2 Autocomplete de evento
+
+O campo de partida usa o componente `EventoAutocomplete` (`src/components/operacoes/EventoAutocomplete.jsx`). Conforme o gerente digita ("Flamengo"), o componente debounce + chama `GET /api/partidas/sugestoes?q=...`. Cada sugestão traz `nome`, `fixture_id`, `kickoff_at`, `campeonato`, `esporte`. Ao escolher uma sugestão, `fixture_id` e `kickoff_at` são salvos no procedimento.
+
+### 5.3 Modelo de resultado aditivo (Task #505)
+
+O sistema usa um modelo **aditivo** para resultado real, suportando o caso híbrido em que o procedimento gera **lucro em cash** **E** **uma FreeBet ganha** ao mesmo tempo:
+
+- `resultado_lucro` (decimal): lucro/prejuízo real em dinheiro. Pode ser positivo, zero ou negativo.
+- `resultado_freebet_ganha` (decimal): valor da FB ganha confirmada. `0` quando nada foi ganho.
+- `resultado_observacao` (texto): observação livre da conferência.
+
+Existe ainda o cadastro **previsional** dos cenários A e B (preenchido na hora de criar):
+
+- **Cenário A** = "lucro direto em cash". Usa `lucro_prejuizo`.
+- **Cenário B** = "perda em cash compensada por FB". Usa `cenario_b_cash` (geralmente negativo, do hedge) + `freebet_valor` (FB esperada).
+
+Quando o gerente abre o modal **"Definir Resultados"** depois da partida, ele preenche os dois campos aditivos e salva via `PATCH /api/procedimentos-tarefas/:id/resultado` (`server/routes/procedimentos.ts` ~1929-2048). O backend faz **somente** alterações na própria linha de `procedimentos_tarefas`:
+
+1. Grava `resultado_lucro`, `resultado_freebet_ganha` e `resultado_observacao`.
+2. Por compatibilidade com código legado, escreve `cenario_realizado = 'A' | 'B'` (A se FB=0, B se FB>0).
+3. Decide o `status_operacao` final:
+   - **`LUCRO_DIRETO`** se não houve FB ganha **ou** se a FB foi marcada como **não creditada** (`freebet_creditada='NAO'`).
+   - **`FALTA_GIRAR_FB`** **somente** quando `resultado_freebet_ganha > 0` **E** o gerente marcou no payload `freebet_creditada='SIM'` (FB caiu na conta, falta queimar).
+4. Grava `freebet_creditada` exatamente como veio do payload (`SIM` ou `NAO`); quando não há FB ganha, força `NAO`.
+5. Emite um evento SSE para os clientes Pro recarregarem o catálogo.
+
+> ⚠️ **A confirmar:** o handler atual de `/resultado` **não cria automaticamente linhas em `freebets`** para os clientes que marcaram o procedimento como feito. A geração de FreeBets no inventário pessoal de cada cliente acontece por outros caminhos (operações no controle de FBs, importação manual, criação automática a partir de outras entidades) — qualquer regra de "uma FB para cada cliente" precisa ser confirmada com o time interno antes de descrever o comportamento como automático na próxima etapa.
+
+### 5.4 Exemplo realista preenchido (Etapa 2)
+
+```text
+esporte:                  "FUTEBOL"
+partida_descricao:        "Real Madrid x Barcelona"
+data_partida:             "2026-05-10"
+horario_partida:          "16:00"
+fixture_id:               1234567        ← veio do autocomplete
+kickoff_at:               "2026-05-10T19:00:00Z"
+procedimento_referencia:  null
+
+# Cadastro previsional (Etapa 2):
+lucro_prejuizo:           "25.00"        ← Cenário A: lucro em cash esperado
+cenario_b_cash:           "-18.00"       ← Cenário B: perda em cash do hedge
+freebet_valor:            "50.00"        ← Cenário B: FB esperada
+
+# Após a partida (modal "Definir Resultados"):
+resultado_lucro:           "27.50"
+resultado_freebet_ganha:   "0"
+resultado_observacao:      "Real venceu por 2x1, fechou na linha A."
+```
+
+---
+
+## 6. Integração com a API Futebol (eventos)
+
+O autocomplete de partidas é alimentado por uma API externa de dados esportivos (`v3.football.api-sports.io`), consumida pelo nosso backend e exposta ao frontend como `GET /api/partidas/sugestoes?q=<termo>`.
+
+Fluxo:
+
+```
+Gerente digita "Flamengo"
+        │
+        ▼
+Frontend (EventoAutocomplete) ── GET /api/partidas/sugestoes?q=Flamengo ──► Backend FreeBet Pro
+                                                                                  │
+                                                                                  ▼
+                                                                  v3.football.api-sports.io
+                                                                                  │
+                                                                                  ▼
+        Lista de jogos com fixture_id, nome, kickoff_at, campeonato
+        │
+        ▼
+Gerente seleciona "Flamengo x Santos"
+        │
+        ▼
+Procedimento salvo com fixture_id=999111 e kickoff_at=...
+```
+
+Para que o `fixture_id` é usado depois?
+
+- Rastreamento automático de placar (badge "AO VIVO", "começou há X min").
+- Funcionalidade de **Early Payout** (alerta no Telegram quando o jogo abre 2 gols de vantagem, se o usuário ativou o opt-in).
+- Filtro do catálogo Pro que esconde procedimentos cujo jogo já encerrou (consulta API Futebol com cache de 3 min).
+
+> **Importante para a BetShark Pro:** vocês **não precisam lidar com a API Futebol**. Se o painel de vocês souber identificar a partida de alguma forma (mesmo que apenas pelo texto "Real x Barça"), tudo bem — o `fixture_id` será apenas um campo opcional na próxima etapa. Apenas é útil saberem que esse identificador existe, porque ele habilita várias funcionalidades secundárias do nosso lado.
+
+---
+
+## 7. Como FreeBets são salvas
+
+Existe a tabela `freebets`, separada de `procedimentos_tarefas`. Cada linha representa **uma FB de um cliente específico** (não é compartilhada). Campos principais:
+
+| Campo | Significado |
+|---|---|
+| `client_id` | A qual cliente Pro a FB pertence. |
+| `casa` | Nome da casa de aposta. |
+| `valor` | Valor em R$. |
+| `tipo_origem` | `MISSAO` \| `PROMOCAO` \| `BONUS` \| `CADASTRO` \| `OUTRO`. |
+| `status` | `RECEBIDAS` \| `DISPONIVEL` \| `UTILIZADA` \| `FINALIZADA`. |
+| `data_recebimento`, `data_uso`, `data_expiracao` | Datas do ciclo de vida. |
+| `evento`, `odd_utilizada`, `resultado` | Preenchidos quando a FB é usada. |
+| `lucro_liquido`, `retorno_bruto` | Resultado financeiro da FB. |
+| `source` | `AUTO` (criada pelo sistema a partir de outra entidade) ou `MANUAL`. |
+
+**Como o resultado de um procedimento se relaciona com a tabela `freebets`:**
+
+Quando, no modal "Definir Resultados", o gerente registra `resultado_freebet_ganha > 0` e marca `freebet_creditada='SIM'`, o backend (§5.3):
+
+1. Atualiza a linha em `procedimentos_tarefas` (campos `resultado_*`, `freebet_creditada='SIM'`, `status_operacao='FALTA_GIRAR_FB'`).
+2. Emite evento SSE para os clientes Pro recarregarem o catálogo — eles veem o card mudar para "Falta Girar Freebet" com o valor da FB ganha exibido.
+
+> ⚠️ **A confirmar:** o handler `PATCH /api/procedimentos-tarefas/:id/resultado` (`server/routes/procedimentos.ts` ~1929-2048) **não faz INSERT em `freebets`**. Não há, neste handler, criação automática de uma linha em `freebets` vinculada aos clientes que marcaram o procedimento como feito. As entradas em `freebets` hoje são alimentadas por outros caminhos (controle de operações, multiparceiro, criação manual). Se a integração com a BetShark Pro precisar dessa propagação automática para o inventário pessoal dos clientes, é uma regra **a ser confirmada e potencialmente implementada** na próxima etapa.
+
+> ⚠️ **A confirmar:** o schema atual de `freebets` (`shared/schema.ts:1145`) **não** possui um campo `origem_procedimento_id` explícito ligando a FB ao procedimento que a gerou. Existem campos `operacao_origem_id` / `parceiro_id` etc., mas não há FK direta para `procedimentos_tarefas`. Se essa rastreabilidade for requisito da integração, precisa ser confirmada com o time interno.
+
+---
+
+## 8. Visão do cliente — página Procedimentos Pro
+
+A página é `src/pages/ProcedimentosPRO.jsx`. É **a** tela onde o cliente Pro consome o catálogo.
+
+### 8.1 Componentes da tela
+
+- **Tabs** "Catálogo" (público) e "Meu Painel" (privado, para usuários autorizados).
+- **Filtros**: janela de tempo (Hoje / Ontem / Próximos), casa, status pessoal, busca, ordenação.
+- **Lista de cards** com: número (`#N`), título, casa, partida, badges (categoria, FB, duplo green), tarja de cor pelo status pessoal, status_operacao do gerente, link para o Telegram.
+
+### 8.2 Status pessoal
+
+Cada cliente tem o seu próprio status sobre cada procedimento (`procedimento_status_cliente`):
+
+- `PENDENTE` (default — ainda não vi / não decidi)
+- `VOU_FAZER` (vou fazer hoje / em breve)
+- `FEITO` (já operei)
+- `DISPENSEI` (não vou fazer)
+
+Esses estados afetam **só** o que aquele cliente vê (cor da tarja, ordenação, contadores), não a publicação para os outros.
+
+### 8.3 Atualização em tempo real (SSE)
+
+Há um stream `GET /api/procedimentos-pro/events` (Server-Sent Events). O frontend mantém uma conexão persistente; sempre que o gerente edita qualquer item do catálogo público, o backend emite um evento `change` e o cliente Pro recarrega o catálogo automaticamente, sem F5.
+
+```
+Gerente edita procedimento #123 ──► PATCH no backend ──► notifyProcedimentoChange()
+                                                                  │
+                                                                  ▼
+                                                         EventEmitter (in-process)
+                                                                  │
+                                                                  ▼
+                                          Todos os clientes PRO conectados via SSE
+                                                                  │
+                                                                  ▼
+                                            React Query invalida e refaz GET /catalogo
+```
+
+### 8.4 Jornada completa (ponta a ponta)
+
+```
+1. Gerente cadastra #123 no Painel de Envios
+        │
+        ▼
+2. Backend grava em procedimentos_tarefas (publico=true, origem=CATALOGO)
+        │
+        ▼
+3. Evento SSE → todos clientes Pro atualizam o catálogo em <2s
+        │
+        ▼
+4. Cliente vê o card e clica "Vou fazer" (status pessoal = VOU_FAZER)
+        │
+        ▼
+5. Cliente opera na casa de aposta (fora do nosso sistema)
+        │
+        ▼
+6. Cliente volta e marca "Feito" (status pessoal = FEITO)
+        │
+        ▼
+7. Após a partida, gerente abre "Definir Resultados" → preenche
+   resultado_lucro=0, resultado_freebet_ganha=50, freebet_creditada=SIM
+        │
+        ▼
+8. Backend atualiza somente procedimentos_tarefas:
+   status_operacao=FALTA_GIRAR_FB, freebet_creditada=SIM, resultado_*=...
+   e emite SSE
+        │
+        ▼
+9. Cliente vê o card atualizado no Pro com badge "FB ganha — falta girar"
+   (a entrada na tabela `freebets` pessoal não é feita por este handler —
+    ver nota em §7)
+```
+
+---
+
+## 9. Modelo de dados resumido
+
+| Tabela | Campos relevantes | Significado de negócio |
+|---|---|---|
+| **`procedimentos_tarefas`** | `id`, `numero`, `titulo`, `casa_aposta`, `categoria`, `prioridade`, `tipo`, `data_partida`, `horario_partida`, `partida_descricao`, `fixture_id`, `kickoff_at`, `status_operacao`, `tachado`, `reenviado_em`, `freebet_creditada`, `procedimento_referencia`, `lucro_prejuizo`, `cenario_b_cash`, `freebet_valor`, `cenario_realizado`, `resultado_lucro`, `resultado_freebet_ganha`, `resultado_observacao`, `publico`, `origem`, `arquivado`, `client_id` | A "linha mestra" de cada procedimento. `publico=true` + `origem='CATALOGO'` = item do catálogo público que todos os Pros veem. `client_id` aponta sempre para o **owner** do catálogo (Super Admin). |
+| **`procedimento_status_cliente`** | `procedimento_id`, `client_id`, `status` (`PENDENTE` \| `VOU_FAZER` \| `FEITO` \| `DISPENSEI`), `marcado_em`, `notas` | Estado **por cliente** sobre cada procedimento. Únique em `(procedimento_id, client_id)`. |
+| **`freebets`** | `id`, `client_id`, `casa`, `valor`, `tipo_origem`, `status`, `data_recebimento`, `data_expiracao`, `source`, `evento`, `resultado`, `lucro_liquido` | Inventário pessoal de FreeBets de cada cliente. **Não é populada pelo handler `/resultado` de procedimentos hoje** — ver nota em §7. |
+| **`users`** | `id`, `email`, `client_id`, `role` (`SUPER_ADMIN` \| `USER` \| ...), `pode_gerenciar_procedimentos` (boolean) | Controle de quem pode operar o Painel de Envios (§2). |
+| **`clients`** | `id`, `plano` (`PRO_MENSAL`, `PRO_TRIMESTRAL`, `PRO_ANUAL`, `START_PRO`, etc.), `status` (`ATIVO` \| ...) | Define se o usuário é elegível para ver Procedimentos Pro. |
+
+---
+
+## 10. Mapa de endpoints internos atuais
+
+> Apenas para contexto. **Estes endpoints NÃO são o endpoint público da integração** — são as rotas internas que o nosso próprio frontend usa hoje.
+
+### 10.1 Painel de Envios (gerente)
+
+| Método + Rota | O que faz |
+|---|---|
+| `GET /api/procedimentos-tarefas` | Lista os procedimentos do catálogo (com filtros). |
+| `GET /api/procedimentos-tarefas/stats/resumo` | KPIs do header. |
+| `GET /api/procedimentos-tarefas/alertas` | Buckets de alertas priorizados. |
+| `GET /api/procedimentos-tarefas/freebets-pendentes` | Autocomplete de FBs ganhas para vincular como `procedimento_referencia`. |
+| `POST /api/procedimentos-tarefas` | Cria um procedimento. |
+| `PATCH /api/procedimentos-tarefas/:id/campo` | Edita 1 campo (whitelist server-side de campos permitidos). |
+| `PATCH /api/procedimentos-tarefas/:id/resultado` | Define `resultado_lucro` e `resultado_freebet_ganha` (modal "Definir Resultados"). |
+| `PATCH /api/procedimentos-tarefas/:id/arquivar` | Arquiva. |
+| `POST /api/procedimentos-tarefas/:id/telegram` | Envia para o canal do Telegram. |
+
+### 10.2 Página Procedimentos Pro (cliente)
+
+| Método + Rota | O que faz |
+|---|---|
+| `GET /api/procedimentos-pro/catalogo` | Lista o catálogo público com `my_status` do requester. |
+| `GET /api/procedimentos-pro/catalogo/casas` | Lista distinta de casas para o filtro. |
+| `PATCH /api/procedimentos-pro/:id/status` | Upsert do status pessoal (`PENDENTE`/`VOU_FAZER`/`FEITO`/`DISPENSEI`). |
+| `POST /api/procedimentos-pro/:id/importar` | Cria uma cópia editável do procedimento no Meu Painel. |
+| `GET /api/procedimentos-pro/events` | Stream SSE de mudanças do catálogo. |
+
+### 10.3 Autocomplete de eventos (ambos)
+
+| Método + Rota | O que faz |
+|---|---|
+| `GET /api/partidas/sugestoes?q=<termo>` | Devolve sugestões de jogos consultando a API Futebol. |
+
+---
+
+## 11. Ponte para a próxima etapa
+
+Com este contexto compreendido, o próximo passo deste trabalho conjunto será desenhar um **endpoint público** que o **BetShark Pro** poderá chamar a partir do painel de vocês — onde vários gerentes do Grupo Shark já cadastram procedimentos hoje (atualmente via Rapid) — para criar procedimentos **diretamente no catálogo do FreeBet Pro**, exatamente como se um gerente nosso tivesse cadastrado pelo Painel de Envios. A partir do momento em que esse endpoint for chamado, o fluxo de **publicação 1-para-N**, **atualização em tempo real via SSE** e **status pessoal por cliente** descrito aqui acontece da mesma forma para os clientes Pro.
+
+**Não** vamos detalhar agora o contrato (URL, autenticação, formato do payload, idempotência, tratamento de erros, atualização e arquivamento, mapeamento de `fixture_id` opcional, etc.) — isso será objeto da próxima tarefa, escrita em cima deste documento.
+
+### Estado atual confirmado (resumo, para evitar mal-entendidos)
+
+Para fechar este documento sem ambiguidade sobre o que **é** automático hoje e o que **não é**:
+
+- ✅ **É automático hoje:** publicação 1-para-N (todo cliente Pro elegível vê o catálogo); atualização em tempo real via SSE quando o gerente edita qualquer procedimento; status pessoal por cliente em `procedimento_status_cliente`; mudança automática de `status_operacao` para `FALTA_GIRAR_FB` ou `LUCRO_DIRETO` ao definir resultado, conforme regras descritas em §5.3.
+- ❌ **NÃO é automático hoje:** o handler `PATCH /api/procedimentos-tarefas/:id/resultado` **não cria linhas em `freebets`** para os clientes que marcaram o procedimento como feito. O inventário pessoal de FBs em `freebets` é alimentado por outros caminhos (controle de operações, multiparceiro, criação manual). Se a integração com a BetShark Pro precisar dessa propagação automática, será discutida e potencialmente implementada na próxima etapa — não está em produção hoje.
