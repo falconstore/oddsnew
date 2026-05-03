@@ -98,22 +98,20 @@ serve(async (req) => {
       // alterações em campos como tachado, reenviado_*, duplo_green_*, fixture_id, etc.
       const alreadySynced = !!proc.freebetpro_external_id;
       if (alreadySynced) {
-        // PATCH: removemos `external_id` (422 invalid_field) e os campos que o
-        // schema do validator deles ainda não reconhece (`tachado_em`, `reenviado_em`,
-        // `reenviado_count`, `duplo_green_*`). Quando publicarem essas chaves,
-        // basta tirar do blocklist abaixo.
-        const PATCH_BLOCKLIST = new Set([
-          "external_id",
-          "tachado_em",
-          "reenviado_em",
-          "reenviado_count",
-          "duplo_green_confirmado",
-          "duplo_green_lucro",
-        ]);
+        // PATCH: o único campo que o validator deles ainda rejeita é `external_id`
+        // (422 invalid_field — não pode ser alterado). Os demais (tachado_em,
+        // reenviado_em, reenviado_count, duplo_green_*) já são aceitos desde 03/05.
+        const PATCH_BLOCKLIST = new Set(["external_id"]);
         const patchBody: Record<string, unknown> = {};
         for (const [k, v] of Object.entries(payload as Record<string, unknown>)) {
           if (!PATCH_BLOCKLIST.has(k)) patchBody[k] = v;
         }
+        // Doc 06 §6 / §8 — flag `reenviar: true` dispara broadcast no Telegram da
+        // FreeBet PRO. Só é enviado quando explicitamente solicitado pelo cliente
+        // (ex.: useToggleReenviado marcando ou incrementando contador). Ausência
+        // do flag = PATCH silencioso.
+        if (body.reenviar === true) patchBody.reenviar = true;
+
         res = await callFreebetPro({
           method: "PATCH",
           path: `/procedimentos/${encodeURIComponent(proc.id)}`,
@@ -129,10 +127,13 @@ serve(async (req) => {
       }
     } else if (action === "result") {
       const payload = buildResultPayload({
+        tipo: proc.tipo,
         resultado_lucro: proc.resultado_lucro,
         resultado_freebet_ganha: proc.resultado_freebet_ganha,
         freebet_creditada: proc.freebet_creditada,
         resultado_observacao: proc.resultado_observacao,
+        duplo_green_confirmado: proc.duplo_green_confirmado,
+        duplo_green_lucro: proc.duplo_green_lucro,
       });
       res = await callFreebetPro({
         method: "POST",

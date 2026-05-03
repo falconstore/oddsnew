@@ -451,6 +451,11 @@ export default function ProcedureControl() {
       {resultProcedure && (
         <DefinirResultadosModal
           procedure={resultProcedure}
+          originProcedure={
+            resultProcedure.tipo === 'QUEIMAR_FB' && resultProcedure.freebet_reference_id
+              ? procedures.find((p) => p.id === resultProcedure.freebet_reference_id) ?? null
+              : null
+          }
           onClose={() => setResultProcedure(null)}
         />
       )}

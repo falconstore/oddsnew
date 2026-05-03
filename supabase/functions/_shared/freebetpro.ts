@@ -112,19 +112,43 @@ export function buildUpsertPayload(p: ProcRow) {
 }
 
 export function buildResultPayload(input: {
+  tipo: string | null;
   resultado_lucro: number;
   resultado_freebet_ganha: number | null;
   freebet_creditada: "SIM" | "NAO" | null;
   resultado_observacao: string | null;
+  duplo_green_confirmado?: boolean | null;
+  duplo_green_lucro?: number | null;
 }) {
   const dec = (n: number | null | undefined) =>
     n == null ? null : Number(n).toFixed(2);
-  return {
+
+  // Doc 06 §4.2 / §4.3: pra QUEIMAR_FB NÃO enviar `freebet_creditada` nem
+  // `resultado_freebet_ganha` — caso contrário a FreeBet PRO criava uma FB
+  // duplicada no inventário (bug confirmado pelo time deles em 03/05/2026).
+  // Hoje o backend deles ignora esses campos pra QUEIMAR_FB com defesa em
+  // profundidade, mas o omitimos aqui pra não logar warning do lado de lá.
+  const isQueima = (input.tipo ?? "") === "QUEIMAR_FB";
+
+  const base: Record<string, unknown> = {
     resultado_lucro: dec(input.resultado_lucro)!,
-    resultado_freebet_ganha: dec(input.resultado_freebet_ganha) ?? "0.00",
-    freebet_creditada: input.freebet_creditada,
     resultado_observacao: input.resultado_observacao,
   };
+
+  if (!isQueima) {
+    base.resultado_freebet_ganha = dec(input.resultado_freebet_ganha) ?? "0.00";
+    base.freebet_creditada = input.freebet_creditada;
+  }
+
+  // Doc 06 §4 — Bloco DG (Duplo Green) pode coexistir com qualquer tipo.
+  if (input.duplo_green_confirmado != null) {
+    base.duplo_green_confirmado = !!input.duplo_green_confirmado;
+    if (input.duplo_green_confirmado && input.duplo_green_lucro != null) {
+      base.duplo_green_lucro = dec(input.duplo_green_lucro);
+    }
+  }
+
+  return base;
 }
 
 export interface FreebetProResponse {

@@ -364,11 +364,17 @@ export function useToggleReenviado() {
         .select()
         .single();
       if (error) throw error;
-      return data;
+      // mode='clear' / desmarcar (toggle quando já estava marcado) NÃO dispara broadcast.
+      // Marcar/incrementar (payload.reenviado_em != null) = sinal explícito do admin
+      // de "atualizei o card, dispara aviso pros assinantes" — vai com `reenviar: true`.
+      const triggerBroadcast = payload.reenviado_em !== null;
+      return { data, triggerBroadcast };
     },
-    onSuccess: (data) => {
+    onSuccess: ({ data, triggerBroadcast }) => {
       queryClient.invalidateQueries({ queryKey: PROCEDURES_KEY });
-      if (data?.id) syncProcedureBestEffort(data.id, 'upsert');
+      if (data?.id) {
+        syncProcedureBestEffort(data.id, 'upsert', { reenviar: triggerBroadcast });
+      }
     },
     onError: (error: Error) => {
       toast({

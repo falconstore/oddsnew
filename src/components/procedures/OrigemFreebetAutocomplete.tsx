@@ -16,7 +16,12 @@ interface OrigemFreebetAutocompleteProps {
   currentId: string | null;       // procedimento sendo editado (não pode ser sua própria origem)
   refValue: string;                // freebet_reference (texto exibido)
   refId: string | null;            // freebet_reference_id (UUID resolvido)
-  onChange: (next: { freebet_reference: string; freebet_reference_id: string | null }) => void;
+  onChange: (next: {
+    freebet_reference: string;
+    freebet_reference_id: string | null;
+    /** Casa da FB origem — auto-preenchida ao selecionar (doc 03 §3, paridade 03/05/2026). */
+    platform?: string;
+  }) => void;
   inputClassName?: string;
 }
 
@@ -85,6 +90,9 @@ export function OrigemFreebetAutocomplete({
     onChange({
       freebet_reference: p.procedure_number || '',
       freebet_reference_id: p.id,
+      // Auto-preenche a casa da FB origem (doc 03 §3 / checklist 9). O ProcedureModal
+      // decide se sobrescreve ou só popula campo vazio.
+      platform: p.platform || '',
     });
     setOpen(false);
   }

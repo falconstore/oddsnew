@@ -479,6 +479,12 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
                           ...formData,
                           freebet_reference: next.freebet_reference,
                           freebet_reference_id: next.freebet_reference_id,
+                          // Auto-preencher Plataforma com a casa da FB origem (doc §3, checklist 9).
+                          // Só popula quando vem do autocomplete (next.platform !== undefined),
+                          // permitindo o usuário editar livremente depois.
+                          platform: next.platform !== undefined && next.platform
+                            ? next.platform
+                            : formData.platform,
                         })}
                         inputClassName="bg-purple-500/5 border-purple-500/20 focus:border-purple-500/50 h-9 text-sm pr-8"
                       />
