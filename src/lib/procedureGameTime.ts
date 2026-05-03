@@ -1,7 +1,16 @@
 import { Procedure } from '@/types/procedures';
 
 // Combina data_partida (YYYY-MM-DD) + horario_partida (HH:MM:SS|HH:MM) num Date.
-export function parseKickoff(proc: Pick<Procedure, 'data_partida' | 'horario_partida'>): Date | null {
+// Prefere `kickoff_at` (ISO timezone-aware, paridade FULL com FreeBet PRO) quando
+// disponível — ele é a fonte de verdade quando o procedimento foi vinculado ao
+// fixture da API-Football.
+export function parseKickoff(
+  proc: Pick<Procedure, 'data_partida' | 'horario_partida'> & { kickoff_at?: string | null },
+): Date | null {
+  if (proc.kickoff_at) {
+    const dt = new Date(proc.kickoff_at);
+    if (!isNaN(dt.getTime())) return dt;
+  }
   if (!proc.data_partida) return null;
   const time = proc.horario_partida || '00:00:00';
   const normalizedTime = time.length === 5 ? `${time}:00` : time;
@@ -12,7 +21,7 @@ export function parseKickoff(proc: Pick<Procedure, 'data_partida' | 'horario_par
 export type GameTimeBucket = 'live' | 'upcoming' | 'ended' | 'none';
 
 export function getGameTimeBucket(
-  proc: Pick<Procedure, 'data_partida' | 'horario_partida'>,
+  proc: Pick<Procedure, 'data_partida' | 'horario_partida'> & { kickoff_at?: string | null },
   now: Date = new Date(),
 ): GameTimeBucket {
   const kickoff = parseKickoff(proc);
@@ -28,7 +37,7 @@ export function getGameTimeBucket(
 // FreeBet Pro pediu que o modal "Definir Resultados" possa ser usado em qualquer
 // procedimento, não só nos com kickoff conhecido.
 export function canCheckResult(
-  proc: Pick<Procedure, 'data_partida' | 'horario_partida'>,
+  proc: Pick<Procedure, 'data_partida' | 'horario_partida'> & { kickoff_at?: string | null },
   now: Date = new Date(),
 ): boolean {
   const bucket = getGameTimeBucket(proc, now);

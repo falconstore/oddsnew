@@ -4,6 +4,7 @@ import { Star, Pencil, Trash2, ExternalLink, Tag, Calendar, Building2, Archive, 
 import { Procedure } from '@/types/procedures';
 import { formatProcedureDate, translateCategory } from '@/lib/procedureUtils';
 import { canCheckResult } from '@/lib/procedureGameTime';
+import { KickoffBadge } from './KickoffBadge';
 
 interface ProcedureMobileCardsProps {
   procedures: Procedure[];
@@ -92,6 +93,7 @@ export function ProcedureMobileCards({ procedures, onEdit, onDelete, onToggleFav
                       <Clock className="w-3 h-3" /> {proc.partida_descricao}
                     </span>
                   )}
+                  <KickoffBadge procedure={proc} />
                 </div>
               </div>
             </div>

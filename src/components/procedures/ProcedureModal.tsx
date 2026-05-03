@@ -4,8 +4,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { X, Star, FileText, Calendar, Building2, Tag, TrendingUp, Link, Hash, Ticket, Zap, Trophy, Clock } from 'lucide-react';
+import { X, Star, FileText, Calendar, Building2, Tag, TrendingUp, Link, Hash, Ticket, Zap, Trophy, Clock, Activity, Shield } from 'lucide-react';
 import { TagManager } from './TagManager';
+import { EventoAutocomplete } from './EventoAutocomplete';
+import { OrigemFreebetAutocomplete } from './OrigemFreebetAutocomplete';
 import {
   Procedure,
   ProcedureFormData,
@@ -13,6 +15,7 @@ import {
   PROCEDURE_CATEGORIES,
   PROCEDURE_STATUSES,
   PROCEDURE_TYPES,
+  PROCEDURE_SPORTS,
 } from '@/types/procedures';
 import { useCreateProcedure, useUpdateProcedure, useProcedures } from '@/hooks/useProcedures';
 import { getAllTags, getAllPlatforms } from '@/lib/procedureUtils';
@@ -41,6 +44,12 @@ const emptyForm: ProcedureFormData = {
   horario_partida: '',
   partida_descricao: '',
   tipo: 'SEM_FB',
+  // Paridade FULL FreeBet Pro
+  kickoff_at: null,
+  fixture_id: null,
+  esporte: 'futebol',
+  cenario_b_cash: '',
+  freebet_reference_id: null,
 };
 
 function FieldLabel({ icon: Icon, label, required }: { icon: typeof FileText; label: string; required?: boolean }) {
@@ -120,6 +129,12 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
         horario_partida: procedure.horario_partida ? procedure.horario_partida.slice(0, 5) : '',
         partida_descricao: procedure.partida_descricao || '',
         tipo: inferredTipo,
+        // Paridade FULL
+        kickoff_at: procedure.kickoff_at || null,
+        fixture_id: procedure.fixture_id ?? null,
+        esporte: procedure.esporte || 'futebol',
+        cenario_b_cash: procedure.cenario_b_cash != null ? String(procedure.cenario_b_cash) : '',
+        freebet_reference_id: procedure.freebet_reference_id || null,
       });
     } else {
       setFormData({ ...emptyForm, procedure_number: suggestedNextNumber, date: new Date().toISOString().slice(0, 10) });
@@ -139,6 +154,26 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
     const alreadyChecked = procedure?.resultado_lucro != null;
     const profitLossToWrite = alreadyChecked ? (procedure!.resultado_lucro as number) : previstoLucro;
 
+    // Paridade FULL — sincroniza data_partida + horario_partida com kickoff_at em
+    // America/Sao_Paulo (fonte de verdade visual). Importante: as colunas legadas
+    // continuam sendo escritas pra não quebrar consultas/relatórios antigos.
+    let data_partida = formData.data_partida || null;
+    let horario_partida = formData.horario_partida || null;
+    if (formData.kickoff_at) {
+      const k = new Date(formData.kickoff_at);
+      data_partida = k.toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }); // YYYY-MM-DD
+      horario_partida = k.toLocaleTimeString('pt-BR', {
+        timeZone: 'America/Sao_Paulo',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      });
+    }
+
+    const cenarioBCash = formData.cenario_b_cash.trim() === ''
+      ? null
+      : (parseFloat(formData.cenario_b_cash) || 0);
+
     const dataToSubmit = {
       date: formData.date,
       procedure_number: formData.procedure_number,
@@ -156,12 +191,19 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
       is_favorite: formData.is_favorite,
       created_by: null,
       // Paridade FreeBet Pro
-      data_partida: formData.data_partida || null,
-      horario_partida: formData.horario_partida || null,
+      data_partida,
+      horario_partida,
       partida_descricao: formData.partida_descricao || null,
       tipo: formData.tipo,
       lucro_prejuizo_previsto: previstoLucro,
       freebet_valor_previsto: showFreebetFields ? previstoFB : null,
+      // Paridade FULL FreeBet Pro
+      kickoff_at: formData.kickoff_at || null,
+      fixture_id: formData.fixture_id ?? null,
+      esporte: formData.esporte || 'futebol',
+      cenario_b_cash: cenarioBCash,
+      // QUEIMAR_FB: preserva o vínculo UUID com a origem
+      freebet_reference_id: formData.tipo === 'QUEIMAR_FB' ? formData.freebet_reference_id : null,
     };
 
     try {
@@ -275,40 +317,63 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
               </div>
             </div>
 
-            {/* Section: Jogo / Evento (paridade FreeBet Pro §8.2) */}
+            {/* Section: Jogo / Evento (paridade FULL FreeBet Pro doc 02 — autocomplete API-Football) */}
             <div>
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-1 h-4 rounded-full bg-amber-400" />
                 <span className="text-xs font-semibold uppercase tracking-widest text-amber-400">Jogo / Evento</span>
+                <span className="text-[10px] text-muted-foreground ml-2">(autocomplete via API-Football)</span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-2">
+                  <FieldLabel icon={Trophy} label="Partida (busca ao vivo)" />
+                  <EventoAutocomplete
+                    partidaDescricao={formData.partida_descricao}
+                    fixtureId={formData.fixture_id}
+                    kickoffAt={formData.kickoff_at}
+                    onChange={(p) => setFormData((f) => ({
+                      ...f,
+                      partida_descricao: p.partida_descricao,
+                      fixture_id: p.fixture_id,
+                      kickoff_at: p.kickoff_at,
+                      esporte: p.esporte ?? f.esporte,
+                    }))}
+                    inputClassName="bg-amber-500/5 border-amber-500/20 focus:border-amber-500/50 h-9 text-sm pr-10"
+                  />
+                </div>
                 <div>
-                  <FieldLabel icon={Calendar} label="Data da partida" />
+                  <FieldLabel icon={Activity} label="Esporte" />
+                  <Select value={formData.esporte} onValueChange={(v) => setFormData({ ...formData, esporte: v })}>
+                    <SelectTrigger
+                      className="bg-amber-500/5 border-amber-500/20 focus:border-amber-500/50 h-9 text-sm"
+                      data-testid="select-esporte"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PROCEDURE_SPORTS.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                <div>
+                  <FieldLabel icon={Calendar} label="Data (manual fallback)" />
                   <Input
                     type="date"
                     value={formData.data_partida}
-                    onChange={(e) => setFormData({ ...formData, data_partida: e.target.value })}
+                    onChange={(e) => setFormData({ ...formData, data_partida: e.target.value, kickoff_at: null, fixture_id: null })}
                     data-testid="input-data-partida"
                     className="bg-amber-500/5 border-amber-500/20 focus:border-amber-500/50 h-9 text-sm"
                   />
                 </div>
                 <div>
-                  <FieldLabel icon={Clock} label="Horário da partida" />
+                  <FieldLabel icon={Clock} label="Horário (manual fallback)" />
                   <Input
                     type="time"
                     value={formData.horario_partida}
-                    onChange={(e) => setFormData({ ...formData, horario_partida: e.target.value })}
+                    onChange={(e) => setFormData({ ...formData, horario_partida: e.target.value, kickoff_at: null, fixture_id: null })}
                     data-testid="input-horario-partida"
-                    className="bg-amber-500/5 border-amber-500/20 focus:border-amber-500/50 h-9 text-sm"
-                  />
-                </div>
-                <div>
-                  <FieldLabel icon={Trophy} label="Descrição (time x time)" />
-                  <Input
-                    value={formData.partida_descricao}
-                    onChange={(e) => setFormData({ ...formData, partida_descricao: e.target.value })}
-                    data-testid="input-partida-descricao"
-                    placeholder="Ex: Flamengo x Palmeiras"
                     className="bg-amber-500/5 border-amber-500/20 focus:border-amber-500/50 h-9 text-sm"
                   />
                 </div>
@@ -391,14 +456,29 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
               {showFreebetFields && (
                 <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <FieldLabel icon={Ticket} label="Referência Freebet" />
-                    <Input
-                      value={formData.freebet_reference}
-                      onChange={(e) => setFormData({ ...formData, freebet_reference: e.target.value })}
-                      data-testid="input-freebet-reference"
-                      placeholder={formData.tipo === 'QUEIMAR_FB' ? 'Nº do procedimento que gerou a FB' : 'Referência...'}
-                      className="bg-purple-500/5 border-purple-500/20 focus:border-purple-500/50 h-9 text-sm"
-                    />
+                    <FieldLabel icon={Ticket} label={formData.tipo === 'QUEIMAR_FB' ? 'Origem da Freebet' : 'Referência Freebet'} required={formData.tipo === 'QUEIMAR_FB'} />
+                    {formData.tipo === 'QUEIMAR_FB' ? (
+                      <OrigemFreebetAutocomplete
+                        procedures={allProcedures}
+                        currentId={procedure?.id ?? null}
+                        refValue={formData.freebet_reference}
+                        refId={formData.freebet_reference_id}
+                        onChange={(next) => setFormData({
+                          ...formData,
+                          freebet_reference: next.freebet_reference,
+                          freebet_reference_id: next.freebet_reference_id,
+                        })}
+                        inputClassName="bg-purple-500/5 border-purple-500/20 focus:border-purple-500/50 h-9 text-sm pr-8"
+                      />
+                    ) : (
+                      <Input
+                        value={formData.freebet_reference}
+                        onChange={(e) => setFormData({ ...formData, freebet_reference: e.target.value })}
+                        data-testid="input-freebet-reference"
+                        placeholder="Referência..."
+                        className="bg-purple-500/5 border-purple-500/20 focus:border-purple-500/50 h-9 text-sm"
+                      />
+                    )}
                   </div>
                   <div>
                     <FieldLabel icon={Ticket} label="Valor Freebet (previsto)" />
@@ -412,6 +492,22 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
                       className="bg-purple-500/5 border-purple-500/20 focus:border-purple-500/50 h-9 text-sm"
                     />
                   </div>
+                </div>
+              )}
+
+              {/* Cenário B (cash) — só faz sentido pra GANHAR_FB com hedge (paridade doc 01) */}
+              {formData.tipo === 'GANHAR_FB' && (
+                <div className="mt-3">
+                  <FieldLabel icon={Shield} label="Cenário B — cash do hedge (opcional)" />
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={formData.cenario_b_cash}
+                    onChange={(e) => setFormData({ ...formData, cenario_b_cash: e.target.value })}
+                    data-testid="input-cenario-b-cash"
+                    placeholder="Ex: 25.00 (lucro/prejuízo no cenário em que NÃO ganha a FB)"
+                    className="bg-purple-500/5 border-purple-500/20 focus:border-purple-500/50 h-9 text-sm"
+                  />
                 </div>
               )}
             </div>

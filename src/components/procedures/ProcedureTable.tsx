@@ -5,6 +5,7 @@ import { Star, Pencil, Trash2, ExternalLink, Tag, Archive, ArchiveRestore, Troph
 import { Procedure } from '@/types/procedures';
 import { formatProcedureDate, translateCategory } from '@/lib/procedureUtils';
 import { canCheckResult } from '@/lib/procedureGameTime';
+import { KickoffBadge } from './KickoffBadge';
 
 interface ProcedureTableProps {
   procedures: Procedure[];
@@ -106,11 +107,14 @@ export function ProcedureTable({ procedures, visibleColumns, onEdit, onDelete, o
                 <TableCell className="text-xs text-muted-foreground py-2 px-2 max-w-[100px] truncate">{proc.promotion_name || '—'}</TableCell>
               )}
               {visibleColumns.includes('partida_descricao') && (
-                <TableCell className="text-xs text-muted-foreground py-2 px-2 max-w-[140px] truncate">
+                <TableCell className="text-xs text-muted-foreground py-2 px-2 max-w-[160px]">
                   {proc.partida_descricao ? (
-                    <span title={`${proc.data_partida || ''} ${proc.horario_partida || ''}`.trim()}>
-                      {proc.partida_descricao}
-                    </span>
+                    <div className="flex flex-col gap-0.5 min-w-0">
+                      <span className="truncate" title={`${proc.data_partida || ''} ${proc.horario_partida || ''}`.trim()}>
+                        {proc.partida_descricao}
+                      </span>
+                      <KickoffBadge procedure={proc} />
+                    </div>
                   ) : (
                     <span className="text-muted-foreground/40">—</span>
                   )}

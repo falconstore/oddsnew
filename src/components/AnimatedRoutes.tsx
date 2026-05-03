@@ -16,6 +16,7 @@ import AdminUsers from '@/pages/admin/Users';
 import AdminLogs from '@/pages/admin/Logs';
 import ScraperStatus from '@/pages/admin/ScraperStatus';
 import ProcedureControl from '@/pages/ProcedureControl';
+import FreebetsGanhas from '@/pages/FreebetsGanhas';
 import BetbraAffiliate from '@/pages/BetbraAffiliate';
 import Subscriptions from '@/pages/Subscriptions';
 
@@ -176,6 +177,13 @@ export function AnimatedRoutes() {
           <RequireAuth pageKey={PAGE_KEYS.PROCEDURE_CONTROL}>
             <PageTransition>
               <ProcedureControl />
+            </PageTransition>
+          </RequireAuth>
+        } />
+        <Route path="/procedures/freebets-ganhas" element={
+          <RequireAuth pageKey={PAGE_KEYS.PROCEDURE_CONTROL}>
+            <PageTransition>
+              <FreebetsGanhas />
             </PageTransition>
           </RequireAuth>
         } />

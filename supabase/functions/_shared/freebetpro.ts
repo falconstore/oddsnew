@@ -35,6 +35,11 @@ type ProcRow = Record<string, unknown> & {
   telegram_link: string | null;
   freebet_reference_id: string | null;
   archived: boolean | null;
+  // Paridade FULL (doc 01/02)
+  kickoff_at: string | null;
+  fixture_id: number | null;
+  esporte: string | null;
+  cenario_b_cash: number | null;
 };
 
 const CATEGORIA_MAP: Record<string, string> = {
@@ -83,6 +88,11 @@ export function buildUpsertPayload(p: ProcRow) {
     link_telegram: p.telegram_link,
     external_referencia_id: p.freebet_reference_id, // null quando freebet_reference é texto livre
     arquivado: !!p.archived,
+    // Paridade FULL com FreeBet Pro
+    kickoff_at: p.kickoff_at,                  // ISO-UTC; FreeBet usa pra badge AO VIVO
+    fixture_id: p.fixture_id,                  // API-Football id (link bidirecional)
+    esporte: p.esporte || "futebol",
+    cenario_b_cash: dec(p.cenario_b_cash),     // hedge cash do cenário B (GANHAR_FB c/ proteção)
   };
 }
 

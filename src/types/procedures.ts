@@ -60,6 +60,11 @@ export interface Procedure {
   freebetpro_last_request_id: string | null;
   freebet_reference_id: string | null;
   editado_por: string | null;
+  // Paridade FULL FreeBet Pro (doc 02 — autocomplete API-Football, doc 01 — esporte + cenário B)
+  kickoff_at: string | null;
+  fixture_id: number | null;
+  esporte: string;
+  cenario_b_cash: number | null;
 }
 
 export interface ProcedureFilters {
@@ -97,6 +102,12 @@ export interface ProcedureFormData {
   horario_partida: string;
   partida_descricao: string;
   tipo: ProcedureType;
+  // Paridade FULL FreeBet Pro
+  kickoff_at: string | null;       // ISO-UTC; preenchido pelo autocomplete
+  fixture_id: number | null;       // API-Football id; null quando texto manual
+  esporte: string;                 // default 'futebol'
+  cenario_b_cash: string;          // numeric; '' = sem cenário B
+  freebet_reference_id: string | null; // UUID origem (QUEIMAR_FB)
 }
 
 export interface ProcedureResultFormData {
@@ -124,6 +135,18 @@ export const PROCEDURE_STATUSES: ProcedureStatus[] = [
   'Aposta Sem Risco',
   'Referência Faltando',
   'Falta Girar Freebet'
+];
+
+// Esportes suportados (paridade doc 01). Hoje só "futebol" tem autocomplete via API-Football,
+// mas o campo aceita os outros pra cadastro manual.
+export const PROCEDURE_SPORTS: { value: string; label: string }[] = [
+  { value: 'futebol',     label: 'Futebol' },
+  { value: 'basquete',    label: 'Basquete' },
+  { value: 'tenis',       label: 'Tênis' },
+  { value: 'volei',       label: 'Vôlei' },
+  { value: 'mma',         label: 'MMA' },
+  { value: 'esports',     label: 'eSports' },
+  { value: 'outro',       label: 'Outro' },
 ];
 
 export const PROCEDURE_TYPES: { value: ProcedureType; label: string; description: string }[] = [
