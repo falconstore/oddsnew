@@ -1,0 +1,241 @@
+📘 BetShark Pro × FreeBet PRO — Paridade do Admin Fluxo de Procedimentos
+Para: Time técnico BetShark
+De: FreeBet PRO
+Data: 03/05/2026
+Objetivo: Documentar o fluxo COMPLETO de um procedimento no admin do FreeBet PRO pra que vocês possam replicar a mesma experiência no admin de vocês, alimentando a integração com payloads corretos.
+
+ 1.⁠ ⁠Visão geral
+Um procedimento no FreeBet PRO percorre 5 etapas:
+
+ 1.⁠ ⁠CRIAR  →  2. PUBLICAR  →  3. FECHAR RESULTADO  →  4. (opcional) ENCADEAR FB  →  5. CONCILIAR
+
+A integração com vocês cobre todas as 5 etapas via 4 endpoints:
+
+POST /procedimentos — criar
+PATCH /procedimentos/{external_id} — atualizar campos / reenviar
+POST /procedimentos/{external_id}/resultado — fechar
+POST /procedimentos/{external_id}/arquivar — arquivar
+Vocês já implementaram o POST inicial com sucesso. Esse documento detalha as 4 telas do admin do FreeBet PRO que vocês precisam replicar pra alimentar todos os endpoints corretamente.
+
+ 2.⁠ ⁠Os 3 tipos de procedimento
+Todo procedimento se enquadra em UM dos 3 tipos:
+
+Tipo	Quando usar	Campos-chave	Lucro real vem de
+SEM_FREEBET (tipo: "NORMAL")	Operação normal sem FB envolvida	lucro_prejuizo	Resultado direto
+GANHAR_FREEBET (tipo: "GANHAR_FB")	Vai apostar pra GANHAR uma freebet	freebet_valor (FB que vai ganhar) + lucro_prejuizo (custo do hedge, geralmente negativo)	Queima futura da FB
+QUEIMAR_FREEBET (tipo: "QUEIMAR_FB")	Vai usar uma FB já ganha	freebet_valor (valor da FB sendo queimada) + lucro_prejuizo (lucro líquido esperado) + procedimento_referencia_external_id (aponta pra FB origem)	Resultado da queima (~70% da FB)
+⚠️ O tipo é deduzido AUTOMATICAMENTE pelo nosso backend baseado em freebet_valor e procedimento_referencia_external_id. Vocês NÃO precisam mandar o campo tipo.
+
+ 3.⁠ ⁠Tela "Novo Procedimento" (cadastro)
+Campos obrigatórios
+[ IDENTIFICAÇÃO ]
+•⁠  ⁠Data Criação        → created_at (auto)
+•⁠  ⁠Nº Procedimento     → numero (auto-incrementado pelo nosso lado)
+•⁠  ⁠Plataforma          → casa_aposta  (Bet365, Betano, Superbet, etc)
+[ PROMOÇÃO ]
+•⁠  ⁠Nome da Promoção    → titulo
+•⁠  ⁠Categoria           → categoria  (PROMOCAO, CASHBACK, FREEBET, SUPERODD, EXTRA, GIROS_GRATIS)
+•⁠  ⁠Status inicial      → "ENVIADO" (default, não mandar nada)
+[ JOGO / EVENTO ]
+•⁠  ⁠Esporte             → esporte
+•⁠  ⁠Data e Hora         → data_partida (YYYY-MM-DD) + horario_partida (HH:MM)
+•⁠  ⁠Evento / Partida    → partida_descricao  ("Time A x Time B")
+[ FREEBET ]  (3 botões mutuamente exclusivos)
+•⁠  ⁠⚪ SEM FREEBET           → não preencher freebet_valor
+•⁠  ⁠🟢 GANHAR FREEBET        → preencher freebet_valor
+•⁠  ⁠🟧 QUEIMAR FREEBET       → preencher freebet_valor + procedimento_referencia_external_id
+                              ↑ dispara autocomplete do inventário (ver seção 5)
+•⁠  ⁠Valor da Freebet (R$)   → freebet_valor (decimal)
+•⁠  ⁠Descrição (opcional)    → descricao_promocao
+[ RESULTADO (esperado, no cadastro) ]
+•⁠  ⁠Lucro/Prejuízo          → lucro_prejuizo  (decimal, pode ser negativo)
+•⁠  ⁠Link Telegram           → link_telegram
+[ TAGS ]
+•⁠  ⁠⚡ Chance Duplo         → dp: true/false  (boolean)
+•⁠  ⁠Tags personalizadas     → etiquetas (array de strings)
+
+Comportamentos importantes
+Ao escolher QUEIMAR FREEBET, o sistema deve abrir um autocomplete listando as FBs disponíveis no inventário (ver seção 5).
+Ao selecionar uma FB do autocomplete, auto-preencher a Plataforma com a casa da FB origem.
+Validação: se tipo=QUEIMAR_FB, o procedimento_referencia_external_id é OBRIGATÓRIO.
+ 4.⁠ ⁠Modal "Definir Resultados" (fechamento)
+Esse modal é o coração do sistema — é onde o resultado real é registrado e o status do procedimento muda.
+
+4.1 Para procedimentos SEM_FREEBET ou GANHAR_FREEBET
+┌─ Bloco A: LUCRO / PREJUÍZO ─────────────┐
+│ Valor cash (decimal, editável)          │
+│ Positivo = lucro                        │
+│ Negativo = prejuízo                     │
+│ 0 = empate                              │
+│ Em branco = não se aplica               │
+│ → resultado_lucro                       │
+└─────────────────────────────────────────┘
+┌─ Bloco B: GANHEI FB (checkbox) ─────────┐
+│ ☐ Ganhei FB                             │
+│ Valor da FB ganha (R$): [    ]          │
+│ "A freebet será registrada como REF #N  │
+│  para queima futura"                    │
+│ → freebet_creditada: SIM                │
+│ → resultado_freebet_ganha (decimal)     │
+└─────────────────────────────────────────┘
+┌─ Bloco C: DUPLO GREEN (checkbox) ───────┐
+│ ☐ Confirmado                            │
+│ Valor do lucro DG (R$): [    ]          │
+│ → duplo_green_confirmado: true          │
+│ → duplo_green_lucro (decimal)           │
+└─────────────────────────────────────────┘
+Observação (opcional, texto livre)
+→ observacao
+
+4.2 Para procedimentos QUEIMAR_FREEBET (DIFERENTE!)
+⚠️ Quando o procedimento é uma queima, o modal precisa ser DIFERENTE pra evitar criar FBs duplicadas no inventário:
+
+┌─ Bloco A: LUCRO / PREJUÍZO ─────────────┐
+│ Valor cash (editável)                   │
+│ → resultado_lucro                       │
+└─────────────────────────────────────────┘
+┌─ Bloco B: FREEBET QUEIMADA (READ-ONLY) ─┐  ← Substitui o "Ganhei FB"
+│ REF #7 · R$ 20,00 · BET365              │
+│ Alianza Universidad x Santos            │
+│ (não editável)                          │
+│ → NÃO mandar freebet_creditada nem      │
+│   resultado_freebet_ganha no payload    │
+└─────────────────────────────────────────┘
+┌─ Bloco C: DUPLO GREEN ──────────────────┐
+│ (igual ao 4.1 — pode rolar DG na queima)│
+└─────────────────────────────────────────┘
+┌─ Bloco D: RESUMO DO PAR (READ-ONLY) ────┐  ← NOVO bloco
+│ Etapa 1 (#7): −R$ 5,00                  │
+│ Etapa 2 (#8): +R$ 14,00                 │
+│ ─────────────────────                   │
+│ LÍQUIDO DO PAR: +R$ 9,00 🟢              │
+└─────────────────────────────────────────┘
+Observação (opcional)
+→ observacao
+
+4.3 Endpoint chamado
+Quando o usuário clica "Salvar resultado":
+
+POST /api/integracoes/betshark/v1/procedimentos/{external_id}/resultado
+Content-Type: application/json
+X-BetShark-Key-Id: betshark_live_...
+X-BetShark-Timestamp: <unix epoch ms>
+X-BetShark-Signature: <HMAC-SHA256>
+{
+  "resultado_lucro": -5.00,           // Bloco A
+  "freebet_creditada": "SIM",         // Bloco B (só GANHAR_FB / SEM_FB)
+  "resultado_freebet_ganha": 20.00,   // Bloco B (só GANHAR_FB / SEM_FB)
+  "duplo_green_confirmado": true,     // Bloco C
+  "duplo_green_lucro": 45.00,         // Bloco C (só se confirmado=true)
+  "observacao": "jogo cancelado..."
+}
+
+⚠️ Para QUEIMAR_FB, NÃO enviar freebet_creditada nem resultado_freebet_ganha — isso causa o bug da FB duplicada.
+
+4.4 State Machine de status (calculado pelo nosso lado)
+Vocês NÃO precisam calcular nem enviar status_operacao. A gente faz automaticamente baseado no fechamento:
+
+Cenário	freebet_creditada	Status resultante
+Sem fechamento	(ausente)	ENVIADO
+Cenário A puro	NAO	LUCRO_DIRETO
+Cenário B (pegou FB)	SIM	FALTA_GIRAR_FB
+Queima fechada	(ausente, é QUEIMAR_FB)	LUCRO_DIRETO
+FB queimada 100%	(auto)	CONCLUIDA (calculado quando saldo da REF zera)
+ 5.⁠ ⁠Tela "FreeBets Ganhas" (inventário)
+Lista todas as FBs ganhas com status do ciclo. Filtros sugeridos: TODAS / FALTA GIRAR / CONCLUÍDAS.
+
+Colunas
+Coluna	Origem
+REF	numero do procedimento que gerou a FB
+Data	created_at
+Jogo · Casa	partida_descricao + casa_aposta
+Valor FB	resultado_freebet_ganha
+Status / Queima	derivado (Falta Girar / Concluída)
+Lucro Queimada	soma de resultado_lucro dos procedimentos QUEIMAR_FB que referenciam essa FB
+Lucro Líquido	Lucro Queimada + lucro_prejuizo da origem
+Tag "Creditada"	quando freebet_creditada = SIM
+Filtro do autocomplete (seção 3)
+Quando o usuário escolhe QUEIMAR_FB no cadastro, listar SOMENTE FBs que atendam:
+
+WHERE freebet_creditada = 'SIM'
+  AND status_operacao = 'FALTA_GIRAR_FB'
+  AND saldo_restante_da_freebet > 0
+
+Cada item do autocomplete deve mostrar: #N · R$ X,XX · CASA · Jogo · L/P origem
+
+ 6.⁠ ⁠Botão "Reenviar"
+Quando o admin clicar em "Reenviar" no painel de vocês (após editar algum campo importante do procedimento), chamar:
+
+PATCH /api/integracoes/betshark/v1/procedimentos/{external_id}
+{
+  "odd_minima": "1.95",            // campos que mudaram
+  "descricao_promocao": "...novo",
+  "reenviar": true                  // FLAG QUE DISPARA O BROADCAST
+}
+
+Quando reenviar: true:
+
+Atualiza os campos enviados
+Marca reenviado_em = now() e incrementa reenviado_count
+Dispara novo broadcast no Telegram pros clientes PRO
+Card aparece com tarja "Reenviado às HH:MM" no catálogo
+Sem o flag (PATCH normal): atualiza silenciosamente, sem notificar.
+
+ 7.⁠ ⁠Botão "Gerar Relatório"
+Posicionar no canto superior direito do admin de procedimentos. Ao clicar, abre modal com 2 colunas:
+
+ESQUERDA: preview do texto pronto + botão "Copiar texto"
+DIREITA: campo editável "FREEBETS PENDENTES DE CONVERSÃO" (textarea livre)
+RODAPÉ: contador "X procedimentos incluídos" + total + botão "Copiar Relatório"
+Formato do texto
+💵📊 Relatório Diário de Lucros ( DD/MM/AAAA )
+💵 SUPER ODD / LUCRO DIRETO :
+10,00 Bet365
+25,00 Betano
+🩶 LUCROS COM FREEBETS :
+14,00 Bet365   ← lucro real das queimas
+🎯 DUPLO GREEN :
+45,00 ( Alianza Universidad x Santos )
+⏳ FREEBETS PENDENTES DE CONVERSÃO :
+[texto editável]
+📅 LUCRO TOTAL DO DIA = R$ XXX,XX
+
+Regras de agrupamento
+SUPER ODD / LUCRO DIRETO: categoria != DUPLO_GREEN AND tipo != QUEIMAR_FB AND lucro_efetivo > 0. Formato linha: VALOR CASA.
+LUCROS COM FREEBETS: tipo == QUEIMAR_FB AND categoria != DUPLO_GREEN. Formato linha: VALOR CASA.
+DUPLO GREEN: categoria == DUPLO_GREEN. Formato linha: VALOR ( EVENTO ).
+Cálculo do lucro_efetivo
+SE resultado_lucro existe e != 0  →  usa ele
+SENÃO                              →  usa lucro_prejuizo
+PARA DUPLO_GREEN                   →  prefere duplo_green_lucro se existir
+
+LUCRO TOTAL DO DIA
+Soma lucro_efetivo de TODAS as 3 seções, com 2 casas decimais e vírgula como separador.
+
+ 8.⁠ ⁠Resumo dos endpoints
+POST   /api/integracoes/betshark/v1/procedimentos
+  → criar (etapa 1 do fluxo)
+PATCH  /api/integracoes/betshark/v1/procedimentos/{external_id}
+  → atualizar campos
+  → com "reenviar": true → dispara broadcast Telegram
+POST   /api/integracoes/betshark/v1/procedimentos/{external_id}/resultado
+  → fechar (etapa 3 do fluxo)
+  → ATENÇÃO ao caso QUEIMAR_FB (seção 4.2)
+POST   /api/integracoes/betshark/v1/procedimentos/{external_id}/arquivar
+  → arquivar/desarquivar
+
+ 9.⁠ ⁠Checklist de paridade pro admin de vocês
+Marquem o que JÁ tem aí:
+
+ Modal "Novo Procedimento" com os 3 botões SEM / GANHAR / QUEIMAR FB
+ Autocomplete de FBs disponíveis ao escolher QUEIMAR_FB
+ Auto-preencher Plataforma ao selecionar FB do autocomplete
+ Modal "Definir Resultados" com Bloco A (cash) + Bloco B (Ganhei FB) + Bloco C (DG) + Observação
+ Variação do modal pra QUEIMAR_FB (Bloco B vira read-only "FB QUEIMADA" + Bloco D resumo do par)
+ Aba "FreeBets Ganhas" com inventário e filtro Falta Girar / Concluídas
+ Botão "Reenviar" no procedimento (com PATCH reenviar: true)
+ Botão "Gerar Relatório" com formato pt-BR e seções DG / FB / Direto
+10.⁠ ⁠Perguntas pra vocês confirmarem
+Vocês já têm botão "Confirmar Duplo Green" no fechamento? (campo duplo_green_confirmado)
+Vocês já têm botão "Reenviar" que dispara update? Hoje, o que ele faz no Supabase de vocês?
+O edge
