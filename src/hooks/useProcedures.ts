@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabaseProcedures, isProceduresSupabaseConfigured } from '@/lib/supabaseProcedures';
 import { Procedure, FreebetCreditada } from '@/types/procedures';
 import { toast } from '@/hooks/use-toast';
+import { syncProcedureBestEffort } from '@/lib/freebetproSync';
 
 const PROCEDURES_KEY = ['procedures'];
 
@@ -53,8 +54,10 @@ export function useCreateProcedure() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: PROCEDURES_KEY });
+      // §8.5 — sync best-effort com FreeBet Pro
+      if (data?.id) syncProcedureBestEffort(data.id, 'upsert');
       toast({
         title: 'Sucesso',
         description: 'Procedimento criado com sucesso!',
@@ -90,8 +93,10 @@ export function useUpdateProcedure() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: PROCEDURES_KEY });
+      // §8.5 — sync best-effort com FreeBet Pro
+      if (data?.id) syncProcedureBestEffort(data.id, 'upsert');
       toast({
         title: 'Sucesso',
         description: 'Procedimento atualizado com sucesso!',
@@ -165,8 +170,10 @@ export function useArchiveProcedure() {
       if (error) throw error;
       return data;
     },
-    onSuccess: (_data, variables) => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: PROCEDURES_KEY });
+      // §8.5 — sync best-effort com FreeBet Pro (archive/unarchive)
+      if (data?.id) syncProcedureBestEffort(data.id, 'archive');
       toast({
         title: variables.archived ? 'Procedimento arquivado' : 'Procedimento restaurado',
         description: variables.archived
@@ -228,8 +235,10 @@ export function useSetProcedureResult() {
       if (error) throw error;
       return { data, auto_status };
     },
-    onSuccess: ({ auto_status }) => {
+    onSuccess: ({ data, auto_status }) => {
       queryClient.invalidateQueries({ queryKey: PROCEDURES_KEY });
+      // §8.5 — sync best-effort com FreeBet Pro (resultado)
+      if (data?.id) syncProcedureBestEffort(data.id, 'result');
       toast({
         title: 'Resultado registrado',
         description: `Status atualizado pra "${auto_status}".`,

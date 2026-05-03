@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Star, Pencil, Trash2, ExternalLink, Tag, Calendar, Building2, Archive, ArchiveRestore, Trophy, Clock } from 'lucide-react';
+import { Star, Pencil, Trash2, ExternalLink, Tag, Calendar, Building2, Archive, ArchiveRestore, Trophy, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Procedure } from '@/types/procedures';
 import { formatProcedureDate, translateCategory } from '@/lib/procedureUtils';
 import { canCheckResult } from '@/lib/procedureGameTime';
@@ -60,6 +60,24 @@ export function ProcedureMobileCards({ procedures, onEdit, onDelete, onToggleFav
                     <Badge variant="outline" className="border-muted-foreground/30 text-muted-foreground text-[10px] px-1.5 py-0">
                       <Archive className="w-2.5 h-2.5 mr-1" /> Arquivado
                     </Badge>
+                  )}
+                  {proc.freebetpro_synced_at && !proc.freebetpro_last_error && (
+                    <span
+                      title={`Sincronizado com FreeBet Pro${proc.freebetpro_numero ? ` (#${proc.freebetpro_numero})` : ''}`}
+                      data-testid={`icon-fbp-synced-mobile-${proc.id}`}
+                      className="inline-flex"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400/70" />
+                    </span>
+                  )}
+                  {proc.freebetpro_last_error && (
+                    <span
+                      title={`Erro FreeBet Pro: ${proc.freebetpro_last_error}`}
+                      data-testid={`icon-fbp-error-mobile-${proc.id}`}
+                      className="inline-flex"
+                    >
+                      <AlertCircle className="w-3.5 h-3.5 text-amber-400/80" />
+                    </span>
                   )}
                 </div>
                 <div className="flex items-center gap-3 mt-1 flex-wrap">

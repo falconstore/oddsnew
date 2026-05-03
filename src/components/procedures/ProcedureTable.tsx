@@ -1,7 +1,7 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Star, Pencil, Trash2, ExternalLink, Tag, Archive, ArchiveRestore, Trophy } from 'lucide-react';
+import { Star, Pencil, Trash2, ExternalLink, Tag, Archive, ArchiveRestore, Trophy, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Procedure } from '@/types/procedures';
 import { formatProcedureDate, translateCategory } from '@/lib/procedureUtils';
 import { canCheckResult } from '@/lib/procedureGameTime';
@@ -81,6 +81,22 @@ export function ProcedureTable({ procedures, visibleColumns, onEdit, onDelete, o
                 <TableCell className="py-2 px-2">
                   <span className="text-sm font-bold text-foreground">{proc.procedure_number}</span>
                   {proc.archived && <Archive className="w-3 h-3 inline ml-1 text-muted-foreground/60" />}
+                  {proc.freebetpro_synced_at && !proc.freebetpro_last_error && (
+                    <span
+                      title={`Sincronizado com FreeBet Pro${proc.freebetpro_numero ? ` (#${proc.freebetpro_numero})` : ''}`}
+                      data-testid={`icon-fbp-synced-${proc.id}`}
+                    >
+                      <CheckCircle2 className="w-3 h-3 inline ml-1 text-emerald-400/70" />
+                    </span>
+                  )}
+                  {proc.freebetpro_last_error && (
+                    <span
+                      title={`Erro FreeBet Pro: ${proc.freebetpro_last_error}`}
+                      data-testid={`icon-fbp-error-${proc.id}`}
+                    >
+                      <AlertCircle className="w-3 h-3 inline ml-1 text-amber-400/80" />
+                    </span>
+                  )}
                 </TableCell>
               )}
               {visibleColumns.includes('platform') && (
