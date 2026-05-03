@@ -1,12 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { X, Star, FileText, Calendar, Building2, Tag, TrendingUp, Link, Hash, Ticket, Zap } from 'lucide-react';
+import { X, Star, FileText, Calendar, Building2, Tag, TrendingUp, Link, Hash, Ticket, Zap, Trophy, Clock } from 'lucide-react';
 import { TagManager } from './TagManager';
-import { Procedure, ProcedureFormData, PROCEDURE_CATEGORIES, PROCEDURE_STATUSES } from '@/types/procedures';
+import {
+  Procedure,
+  ProcedureFormData,
+  ProcedureType,
+  PROCEDURE_CATEGORIES,
+  PROCEDURE_STATUSES,
+  PROCEDURE_TYPES,
+} from '@/types/procedures';
 import { useCreateProcedure, useUpdateProcedure, useProcedures } from '@/hooks/useProcedures';
 import { getAllTags, getAllPlatforms } from '@/lib/procedureUtils';
 import { useBookmakers } from '@/hooks/useOddsData';
@@ -29,7 +36,11 @@ const emptyForm: ProcedureFormData = {
   telegram_link: '',
   dp: false,
   tags: [],
-  is_favorite: false
+  is_favorite: false,
+  data_partida: '',
+  horario_partida: '',
+  partida_descricao: '',
+  tipo: 'SEM_FB',
 };
 
 function FieldLabel({ icon: Icon, label, required }: { icon: typeof FileText; label: string; required?: boolean }) {
@@ -55,14 +66,11 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
     .sort((a, b) => a.priority - b.priority)
     .map(b => b.name);
 
-  // Platforms from procedures not already in bookmakers list
   const procedurePlatforms = getAllPlatforms(allProcedures);
   const extraPlatforms = procedurePlatforms.filter(
     p => !activeBookmakerNames.some(n => n.toLowerCase() === p.toLowerCase())
   );
 
-  // Build combined options: bookmakers first, then extra from procedures
-  // If editing and platform not in list anywhere, prepend it with a "(valor salvo)" label
   const allKnownPlatforms = [...activeBookmakerNames, ...extraPlatforms];
   const hasLegacyPlatform = !!formData.platform && !allKnownPlatforms.some(
     n => n.toLowerCase() === formData.platform.toLowerCase()
@@ -75,8 +83,25 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
 
   const availableTags = getAllTags(allProcedures);
 
+  // Próximo Nº livre (paridade FreeBet Pro §8.2)
+  const suggestedNextNumber = useMemo(() => {
+    const nums = allProcedures
+      .map(p => parseInt(p.procedure_number, 10))
+      .filter(n => !isNaN(n));
+    return nums.length ? String(Math.max(...nums) + 1) : '1';
+  }, [allProcedures]);
+
   useEffect(() => {
     if (procedure) {
+      // Backfill UX: dados pré-migration não tinham `tipo` setado (default 'SEM_FB' no DB).
+      // Inferimos pela presença de freebet_value/reference pra não esconder esses campos
+      // no modal (e evitar limpá-los silenciosamente ao salvar).
+      const hasLegacyFB = !procedure.tipo || procedure.tipo === 'SEM_FB';
+      const fbVal = procedure.freebet_valor_previsto ?? procedure.freebet_value;
+      const inferredTipo = hasLegacyFB && ((fbVal && fbVal > 0) || procedure.freebet_reference)
+        ? 'GANHAR_FB'
+        : (procedure.tipo || 'SEM_FB');
+
       setFormData({
         date: procedure.date || '',
         procedure_number: procedure.procedure_number || '',
@@ -85,20 +110,35 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
         category: procedure.category || 'Promoção',
         status: procedure.status || 'Enviado',
         freebet_reference: procedure.freebet_reference || '',
-        freebet_value: procedure.freebet_value?.toString() || '',
-        profit_loss: procedure.profit_loss?.toString() || '',
+        freebet_value: fbVal?.toString() || '',
+        profit_loss: (procedure.lucro_prejuizo_previsto ?? procedure.profit_loss)?.toString() || '',
         telegram_link: procedure.telegram_link || '',
         dp: procedure.dp || false,
         tags: procedure.tags || [],
-        is_favorite: procedure.is_favorite || false
+        is_favorite: procedure.is_favorite || false,
+        data_partida: procedure.data_partida || '',
+        horario_partida: procedure.horario_partida ? procedure.horario_partida.slice(0, 5) : '',
+        partida_descricao: procedure.partida_descricao || '',
+        tipo: inferredTipo,
       });
     } else {
-      setFormData(emptyForm);
+      setFormData({ ...emptyForm, procedure_number: suggestedNextNumber, date: new Date().toISOString().slice(0, 10) });
     }
-  }, [procedure]);
+  }, [procedure, suggestedNextNumber]);
+
+  const showFreebetFields = formData.tipo !== 'SEM_FB';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const previstoLucro = parseFloat(formData.profit_loss) || 0;
+    const previstoFB = formData.freebet_value ? parseFloat(formData.freebet_value) : null;
+
+    // Se o procedimento já foi conferido (resultado_lucro != null), o `profit_loss`
+    // deve continuar refletindo o REALIZADO (resultado_lucro), não o previsto. Sem isso,
+    // editar a previsão depois de Conferir dessincronizava os KPIs/gráficos legados.
+    const alreadyChecked = procedure?.resultado_lucro != null;
+    const profitLossToWrite = alreadyChecked ? (procedure!.resultado_lucro as number) : previstoLucro;
+
     const dataToSubmit = {
       date: formData.date,
       procedure_number: formData.procedure_number,
@@ -106,40 +146,43 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
       promotion_name: formData.promotion_name || null,
       category: formData.category,
       status: formData.status,
-      freebet_reference: formData.freebet_reference || null,
-      freebet_value: formData.freebet_value ? parseFloat(formData.freebet_value) : null,
-      profit_loss: parseFloat(formData.profit_loss) || 0,
+      freebet_reference: showFreebetFields ? (formData.freebet_reference || null) : null,
+      // Mantemos as colunas legadas espelhadas (gráficos/KPIs leem profit_loss/freebet_value)
+      freebet_value: showFreebetFields ? previstoFB : null,
+      profit_loss: profitLossToWrite,
       telegram_link: formData.telegram_link || null,
       dp: formData.dp,
       tags: formData.tags,
       is_favorite: formData.is_favorite,
-      created_by: null
+      created_by: null,
+      // Paridade FreeBet Pro
+      data_partida: formData.data_partida || null,
+      horario_partida: formData.horario_partida || null,
+      partida_descricao: formData.partida_descricao || null,
+      tipo: formData.tipo,
+      lucro_prejuizo_previsto: previstoLucro,
+      freebet_valor_previsto: showFreebetFields ? previstoFB : null,
     };
+
     try {
       if (procedure) {
         await updateProcedure.mutateAsync({ id: procedure.id, ...dataToSubmit });
       } else {
-        await createProcedure.mutateAsync(dataToSubmit);
+        await createProcedure.mutateAsync(dataToSubmit as Omit<Procedure, 'id' | 'created_date' | 'updated_date'>);
       }
       onClose();
     } catch {
-      // handled in hooks
+      /* handled in hooks */
     }
   };
 
-  const showFreebetFields = formData.category === 'Promoção' || formData.category === 'Freebet';
   const isLoading = createProcedure.isPending || updateProcedure.isPending;
   const isEditing = !!procedure;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/70 backdrop-blur-md"
-        onClick={onClose}
-      />
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={onClose} />
 
-      {/* Modal */}
       <div className="relative w-full max-w-4xl max-h-[90vh] flex flex-col rounded-3xl overflow-hidden border border-white/10 shadow-2xl shadow-black/50 animate-fade-in-up">
         {/* Header */}
         <div className="relative flex-shrink-0 bg-gradient-to-r from-cyan-500/10 via-primary/5 to-transparent border-b border-white/10 p-5">
@@ -164,6 +207,7 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
                 variant="ghost"
                 size="sm"
                 onClick={() => setFormData({ ...formData, is_favorite: !formData.is_favorite })}
+                data-testid="button-toggle-favorite-modal"
                 className={`h-9 w-9 rounded-xl transition-all ${formData.is_favorite ? 'text-yellow-400 bg-yellow-400/10 hover:bg-yellow-400/20' : 'text-muted-foreground hover:text-yellow-400 hover:bg-yellow-400/10'}`}
               >
                 <Star className={`w-4.5 h-4.5 ${formData.is_favorite ? 'fill-yellow-400' : ''}`} />
@@ -173,6 +217,7 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
                 size="icon"
                 onClick={onClose}
                 disabled={isLoading}
+                data-testid="button-close-modal"
                 className="h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground hover:bg-white/10"
               >
                 <X className="w-4.5 h-4.5" />
@@ -198,6 +243,7 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
                     value={formData.date}
                     onChange={(e) => setFormData({ ...formData, date: e.target.value })}
                     required
+                    data-testid="input-date"
                     className="bg-white/5 border-white/10 focus:border-cyan-500/50 focus:ring-cyan-500/20 h-9 text-sm"
                   />
                 </div>
@@ -207,7 +253,8 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
                     value={formData.procedure_number}
                     onChange={(e) => setFormData({ ...formData, procedure_number: e.target.value })}
                     required
-                    placeholder="Ex: 1234"
+                    data-testid="input-procedure-number"
+                    placeholder={`Próximo livre: ${suggestedNextNumber}`}
                     className="bg-white/5 border-white/10 focus:border-cyan-500/50 h-9 text-sm"
                   />
                 </div>
@@ -217,13 +264,53 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
                     value={formData.platform}
                     onValueChange={(v) => setFormData({ ...formData, platform: v })}
                   >
-                    <SelectTrigger className="bg-white/5 border-white/10 focus:border-cyan-500/50 h-9 text-sm">
+                    <SelectTrigger className="bg-white/5 border-white/10 focus:border-cyan-500/50 h-9 text-sm" data-testid="select-platform">
                       <SelectValue placeholder="Selecione..." />
                     </SelectTrigger>
                     <SelectContent>
                       {platformOptions.map((p) => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
+                </div>
+              </div>
+            </div>
+
+            {/* Section: Jogo / Evento (paridade FreeBet Pro §8.2) */}
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-1 h-4 rounded-full bg-amber-400" />
+                <span className="text-xs font-semibold uppercase tracking-widest text-amber-400">Jogo / Evento</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <FieldLabel icon={Calendar} label="Data da partida" />
+                  <Input
+                    type="date"
+                    value={formData.data_partida}
+                    onChange={(e) => setFormData({ ...formData, data_partida: e.target.value })}
+                    data-testid="input-data-partida"
+                    className="bg-amber-500/5 border-amber-500/20 focus:border-amber-500/50 h-9 text-sm"
+                  />
+                </div>
+                <div>
+                  <FieldLabel icon={Clock} label="Horário da partida" />
+                  <Input
+                    type="time"
+                    value={formData.horario_partida}
+                    onChange={(e) => setFormData({ ...formData, horario_partida: e.target.value })}
+                    data-testid="input-horario-partida"
+                    className="bg-amber-500/5 border-amber-500/20 focus:border-amber-500/50 h-9 text-sm"
+                  />
+                </div>
+                <div>
+                  <FieldLabel icon={Trophy} label="Descrição (time x time)" />
+                  <Input
+                    value={formData.partida_descricao}
+                    onChange={(e) => setFormData({ ...formData, partida_descricao: e.target.value })}
+                    data-testid="input-partida-descricao"
+                    placeholder="Ex: Flamengo x Palmeiras"
+                    className="bg-amber-500/5 border-amber-500/20 focus:border-amber-500/50 h-9 text-sm"
+                  />
                 </div>
               </div>
             </div>
@@ -240,6 +327,7 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
                   <Input
                     value={formData.promotion_name}
                     onChange={(e) => setFormData({ ...formData, promotion_name: e.target.value })}
+                    data-testid="input-promotion-name"
                     placeholder="Nome da promoção..."
                     className="bg-white/5 border-white/10 focus:border-primary/50 h-9 text-sm"
                   />
@@ -247,7 +335,7 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
                 <div>
                   <FieldLabel icon={Tag} label="Categoria" required />
                   <Select value={formData.category} onValueChange={(v) => setFormData({ ...formData, category: v })}>
-                    <SelectTrigger className="bg-white/5 border-white/10 focus:border-primary/50 h-9 text-sm">
+                    <SelectTrigger className="bg-white/5 border-white/10 focus:border-primary/50 h-9 text-sm" data-testid="select-category">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -258,7 +346,7 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
                 <div>
                   <FieldLabel icon={FileText} label="Status" required />
                   <Select value={formData.status} onValueChange={(v) => setFormData({ ...formData, status: v })}>
-                    <SelectTrigger className="bg-white/5 border-white/10 focus:border-primary/50 h-9 text-sm">
+                    <SelectTrigger className="bg-white/5 border-white/10 focus:border-primary/50 h-9 text-sm" data-testid="select-status">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -269,53 +357,82 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
               </div>
             </div>
 
-            {/* Section: Freebet (conditional) */}
-            {showFreebetFields && (
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-1 h-4 rounded-full bg-purple-400" />
-                  <span className="text-xs font-semibold uppercase tracking-widest text-purple-400">Freebet</span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Section: Tipo de Freebet (paridade FreeBet Pro §8.2) */}
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-1 h-4 rounded-full bg-purple-400" />
+                <span className="text-xs font-semibold uppercase tracking-widest text-purple-400">Tipo de Freebet</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {PROCEDURE_TYPES.map(({ value, label, description }) => {
+                  const selected = formData.tipo === value;
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setFormData({ ...formData, tipo: value as ProcedureType })}
+                      data-testid={`button-tipo-${value.toLowerCase()}`}
+                      className={`text-left p-3 rounded-xl border transition-all ${
+                        selected
+                          ? 'bg-purple-500/15 border-purple-500/50 text-purple-200'
+                          : 'bg-white/[0.03] border-white/10 text-muted-foreground hover:bg-white/[0.06]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 text-sm font-semibold">
+                        <Ticket className="w-3.5 h-3.5" />
+                        {label}
+                      </div>
+                      <p className="text-[11px] mt-1 opacity-80">{description}</p>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {showFreebetFields && (
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <FieldLabel icon={Ticket} label="Referência Freebet" />
                     <Input
                       value={formData.freebet_reference}
                       onChange={(e) => setFormData({ ...formData, freebet_reference: e.target.value })}
-                      placeholder="Referência..."
+                      data-testid="input-freebet-reference"
+                      placeholder={formData.tipo === 'QUEIMAR_FB' ? 'Nº do procedimento que gerou a FB' : 'Referência...'}
                       className="bg-purple-500/5 border-purple-500/20 focus:border-purple-500/50 h-9 text-sm"
                     />
                   </div>
                   <div>
-                    <FieldLabel icon={Ticket} label="Valor Freebet" />
+                    <FieldLabel icon={Ticket} label="Valor Freebet (previsto)" />
                     <Input
                       type="number"
                       step="0.01"
                       value={formData.freebet_value}
                       onChange={(e) => setFormData({ ...formData, freebet_value: e.target.value })}
+                      data-testid="input-freebet-value"
                       placeholder="0.00"
                       className="bg-purple-500/5 border-purple-500/20 focus:border-purple-500/50 h-9 text-sm"
                     />
                   </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
 
-            {/* Section: Resultado */}
+            {/* Section: Previsão (resultado real entra no modal "Definir Resultados") */}
             <div>
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-1 h-4 rounded-full bg-emerald-400" />
-                <span className="text-xs font-semibold uppercase tracking-widest text-emerald-400">Resultado</span>
+                <span className="text-xs font-semibold uppercase tracking-widest text-emerald-400">Previsão</span>
+                <span className="text-[10px] text-muted-foreground ml-2">(o resultado real é registrado pelo botão "Conferir")</span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 <div>
-                  <FieldLabel icon={TrendingUp} label="Lucro/Prejuízo" required />
+                  <FieldLabel icon={TrendingUp} label="Lucro/Prejuízo previsto" required />
                   <Input
                     type="number"
                     step="0.01"
                     value={formData.profit_loss}
                     onChange={(e) => setFormData({ ...formData, profit_loss: e.target.value })}
                     required
+                    data-testid="input-profit-loss"
                     placeholder="0.00"
                     className="bg-emerald-500/5 border-emerald-500/20 focus:border-emerald-500/50 h-9 text-sm font-mono"
                   />
@@ -325,6 +442,7 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
                   <Input
                     value={formData.telegram_link}
                     onChange={(e) => setFormData({ ...formData, telegram_link: e.target.value })}
+                    data-testid="input-telegram-link"
                     placeholder="https://t.me/..."
                     className="bg-white/5 border-white/10 focus:border-cyan-500/50 h-9 text-sm"
                   />
@@ -335,6 +453,7 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
                       id="dp"
                       checked={formData.dp}
                       onCheckedChange={(checked) => setFormData({ ...formData, dp: checked })}
+                      data-testid="switch-dp"
                     />
                     <Label htmlFor="dp" className="text-sm cursor-pointer flex items-center gap-1.5">
                       <Zap className="w-3.5 h-3.5 text-emerald-400" />
@@ -371,6 +490,7 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
               variant="outline"
               onClick={onClose}
               disabled={isLoading}
+              data-testid="button-cancel-procedure"
               className="border-white/10 hover:bg-white/5 text-sm h-9"
             >
               Cancelar
@@ -379,6 +499,7 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
               type="submit"
               form="procedure-form"
               disabled={isLoading}
+              data-testid="button-save-procedure"
               className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground shadow-lg shadow-primary/20 glow-primary h-9 text-sm px-6 font-semibold"
             >
               {isLoading ? (

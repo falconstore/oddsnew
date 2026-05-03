@@ -16,6 +16,12 @@ export type ProcedureStatus =
   | 'Referência Faltando'
   | 'Falta Girar Freebet';
 
+// Tipo de freebet (paridade com FreeBet Pro §8.1)
+export type ProcedureType = 'SEM_FB' | 'GANHAR_FB' | 'QUEIMAR_FB';
+
+// Crédito de freebet pós-jogo (paridade com FreeBet Pro §8.4)
+export type FreebetCreditada = 'SIM' | 'NAO';
+
 export interface Procedure {
   id: string;
   created_date: string | null;
@@ -34,6 +40,22 @@ export interface Procedure {
   dp: boolean;
   tags: string[];
   is_favorite: boolean;
+  // Paridade FreeBet Pro
+  data_partida: string | null;
+  horario_partida: string | null;
+  partida_descricao: string | null;
+  tipo: ProcedureType;
+  archived: boolean;
+  archived_at: string | null;
+  lucro_prejuizo_previsto: number | null;
+  freebet_valor_previsto: number | null;
+  resultado_lucro: number | null;
+  resultado_freebet_ganha: number | null;
+  freebet_creditada: FreebetCreditada | null;
+  resultado_observacao: string | null;
+  freebetpro_external_id: string | null;
+  freebetpro_synced_at: string | null;
+  freebetpro_last_error: string | null;
 }
 
 export interface ProcedureFilters {
@@ -47,6 +69,9 @@ export interface ProcedureFilters {
   urgent: string;
   hasFreebetValue: string;
   onlyFavorites: boolean;
+  // Paridade FreeBet Pro
+  showArchived: boolean;
+  gameTime: string; // 'all' | 'live' | 'upcoming' | 'ended' | 'none'
 }
 
 export interface ProcedureFormData {
@@ -63,6 +88,18 @@ export interface ProcedureFormData {
   dp: boolean;
   tags: string[];
   is_favorite: boolean;
+  // Paridade FreeBet Pro
+  data_partida: string;
+  horario_partida: string;
+  partida_descricao: string;
+  tipo: ProcedureType;
+}
+
+export interface ProcedureResultFormData {
+  resultado_lucro: string;
+  resultado_freebet_ganha: string;
+  freebet_creditada: '' | FreebetCreditada;
+  resultado_observacao: string;
 }
 
 export const PROCEDURE_CATEGORIES: ProcedureCategory[] = [
@@ -85,11 +122,18 @@ export const PROCEDURE_STATUSES: ProcedureStatus[] = [
   'Falta Girar Freebet'
 ];
 
+export const PROCEDURE_TYPES: { value: ProcedureType; label: string; description: string }[] = [
+  { value: 'SEM_FB',     label: 'Sem Freebet',     description: 'Operação sem freebet envolvida' },
+  { value: 'GANHAR_FB',  label: 'Ganhar Freebet',  description: 'Operação que pode gerar uma freebet' },
+  { value: 'QUEIMAR_FB', label: 'Queimar Freebet', description: 'Operação para girar uma freebet existente' },
+];
+
 export const AVAILABLE_COLUMNS = [
   { key: 'date', label: 'Data', default: true },
   { key: 'procedure_number', label: 'Nº Procedimento', default: true },
   { key: 'platform', label: 'Plataforma', default: true },
   { key: 'promotion_name', label: 'Promoção', default: true },
+  { key: 'partida_descricao', label: 'Evento', default: false },
   { key: 'category', label: 'Categoria', default: true },
   { key: 'status', label: 'Status', default: true },
   { key: 'freebet_reference', label: 'Ref. Freebet', default: true },

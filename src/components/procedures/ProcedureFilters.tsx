@@ -3,7 +3,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { ProcedureFilters as FiltersType, PROCEDURE_CATEGORIES, PROCEDURE_STATUSES } from '@/types/procedures';
-import { Search, Building2, Tag, Activity, TrendingUp, AlertCircle, Ticket, Star } from 'lucide-react';
+import { Search, Building2, Tag, Activity, TrendingUp, AlertCircle, Ticket, Star, Archive, Clock } from 'lucide-react';
 
 interface ProcedureFiltersProps {
   filters: FiltersType;
@@ -159,14 +159,45 @@ export function ProcedureFilters({ filters, onFilterChange, platforms, available
           </Select>
         </div>
 
+        <div>
+          <Label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 mb-1.5">
+            <Clock className="w-3 h-3" /> Horário do jogo
+          </Label>
+          <Select value={filters.gameTime} onValueChange={(v) => updateFilter('gameTime', v)}>
+            <SelectTrigger className="h-8 text-xs bg-white/5 border-white/10" data-testid="select-game-time">
+              <SelectValue placeholder="Todos" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="upcoming">Em breve</SelectItem>
+              <SelectItem value="live">Ao vivo (≤150min)</SelectItem>
+              <SelectItem value="ended">Encerrado</SelectItem>
+              <SelectItem value="none">Sem partida</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
         <div className="flex items-center gap-2 pt-5">
           <Switch
             id="onlyFavorites"
             checked={filters.onlyFavorites}
             onCheckedChange={(checked) => updateFilter('onlyFavorites', checked)}
+            data-testid="switch-only-favorites"
           />
           <Label htmlFor="onlyFavorites" className="text-xs flex items-center gap-1.5 cursor-pointer">
             <Star className="w-3 h-3 text-yellow-400" /> Favoritos
+          </Label>
+        </div>
+
+        <div className="flex items-center gap-2 pt-5">
+          <Switch
+            id="showArchived"
+            checked={filters.showArchived}
+            onCheckedChange={(checked) => updateFilter('showArchived', checked)}
+            data-testid="switch-show-archived"
+          />
+          <Label htmlFor="showArchived" className="text-xs flex items-center gap-1.5 cursor-pointer">
+            <Archive className="w-3 h-3 text-muted-foreground" /> Mostrar arquivados
           </Label>
         </div>
       </div>

@@ -11,8 +11,10 @@ import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-import { useProcedures, useDeleteProcedure, useToggleFavorite } from '@/hooks/useProcedures';
+import { useProcedures, useDeleteProcedure, useToggleFavorite, useArchiveProcedure } from '@/hooks/useProcedures';
 import { Procedure, ProcedureFilters as FiltersType, AVAILABLE_COLUMNS } from '@/types/procedures';
+import { getGameTimeBucket } from '@/lib/procedureGameTime';
+import { DefinirResultadosModal } from '@/components/procedures/DefinirResultadosModal';
 import {
   parseDate,
   getCurrentMonthProfit,
@@ -52,9 +54,11 @@ export default function ProcedureControl() {
   const { data: procedures = [], refetch } = useProcedures();
   const deleteProcedure = useDeleteProcedure();
   const toggleFavorite = useToggleFavorite();
+  const archiveProcedure = useArchiveProcedure();
   
   const [showModal, setShowModal] = useState(false);
   const [editingProcedure, setEditingProcedure] = useState<Procedure | null>(null);
+  const [resultProcedure, setResultProcedure] = useState<Procedure | null>(null);
   const [selectedMonth, setSelectedMonth] = usePersistedState('proc_month', new Date());
   const [showNotifications, setShowNotifications] = useState(true);
   const [showImportModal, setShowImportModal] = useState(false);
@@ -70,7 +74,9 @@ export default function ProcedureControl() {
     profitLoss: 'all',
     urgent: 'all',
     hasFreebetValue: 'all',
-    onlyFavorites: false
+    onlyFavorites: false,
+    showArchived: false,
+    gameTime: 'all',
   });
   
   const [visibleColumns, setVisibleColumns] = usePersistedState<string[]>('proc_columns', AVAILABLE_COLUMNS.map(col => col.key));
@@ -86,9 +92,17 @@ export default function ProcedureControl() {
   };
 
   const handleDelete = async (id: string) => {
-    if (window.confirm('Tem certeza que deseja remover este procedimento?')) {
+    if (window.confirm('Tem certeza que deseja EXCLUIR PERMANENTEMENTE este procedimento? Esta ação não pode ser desfeita. Para esconder sem perder, use Arquivar.')) {
       await deleteProcedure.mutateAsync(id);
     }
+  };
+
+  const handleArchive = async (proc: Procedure) => {
+    await archiveProcedure.mutateAsync({ id: proc.id, archived: !proc.archived });
+  };
+
+  const handleCheckResult = (proc: Procedure) => {
+    setResultProcedure(proc);
   };
 
   const handleToggleFavorite = (proc: Procedure) => {
@@ -103,6 +117,8 @@ export default function ProcedureControl() {
     return procedures.filter(proc => {
       const procDate = parseDate(proc.date);
       if (!procDate || procDate < monthStart || procDate > monthEnd) return false;
+      if (!filters.showArchived && proc.archived) return false;
+      if (filters.gameTime !== 'all' && getGameTimeBucket(proc, today) !== filters.gameTime) return false;
       if (filters.searchNumber && !proc.procedure_number?.toLowerCase().includes(filters.searchNumber.toLowerCase())) return false;
       if (filters.searchPromotion && proc.promotion_name && !proc.promotion_name.toLowerCase().includes(filters.searchPromotion.toLowerCase())) return false;
       if (filters.searchTags !== 'all' && !proc.tags?.includes(filters.searchTags)) return false;
@@ -373,6 +389,8 @@ export default function ProcedureControl() {
               visibleColumns={visibleColumns}
               onEdit={canEdit ? handleEdit : undefined}
               onDelete={canEdit ? handleDelete : undefined}
+              onArchive={canEdit ? handleArchive : undefined}
+              onCheckResult={canEdit ? handleCheckResult : undefined}
               onToggleFavorite={handleToggleFavorite}
             />
           </div>
@@ -381,6 +399,8 @@ export default function ProcedureControl() {
               procedures={filteredProcedures}
               onEdit={canEdit ? handleEdit : undefined}
               onDelete={canEdit ? handleDelete : undefined}
+              onArchive={canEdit ? handleArchive : undefined}
+              onCheckResult={canEdit ? handleCheckResult : undefined}
               onToggleFavorite={handleToggleFavorite}
             />
           </div>
@@ -408,6 +428,12 @@ export default function ProcedureControl() {
           visibleColumns={visibleColumns}
           onColumnsChange={setVisibleColumns}
           onClose={() => setShowColumnCustomizer(false)}
+        />
+      )}
+      {resultProcedure && (
+        <DefinirResultadosModal
+          procedure={resultProcedure}
+          onClose={() => setResultProcedure(null)}
         />
       )}
     </Layout>

@@ -1,17 +1,20 @@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Star, Pencil, Trash2, ExternalLink, Tag, Calendar, Building2 } from 'lucide-react';
+import { Star, Pencil, Trash2, ExternalLink, Tag, Calendar, Building2, Archive, ArchiveRestore, Trophy, Clock } from 'lucide-react';
 import { Procedure } from '@/types/procedures';
 import { formatProcedureDate, translateCategory } from '@/lib/procedureUtils';
+import { canCheckResult } from '@/lib/procedureGameTime';
 
 interface ProcedureMobileCardsProps {
   procedures: Procedure[];
   onEdit?: (proc: Procedure) => void;
   onDelete?: (id: string) => void;
   onToggleFavorite: (proc: Procedure) => void;
+  onArchive?: (proc: Procedure) => void;
+  onCheckResult?: (proc: Procedure) => void;
 }
 
-export function ProcedureMobileCards({ procedures, onEdit, onDelete, onToggleFavorite }: ProcedureMobileCardsProps) {
+export function ProcedureMobileCards({ procedures, onEdit, onDelete, onToggleFavorite, onArchive, onCheckResult }: ProcedureMobileCardsProps) {
   const getStatusBadge = (status: string) => {
     if (status === 'Concluído' || status === 'Lucro Direto') {
       return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
@@ -29,10 +32,13 @@ export function ProcedureMobileCards({ procedures, onEdit, onDelete, onToggleFav
 
   return (
     <div className="lg:hidden space-y-3">
-      {procedures.map((proc) => (
+      {procedures.map((proc) => {
+        const showCheck = onCheckResult && canCheckResult(proc) && !proc.archived;
+        return (
         <div
           key={proc.id}
-          className="glass rounded-2xl border border-white/5 p-4 card-hover overflow-hidden"
+          data-testid={`card-procedure-${proc.id}`}
+          className={`glass rounded-2xl border p-4 card-hover overflow-hidden ${proc.archived ? 'border-white/5 opacity-60' : 'border-white/5'}`}
         >
           <div className="flex justify-between items-start mb-3">
             <div className="flex items-start gap-3">
@@ -50,14 +56,24 @@ export function ProcedureMobileCards({ procedures, onEdit, onDelete, onToggleFav
                   <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary text-[10px] px-1.5 py-0">
                     {translateCategory(proc.category)}
                   </Badge>
+                  {proc.archived && (
+                    <Badge variant="outline" className="border-muted-foreground/30 text-muted-foreground text-[10px] px-1.5 py-0">
+                      <Archive className="w-2.5 h-2.5 mr-1" /> Arquivado
+                    </Badge>
+                  )}
                 </div>
-                <div className="flex items-center gap-3 mt-1">
+                <div className="flex items-center gap-3 mt-1 flex-wrap">
                   <span className="text-xs text-muted-foreground flex items-center gap-1">
                     <Building2 className="w-3 h-3" /> {proc.platform}
                   </span>
                   <span className="text-xs text-muted-foreground flex items-center gap-1">
                     <Calendar className="w-3 h-3" /> {formatProcedureDate(proc.date)}
                   </span>
+                  {proc.partida_descricao && (
+                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Clock className="w-3 h-3" /> {proc.partida_descricao}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -111,17 +127,41 @@ export function ProcedureMobileCards({ procedures, onEdit, onDelete, onToggleFav
             </div>
           )}
 
-          {(onEdit || onDelete) && (
-            <div className="flex gap-2 pt-3 border-t border-white/5">
+          {(onEdit || onDelete || onArchive || showCheck) && (
+            <div className="flex gap-2 pt-3 border-t border-white/5 flex-wrap">
+              {showCheck && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onCheckResult!(proc)}
+                  data-testid={`button-conferir-mobile-${proc.id}`}
+                  className="flex-1 h-8 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300"
+                >
+                  <Trophy className="w-3.5 h-3.5 mr-1.5" />
+                  Conferir
+                </Button>
+              )}
               {onEdit && (
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => onEdit(proc)}
+                  data-testid={`button-edit-mobile-${proc.id}`}
                   className="flex-1 h-8 border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10 hover:text-cyan-300"
                 >
                   <Pencil className="w-3.5 h-3.5 mr-1.5" />
                   Editar
+                </Button>
+              )}
+              {onArchive && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onArchive(proc)}
+                  data-testid={`button-archive-mobile-${proc.id}`}
+                  className="flex-1 h-8 border-amber-500/30 text-amber-400 hover:bg-amber-500/10 hover:text-amber-300"
+                >
+                  {proc.archived ? <><ArchiveRestore className="w-3.5 h-3.5 mr-1.5" />Restaurar</> : <><Archive className="w-3.5 h-3.5 mr-1.5" />Arquivar</>}
                 </Button>
               )}
               {onDelete && (
@@ -129,16 +169,17 @@ export function ProcedureMobileCards({ procedures, onEdit, onDelete, onToggleFav
                   variant="outline"
                   size="sm"
                   onClick={() => onDelete(proc.id)}
+                  data-testid={`button-delete-mobile-${proc.id}`}
                   className="flex-1 h-8 border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300"
                 >
                   <Trash2 className="w-3.5 h-3.5 mr-1.5" />
-                  Remover
+                  Excluir
                 </Button>
               )}
             </div>
           )}
         </div>
-      ))}
+      );})}
     </div>
   );
 }

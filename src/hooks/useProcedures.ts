@@ -1,11 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabaseProcedures, isProceduresSupabaseConfigured } from '@/lib/supabaseProcedures';
-import { Procedure } from '@/types/procedures';
+import { Procedure, FreebetCreditada } from '@/types/procedures';
 import { toast } from '@/hooks/use-toast';
 
 const PROCEDURES_KEY = ['procedures'];
 
-// Fetch all procedures
+// Fetch all procedures (incluindo arquivados — o filtro "showArchived" mora na UI)
 export function useProcedures() {
   return useQuery({
     queryKey: PROCEDURES_KEY,
@@ -107,7 +107,7 @@ export function useUpdateProcedure() {
   });
 }
 
-// Delete a procedure
+// Delete a procedure (hard delete — separado do arquivar)
 export function useDeleteProcedure() {
   const queryClient = useQueryClient();
 
@@ -135,6 +135,110 @@ export function useDeleteProcedure() {
       toast({
         title: 'Erro',
         description: `Erro ao remover procedimento: ${error.message}`,
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
+// Archive / Unarchive (soft delete — paridade com §8.5 do FreeBet Pro)
+export function useArchiveProcedure() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, archived }: { id: string; archived: boolean }) => {
+      if (!isProceduresSupabaseConfigured()) {
+        throw new Error('Procedures Supabase not configured');
+      }
+
+      const { data, error } = await supabaseProcedures
+        .from('procedures')
+        .update({
+          archived,
+          archived_at: archived ? new Date().toISOString() : null,
+          updated_date: new Date().toISOString(),
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: PROCEDURES_KEY });
+      toast({
+        title: variables.archived ? 'Procedimento arquivado' : 'Procedimento restaurado',
+        description: variables.archived
+          ? 'Você pode ver os arquivados ativando "Mostrar arquivados" nos filtros.'
+          : 'O procedimento voltou pra lista ativa.',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Erro',
+        description: `Erro ao arquivar procedimento: ${error.message}`,
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
+// Definir resultados pós-jogo (paridade com §8.4 do FreeBet Pro)
+// Auto-decide status_operacao:
+//   - LUCRO_DIRETO  se freebet_valor_previsto = 0/null OU freebet_creditada = 'NAO'
+//   - FALTA_GIRAR_FB se freebet_valor_previsto > 0 E freebet_creditada = 'SIM'
+export function useSetProcedureResult() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: {
+      id: string;
+      freebet_valor_previsto: number | null;
+      resultado_lucro: number;
+      resultado_freebet_ganha: number | null;
+      freebet_creditada: FreebetCreditada | null;
+      resultado_observacao: string | null;
+    }) => {
+      if (!isProceduresSupabaseConfigured()) {
+        throw new Error('Procedures Supabase not configured');
+      }
+
+      const hasFreebet = (input.freebet_valor_previsto ?? 0) > 0;
+      const auto_status = hasFreebet && input.freebet_creditada === 'SIM'
+        ? 'Falta Girar Freebet'
+        : 'Lucro Direto';
+
+      const { data, error } = await supabaseProcedures
+        .from('procedures')
+        .update({
+          resultado_lucro: input.resultado_lucro,
+          resultado_freebet_ganha: input.resultado_freebet_ganha,
+          freebet_creditada: input.freebet_creditada,
+          resultado_observacao: input.resultado_observacao,
+          // Espelha pra profit_loss pra preservar gráficos/KPIs legados
+          profit_loss: input.resultado_lucro,
+          status: auto_status,
+          updated_date: new Date().toISOString(),
+        })
+        .eq('id', input.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { data, auto_status };
+    },
+    onSuccess: ({ auto_status }) => {
+      queryClient.invalidateQueries({ queryKey: PROCEDURES_KEY });
+      toast({
+        title: 'Resultado registrado',
+        description: `Status atualizado pra "${auto_status}".`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Erro',
+        description: `Erro ao registrar resultado: ${error.message}`,
         variant: 'destructive',
       });
     },
