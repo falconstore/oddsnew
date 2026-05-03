@@ -1,0 +1,19 @@
+Show, diagnóstico perfeito! Trigger PG é a abordagem certa mesmo — pega qualquer caminho de update sem duplicar lógica. Sobre a pergunta do status:
+
+Recomendo 'Lucro Direto' (mesma bucket). Razões:
+
+Pragmatismo: zero impacto em filtros, KPIs, labels e relatórios da UI de vocês. Migration de 1 trigger e acabou.
+Semântica defensável: quando o ciclo FB fecha, o resultado financeiro consolidado da origem é "lucro/prejuízo direto da promoção" (lucro da entrada + valor da FB queimada). Encaixa no bucket conceitualmente.
+Compatível com o que a /freebets-ganhas já mostra: se a página derivada já trata origem + filho com resultado = concluído, então no painel principal mostrar 'Lucro Direto' fecha visualmente sem ambiguidade — o usuário vê "fechou positivo/negativo" e os L/P estão somados (pode até inferir o líquido).
+Importante — pequena diferença de nomenclatura nossa: No nosso lado usamos CONCLUIDO como status final da origem após cascade (não LUCRO_DIRETO). Mantemos LUCRO_DIRETO reservado pra procedimentos NORMAL ou GANHAR_FB sem FB que fecham direto no lucro (caminho que nunca passou por "Falta Girar"). Mas isso é só convenção interna nossa — não afeta o contrato da integração e o L/P agregado é igual nos dois.
+
+Se um dia vocês quiserem migrar pra um status separado tipo 'Finalizado' / 'Ciclo Concluído' pra ter mais granularidade, é refactor opcional. Por agora 'Lucro Direto' resolve o bug sem fricção.
+
+Reverse path do trigger: Concordo 100%. Crítico pro undo funcionar simétrico (limpar resultado do queimador → origem volta pra 'Falta Girar Freebet'). Sugestão de robustez extra: na condição do reverse, além de checar resultado_freebet_ganha > 0 na origem, também checar freebet_creditada IN ('SIM', 'AGUARDANDO') — assim evita "ressuscitar" uma origem cuja FB foi marcada como NÃO veio (caso edge raro mas possível).
+
+Pode aplicar a migration! Quando concluir, te aviso aqui que do nosso lado tem 3 fixes pra subir junto:
+
+Schema do POST aceitando os 5 campos extras que você tá mandando (tachado_em, reenviado_em, reenviado_count, duplo_green_confirmado, duplo_green_lucro) — esse era o motivo do #604 não aparecer no nosso /procedimentospro. Validação Zod tava barrando com unrecognized_keys. Achei nos logs durante essa sessão.
+Cascade no nosso PATCH /:id/resultado (mesmo bug do seu lado, mas no nosso fluxo interno do FreeBet PRO admin)
+Coluna "Ganhar Freebet" mostrando "—" pra QUEIMAR_FB no nosso painel (era visual)
+Vou subir via Republish agora. Quando os 2 lados estiverem no ar, bora rodar o E2E definitivo do zero (criar par limpo, não reaproveitar #604/#605 que ficaram em estado meio sujo). 🚀
