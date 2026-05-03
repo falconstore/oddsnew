@@ -56,6 +56,9 @@ export interface Procedure {
   freebetpro_external_id: string | null;
   freebetpro_synced_at: string | null;
   freebetpro_last_error: string | null;
+  freebetpro_numero: number | null;
+  freebetpro_last_request_id: string | null;
+  freebet_reference_id: string | null;
   editado_por: string | null;
 }
 
