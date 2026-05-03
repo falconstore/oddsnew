@@ -6,3 +6,9 @@ id = "TIrscKST9cTCwsi5t-VXJ"
 uri = "file://.local/auditoria-betshark-procedimentos-vs-freebetpro.txt"
 type = "text"
 title = "Auditoria BetShark × FreeBet Pro (§8)"
+
+[[outputs]]
+id = "8MKMtbSCZ2HkSomXiE72Q"
+uri = "file://.local/paridade_freebetpro_resumo.txt"
+type = "text"
+title = "Paridade FreeBet Pro — Resumo (.txt)"
