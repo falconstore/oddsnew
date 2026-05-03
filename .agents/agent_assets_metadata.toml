@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "TIrscKST9cTCwsi5t-VXJ"
+uri = "file://.local/auditoria-betshark-procedimentos-vs-freebetpro.txt"
+type = "text"
+title = "Auditoria BetShark × FreeBet Pro (§8)"
