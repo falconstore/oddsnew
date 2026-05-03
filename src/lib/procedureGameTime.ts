@@ -23,10 +23,14 @@ export function getGameTimeBucket(
   return 'ended';
 }
 
-// Botão "Conferir" só aparece após kickoff + 150min (regra do FreeBet Pro §8.4)
+// Botão "Conferir" aparece após kickoff + 150min (regra do FreeBet Pro §8.4) E
+// também em procedimentos sem partida agendada (legado ou casos sem horário) — a
+// FreeBet Pro pediu que o modal "Definir Resultados" possa ser usado em qualquer
+// procedimento, não só nos com kickoff conhecido.
 export function canCheckResult(
   proc: Pick<Procedure, 'data_partida' | 'horario_partida'>,
   now: Date = new Date(),
 ): boolean {
-  return getGameTimeBucket(proc, now) === 'ended';
+  const bucket = getGameTimeBucket(proc, now);
+  return bucket === 'ended' || bucket === 'none';
 }

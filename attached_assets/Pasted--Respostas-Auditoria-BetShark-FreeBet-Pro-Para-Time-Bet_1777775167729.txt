@@ -1,0 +1,176 @@
+# Respostas à Auditoria BetShark × FreeBet Pro
+
+**Para:** Time BetShark Pro (Grupo Shark 100% Green) — e o agente do Replit que vai implementar do lado deles
+**De:** FreeBet Pro
+**Documentos relacionados:**
+- `01-contexto-procedimentos-pro.md`
+- `02-painel-de-envios-walkthrough.md`
+- *Auditoria BetShark × FreeBet Pro* (gerado pelo time da Shark)
+
+---
+
+## 0. Reconhecimento
+
+A auditoria deixou claro que o painel da Shark **não está começando do zero**. Vocês já têm coisas que o FreeBet Pro nem mencionou no checklist:
+
+- Heatmap calendário (`CalendarChart`)
+- Curva acumulada (`MountainChart`)
+- `NotificationPanel` com regras de urgência por idade
+- Customização de colunas (`ColumnCustomizer`)
+- Importação CSV (`ImportModal`)
+- Favoritos
+
+O trabalho de paridade é **completar lacunas**, não reescrever.
+
+E o "Rapid" foi engano nosso — foi citado por alguém na conversa interna mas não existe integração Rapid no código de vocês. Cadastro hoje é manual + CSV. Esquecer essa palavra.
+
+---
+
+## 1. ⚠️ Preservação dos dados existentes (regra de ouro)
+
+> **Esta seção é dirigida ao agente do Replit que vai implementar do lado da Shark — leia antes de qualquer migration.**
+
+A Shark **já tem vários procedimentos cadastrados em produção**. A integração com o FreeBet Pro vale **só daqui pra frente** — nada de retroativo, nada de tocar em dado histórico.
+
+### 1.1 O que NÃO fazer
+
+- ❌ **Não** rodar `UPDATE procedures SET ...` em massa em registros antigos (exceto o backfill controlado descrito em §1.2).
+- ❌ **Não** marcar procedimentos antigos com `freebetpro_external_id` ou `freebetpro_synced_at`. Eles **nunca** vão ser sincronizados pra cá retroativamente.
+- ❌ **Não** apagar nem reformatar dados antigos só porque o schema novo "é mais limpo".
+- ❌ **Não** preencher `data_partida` / `horario_partida` / `partida_descricao` retroativamente em quem não tinha. Deixa `NULL` mesmo.
+- ❌ **Não** disparar nenhuma chamada pro endpoint do FreeBet Pro com procedimentos antigos como "alimentação inicial". O catálogo do FreeBet Pro não recebe histórico.
+- ❌ **Não** mudar `status` ou `profit_loss` de itens existentes durante a migration.
+
+### 1.2 O que pode fazer com segurança nos dados existentes
+
+Apenas estas duas operações tocam em dado antigo, e ambas são **não destrutivas**:
+
+1. **Adicionar colunas novas com default `NULL` ou valor neutro:**
+   - `data_partida`, `horario_partida`, `partida_descricao` → default `NULL`.
+   - `tipo` enum → default `SEM_FB` (preserva semântica: o que não tinha freebet, continua sendo "sem freebet").
+   - `archived` → default `FALSE`.
+   - `lucro_prejuizo_previsto`, `freebet_valor_previsto`, `resultado_freebet_ganha`, `freebet_creditada`, `resultado_observacao` → default `NULL`.
+   - `freebetpro_external_id`, `freebetpro_synced_at`, `freebetpro_last_error` → default `NULL`.
+   - `editado_por` → default `NULL`.
+
+2. **Backfill controlado de `profit_loss → resultado_lucro`:**
+   ```sql
+   UPDATE procedures
+   SET resultado_lucro = profit_loss
+   WHERE resultado_lucro IS NULL;
+   ```
+   Isso **copia** o valor, não move. `profit_loss` continua intacto. Razão: nosso modelo separa previsional e realizado; nos itens antigos só existe um número, então ele é o "realizado".
+
+   > Se preferirem ainda mais conservador: **não fazer o backfill** e deixar `resultado_lucro = NULL` nos antigos. A UI mostra "—" e ninguém perde dado nenhum. Decisão de vocês.
+
+### 1.3 Filtros que isolam novo × antigo
+
+Para garantir que nada antigo vaza pra integração:
+
+```sql
+-- Procedimentos elegíveis pra sync com FreeBet Pro
+WHERE archived = FALSE
+  AND created_date >= '<DATA_DE_CORTE>'  -- escolher dia da virada
+  AND freebetpro_external_id IS NULL     -- ainda não sincronizado
+```
+
+**Recomendação:** definir uma `DATA_DE_CORTE` = dia em que a integração entra em produção. Tudo anterior fica fora, sem exceção.
+
+### 1.4 UI: campos novos opcionais nos antigos
+
+- Nos cards/linhas de procedimentos antigos, os campos novos (Tipo de FB, Jogo/Evento) ficam vazios — **isso é esperado**. Não exibir "Pendente" ou "Faltando", só "—" ou esconder.
+- O botão "Sincronizar com FreeBet Pro" **não aparece** em procedimentos com `created_date < DATA_DE_CORTE`.
+- O modal "Definir Resultados" pode ser usado opcionalmente em qualquer procedimento (novo ou antigo), mas a regra automática `LUCRO_DIRETO` vs `FALTA_GIRAR_FB` só faz sentido em quem tem `tipo` preenchido — então os antigos continuam com status manual.
+
+### 1.5 Resumo em uma frase
+
+> **Os procedimentos antigos continuam funcionando exatamente como hoje. A integração com o FreeBet Pro é uma feature nova que só toca em procedimentos criados a partir da data de corte.**
+
+---
+
+## 2. Respostas às 5 decisões abertas da auditoria
+
+### Decisão 1 — Duplo Green: 7ª categoria ou flag `dp` boolean?
+
+**Resposta:** mantenham `dp` boolean como está. Não migrem nada.
+
+**Como mapear na borda da integração:** quando vocês forem chamar o nosso endpoint, se `dp=true`, incluam a string `"Chance Duplo"` no array `tags` do payload. A categoria principal continua sendo a real (Promoção / Cashback / Freebet / etc).
+
+**Por quê:** "Duplo Green" no nosso lado às vezes é categoria, às vezes é tag/flag — o modelo de vocês é mais limpo. Esse mapeamento simples na borda evita migração e evita conflito semântico (não dá pra um procedimento ser ao mesmo tempo "Cashback" e "Duplo Green" como categoria — mas dá pra ser "Cashback com chance de duplo green").
+
+### Decisão 2 — Separar previsional × realizado, com backfill?
+
+**Resposta:** sim, separem. Backfill copiando `profit_loss → resultado_lucro` está correto e seguro.
+
+**Esquema sugerido:**
+- `lucro_prejuizo_previsto` (numeric, null) — o que o gerente espera lucrar, preenchido na criação
+- `freebet_valor_previsto` (numeric, null) — FB esperada na criação
+- `resultado_lucro` (numeric, null) — cash real após o jogo
+- `resultado_freebet_ganha` (numeric, null) — FB realmente recebida
+- `freebet_creditada` (`SIM` / `NAO` / null) — só relevante quando `resultado_freebet_ganha > 0`
+- `resultado_observacao` (text, null)
+
+`profit_loss` original fica preservado (nem renomear). Se quiserem, depois de uns meses estável, vocês podem dropar — mas isso é decisão futura, não bloqueia nada.
+
+### Decisão 3 — Arquivamento substitui delete?
+
+**Resposta:** adicionem arquivamento (`archived` boolean + `archived_at` timestamptz) **e mantenham o delete** como ação separada com confirmação.
+
+**Por quê:** arquivar é o estado normal de "saiu da operação ativa mas pode ser consultado/desarquivado". Delete é definitivo, deve ser raro, com confirmação dupla. Os dois têm uso. É exatamente o que fazemos.
+
+**Impacto na integração:**
+- `archived=true` → enviar PATCH/DELETE pro FreeBet Pro removendo do catálogo público.
+- `delete` físico → mesmo efeito + remover registro local.
+
+### Decisão 4 — `fixture_id` agora ou texto livre?
+
+**Resposta:** texto livre no MVP. **Não implementem API Futebol agora.**
+
+Vocês mandam só `partida_descricao` (string). Nosso lado funciona normal — só não vai ter o widget de placar ao vivo no card do cliente. Se um dia vocês quiserem essa feature, conversamos com calma.
+
+### Decisão 5 — `external_id`: UUID ou campo dedicado?
+
+**Resposta:** usem o **UUID da tabela `procedures`** de vocês (o `id` que já existe).
+
+**Por quê:**
+- `procedure_number` é humano e pode ser editado → quebra idempotência se o gerente renumerar.
+- UUID é estável pra sempre.
+
+A gente guarda esse UUID no nosso lado como `external_id` e usa ele como chave de upsert. Mesmo UUID reenviado = update. Sem duplicação.
+
+---
+
+## 3. Roteiro sugerido pra implementação do lado da Shark
+
+Em ordem, pra não fazer trabalho à toa:
+
+1. **Migration de schema** (§1.2 + Decisões 2, 3, 5). Tudo aditivo, sem perda de dado.
+2. **UI: 6ª seção "Jogo/Evento" no `ProcedureModal`** (campos `data_partida`, `horario_partida`, `partida_descricao`).
+3. **UI: bloco radio "Tipo de Freebet"** (Sem/Ganhar/Queimar) substituindo a seção condicional atual.
+4. **UI: modal separado "Definir Resultados"** com regra automática `LUCRO_DIRETO` vs `FALTA_GIRAR_FB`.
+5. **UI: ação "Arquivar" + filtro "Mostrar arquivados"** (sem mexer no delete existente).
+6. **UI: indicador visual "Sincronizado com FreeBet Pro"** no card (cinza enquanto não sincronizado, verde com timestamp depois).
+7. **(Esperar)** spec do endpoint público do FreeBet Pro.
+8. **Edge Function `freebetpro-sync`** chamada após create/update/archive de procedimentos com `created_date >= DATA_DE_CORTE`.
+9. **(Fase 2)** `freebetpro-webhook` reverso pra receber "marcado como feito" — opcional.
+
+Os passos 1–6 podem ser feitos **antes** do endpoint estar pronto, sem bloqueio nenhum. O endpoint só entra no passo 7-8.
+
+---
+
+## 4. Próxima entrega do lado do FreeBet Pro
+
+Assim que vocês confirmarem essas respostas, eu escrevo o **`04-spec-endpoint-publico.md`** com:
+
+- URL e método (provável: `POST /api/v1/parceiros/betshark/procedimentos`).
+- Autenticação (provável: header `Authorization: Bearer <token>` por parceiro, gerenciado por env var no nosso lado).
+- Schema completo do payload (JSON), com cada campo, tipo, obrigatoriedade e validação.
+- Comportamento de upsert por `external_id`.
+- Endpoint de update e arquivamento.
+- Tratamento de erros (códigos HTTP, formato do corpo de erro).
+- Exemplos de request/response.
+- Política de rate limit, se houver.
+
+---
+
+> **Em uma frase:** dados antigos não se mexe; campos novos entram aditivos com default neutro; integração só vale daqui pra frente; a paridade do schema sai antes do endpoint, sem bloqueio.
