@@ -6,6 +6,7 @@ import { Procedure } from '@/types/procedures';
 import { formatProcedureDate, translateCategory } from '@/lib/procedureUtils';
 import { canCheckResult } from '@/lib/procedureGameTime';
 import { KickoffBadge } from './KickoffBadge';
+import { StatusActionToggles } from './StatusActionToggles';
 
 interface ProcedureTableProps {
   procedures: Procedure[];
@@ -62,7 +63,7 @@ export function ProcedureTable({ procedures, visibleColumns, onEdit, onDelete, o
             <TableRow
               key={proc.id}
               data-testid={`row-procedure-${proc.id}`}
-              className={`border-white/5 hover:bg-white/[0.03] transition-colors group ${proc.archived ? 'opacity-50' : ''}`}
+              className={`border-white/5 hover:bg-white/[0.03] transition-colors group ${proc.archived ? 'opacity-50' : ''} ${proc.tachado ? 'opacity-50 grayscale' : ''}`}
             >
               <TableCell className="w-8 py-2 px-2">
                 <Button
@@ -129,9 +130,12 @@ export function ProcedureTable({ procedures, visibleColumns, onEdit, onDelete, o
               )}
               {visibleColumns.includes('status') && (
                 <TableCell className="py-2 px-2">
-                  <Badge className={`text-[10px] px-1.5 py-0 border font-medium ${getStatusBadge(proc.status)}`}>
-                    {proc.status}
-                  </Badge>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <Badge className={`text-[10px] px-1.5 py-0 border font-medium ${getStatusBadge(proc.status)}`}>
+                      {proc.status}
+                    </Badge>
+                    <StatusActionToggles procedure={proc} />
+                  </div>
                 </TableCell>
               )}
               {visibleColumns.includes('freebet_reference') && (

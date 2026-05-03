@@ -5,6 +5,7 @@ import { Procedure } from '@/types/procedures';
 import { formatProcedureDate, translateCategory } from '@/lib/procedureUtils';
 import { canCheckResult } from '@/lib/procedureGameTime';
 import { KickoffBadge } from './KickoffBadge';
+import { StatusActionToggles } from './StatusActionToggles';
 
 interface ProcedureMobileCardsProps {
   procedures: Procedure[];
@@ -39,7 +40,7 @@ export function ProcedureMobileCards({ procedures, onEdit, onDelete, onToggleFav
         <div
           key={proc.id}
           data-testid={`card-procedure-${proc.id}`}
-          className={`glass rounded-2xl border p-4 card-hover overflow-hidden ${proc.archived ? 'border-white/5 opacity-60' : 'border-white/5'}`}
+          className={`glass rounded-2xl border p-4 card-hover overflow-hidden ${proc.archived ? 'border-white/5 opacity-60' : 'border-white/5'} ${proc.tachado ? 'opacity-50 grayscale' : ''}`}
         >
           <div className="flex justify-between items-start mb-3">
             <div className="flex items-start gap-3">
@@ -107,9 +108,12 @@ export function ProcedureMobileCards({ procedures, onEdit, onDelete, onToggleFav
           <div className="grid grid-cols-2 gap-2 text-xs mb-3">
             <div className="bg-white/[0.03] rounded-xl p-2.5 border border-white/5">
               <p className="text-muted-foreground mb-1">Status</p>
-              <Badge className={`text-[10px] px-1.5 py-0 border font-medium ${getStatusBadge(proc.status)}`}>
-                {proc.status}
-              </Badge>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <Badge className={`text-[10px] px-1.5 py-0 border font-medium ${getStatusBadge(proc.status)}`}>
+                  {proc.status}
+                </Badge>
+                <StatusActionToggles procedure={proc} />
+              </div>
             </div>
             <div className="bg-white/[0.03] rounded-xl p-2.5 border border-white/5">
               <p className="text-muted-foreground mb-1">Lucro/Prejuízo</p>

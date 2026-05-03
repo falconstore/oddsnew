@@ -204,32 +204,50 @@ export function useSetProcedureResult() {
     mutationFn: async (input: {
       id: string;
       freebet_valor_previsto: number | null;
-      resultado_lucro: number;
+      resultado_lucro: number | null;
       resultado_freebet_ganha: number | null;
       freebet_creditada: FreebetCreditada | null;
       resultado_observacao: string | null;
+      duplo_green_confirmado?: boolean;
+      duplo_green_lucro?: number | null;
     }) => {
       if (!isProceduresSupabaseConfigured()) {
         throw new Error('Procedures Supabase not configured');
       }
 
-      const hasFreebet = (input.freebet_valor_previsto ?? 0) > 0;
-      const auto_status = hasFreebet && input.freebet_creditada === 'SIM'
+      // Paridade doc 06 §3 — freebet_creditada é AUTO baseado no valor da FB ganha:
+      // SIM se valor > 0, NAO se = 0/null. Mas se o caller já mandou explícito, respeita.
+      const fbValor = input.resultado_freebet_ganha ?? 0;
+      const fbCreditadaAuto: FreebetCreditada | null =
+        input.freebet_creditada !== undefined && input.freebet_creditada !== null
+          ? input.freebet_creditada
+          : fbValor > 0
+            ? 'SIM'
+            : 'NAO';
+
+      const hasFB = fbValor > 0;
+      const auto_status = hasFB && fbCreditadaAuto === 'SIM'
         ? 'Falta Girar Freebet'
         : 'Lucro Direto';
 
+      const updatePayload: Record<string, unknown> = {
+        resultado_lucro: input.resultado_lucro,
+        resultado_freebet_ganha: input.resultado_freebet_ganha,
+        freebet_creditada: fbCreditadaAuto,
+        resultado_observacao: input.resultado_observacao,
+        // Espelha pra profit_loss pra preservar gráficos/KPIs legados
+        profit_loss: input.resultado_lucro ?? 0,
+        status: auto_status,
+        updated_date: new Date().toISOString(),
+      };
+      if (input.duplo_green_confirmado !== undefined) {
+        updatePayload.duplo_green_confirmado = input.duplo_green_confirmado;
+        updatePayload.duplo_green_lucro = input.duplo_green_lucro ?? null;
+      }
+
       const { data, error } = await supabaseProcedures
         .from('procedures')
-        .update({
-          resultado_lucro: input.resultado_lucro,
-          resultado_freebet_ganha: input.resultado_freebet_ganha,
-          freebet_creditada: input.freebet_creditada,
-          resultado_observacao: input.resultado_observacao,
-          // Espelha pra profit_loss pra preservar gráficos/KPIs legados
-          profit_loss: input.resultado_lucro,
-          status: auto_status,
-          updated_date: new Date().toISOString(),
-        })
+        .update(updatePayload)
         .eq('id', input.id)
         .select()
         .single();
@@ -250,6 +268,109 @@ export function useSetProcedureResult() {
       toast({
         title: 'Erro',
         description: `Erro ao registrar resultado: ${error.message}`,
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
+// Toggle Tachado (paridade FreeBet PRO doc 05 §2.5 — "passou da hora")
+export function useToggleTachado() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, tachado }: { id: string; tachado: boolean }) => {
+      if (!isProceduresSupabaseConfigured()) {
+        throw new Error('Procedures Supabase not configured');
+      }
+      const { data, error } = await supabaseProcedures
+        .from('procedures')
+        .update({ tachado, updated_date: new Date().toISOString() })
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onMutate: async ({ id, tachado }) => {
+      // Optimistic update — reflete instantâneo na lista
+      await queryClient.cancelQueries({ queryKey: PROCEDURES_KEY });
+      const prev = queryClient.getQueryData<Procedure[]>(PROCEDURES_KEY);
+      if (prev) {
+        queryClient.setQueryData<Procedure[]>(
+          PROCEDURES_KEY,
+          prev.map((p) => (p.id === id ? { ...p, tachado } : p)),
+        );
+      }
+      return { prev };
+    },
+    onError: (error: Error, _vars, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(PROCEDURES_KEY, ctx.prev);
+      toast({
+        title: 'Erro',
+        description: `Falha ao atualizar tachado: ${error.message}`,
+        variant: 'destructive',
+      });
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: PROCEDURES_KEY });
+      if (data?.id) syncProcedureBestEffort(data.id, 'upsert');
+    },
+  });
+}
+
+// Toggle Reenviado (paridade FreeBet PRO doc 05 §2.5 — "atualizei depois de publicar")
+//   - mode='toggle'    → marca/desmarca. Marcar = reenviado_em=now, count=1. Desmarcar = null/0.
+//   - mode='increment' → mantém marcado, atualiza reenviado_em e incrementa count.
+//   - mode='clear'     → reset null/0.
+export function useToggleReenviado() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      id,
+      mode,
+      currentReenviadoEm,
+      currentCount,
+    }: {
+      id: string;
+      mode: 'toggle' | 'increment' | 'clear';
+      currentReenviadoEm: string | null;
+      currentCount: number;
+    }) => {
+      if (!isProceduresSupabaseConfigured()) {
+        throw new Error('Procedures Supabase not configured');
+      }
+      let payload: { reenviado_em: string | null; reenviado_count: number };
+      if (mode === 'clear') {
+        payload = { reenviado_em: null, reenviado_count: 0 };
+      } else if (mode === 'increment') {
+        payload = { reenviado_em: new Date().toISOString(), reenviado_count: (currentCount || 0) + 1 };
+      } else {
+        // toggle
+        if (currentReenviadoEm) {
+          payload = { reenviado_em: null, reenviado_count: 0 };
+        } else {
+          payload = { reenviado_em: new Date().toISOString(), reenviado_count: 1 };
+        }
+      }
+      const { data, error } = await supabaseProcedures
+        .from('procedures')
+        .update({ ...payload, updated_date: new Date().toISOString() })
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: PROCEDURES_KEY });
+      if (data?.id) syncProcedureBestEffort(data.id, 'upsert');
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Erro',
+        description: `Falha ao marcar reenvio: ${error.message}`,
         variant: 'destructive',
       });
     },
