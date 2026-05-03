@@ -1,0 +1,33 @@
+Vamos publicar a integração BetShark Pro → FreeBet PRO em produção e começar os testes na prática.
+
+Do nosso lado tá tudo pronto: endpoint público implementado, banco de dados configurado e chave de API gerada pra vocês.
+
+🔐 Vou compartilhar 3 coisas pelo Bitwarden (canal seguro):
+
+URL base do endpoint (algo como https://app.freebetpro.com.br/api/integracoes/betshark/v1)
+X-BetShark-Key-Id — vai no header de toda chamada
+Secret HMAC — usado pra calcular o X-Signature (fica só do lado de vocês, nunca trafega)
+⚠️ O secret não é recuperável. Se perderem, eu revogo a chave atual e gero uma nova. Guardem direito.
+
+✅ Antes do primeiro POST, preciso confirmar com vocês:
+
+Data de corte — a partir de qual dia/hora os procedimentos novos da Shark começam a sincronizar pro FreeBet PRO. Tudo anterior fica fora (regra do doc 03-respostas-auditoria-shark.md, §1).
+IPs de saída do servidor de vocês — se quiserem que a gente trave allowlist. Se não tiver IP fixo agora, deixo liberado e vocês me passam depois.
+Confirmado: o slug do parceiro é betshark.
+📋 Roteiro do teste prático (sugestão):
+
+Passo 1 — Criem 1 procedimento de teste bem identificável no painel da Shark (ex: título "TESTE INTEGRAÇÃO 03/05", plataforma "Bet365", categoria "PROMOCAO", sem freebet) e disparem o POST /procedimentos. Eu confirmo na hora aqui se apareceu no Painel de Envios do FreeBet PRO e se o cliente Pro viu na tela em <2s via SSE.
+
+Passo 2 — Reenviem o mesmo POST (mesmo external_id, mesmo Idempotency-Key). Esperado: 200 OK, created: false, mesmo internal_id. Não pode duplicar.
+
+Passo 3 — Disparem POST /procedimentos/{external_id}/resultado com lucro. Eu confirmo que o status_operacao recalculou pra LUCRO_DIRETO.
+
+Passo 4 — Repitam com tipo: "GANHAR_FB" + freebet_valor: 20, e depois resultado_freebet_ganha: 20 + freebet_creditada: "SIM". Eu confirmo que a freebet de R$ 20 caiu na conta do cliente Pro automaticamente.
+
+Passo 5 — POST /procedimentos/{external_id}/arquivar com {"arquivado": true}. Procedimento some do feed do cliente.
+
+🐛 Se algo der erro:
+
+Toda resposta tem um request_id. Me mandem esse request_id + o request original (sem o secret) que eu olho no log de auditoria do nosso lado e a gente bate ponto a ponto.
+
+📚 Spec técnica completa (HMAC, validações, códigos de erro, rate limit) está no docs/integracoes/betshark-pro/02-spec-endpoint-integracao.md que vocês já têm.
