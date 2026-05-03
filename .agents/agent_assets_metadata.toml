@@ -12,3 +12,9 @@ id = "8MKMtbSCZ2HkSomXiE72Q"
 uri = "file://.local/paridade_freebetpro_resumo.txt"
 type = "text"
 title = "Resposta pra FreeBet Pro — Resumo atualizado (.txt)"
+
+[[outputs]]
+id = "SmZWJrS988Aog03BsZOSv"
+uri = "file://.local/resposta_spec_endpoint_freebetpro.txt"
+type = "text"
+title = "Resposta à Spec do Endpoint FreeBet Pro — §13 (.txt)"

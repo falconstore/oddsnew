@@ -1,0 +1,354 @@
+Spec do endpoint público — BetShark Pro → FreeBet Pro
+Para quem é este documento: equipe técnica do Grupo Shark 100% Green / BetShark Pro.
+
+Objetivo: definir o contrato do endpoint público que o painel BetShark Pro vai chamar para criar, atualizar, arquivar e definir resultados de procedimentos diretamente no catálogo público do FreeBet Pro, fechando a paridade §8.5 que ficou em aberto.
+
+Pré-requisito de leitura: 01-contexto-procedimentos-pro.md. Toda a regra de negócio (1-para-N, status_operacao, modelo aditivo de resultado, SSE) descrita lá vale aqui também — este documento só descreve como vocês entram nesse fluxo de fora.
+
+Status: proposta. A seção §13 lista os pontos abertos que precisam ser confirmados em conjunto antes de a gente partir pra implementação. Implementação real é uma task separada (não está no escopo deste doc).
+
+1. Visão geral
+A BetShark Pro vai chamar um conjunto de rotas HTTP REST hospedadas no domínio do FreeBet Pro. Cada chamada autenticada cria/atualiza um procedimento no nosso catálogo público (procedimentos_tarefas, com origem='CATALOGO' e publico=true) como se um gerente nosso tivesse cadastrado pelo Painel de Envios.
+
+A partir do momento em que a chamada é aceita, todo o resto do fluxo descrito no doc 01 acontece automaticamente:
+
+O procedimento aparece em <2s para todos os clientes Pro elegíveis (publicação 1-para-N via SSE).
+Cada cliente Pro mantém o seu status pessoal (PENDENTE/VOU_FAZER/FEITO/DISPENSEI).
+Quando vocês mandarem o resultado, o status_operacao do card é recalculado (LUCRO_DIRETO ou FALTA_GIRAR_FB) seguindo a mesma regra do nosso modal "Definir Resultados".
+BetShark Pro (Supabase)              FreeBet Pro (este endpoint)             Clientes Pro
+─────────────────────────            ───────────────────────────             ──────────────
+Gerente Shark cadastra      ──HTTP──►  POST /api/integracoes/betshark
+no painel deles                        /procedimentos
+                                            │
+                                            ▼
+                                       INSERT em procedimentos_tarefas
+                                       (origem=CATALOGO, owner=Shark)
+                                            │
+                                            ▼
+                                       notifyProcedimentoChange (SSE) ──►   Card aparece
+                                                                            no Pro <2s
+
+2. Identidade do parceiro
+Cada parceiro de integração (no MVP, só a BetShark Pro) é cadastrado uma vez no nosso lado. A configuração mora numa nova tabela integracoes_parceiros:
+
+Campo	Tipo	Significado
+id	serial	Primary key.
+slug	text unique	Identificador legível. Sugerido: 'betshark'.
+nome	text	Nome amigável ('BetShark Pro — Grupo Shark 100% Green').
+owner_client_id	int FK clients.id	Qual catálogo Pro recebe os procedimentos. Toda chamada cai aqui — fica idêntico a um gerente do owner ter cadastrado pelo Painel de Envios.
+api_key_hash	text	Hash (bcrypt) da API key. Nunca guardamos a chave em claro.
+webhook_secret	text	Segredo HMAC, gerado uma vez e guardado em variável de ambiente do lado do parceiro. Usado pra assinar o body.
+ip_allowlist	jsonb	Array de IPs/CIDR. Vazio = sem restrição.
+rate_limit_rpm	int	Default 60. Limite de chamadas por minuto por API key.
+ativo	bool	Kill switch operacional.
+created_at, updated_at	timestamptz	Auditoria.
+Como a chave chega até vocês: um Super Admin nosso vai gerar a chave uma vez no painel interno, copiar uma única vez o valor em claro, e mandar pra Shark por canal seguro (1Password, Bitwarden ou similar). A partir daí só temos o hash. Se vocês perderem, geramos uma nova (revoga a antiga).
+
+3. Endpoints
+Base: https://app.freebetpro.com.br/api/integracoes/betshark
+
+Nota: o domínio final pode mudar (homolog vs prod). A spec define caminhos relativos; o domínio final fica no envelope de integração que mandamos junto com a chave.
+
+Método	Rota	O que faz
+POST	/procedimentos	Cria um procedimento, ou faz upsert se o external_id já existe.
+PATCH	/procedimentos/:external_id	Atualiza campos parciais. Whitelist server-side.
+PATCH	/procedimentos/:external_id/resultado	Define o resultado real (modal "Definir Resultados").
+POST	/procedimentos/:external_id/arquivar	Arquiva (soft delete) ou restaura.
+GET	/procedimentos/:external_id	Lê o estado atual no nosso lado. Útil pra reconciliação.
+:external_id é o UUID do procedures.id do lado da BetShark — é a chave que liga os dois sistemas.
+
+4. Autenticação
+Toda requisição precisa de três headers (ausência de qualquer um → 401):
+
+Authorization: Bearer <api_key>
+X-Integracao-Slug: betshark
+X-Timestamp: 1746290520
+X-Signature: sha256=<hex>
+
+4.1 Bearer
+api_key é a string em claro que entregamos uma única vez. Comparada via bcrypt.compare contra api_key_hash no banco.
+O X-Integracao-Slug é redundância proposital (sanity check, evita confundir parceiros se um dia tiver mais de um).
+4.2 Janela de timestamp
+X-Timestamp é o unix epoch em segundos (UTC) no momento da requisição.
+Aceitamos uma janela de ±300s (5 min). Fora disso, 401. Isso impede replay de chamadas antigas.
+4.3 HMAC do body
+Calculado assim, do lado de vocês, antes de enviar:
+
+mensagem  = X-Timestamp + "." + corpo_cru_bytes
+assinatura = HMAC_SHA256(webhook_secret, mensagem)
+X-Signature = "sha256=" + hex(assinatura)
+
+Do nosso lado: rejeitamos com 401 se a assinatura recalculada não bater. Esse é o mesmo padrão dos webhooks que já recebemos da Lastlink e do FrontZapp — então a abordagem está validada em produção.
+
+4.4 Erros de auth
+Sempre 401 com body genérico:
+{ "ok": false, "error": { "code": "UNAUTHORIZED", "message": "auth failed" } }
+
+Não detalhamos o motivo (chave errada vs assinatura errada vs janela expirada) pra não dar pista pra brute-force.
+5. Idempotência
+A chave de idempotência é o external_id (UUID do procedures.id da BetShark). Vamos persistir esse valor numa coluna nova:
+
+ALTER TABLE procedimentos_tarefas
+  ADD COLUMN external_id TEXT,
+  ADD COLUMN external_source TEXT;
+CREATE UNIQUE INDEX procedimentos_tarefas_external_uniq
+  ON procedimentos_tarefas (external_source, external_id)
+  WHERE external_id IS NOT NULL;
+
+POST /procedimentos com external_id que não existe → cria nova linha. Resposta 201 Created com created: true.
+POST /procedimentos com external_id que já existe (mesmo external_source='betshark') → trata como update (upsert). Resposta 200 OK com created: false.
+Resultado prático: vocês podem reenviar o mesmo POST sem medo. Útil em retry de timeout/5xx.
+
+6. Criar / atualizar procedimento
+6.1 Endpoint
+POST /api/integracoes/betshark/procedimentos
+
+6.2 Payload de exemplo
+{
+  "external_id": "8a4c2f10-9a3a-4b9b-9e9d-3b1a4d0b1f8e",
+  "titulo": "SuperOdd Bet365 — Real Madrid vence o Barcelona",
+  "casa_aposta": "Bet365",
+  "categoria": "SUPERODD",
+  "prioridade": "ALTA",
+  "tipo": "SEM_FB",
+  "data_partida": "2026-05-10",
+  "horario_partida": "16:00",
+  "partida_descricao": "Real Madrid x Barcelona",
+  "lucro_prejuizo_previsto": "25.00",
+  "freebet_valor_previsto": null,
+  "dp": false,
+  "descricao_promocao": "Aposte até R$50 e receba odd turbinada de 5.00.",
+  "link_promocao": "https://www.bet365.com/superodds/...",
+  "link_telegram": "https://t.me/sharkpro/12345",
+  "external_referencia_id": null,
+  "arquivado": false
+}
+
+6.3 Mapeamento campo a campo
+Campo BetShark (no payload)	Campo nosso (procedimentos_tarefas)	Obrigatório?	Notas
+external_id (UUID)	external_id	Sim	Idempotência.
+titulo (text)	titulo	Sim	Aparece no card.
+casa_aposta (text)	casa_aposta	Sim	Sem casa, o card fica sem identidade visual.
+categoria (enum)	categoria	Recomendado	Valores aceitos: PROMOCAO, CASHBACK, FREEBET, SUPERODD, EXTRA, GIROS_GRATIS, DUPLO_GREEN. Outro valor → 422 UNPROCESSABLE_PAYLOAD.
+prioridade (enum)	prioridade	Não	ALTA / MEDIA / BAIXA. Default MEDIA.
+tipo (enum BetShark)	tipo (enum nosso)	Não	Mapeamento: SEM_FB → NORMAL, GANHAR_FB → GANHAR_FB, QUEIMAR_FB → QUEIMAR_FB. Default NORMAL.
+data_partida (YYYY-MM-DD)	data_partida	Não	Wall-clock SP. Sem timezone — interpretamos como Brasília.
+horario_partida (HH:MM)	horario_partida	Não	Hora local SP.
+partida_descricao (text)	partida_descricao	Não	Texto livre. No MVP não passamos fixture_id — autocomplete e Early Payout do nosso lado não funcionam pra esses procedimentos, e tudo bem. Está documentado em §10.
+lucro_prejuizo_previsto (decimal string)	lucro_prejuizo	Não	Cenário A previsional. Aceita negativo.
+freebet_valor_previsto (decimal string | null)	freebet_valor	Só faz sentido em GANHAR_FB/QUEIMAR_FB	FB esperada.
+dp (bool)	possivel_duplo + tag "Chance Duplo" adicionada em etiquetas	Não	Como vocês decidiram no item 6.1 do relatório de paridade.
+descricao_promocao (text)	descricao_promocao	Não	Descrição comercial.
+link_promocao (URL http/https)	link_promocao	Não	Sanitizado server-side; URL inválida → 400.
+link_telegram (URL)	link_telegram	Não	Link da mensagem original no canal de vocês, se existir.
+external_referencia_id (UUID | null)	procedimento_referencia (resolvido)	Não	Para QUEIMAR_FB: aponta pro UUID do GANHAR_FB que originou a FB. Backend faz lookup em procedimentos_tarefas.external_id e grava o id interno. Se o UUID não for encontrado, retornamos 422 UNRESOLVED_REFERENCE.
+arquivado (bool)	arquivado	Não	Default false. Permite criar já arquivado se vocês quiserem (raro).
+6.4 Campos que o backend preenche sozinho (não vêm no payload)
+Campo nosso	Como é preenchido
+client_id	owner_client_id do parceiro resolvido pela API key.
+numero	Próximo livre no catálogo do owner (mesmo algoritmo do nosso POST /api/procedimentos-tarefas interno). Exposto na resposta.
+origem	'CATALOGO'.
+publico	true.
+status_operacao	'ENVIADO' na criação.
+external_source	'betshark'.
+created_at, updated_at	Timestamps automáticos.
+6.5 Resposta de sucesso
+{
+  "ok": true,
+  "created": true,
+  "data": {
+    "internal_id": 12345,
+    "external_id": "8a4c2f10-9a3a-4b9b-9e9d-3b1a4d0b1f8e",
+    "numero": 47,
+    "status_operacao": "ENVIADO",
+    "synced_at": "2026-05-03T18:42:00.123Z"
+  }
+}
+
+201 Created quando criou novo.
+200 OK quando deu upsert (já existia).
+synced_at é o timestamp que vocês podem gravar em procedures.freebetpro_synced_at pro controle de sync que vocês já provisionaram.
+
+7. Atualização parcial
+7.1 Endpoint
+PATCH /api/integracoes/betshark/procedimentos/:external_id
+
+7.2 Body
+Mesmo schema do POST, mas todos os campos são opcionais. Só os campos enviados são atualizados.
+
+Whitelist explícita: os campos editáveis são exatamente os de §6.3. Não é possível editar via este endpoint:
+
+external_id (a chave)
+external_source
+client_id
+numero
+origem
+publico
+Os campos de resultado (resultado_lucro, resultado_freebet_ganha, freebet_creditada, resultado_observacao) — esses têm rota dedicada, ver §8.
+Tentativa de enviar campo fora da whitelist → 400 VALIDATION_ERROR listando o campo ofensor.
+
+7.3 Resposta
+{ "ok": true, "data": { "internal_id": 12345, "synced_at": "..." } }
+
+404 NOT_FOUND se o external_id não existe (ainda) no nosso lado.
+
+8. Definir resultado
+Espelha o handler interno PATCH /api/procedimentos-tarefas/:id/resultado descrito em §5.3 do doc 01.
+
+8.1 Endpoint
+PATCH /api/integracoes/betshark/procedimentos/:external_id/resultado
+
+8.2 Body
+{
+  "resultado_lucro": "0.00",
+  "resultado_freebet_ganha": "50.00",
+  "freebet_creditada": "SIM",
+  "resultado_observacao": "Real venceu 2x1, FB de R$50 caiu na conta."
+}
+
+Campo	Tipo	Obrigatório?	Notas
+resultado_lucro	decimal string	Sim	Cash real. Aceita positivo, zero ou negativo.
+resultado_freebet_ganha	decimal string	Não (default "0")	Valor da FB ganha confirmada.
+freebet_creditada	"SIM" | "NAO" | null	Quando resultado_freebet_ganha > 0	Se null/ausente com FB > 0, força "NAO".
+resultado_observacao	text	Não	Observação livre.
+8.3 Comportamento server-side (igual ao handler interno)
+Backend:
+
+Grava resultado_lucro, resultado_freebet_ganha, resultado_observacao.
+Por compat com código legado, escreve cenario_realizado = 'A' | 'B' (A se FB=0, B se FB>0).
+Decide status_operacao:
+LUCRO_DIRETO se não houve FB ganha ou se freebet_creditada='NAO'.
+FALTA_GIRAR_FB quando resultado_freebet_ganha > 0 E freebet_creditada='SIM'.
+Grava freebet_creditada exatamente como veio (quando FB=0, força 'NAO').
+Emite SSE pros clientes Pro recarregarem o catálogo.
+8.4 Resposta
+{
+  "ok": true,
+  "data": {
+    "internal_id": 12345,
+    "status_operacao": "FALTA_GIRAR_FB",
+    "synced_at": "2026-05-03T22:15:00.000Z"
+  }
+}
+
+⚠️ Igual ao handler interno: este endpoint não cria linhas em freebets (inventário pessoal por cliente). Esse comportamento está documentado em §7 e §9 do doc 01.
+
+9. Arquivar / restaurar
+9.1 Endpoint
+POST /api/integracoes/betshark/procedimentos/:external_id/arquivar
+
+9.2 Body
+{ "arquivado": true }
+
+ou para restaurar:
+
+{ "arquivado": false }
+
+9.3 Resposta
+{ "ok": true, "data": { "internal_id": 12345, "arquivado": true, "synced_at": "..." } }
+
+Espelha o handler interno PATCH /api/procedimentos-tarefas/:id/arquivar. Soft delete — o registro continua no banco, só some das listagens default.
+
+10. Leitura (opcional, para reconciliação)
+10.1 Endpoint
+GET /api/integracoes/betshark/procedimentos/:external_id
+
+10.2 Resposta
+{
+  "ok": true,
+  "data": {
+    "internal_id": 12345,
+    "external_id": "8a4c2f10-9a3a-4b9b-9e9d-3b1a4d0b1f8e",
+    "numero": 47,
+    "titulo": "SuperOdd Bet365 — Real Madrid vence o Barcelona",
+    "casa_aposta": "Bet365",
+    "categoria": "SUPERODD",
+    "prioridade": "ALTA",
+    "tipo": "NORMAL",
+    "data_partida": "2026-05-10",
+    "horario_partida": "16:00",
+    "partida_descricao": "Real Madrid x Barcelona",
+    "lucro_prejuizo": "25.00",
+    "freebet_valor": null,
+    "possivel_duplo": false,
+    "arquivado": false,
+    "status_operacao": "FALTA_GIRAR_FB",
+    "freebet_creditada": "SIM",
+    "resultado_lucro": "0.00",
+    "resultado_freebet_ganha": "50.00",
+    "resultado_observacao": "Real venceu 2x1, FB de R$50 caiu na conta.",
+    "created_at": "2026-05-03T15:00:00.000Z",
+    "updated_at": "2026-05-03T22:15:00.000Z"
+  }
+}
+
+404 NOT_FOUND se external_id não existe.
+
+11. Envelope de erro padrão
+Todo erro segue o mesmo formato:
+
+{
+  "ok": false,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Campo 'categoria' inválido.",
+    "field": "categoria",
+    "request_id": "req_01HZX..."
+  }
+}
+
+HTTP	code	Quando acontece
+400	VALIDATION_ERROR	Body malformado, campo desconhecido fora da whitelist, URL inválida, decimal inválido.
+401	UNAUTHORIZED	Auth (chave / assinatura / timestamp) falhou. Sem detalhe.
+403	FORBIDDEN_PARTNER	Parceiro ativo=false, ou IP fora da allowlist.
+404	NOT_FOUND	external_id não existe (em PATCH/GET/arquivar).
+409	CONFLICT	Race condition em upsert (raro; tentar de novo).
+422	UNPROCESSABLE_PAYLOAD	Mapeamento de enum falhou (categoria/tipo com valor não suportado).
+422	UNRESOLVED_REFERENCE	external_referencia_id aponta pra UUID inexistente no nosso lado.
+429	RATE_LIMITED	Mais de rate_limit_rpm chamadas no minuto. Header Retry-After indica segundos.
+500	INTERNAL_ERROR	Erro nosso. Vocês podem retry com backoff.
+503	MAINTENANCE	Janela de manutenção rara. Header Retry-After indica segundos.
+Todo response (sucesso ou erro) traz o header X-Request-Id pra correlação com nossos logs. Quando vocês reportarem um problema, mandar esse request_id acelera o suporte.
+
+12. Operacional — rate limit, segurança, logs
+12.1 Rate limit
+Default: 60 requisições por minuto por API key. Configurável por parceiro.
+Janela deslizante (sliding window).
+Excedeu → 429 com Retry-After: <segundos>.
+12.2 IP allowlist
+Opcional. Vazio = qualquer IP.
+Quando preenchida (lista de IPs ou CIDRs), chamadas de fora dela retornam 403 FORBIDDEN_PARTNER.
+12.3 Tamanho do body
+Limite de 32 KB. Body maior → 400 VALIDATION_ERROR. Não estamos esperando payload grande aqui.
+12.4 Validação de schema
+Zod estrito (.strict()). Qualquer campo extra fora da whitelist é rejeitado em vez de silenciosamente ignorado.
+12.5 Logs e auditoria
+Toda chamada vai numa tabela integracoes_log com: parceiro_id, rota, method, external_id, http_status, latency_ms, ip, request_id, created_at. Sem corpo, sem segredos.
+Retenção mínima: 90 dias.
+Útil pra responder reclamações tipo "criei e não apareceu".
+12.6 Política de retry sugerida (lado de vocês)
+Em 5xx ou erro de rede: retry exponencial com jitter (1s, 2s, 4s, 8s, 16s, max 5 tentativas).
+Em 409 CONFLICT: retry imediato 1x.
+Em 429: respeitar Retry-After.
+Em 4xx (exceto 409/429): não retry — é erro de contrato, abrir bug.
+13. Pontos abertos a confirmar antes da implementação
+Slug do parceiro: propondo 'betshark'. OK?
+Domínio de produção e de homolog: confirmar se vamos expor um host de homolog separado (app-staging.freebetpro.com.br) pra Shark testar antes de apontar pra prod.
+Owner único vs multi-owner: o spec assume 1 parceiro = 1 owner_client_id. Se a Shark um dia precisar despejar procedimentos em catálogos de múltiplos donos, vira outra task. OK no MVP?
+external_referencia_id (cadeia FB cross-system): essa abordagem funciona pra vocês? Hoje vocês só amarram QUEIMAR_FB → GANHAR_FB quando os dois saíram do BetShark, certo? Se um dia vocês quiserem queimar uma FB ganha em um procedimento que veio de outra origem (dentro do FreeBet Pro), precisamos pensar diferente.
+numero do nosso lado: exposto na resposta. Vocês precisam exibir/guardar do lado de vocês? (Sugerido: guardar em procedures.freebetpro_numero pra mostrar nos relatórios.)
+Webhook reverso (nosso → BetShark) pra avisar quando um gerente nosso editar um procedimento que veio de vocês: fora do MVP. Fica como follow-up. Vocês precisam disso já?
+Geração da chave de API: vamos gerar pelo painel interno e mandar por canal seguro. Confirmar canal preferido (1Password / Bitwarden / outro).
+Janela de timestamp HMAC: propondo 5 min. Vocês conseguem garantir clock sync nesse intervalo?
+14. O que NÃO está nesta spec
+Implementação real do endpoint — vira uma task separada depois que vocês confirmarem §13. Vai incluir: migration (procedimentos_tarefas.external_id/external_source, tabela integracoes_parceiros, tabela integracoes_log), rotas em server/routes/integracoesBetshark.ts, middleware de auth+HMAC, validação Zod, rate limit, painel admin pra gerar chave.
+Geração e envio da chave (operacional, fora da spec).
+Webhook reverso (nosso → vocês) — fora do MVP.
+Propagação automática de FreeBet por cliente ao receber resultado — segue idêntico ao handler interno (não cria linhas em freebets). Se a Shark precisar disso, vira discussão à parte.
+15. Próximos passos
+Vocês: revisar este doc, responder os 8 pontos abertos da §13.
+Nós: ajustar a spec com as respostas, marcar como "aprovada".
+Nós: abrir task de implementação (migration + endpoint + admin de chaves) e entregar com testes ponta a ponta usando uma chave de homolog.
+Vocês: apontar o sync do BetShark Pro pro endpoint de homolog, validar com 5–10 procedimentos reais arquivados, dar OK pra prod.
+Nós: gerar chave de prod, enviar por canal seguro, ativar parceiro (ativo=true).
+Vocês: virar a chave em prod. Sync ativo, paridade §8.5 fechada.
