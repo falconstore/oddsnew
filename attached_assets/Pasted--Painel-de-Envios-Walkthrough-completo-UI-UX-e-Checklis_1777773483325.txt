@@ -1,0 +1,308 @@
+# Painel de Envios — Walkthrough completo (UI/UX) e Checklist de Paridade
+
+**Para:** Time BetShark Pro (Grupo Shark 100% Green)
+**De:** FreeBet Pro
+**Documento companheiro de:** `01-contexto-procedimentos-pro.md`
+**Objetivo:** explicar **com detalhe operacional** como o gerente usa o **Painel de Envios** do FreeBet Pro — tela por tela, campo por campo — para que vocês possam:
+
+1. Entender, sem ambiguidade, o que vai acontecer no nosso lado quando o endpoint público da integração for chamado.
+2. Avaliar a **possibilidade de replicar** a experiência no painel de vocês (BetShark Pro).
+
+A partir deste entendimento, o contrato do endpoint sai praticamente "de graça" — porque os campos do payload são exatamente os campos que o gerente preenche aqui.
+
+> **Nomenclatura:** "**Painel de Envios**" é o item do menu lateral. Ao clicar, o gerente é levado para a página **"Procedimentos PRO — Painel Admin"**. Os dois nomes se referem à mesma tela.
+
+---
+
+## 1. Quem opera e onde
+
+- **Quem opera:** usuários com flag `pode_gerenciar_procedimentos = true` (gerentes/operadores) ou Super Admin.
+- **Menu lateral:** *CONTROLE DE PROCEDIMENTOS → Painel de Envios*.
+- **Rota técnica:** `/painel-de-envios` (frontend React, arquivo principal `src/pages/PainelDeEnvios.jsx`).
+- **O que ele faz na prática:** cadastra, edita, organiza, anota resultado e arquiva os procedimentos do **catálogo público** (`publico=true`, `origem='CATALOGO'`). Esse catálogo é o que **todos os clientes Pro** veem na página *Procedimentos Pro*.
+
+> Tudo que o gerente faz aqui aparece em tempo real para todos os clientes Pro elegíveis (via SSE — ver §7). Não há "publicar/despublicar manual" — o ato de salvar já publica.
+
+---
+
+## 2. Visão geral da tela
+
+![Painel de Envios — visão geral em modo Lista](./imagens/01-painel-lista.png)
+
+A tela tem 4 zonas, de cima para baixo:
+
+1. **Header da página** — título *Procedimentos PRO — Painel Admin* + ações principais à direita: `Alertas`, `Gerar Relatório`, `+ Novo Procedimento`.
+2. **Faixa de KPIs** com seletor de período.
+3. **Barra de filtros**.
+4. **Tabela de procedimentos** com troca de aba *Lista / FreeBets Ganhas*.
+
+---
+
+## 3. KPIs (header)
+
+Cinco "pílulas" no topo, cada uma é um KPI:
+
+| KPI | O que mede |
+|---|---|
+| **Procedimentos** | Quantidade total no período selecionado |
+| **L/P Realizado** | Soma de `resultado_lucro` (em R$) dos itens já fechados |
+| **Freebets Ganhas** | Quantidade/valor de FBs efetivamente ganhas no período |
+| **Duplo Green** | Quantos procedimentos terminaram em duplo green (ambas as pernas ganharam) |
+| **Falta Conferir** | Procedimentos cuja partida já passou + 150min e ainda **sem `cenario_realizado`** preenchido — fila de "tem coisa pra fechar" |
+
+À direita do título da seção há o **seletor de período**: `Hoje` / `7 dias` / `Mês` / `Ano` / `Tudo`. Filtra os KPIs (não filtra a lista abaixo).
+
+---
+
+## 4. Barra de filtros
+
+Da esquerda para a direita (todos visíveis na barra principal):
+
+| Filtro | Tipo | Comportamento |
+|---|---|---|
+| **🔍 Busca** | Texto livre | Procura em `numero`, `casa_aposta`, `partida_descricao` e `titulo` (case-insensitive). |
+| **Status** | Multi-select dropdown | Filtra por um ou vários dos 8 valores de `status_operacao` (ver §3.4 do doc 01). Default: *Todos*. |
+| **Categoria** | Multi-select dropdown | Filtra por categoria (Promoção, Cashback, Freebet, Superodd, Extra, Ganhar Giros, Duplo Green). Default: *Todos*. |
+| **Jogo (horário)** | Single-select | Ao vivo / Em breve / Agendado / Encerrado / Sem jogo. Default: *Todos*. |
+| **Tachados** | Toggle de 3 estados | "Mostrando todos" → "Apenas tachados" → "Ocultar tachados". |
+| **Arquivados** | Toggle | Liga/desliga a exibição da seção de arquivados ao final da lista. |
+
+> ⚠️ A confirmar: em telas mais estreitas pode aparecer um botão "Mais filtros" agrupando os menos usados. No print de referência (§2) todos os filtros estão na barra principal.
+
+---
+
+## 5. Lista (tabela principal)
+
+A tabela mostra "**N procedimentos**" no canto superior esquerdo da seção e tem as seguintes colunas:
+
+| Coluna | Conteúdo |
+|---|---|
+| **Data Criação** | Data em que o procedimento foi cadastrado (não é a data do jogo). |
+| **Nº** | Número do procedimento (`numero`, sequencial). |
+| **Plataforma** | Nome/logo da casa de aposta. |
+| **Promoção** | Título curto da promoção (`titulo`). Clicável para abrir em modo visualização. |
+| **Evento** | Descrição da partida (ex.: "São Paulo x Bahia") + horário com badge colorido (`Em Breve` / `Ao Vivo` / `Encerrado`). |
+| **Categoria** | Badge colorida (Promoção, Freebet, etc.). |
+| **Status** | Chip clicável com o `status_operacao` atual (Falta Girar Freebet, Lucro Direto, Enviado, etc.). Permite troca rápida. |
+| **Ref. FB** | Referência cruzada quando o procedimento faz parte de uma cadeia de FB (ex.: `#356 R$20`). |
+| **Ganhar Freebet** | Valor da FB esperada (`freebet_valor`). |
+| **L/P** | Lucro/prejuízo real (`resultado_lucro`) com cor (verde positivo, vermelho negativo). |
+| **Tags** | Etiquetas livres (incluindo "Chance Duplo" / "DG" se marcado). |
+| **Link** | Ícone que abre o link do Telegram associado (`link_telegram`), se houver. |
+| **Ações** | Menu `[⋯]` com editar, arquivar, excluir, etc. + atalhos visuais (estrela, ampulheta para tachar). |
+
+### 5.1 Ordenação e drag-and-drop
+
+- Padrão: por `Nº` decrescente (mais recente em cima).
+- Modos alternativos disponíveis: por horário da partida, por prioridade, ou modo "posição manual" com drag-and-drop linha a linha (`@dnd-kit`).
+
+### 5.2 Ações inline em cada linha
+
+- **Trocar `status_operacao`**: clique direto no chip de status — abre dropdown, troca e salva via `PATCH /campo`. **Optimistic update** (UI já mostra antes do servidor responder).
+- **Estrela / Tachar**: marca como "deixe pra depois" sem remover.
+- **Reenviar**: incrementa contador quando o gerente avisa o canal de novo (badge tipo `0/272` no canto direito da linha indica número de visualizações/marcações).
+- **Editar**: ícone lápis dentro de `[⋯]` — abre modal em modo edição.
+- **Arquivar / Excluir**: dentro de `[⋯]` — arquivar é reversível, excluir pede confirmação.
+
+### 5.3 Aba "FreeBets Ganhas"
+
+À direita da aba *Lista* há a aba **FreeBets Ganhas** — visão dedicada ao ciclo das FBs (geração → falta girar → concluída). Filtros adicionais por status do crédito (`Creditada` / `Não veio` / `Aguardando`).
+
+`[INSERIR PRINT 03: aba "FreeBets Ganhas" aberta — não pude capturar sem login]`
+
+---
+
+## 6. Modal "Novo / Editar Procedimento"
+
+É o coração da operação. Abre centralizado, dividido em **6 seções coloridas**:
+
+![Modal Novo Procedimento — todas as seções](./imagens/02-modal-novo-procedimento.png)
+
+### 6.1 Seções e campos (na ordem em que aparecem)
+
+#### 🆔 Identificação
+
+| Campo | Tipo | Obrigatório | Notas |
+|---|---|---|---|
+| `Data Criação` | data | sim (auto) | Preenchida automaticamente com hoje. |
+| `Nº Procedimento` | inteiro | sim | Sugerido sequencialmente (próximo nº livre). Editável. |
+| `Plataforma` | select | **sim** (asterisco) | Lista de casas cadastradas. |
+
+#### 🎁 Promoção
+
+| Campo | Tipo | Obrigatório | Notas |
+|---|---|---|---|
+| `Nome da Promoção` | string | sim | Ex.: "Superbet — Chance Extra…". |
+| `Categoria` | select | sim | Promoção / Cashback / Freebet / Superodd / Extra / Ganhar Giros / Duplo Green. |
+| `Status` | select | sim (default **Enviado**) | 8 valores de `status_operacao`. |
+
+#### 🎮 Jogo / Evento
+
+| Campo | Tipo | Obrigatório | Notas |
+|---|---|---|---|
+| `Esporte` | select | sim (default Futebol) | |
+| `Data e Hora` | `datetime-local` | não | Pode ficar vazio se for promoção sem jogo. |
+| `Evento / Partida` | autocomplete | não | Componente `EventoAutocomplete` — busca partidas via `GET /api/partidas/sugestoes?q=`. Ao escolher, preenche **automaticamente** Data/Hora + `fixture_id` + `kickoff_at` com fuso correto. Pode ser digitado livre (sem buscar). |
+
+#### 🎟️ Freebet (cadeia)
+
+Três cards clicáveis (radio visual) — o gerente escolhe **um**:
+
+| Card | O que significa |
+|---|---|
+| **☐ Sem Freebet** (default) | Operação normal, sem freebet envolvida. |
+| **🟧 Ganhar Freebet** | Vou GANHAR uma freebet com esta operação. |
+| **🟪 Queimar Freebet** | Vou QUEIMAR uma freebet ganha antes (em outro procedimento). |
+
+> Quando "Queimar Freebet" é selecionado, aparecem campos adicionais para indicar **qual procedimento** gerou a FB que será queimada (referência cruzada — vira a coluna "Ref. FB" na lista).
+
+#### 📈 Resultado (previsional)
+
+| Campo | Tipo | Obrigatório | Notas |
+|---|---|---|---|
+| `Lucro/Prejuízo` | numérico | **sim** (asterisco) | Valor **esperado** em cash (ex.: `30,00`). É a previsão antes do jogo, não o resultado final. |
+| `Link Telegram` | URL | não | Ex.: `https://t.me/canal/123`. |
+
+> **Importante:** este "Lucro/Prejuízo" é o **previsional** preenchido na criação. O **resultado real** (depois do jogo) é registrado em outro modal — "**Definir Resultados**" — descrito em §6.3.
+
+#### 🏷️ Tags
+
+| Campo | Tipo | Notas |
+|---|---|---|
+| `Chance Duplo` | toggle | Marca o procedimento como tendo chance de duplo green. |
+| `Tags personalizadas` | input livre + Enter | Etiquetas customizadas (não impactam lógica, só visual/filtro). |
+
+### 6.2 Botões do modal
+
+`Cancelar` (esquerda) | `Criar` (direita, primário azul) — em modo edição vira `Salvar`.
+
+### 6.3 Modal "Definir Resultados" (pós-jogo)
+
+Aberto a partir de uma ação na linha (botão "Conferir" ou ícone, aparece quando a partida já acabou — `kickoff_at + 150min < agora`).
+
+**Campos:**
+
+| Campo | Tipo | Obrigatório |
+|---|---|---|
+| `resultado_lucro` | numérico | sim (cash real, pode ser negativo, zero ou positivo) |
+| `resultado_freebet_ganha` | numérico | sim (FB efetivamente recebida; 0 se não veio) |
+| `freebet_creditada` | radio SIM/NÃO | só se FB > 0 |
+| `resultado_observacao` | textarea | não |
+
+**Lógica do backend ao salvar** (`PATCH /api/procedimentos-tarefas/:id/resultado` — `server/routes/procedimentos.ts` ~1929-2048):
+
+1. Grava os 4 campos acima.
+2. Escreve `cenario_realizado = 'A'` se FB=0, `'B'` se FB>0 (compatibilidade com código legado).
+3. Decide `status_operacao`:
+   - `LUCRO_DIRETO` se FB=0 ou `freebet_creditada='NAO'`.
+   - `FALTA_GIRAR_FB` somente se FB>0 **E** `freebet_creditada='SIM'`.
+4. Emite SSE para os clientes Pro recarregarem o catálogo.
+5. **Não cria linhas em `freebets`** (ver `⚠️ A confirmar` na §7 do doc 01).
+
+`[INSERIR PRINT 04: modal "Definir Resultados" aberto — não pude capturar sem login]`
+
+---
+
+## 7. Tempo real e UX fluida
+
+### 7.1 Server-Sent Events
+
+- Stream: `GET /api/procedimentos-pro/events`.
+- O frontend dos clientes Pro mantém conexão persistente.
+- Cada `notifyProcedimentoChange()` no backend (gerente editou algo) → evento `change` → React Query invalida → cliente refaz `GET /catalogo` em <2s.
+- **Não tem polling.**
+
+### 7.2 Optimistic updates
+
+Mutações de campo único (`campoMutation`, `tachadoMutation`, `reenviadoMutation`) atualizam a UI **antes** do servidor confirmar. Se falhar, faz rollback + toast de erro. Sensação: tudo é instantâneo.
+
+### 7.3 Undo
+
+Quando o sistema fecha uma cadeia de FB automaticamente em cascata, aparece toast com **"Desfazer"** por alguns segundos.
+
+---
+
+## 8. Checklist de paridade — o que o BetShark Pro precisa para reproduzir a experiência
+
+Para cada item:
+- ✅ **Essencial** — sem isso a experiência quebra do lado do cliente Pro.
+- ⚙️ **Importante** — sem isso piora muito a UX, mas funciona.
+- 💡 **Desejável** — agrega valor, dá pra adiar.
+
+### 8.1 Modelo de dados (espelhamento mínimo)
+
+- ✅ Tabela equivalente a `procedimentos_tarefas` com pelo menos: `numero`, `casa`, `categoria`, `titulo`, `data_partida`+`horario_partida`, `partida_descricao`, `status_operacao`, `freebet_valor`, `lucro_prejuizo`, `tipo` (sem-FB / ganhar-FB / queimar-FB), `link_telegram`, `tags[]`.
+- ⚙️ `fixture_id` opcional (só se quiserem suporte a placar ao vivo no card do cliente).
+- ⚙️ `procedimento_referencia` (FK pra outro procedimento) — só se forem operar cadeias "Queimar FB".
+- 💡 Campos de auditoria (`criado_por`, `editado_por`, `criado_em`, `atualizado_em`).
+
+### 8.2 Tela de cadastro / edição
+
+- ✅ Formulário com **as 6 seções** descritas em §6.1 (ou equivalente).
+- ✅ Campo `categoria` com no mínimo as 7 opções nossas (vocês podem ter mais, mas precisam mapear pras nossas no momento de chamar o endpoint).
+- ✅ Campo `status_operacao` com os 8 valores nossos.
+- ✅ Seleção de tipo de FB com 3 opções (Sem FB / Ganhar FB / Queimar FB).
+- ⚙️ Autocomplete de partida (vocês podem usar API própria; a gente trata como texto livre se não vier `fixture_id`).
+- ⚙️ Default sensato no `Nº Procedimento` (próximo livre) e `Status` (`Enviado`).
+
+### 8.3 Lista / dashboard
+
+- ⚙️ KPIs do header (vocês podem mostrar outros — não atrapalha o nosso lado).
+- ⚙️ Filtros por status, categoria, horário do jogo, busca textual, tachados, arquivados.
+- 💡 Ordenação manual via drag-and-drop.
+- 💡 Aba "FreeBets Ganhas" com filtros de ciclo.
+
+### 8.4 Fluxo pós-jogo
+
+- ✅ Tela/modal "Definir Resultados" com `resultado_lucro`, `resultado_freebet_ganha`, `freebet_creditada` (radio SIM/NÃO quando FB>0).
+- ✅ Decisão automática de `status_operacao` final (regra de §6.3 — `LUCRO_DIRETO` vs `FALTA_GIRAR_FB`).
+- ⚙️ Botão visível só quando a partida acabou (regra do +150min).
+
+### 8.5 Comunicação com o FreeBet Pro (futuro endpoint)
+
+- ✅ Cliente HTTP autenticado (token por parceiro provavelmente).
+- ✅ **Idempotência**: enviar um `external_id` (id do procedimento no lado de vocês) — mesmo `external_id` reenviado vira **update**, não duplica.
+- ✅ Tratamento de update e arquivamento (provavelmente `PUT` para update e endpoint separado para arquivar).
+- ⚙️ Indicador no card do BetShark Pro: "publicado no FreeBet Pro" + timestamp da última sincronização.
+- ⚙️ Tela de "fila/log de sincronização" mostrando o que foi enviado, falhou, foi atualizado.
+- 💡 Webhook reverso (FreeBet Pro → BetShark Pro) avisando quando alguém marca um procedimento de vocês como "feito".
+
+### 8.6 O que **não precisa** ter no BetShark Pro
+
+- ❌ SSE para clientes — é responsabilidade nossa.
+- ❌ Tabela de status pessoal por cliente (`procedimento_status_cliente`) — é nosso.
+- ❌ Tabela `freebets` (inventário pessoal) — é nosso.
+- ❌ Integração com API Futebol — se não enviarem `fixture_id`, a gente trata como sem placar ao vivo (funciona normal).
+
+---
+
+## 9. Decisões de produto que ficam fáceis depois deste doc
+
+Quando formos especificar o endpoint público, estas 9 perguntas precisam de resposta — e este doc ajuda a responder cada uma:
+
+1. **Autenticação**: token estático por parceiro ou OAuth/HMAC?
+2. **Idempotência**: `external_id` obrigatório no payload? Único por parceiro?
+3. **Update e arquivamento**: mesmo endpoint com upsert por `external_id`, ou rotas separadas (`PUT /:external_id`, `POST /:external_id/arquivar`)?
+4. **`fixture_id`**: opcional desde o MVP (vocês mandam só `partida_descricao` em texto)?
+5. **Categorias**: vocês adotam as nossas 7 ou mantêm as suas e fazem o mapeamento na borda?
+6. **Tipo de FB (Sem/Ganhar/Queimar)**: como vocês representam hoje? Se diferente, mapeamos onde?
+7. **Imagens/banners**: se vocês quiserem mostrar banners, mandam URLs já hospedadas ou fazem upload via multipart pro nosso endpoint? (Hoje o nosso modal tem campo de banners — não aparece nos prints, mas existe na API.)
+8. **Propagação para `freebets`**: entra no escopo do endpoint inicial ou é fase 2?
+9. **Janela de exclusão**: permitimos `DELETE` no endpoint, ou só arquivamento?
+
+Cada resposta vira um campo do contrato. Quando essas 9 estiverem fechadas, a próxima task de spec do endpoint é só preencher um esqueleto.
+
+---
+
+## 10. Próximos passos sugeridos
+
+1. **Você** revisa este doc, captura os 2 prints faltantes (modal "Definir Resultados" e aba "FreeBets Ganhas") e envia o pacote completo (`.md` + pasta `imagens/`) pro time da BetShark.
+2. **Time BetShark** lê e responde:
+   - Quais itens do checklist de paridade (§8) eles topam implementar no MVP?
+   - Sugestões/discordâncias sobre as 9 decisões abertas (§9)?
+3. **Em conjunto**, fechamos as 9 decisões e abrimos a próxima task: *"Especificar endpoint público para BetShark cadastrar procedimentos"* (já proposta como follow-up #555).
+4. Implementação do endpoint + cliente HTTP no BetShark Pro = trabalho pequeno, porque o contrato sai pronto.
+
+---
+
+> **Resumo de uma frase:** depois deste doc, vocês conseguem desenhar o painel de vocês de forma compatível com o nosso — e o endpoint vira só o "tubo" que conecta os dois lados, com campos e regras já alinhados.
