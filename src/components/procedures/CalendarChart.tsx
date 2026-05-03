@@ -4,7 +4,7 @@ import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 
 interface CalendarChartProps {
-  data: { date: string; profit: number; count: number }[];
+  data: { date: string; profit: number; count: number; fbCount?: number; fbTotal?: number }[];
   title: string;
   selectedMonth: Date;
 }
@@ -22,7 +22,7 @@ export function CalendarChart({ data, title, selectedMonth }: CalendarChartProps
 
   const getDayData = (day: Date) => {
     const dateKey = format(day, 'dd/MM', { locale: ptBR });
-    return data.find(d => d.date === dateKey) || { date: dateKey, profit: 0, count: 0 };
+    return data.find(d => d.date === dateKey) || { date: dateKey, profit: 0, count: 0, fbCount: 0, fbTotal: 0 };
   };
 
   const getColorIntensity = (profit: number) => {
@@ -86,39 +86,50 @@ export function CalendarChart({ data, title, selectedMonth }: CalendarChartProps
             const colors = getColorIntensity(dayData.profit);
             const isToday = isSameDay(day, new Date());
 
+            const fbCount = dayData.fbCount ?? 0;
+            const fbTotal = dayData.fbTotal ?? 0;
             return (
               <div
                 key={day.toString()}
                 className={cn(
-                  "aspect-[4/3] rounded-md border p-1 flex flex-col justify-center items-center transition-all hover:scale-105 group relative",
+                  "aspect-[4/3] min-h-[88px] rounded-md border p-1.5 flex flex-col items-stretch justify-between transition-all hover:scale-105 group relative",
                   colors.borderClass,
                   isToday && 'ring-2 ring-primary ring-offset-1 ring-offset-background'
                 )}
                 style={{
                   backgroundColor: `hsl(var(--${colors.colorClass.replace('bg-', '')}) / ${colors.opacity})`
                 }}
+                data-testid={`calendar-day-${dayData.date}`}
               >
-                {/* Número do dia */}
+                {/* DIA */}
                 <div className={cn(
-                  "text-lg sm:text-xl md:text-2xl font-bold leading-none",
+                  "text-base sm:text-lg md:text-xl font-bold leading-none text-left",
                   colors.textClass
                 )}>
                   {format(day, 'd')}
                 </div>
-                
-                {/* Informações do dia */}
+
+                {/* LUCRO + FB + PROC */}
                 {dayData.count > 0 ? (
-                  <div className={cn("text-center w-full", colors.textClass)}>
-                    <div className="text-[9px] sm:text-[10px] md:text-xs font-medium leading-tight">
-                      {dayData.count} proc.
-                    </div>
-                    <div className="text-[10px] sm:text-xs md:text-sm font-bold leading-tight">
+                  <div className={cn("text-left w-full space-y-0.5", colors.textClass)}>
+                    {/* Lucro do dia */}
+                    <div className="text-[10px] sm:text-xs md:text-sm font-bold leading-tight font-mono">
                       R$ {dayData.profit.toFixed(0)}
+                    </div>
+                    {/* Quantidade + valor total de FB ganhas no dia */}
+                    {fbCount > 0 && (
+                      <div className="text-[9px] sm:text-[10px] md:text-[11px] leading-tight font-medium opacity-90">
+                        🎟️ {fbCount} • R$ {fbTotal.toFixed(0)}
+                      </div>
+                    )}
+                    {/* Quantidade de procedimentos do dia */}
+                    <div className="text-[9px] sm:text-[10px] md:text-[11px] font-medium leading-tight opacity-80">
+                      {dayData.count} proc.
                     </div>
                   </div>
                 ) : (
                   <div className={cn(
-                    "text-[8px] sm:text-[9px] md:text-[10px] text-center opacity-60",
+                    "text-[8px] sm:text-[9px] md:text-[10px] text-left opacity-60",
                     colors.textClass
                   )}>
                     Sem dados
@@ -127,9 +138,12 @@ export function CalendarChart({ data, title, selectedMonth }: CalendarChartProps
 
                 {/* Tooltip */}
                 {dayData.count > 0 && (
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1.5 bg-popover border border-border rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 whitespace-nowrap">
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-2 bg-popover border border-border rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 whitespace-nowrap">
                     <p className="text-xs font-bold text-foreground">R$ {dayData.profit.toFixed(2)}</p>
                     <p className="text-[10px] text-muted-foreground">{dayData.count} procedimentos</p>
+                    {fbCount > 0 && (
+                      <p className="text-[10px] text-purple-400">🎟️ {fbCount} freebet{fbCount > 1 ? 's' : ''} • R$ {fbTotal.toFixed(2)}</p>
+                    )}
                   </div>
                 )}
               </div>

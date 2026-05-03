@@ -246,8 +246,8 @@ export const getMountainChartData = (procedures: Procedure[], selectedMonth: Dat
 export const getDailyProfitData = (procedures: Procedure[], selectedMonth: Date) => {
   const monthStart = startOfMonth(selectedMonth);
   const monthEnd = endOfDay(endOfMonth(selectedMonth));
-  const dailyData: Record<string, { profit: number; count: number }> = {};
-  
+  const dailyData: Record<string, { profit: number; count: number; fbCount: number; fbTotal: number }> = {};
+
   getCountableProcedures(procedures)
     .filter(proc => {
       const procDate = proc.date ? parseDate(proc.date) : null;
@@ -258,15 +258,21 @@ export const getDailyProfitData = (procedures: Procedure[], selectedMonth: Date)
       if (procDate && !isNaN(procDate.getTime())) {
         const dateKey = format(procDate, 'dd/MM', { locale: ptBR });
         if (!dailyData[dateKey]) {
-          dailyData[dateKey] = { profit: 0, count: 0 };
+          dailyData[dateKey] = { profit: 0, count: 0, fbCount: 0, fbTotal: 0 };
         }
         dailyData[dateKey].profit += (proc.profit_loss || 0);
         dailyData[dateKey].count += 1;
+        // Freebets ganhas no dia (resultado_freebet_ganha > 0)
+        const fbGanha = proc.resultado_freebet_ganha ?? 0;
+        if (fbGanha > 0) {
+          dailyData[dateKey].fbCount += 1;
+          dailyData[dateKey].fbTotal += fbGanha;
+        }
       }
     });
-  
+
   return Object.entries(dailyData)
-    .map(([date, data]) => ({ date, profit: data.profit, count: data.count }))
+    .map(([date, data]) => ({ date, profit: data.profit, count: data.count, fbCount: data.fbCount, fbTotal: data.fbTotal }))
     .sort((a, b) => {
       const [dayA, monthA] = a.date.split('/');
       const [dayB, monthB] = b.date.split('/');
