@@ -356,32 +356,39 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
                   </Select>
                 </div>
               </div>
-              {/* Manual fallback — só aparece quando NÃO há fixture vinculado da API.
-                  Quando vinculado, data/horário vêm do kickoff_at automaticamente. */}
-              {!formData.kickoff_at && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-                  <div>
-                    <FieldLabel icon={Calendar} label="Data (manual)" />
-                    <Input
-                      type="date"
-                      value={formData.data_partida}
-                      onChange={(e) => setFormData({ ...formData, data_partida: e.target.value })}
-                      data-testid="input-data-partida"
-                      className="bg-amber-500/5 border-amber-500/20 focus:border-amber-500/50 h-9 text-sm"
-                    />
-                  </div>
-                  <div>
-                    <FieldLabel icon={Clock} label="Horário (manual)" />
-                    <Input
-                      type="time"
-                      value={formData.horario_partida}
-                      onChange={(e) => setFormData({ ...formData, horario_partida: e.target.value })}
-                      data-testid="input-horario-partida"
-                      className="bg-amber-500/5 border-amber-500/20 focus:border-amber-500/50 h-9 text-sm"
-                    />
-                  </div>
+              {/* Data/horário sempre visíveis. Quando há fixture vinculado da API,
+                  preenchem automaticamente a partir do kickoff_at em America/Sao_Paulo.
+                  Se editar manualmente, desvincula o fixture pra evitar inconsistência. */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                <div>
+                  <FieldLabel icon={Calendar} label="Data da partida" />
+                  <Input
+                    type="date"
+                    value={
+                      formData.kickoff_at
+                        ? new Date(formData.kickoff_at).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' })
+                        : formData.data_partida
+                    }
+                    onChange={(e) => setFormData({ ...formData, data_partida: e.target.value, kickoff_at: null, fixture_id: null })}
+                    data-testid="input-data-partida"
+                    className="bg-amber-500/5 border-amber-500/20 focus:border-amber-500/50 h-9 text-sm"
+                  />
                 </div>
-              )}
+                <div>
+                  <FieldLabel icon={Clock} label="Horário da partida" />
+                  <Input
+                    type="time"
+                    value={
+                      formData.kickoff_at
+                        ? new Date(formData.kickoff_at).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit', hour12: false })
+                        : formData.horario_partida
+                    }
+                    onChange={(e) => setFormData({ ...formData, horario_partida: e.target.value, kickoff_at: null, fixture_id: null })}
+                    data-testid="input-horario-partida"
+                    className="bg-amber-500/5 border-amber-500/20 focus:border-amber-500/50 h-9 text-sm"
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Section: Promoção */}
