@@ -1,0 +1,89 @@
+Pessoal, queria pedir uma feature pro admin de vocês: o botão "Gerar
+Relatório" igual o que temos aqui no FreeBet PRO.
+
+A ideia é: no fim do dia (ou quando quiserem), vocês clicam num botão
+no admin de vocês e o sistema gera AUTOMATICAMENTE o texto do
+relatório diário no formato padrão, pra mandar nos grupos. Hoje vocês
+precisam montar isso na mão, e isso é trabalho repetitivo que dá pra
+automatizar do lado de vocês.
+
+═══════════════════════════════════════════════════════
+SPEC DO RELATÓRIO (igual o nosso)
+═══════════════════════════════════════════════════════
+
+FORMATO DO TEXTO GERADO:
+
+💵📊 Relatório Diário de Lucros ( DD/MM/AAAA )
+
+💵 SUPER ODD / LUCRO DIRETO :
+10,00 Bet365
+25,00 Betano
+[etc]
+
+🩶 LUCROS COM FREEBETS :
+50,00 Bet365
+[etc]
+
+🎯 DUPLO GREEN :
+30,00 ( Flamengo x Vasco )
+[etc]
+
+⏳ FREEBETS PENDENTES DE CONVERSÃO :
+[texto editável manual — campo livre que o admin digita]
+
+📅 LUCRO TOTAL DO DIA = R$ XXX,XX
+
+═══════════════════════════════════════════════════════
+REGRAS DE AGRUPAMENTO
+═══════════════════════════════════════════════════════
+
+Pega TODOS os procedimentos do dia (filtra por data de criação = hoje)
+e separa em 3 seções:
+
+1. SUPER ODD / LUCRO DIRETO:
+   - categoria != 'DUPLO_GREEN'
+   - tipo != 'QUEIMAR_FB'
+   - lucro_efetivo > 0
+   - Formato linha: "VALOR CASA" (ex: "10,00 Bet365")
+
+2. LUCROS COM FREEBETS:
+   - tipo == 'QUEIMAR_FB'
+   - categoria != 'DUPLO_GREEN'
+   - Formato linha: "VALOR CASA"
+
+3. DUPLO GREEN:
+   - categoria == 'DUPLO_GREEN'
+   - Formato linha: "VALOR ( EVENTO )"
+     (ex: "30,00 ( Flamengo x Vasco )")
+
+LUCRO_EFETIVO:
+- Se resultado_lucro existir e for != 0 → usa ele (valor real fechado)
+- Senão → usa lucro_prejuizo (esperado/cadastrado)
+- Pra DUPLO_GREEN: prefere duplo_green_lucro se existir
+
+LUCRO TOTAL DO DIA:
+- Soma o lucro_efetivo de TODAS as 3 seções
+- Pra LUCROS COM FREEBETS: se não tem resultado_lucro real, usa
+  freebet_valor como fallback (a freebet "vira" lucro)
+
+FORMATAÇÃO DE NÚMEROS:
+- Sempre 2 casas decimais
+- Vírgula como separador decimal (pt-BR)
+- Sem separador de milhar
+
+═══════════════════════════════════════════════════════
+UI DO MODAL (igual o nosso, ver print anexo)
+═══════════════════════════════════════════════════════
+
+- Botão "📋 Gerar Relatório" no canto superior direito do admin
+- Ao clicar, abre modal com 2 colunas:
+  → ESQUERDA: Preview do texto pronto (com botão "Copiar texto")
+  → DIREITA: Campo editável "FREEBETS PENDENTES" (textarea livre)
+- Embaixo: contador "X procedimentos incluídos" + total
+- Rodapé: botão "Copiar Relatório" (copia o texto final pra clipboard)
+
+═══════════════════════════════════════════════════════
+
+Esse fechamento é o mesmo que vocês usam pra fazer marketing nos
+grupos, e ter ele automático economiza muito tempo. Conseguem
+implementar aí?

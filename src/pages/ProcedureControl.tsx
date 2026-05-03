@@ -41,6 +41,7 @@ import { ProcedureTable } from '@/components/procedures/ProcedureTable';
 import { ProcedureMobileCards } from '@/components/procedures/ProcedureMobileCards';
 import { ProcedureModal } from '@/components/procedures/ProcedureModal';
 import { ImportModal } from '@/components/procedures/ImportModal';
+import { GerarRelatorioModal } from '@/components/procedures/GerarRelatorioModal';
 import { ColumnCustomizer } from '@/components/procedures/ColumnCustomizer';
 import { NotificationPanel } from '@/components/procedures/NotificationPanel';
 import { MountainChart } from '@/components/procedures/MountainChart';
@@ -62,6 +63,7 @@ export default function ProcedureControl() {
   const [selectedMonth, setSelectedMonth] = usePersistedState('proc_month', new Date());
   const [showNotifications, setShowNotifications] = useState(true);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showRelatorioModal, setShowRelatorioModal] = useState(false);
   const [showColumnCustomizer, setShowColumnCustomizer] = useState(false);
   
   const [filters, setFilters] = usePersistedState<FiltersType>('proc_filters', {
@@ -204,6 +206,16 @@ export default function ProcedureControl() {
           </div>
           {canEdit && (
             <div className="flex gap-2 flex-shrink-0">
+              <Button
+                variant="outline"
+                onClick={() => setShowRelatorioModal(true)}
+                size="sm"
+                className="border-white/10 hover:bg-white/5 h-9"
+                data-testid="button-gerar-relatorio"
+              >
+                <FileText className="w-3.5 h-3.5 mr-1.5" />
+                Gerar Relatório
+              </Button>
               <Button
                 variant="outline"
                 onClick={() => setShowImportModal(true)}
@@ -423,6 +435,12 @@ export default function ProcedureControl() {
           onSuccess={() => refetch()}
         />
       )}
+      <GerarRelatorioModal
+        open={showRelatorioModal}
+        onOpenChange={setShowRelatorioModal}
+        procedures={procedures}
+      />
+
       {showColumnCustomizer && (
         <ColumnCustomizer
           visibleColumns={visibleColumns}
