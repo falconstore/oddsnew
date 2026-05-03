@@ -32,6 +32,8 @@ export function useProcedures() {
     refetchInterval: 120000,
     refetchIntervalInBackground: false,
     enabled: isProceduresSupabaseConfigured(),
+    // Mantém a lista estável durante refetches — evita o "pisca" do skeleton.
+    placeholderData: (prev) => prev,
   });
 }
 

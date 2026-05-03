@@ -7,7 +7,6 @@ interface RequireAuthProps {
   pageKey?: PageKey;
 }
 
-// Ordered list of pages to try redirecting to
 const REDIRECT_ORDER: { pageKey: PageKey; path: string }[] = [
   { pageKey: 'dashboard', path: '/' },
   { pageKey: 'procedure_control', path: '/procedure-control' },
@@ -32,10 +31,11 @@ const getFirstPermittedPath = (
 };
 
 export const RequireAuth = ({ children, pageKey }: RequireAuthProps) => {
-  const { user, loading, isApproved, isAdmin, userPermissions, canViewPage } = useAuth();
+  const { user, loading, hasBooted, permissionsReady, isApproved, isAdmin, userPermissions, canViewPage } = useAuth();
   const location = useLocation();
 
-  if (loading) {
+  // Boot inicial: ainda não temos resposta do Supabase pra saber se há sessão.
+  if (!hasBooted && loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-muted-foreground">Carregando...</div>
@@ -48,11 +48,22 @@ export const RequireAuth = ({ children, pageKey }: RequireAuthProps) => {
     return <Navigate to={`/login?returnTo=${returnTo}`} replace />;
   }
 
+  // Gate de permissões: se já temos um user mas o fetch de user_permissions
+  // pra esse id ainda não voltou (boot ou troca real de usuário), aguarda
+  // antes de avaliar isApproved/canViewPage. Sem isso poderíamos redirecionar
+  // pra /login na fração de segundo entre "user chegou" e "permissões chegaram".
+  if (!permissionsReady) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-muted-foreground">Carregando...</div>
+      </div>
+    );
+  }
+
   if (!isApproved) {
     return <Navigate to="/login" replace />;
   }
 
-  // Redirect to first permitted page if no access
   if (pageKey && !canViewPage(pageKey)) {
     const fallback = getFirstPermittedPath(userPermissions, isAdmin);
     return <Navigate to={fallback} replace />;

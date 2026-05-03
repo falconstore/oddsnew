@@ -17,6 +17,8 @@ export const useScraperStatus = () => {
       return data as ScraperStatus[];
     },
     refetchInterval: 30000, // 30 segundos
+    // Mantém a tabela estável durante refetches — evita o "pisca" do skeleton.
+    placeholderData: (prev) => prev,
   });
 };
 

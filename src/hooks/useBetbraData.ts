@@ -31,6 +31,8 @@ export function useBetbraData() {
     refetchInterval: 120000,
     refetchIntervalInBackground: false,
     enabled: isProceduresSupabaseConfigured(),
+    // Mantém a tabela estável durante refetches — evita o "pisca" do skeleton.
+    placeholderData: (prev) => prev,
   });
 }
 

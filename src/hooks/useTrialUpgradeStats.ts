@@ -104,5 +104,8 @@ export const useTrialUpgradeStats = (
     },
     staleTime: 30_000,
     refetchInterval: 60_000,
+    // Mantém os KPIs antigos visíveis durante o refetch — sem isso o card
+    // pisca pro skeleton a cada 60s e parece um "F5".
+    placeholderData: (prev) => prev,
   });
 };

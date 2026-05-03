@@ -23,6 +23,7 @@ export const useRealtimeSubscription = ({
   const queryClient = useQueryClient();
   const channelRef = useRef<ReturnType<ReturnType<typeof getSupabase>['channel']> | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingWhileHiddenRef = useRef(false);
 
   useEffect(() => {
     if (!enabled || !isSupabaseConfigured()) return;
@@ -37,10 +38,30 @@ export const useRealtimeSubscription = ({
     // N refetches simultâneos e cada cliente conectado pisca várias vezes seguidas.
     const flush = () => {
       timerRef.current = null;
+      // Se a aba está escondida (usuário tirando print, em outra tab),
+      // adiamos o refetch pra quando ela voltar — evita o "pisca" que
+      // aparece logo após capturar a tela.
+      if (typeof document !== 'undefined' && document.hidden) {
+        pendingWhileHiddenRef.current = true;
+        return;
+      }
       queryKeys.forEach(key => {
         queryClient.invalidateQueries({ queryKey: key });
       });
     };
+
+    const onVisibilityChange = () => {
+      if (typeof document === 'undefined') return;
+      if (!document.hidden && pendingWhileHiddenRef.current) {
+        pendingWhileHiddenRef.current = false;
+        queryKeys.forEach(key => {
+          queryClient.invalidateQueries({ queryKey: key });
+        });
+      }
+    };
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', onVisibilityChange);
+    }
 
     const channel = supabase
       .channel(channelName)
@@ -67,6 +88,9 @@ export const useRealtimeSubscription = ({
       if (timerRef.current) {
         clearTimeout(timerRef.current);
         timerRef.current = null;
+      }
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', onVisibilityChange);
       }
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);

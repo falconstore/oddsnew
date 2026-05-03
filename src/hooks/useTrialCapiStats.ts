@@ -88,5 +88,8 @@ export const useTrialCapiStats = () => {
     },
     staleTime: 30_000,
     refetchInterval: 60_000,
+    // Mantém o painel CAPI estável entre refetches — sem isso o card
+    // pisca pro skeleton a cada 60s.
+    placeholderData: (prev) => prev,
   });
 };

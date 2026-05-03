@@ -24,6 +24,8 @@ export function useSubscriptions() {
     },
     refetchInterval: 120000,
     refetchIntervalInBackground: false,
+    // Mantém a tabela estável durante refetches — evita o "pisca" do skeleton.
+    placeholderData: (prev) => prev,
   });
 }
 
