@@ -1,0 +1,593 @@
+Pacote de paridade — BetShark Pro × FreeBet PRO
+Esta pasta contém 4 documentos que descrevem o que falta no modal "Novo Procedimento" do lado do BetShark Pro pra ficar idêntico ao do FreeBet PRO. O contrato HTTP entre as duas plataformas (POST /api/integracoes/betshark/procedimentos e variantes) já está homologado — esses docs são sobre paridade da experiência de cadastro e da tela de acompanhamento.
+
+A integração já aceita os campos vistos hoje no payload do Shark; o normalizador de aliases (normalizeBetsharkAliases em server/routes/integracoesBetshark.ts:253) converte os 4 nomes alternativos do Shark pros nomes canônicos antes da validação Zod. Nada precisa mudar lá.
+
+Ordem de leitura sugerida
+01 — Comparativo de campos do modal Tabela campo a campo do nosso modal (Painel de Envios → Novo Procedimento) marcando o que o Shark já manda vs falta mandar, com tipo, exemplo e obrigatoriedade. Ponto de partida pra entender o gap.
+
+02 — Guia API-Football passo a passo Como o autocomplete de eventos com fixture_id funciona no nosso lado e como o Shark replica do zero: pegar token na api-sports.io, headers, endpoint, parâmetros, resposta normalizada, debounce, cache. Habilita as funcionalidades secundárias (badge AO VIVO, opt-in 🔔 de 2 gols de vantagem, filtro de jogo encerrado).
+
+03 — Lógica Ganhar FreeBet / Queimar FreeBet Quando o procedimento é GANHAR_FB (gera FB futura) vs QUEIMAR_FB (gasta FB já ganha) vs NORMAL. Documenta o deduzirTipoFB() (servidor força o tipo correto mesmo se o checkbox manual estiver errado) e a cadeia via external_referencia_id. Sem isso, o ciclo da FB não fecha.
+
+04 — Aba "FreeBets Ganhas" Replica conceitual da nossa tela: 3 status derivados (falta_girar, queimando, concluida), 4 KPIs, filtros pills (período × status), comportamento "ciclo completo" (quando a queima fecha automaticamente a origem). Sugere endpoint equivalente no lado do Shark.
+
+Recados pro time do Shark
+A integração POST/PATCH já tá funcionando. O smoke test do dia 03/05 passou com Status 201, procedimento id=35 numero=500. Esses 4 documentos são sobre a UI de cadastro e a tela de acompanhamento do lado de vocês.
+A chave da API-Football vai ser fornecida pelo time FreeBet. Detalhes em 02-guia-api-football.md. Não compartilhem a chave em commit/log; usem env var.
+Cada documento termina com checklist objetiva — usem como controle interno de "feito / em andamento / não começou".
+Qualquer dúvida, abram issue mencionando o número da seção (ex: "doc 03 §3.2") pra ficar fácil rastrear.
+
+01 — Comparativo de campos do modal
+Objetivo: Listar todos os campos do modal "Novo Procedimento" do FreeBet PRO (src/pages/PainelDeEnvios.jsx → ProcedimentoForm) e comparar com o que o BetShark Pro já envia hoje no payload de teste, apontando os gaps.
+
+1. Os 17 campos que o Shark já manda hoje
+Visto no log do POST de homologação (req_MOP7LMHC11KR4Z5Z69FK, dia 03/05/2026):
+
+external_id, titulo, casa_aposta, categoria, prioridade, tipo,
+data_partida, horario_partida, partida_descricao,
+lucro_prejuizo_previsto, freebet_valor_previsto,
+dp, descricao_promocao, link_promocao, link_telegram,
+external_referencia_id, arquivado
+
+Esses 17 campos cobrem o núcleo do modal. Os 4 nomes em itálico (lucro_prejuizo_previsto, freebet_valor_previsto, external_referencia_id, arquivado) são aliases que o normalizador do FreeBet PRO já converte automaticamente — nenhuma mudança necessária do lado do Shark nesses 4.
+
+2. Tabela completa — modal FreeBet PRO × payload Shark
+#	Seção (modal)	Label visível	Campo no payload Shark	Tipo / formato	Obrigatório?	Status
+1	Identificação	Nº Procedimento	(gerado pelo backend FreeBet)	inteiro	—	⚙ Backend
+2	Identificação	Plataforma (casa)	casa_aposta	string 1..80	Sim	✅ Já manda
+3	Promoção	Nome da Promoção	titulo	string 1..200	Sim	✅ Já manda
+4	Promoção	Categoria	categoria	enum¹	Recomendado	✅ Já manda
+5	Promoção	Status	status_operacao (não exposto)	enum²	—	⚙ Sempre ENVIADO na criação
+6	Jogo / Evento	Esporte	esporte	string, default FUTEBOL	Não	⚠ Não envia (assume FUTEBOL)
+7	Jogo / Evento	Data e Hora	data_partida + horario_partida	YYYY-MM-DD + HH:MM (BRT)	Não	✅ Já manda
+8	Jogo / Evento	Data e Hora (precisão UTC)	kickoff_at	ISO 8601 com offset	Não	❌ Falta — habilita ordenação por horário e alertas "começa em breve" / "ao vivo agora"
+9	Jogo / Evento	Evento / Partida (autocomplete)	partida_descricao	string até 200	Não	✅ Já manda (texto livre)
+10	Jogo / Evento	Evento / Partida (vinculado)	fixture_id	inteiro positivo	Não	❌ Falta — habilita opt-in 🔔 (2 gols de vantagem), badge AO VIVO, filtro de jogo encerrado. Vide doc 02
+11	Promoção	Banner / imagens	imagens_banner	array de URLs (até 5)	Não	⚠ Não envia
+12	Promoção	Descrição	descricao_promocao	text até 5000	Não	✅ Já manda
+13	Promoção	Link da promoção	link_promocao	URL http/https	Não	✅ Já manda
+14	Resultado	Lucro/Prejuízo previsto	lucro_prejuizo_previsto (alias de lucro_prejuizo)	decimal string	Não	✅ Já manda
+15	Resultado	Cenário B (perda do hedge)	cenario_b_cash	decimal	Não	❌ Falta — usado pra calcular lucro líquido do ciclo FB
+16	Resultado	Link Telegram	link_telegram	URL	Não	✅ Já manda
+17	Freebet	Tipo (Normal / Ganhar FB / Queimar FB / Duplo)	tipo	enum³	Não, default NORMAL	✅ Já manda. ⚠ Backend pode sobrescrever via deduzirTipoFB() — vide doc 03
+18	Freebet	FB esperada	freebet_valor_previsto (alias de freebet_valor)	decimal ≥ 0	Só p/ GANHAR_FB / QUEIMAR_FB	✅ Já manda
+19	Freebet	Origem da FB (autocomplete)	external_referencia_id (alias de procedimento_referencia_external_id)	UUID	Só p/ QUEIMAR_FB	✅ Já manda
+20	Tags	Chance Duplo	dp	bool	Não	✅ Já manda
+21	Tags	Tachado	tachado	bool	Não	⚠ Provavelmente não envia — se vocês não usam, ignorem
+22	Tags	Etiquetas livres	etiquetas	array de strings	Não	⚠ Não envia — opcional
+23	Bandeira	Arquivar	arquivado (alias de arquivar)	bool	Não, default false	✅ Já manda
+24	Prioridade	Prioridade	prioridade	enum⁴, default MEDIA	Não	✅ Já manda
+Enums:
+
+categoria: PROMOCAO | CASHBACK | FREEBET | SUPERODD | EXTRA | GIROS_GRATIS | DUPLO_GREEN
+status_operacao (gerenciado pelo backend FreeBet): ENVIADO | PARTIDA_ABERTO | FREEBET_PENDENTE | REFERENCIA_FALTANDO | FALTA_GIRAR_FB | APOSTA_SEM_RISCO | CONCLUIDO | LUCRO_DIRETO
+tipo: NORMAL | GANHAR_FB | QUEIMAR_FB | DUPLO. Aceita também SEM_FB (alias → NORMAL).
+prioridade: ALTA | MEDIA | BAIXA
+3. Resumo dos gaps
+Gaps bloqueantes (impedem features importantes)
+Gap	Impacto se não enviar
+fixture_id	Sem opt-in 🔔 (alerta de 2 gols de vantagem no Telegram). Sem badge "AO VIVO" no card. Sem filtro de jogo encerrado. Vide doc 02 pra implementar.
+kickoff_at	Sem ordenação cronológica precisa. Sem alertas "começa em breve" e "ao vivo agora" (/alertas do nosso backend).
+Gaps menores (recomendados, mas não bloqueiam nada)
+Gap	Impacto
+esporte	Default FUTEBOL. Se o Shark cobrir basquete/tênis, mandar evita exibir esporte errado no card.
+cenario_b_cash	Sem ele, o "lucro líquido do ciclo FB" da aba FreeBets Ganhas conta só a etapa 1 (ganhar) — não soma a perda do hedge. Vide doc 04.
+imagens_banner	Card aparece sem banner visual; cosmético.
+Gaps opcionais
+tachado, etiquetas: cosméticos. Mandar se já existir do lado de vocês; ignorar caso contrário.
+4. Checklist de implementação (Shark)
+Marquem conforme avançam:
+
+ Validar que os 17 campos atuais continuam sendo enviados sem regressão (smoke POST /procedimentos retorna 201).
+ Adicionar kickoff_at (ISO 8601 UTC, ex: "2026-05-10T19:00:00Z") sempre que data_partida + horario_partida estiverem preenchidos.
+ Implementar autocomplete de eventos no modal de vocês usando API-Football (vide doc 02) e capturar fixture_id quando o usuário selecionar uma sugestão.
+ Mandar esporte explicitamente (não confiar no default).
+ Mandar cenario_b_cash quando o tipo for GANHAR_FB/DUPLO e existir hedge previsto.
+ (Opcional) Mandar imagens_banner se vocês têm CDN com banners.
+ (Opcional) Mandar tachado / etiquetas se forem usar.
+5. Referências cruzadas
+Spec completa do contrato: docs/integracoes/betshark-pro/02-spec-endpoint-integracao.md
+Próximo doc: 02 — Guia API-Football passo a passo
+
+02 — Guia API-Football passo a passo
+Objetivo: Ensinar o time do Shark a implementar, do zero, o autocomplete de eventos com fixture_id no modal "Novo Procedimento" de vocês — exatamente como funciona no nosso EventoAutocomplete.jsx. Sem precisar olhar código nosso.
+
+1. O que muda na UX
+Hoje o modal de vocês tem (provavelmente) um campo de texto livre pra "Partida". Com este guia, vocês adicionam:
+
+Dropdown que abre conforme o usuário digita 2+ caracteres.
+Lista de jogos reais do dia (ou amanhã/depois) puxada da API-Football.
+Ao clicar em um jogo, captura fixture_id (inteiro), kickoff_at (UTC ISO 8601), nome do campeonato e país.
+Mantém possibilidade de digitar livre (caso o jogo não esteja na lista).
+Mostra um badge "AO VIVO" pros jogos que já começaram.
+Por que vocês querem isso: o fixture_id desbloqueia 3 features no FreeBet PRO sem custo adicional pra vocês:
+
+🔔 Opt-in de "2 gols de vantagem" — alerta Telegram automático.
+⚡ Badge "AO VIVO" / "ENCERRADO" no card do procedimento.
+🔁 Filtro automático de jogos encerrados sem resultado registrado.
+2. Pegando a chave da API-Football
+A FreeBet vai fornecer a chave pro time do Shark — não precisam criar conta. Mas pra entenderem o que estão usando:
+
+A API é a api-sports.io (também espelhada no RapidAPI).
+Plano necessário: Pro (≈ US$ 19/mês) — 7.500 chamadas/dia, jogos em tempo real, ligas brasileiras incluídas.
+Host base: v3.football.api-sports.io (versão direta) ou api-football-v1.p.rapidapi.com (RapidAPI).
+Header de autenticação:
+Direto (api-sports.io): x-apisports-key: <SUA_CHAVE>
+Via RapidAPI: x-rapidapi-key: <SUA_CHAVE> + x-rapidapi-host: v3.football.api-sports.io
+⚠ Nunca commitem a chave. Usem env var (ex: API_FOOTBALL_KEY). Nunca exponham no frontend — todas as chamadas devem sair do backend de vocês, com o frontend chamando um endpoint próprio (GET /api/eventos/buscar?q=...).
+
+3. Endpoint usado: GET /fixtures
+3.1 Parâmetros que o FreeBet usa hoje
+GET https://v3.football.api-sports.io/fixtures?date=YYYY-MM-DD
+Headers:
+  x-apisports-key: <chave>
+
+date=YYYY-MM-DD — pega todos os jogos do dia (UTC). O FreeBet faz 3 chamadas em paralelo: hoje, amanhã, depois de amanhã (API_FOOTBALL_DIAS_AHEAD = 3).
+Não usamos live=all no /fixtures por dia — o flag "AO VIVO" é derivado no cliente comparando kickoff_at com Date.now() (jogo é "ao vivo" se já começou e estamos na janela de 4h pós-kickoff).
+3.2 Resposta crua (resumo dos campos relevantes)
+{
+  "response": [
+    {
+      "fixture": {
+        "id": 1234567,
+        "date": "2026-05-10T19:00:00+00:00",
+        "status": { "short": "NS", "long": "Not Started" }
+      },
+      "league": {
+        "name": "Brasileirão Serie A",
+        "country": "Brazil"
+      },
+      "teams": {
+        "home": { "name": "Flamengo" },
+        "away": { "name": "Palmeiras" }
+      },
+      "goals": { "home": null, "away": null }
+    }
+  ]
+}
+
+3.3 Normalização (forma que o frontend espera)
+O nosso backend transforma cada response[i] no objeto abaixo (mais simples e direto):
+
+{
+  "nome": "Flamengo x Palmeiras",
+  "campeonato": "Brasileirão Serie A (Brazil)",
+  "data_hora": "2026-05-10T19:00:00.000Z",
+  "fixture_id": 1234567,
+  "kickoff_at": "2026-05-10T19:00:00.000Z",
+  "esporte": "futebol",
+  "source": "api-football"
+}
+
+Use exatamente esse formato no endpoint do backend de vocês — torna o frontend trivial de implementar.
+
+4. Cache e quota
+A API-Football permite 7.500 calls/dia no plano Pro. Sem cache, vocês esgotam em horas. Estratégia que usamos:
+
+Cache em memória de 12 horas (chave: fetchedAt + lista).
+Cada refresh executa 3 chamadas (hoje + 2 dias).
+Total: ~6 chamadas/dia (12h ÷ 2 atualizações × 3 dias). Sobra cota de sobra.
+// Pseudocódigo (Node)
+let cache = { data: [], fetchedAt: 0 };
+const TTL = 12 * 60 * 60 * 1000;
+const DIAS_AHEAD = 3;
+async function fetchFixtures() {
+  if (Date.now() - cache.fetchedAt < TTL && cache.data.length > 0) {
+    return cache.data;
+  }
+  const todas = [];
+  for (let i = 0; i < DIAS_AHEAD; i++) {
+    const d = new Date(Date.now() + i * 86400_000);
+    const ymd = d.toISOString().slice(0, 10);
+    const r = await fetch(`https://v3.football.api-sports.io/fixtures?date=${ymd}`, {
+      headers: { 'x-apisports-key': process.env.API_FOOTBALL_KEY }
+    });
+    if (!r.ok) continue;
+    const json = await r.json();
+    for (const f of (json.response || [])) {
+      const home = f?.teams?.home?.name;
+      const away = f?.teams?.away?.name;
+      const fxId = Number(f?.fixture?.id);
+      const dt = f?.fixture?.date;
+      if (!home || !away || !Number.isFinite(fxId) || !dt) continue;
+      todas.push({
+        nome: `${home} x ${away}`,
+        campeonato: `${f.league?.name || ''}${f.league?.country ? ` (${f.league.country})` : ''}`,
+        data_hora: new Date(dt).toISOString(),
+        fixture_id: fxId,
+        kickoff_at: new Date(dt).toISOString(),
+        esporte: 'futebol',
+        source: 'api-football',
+      });
+    }
+  }
+  cache = { data: todas, fetchedAt: Date.now() };
+  return todas;
+}
+
+5. Endpoint de busca (backend de vocês)
+Crie um endpoint próprio, autenticado, que filtra a lista cacheada pelo termo de busca:
+
+// GET /api/eventos/buscar?q=flam
+app.get('/api/eventos/buscar', requireAuth, async (req, res) => {
+  const q = String(req.query.q || '').trim().toLowerCase();
+  if (q.length < 2) return res.json([]);
+  const todas = await fetchFixtures();
+  const agora = Date.now();
+  const JANELA_AO_VIVO = 4 * 60 * 60 * 1000; // 4h pós-kickoff = ainda relevante
+  const resultado = todas
+    .filter(f => f.nome.toLowerCase().includes(q))
+    .filter(f => new Date(f.data_hora).getTime() > agora - JANELA_AO_VIVO)
+    .sort((a, b) => new Date(a.data_hora) - new Date(b.data_hora))
+    .slice(0, 15);
+  res.json(resultado);
+});
+
+6. Frontend (autocomplete)
+Pontos críticos pra UX boa:
+
+Debounce 250ms — não dispara request a cada tecla.
+AbortController — cancela request anterior se o usuário continuar digitando.
+Mínimo 2 caracteres — abaixo disso a lista é vazia.
+Limpar seleção se o texto muda — se o usuário selecionou "Flamengo x Palmeiras" e depois apaga "Palmeiras", o fixture_id deve voltar pra null.
+Auto-vincular ao reabrir — em modo edição, se o texto bate exato com um jogo da lista, auto-vincula o fixture_id (busca por nome + match exato case-insensitive).
+Esqueleto React (vanilla JS é equivalente):
+
+function EventoAutocomplete({ value, onChange, onSelectSugestao }) {
+  const [sugestoes, setSugestoes] = useState([]);
+  const debounceRef = useRef(null);
+  const abortRef = useRef(null);
+  function buscar(termo) {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!termo || termo.length < 2) return setSugestoes([]);
+    debounceRef.current = setTimeout(async () => {
+      if (abortRef.current) abortRef.current.abort();
+      abortRef.current = new AbortController();
+      const r = await fetch(`/api/eventos/buscar?q=${encodeURIComponent(termo)}`, {
+        signal: abortRef.current.signal,
+        credentials: 'include',
+      });
+      if (r.ok) setSugestoes(await r.json());
+    }, 250);
+  }
+  function selecionar(s) {
+    onChange(s.nome);
+    onSelectSugestao({
+      partida_descricao: s.nome,
+      fixture_id: s.fixture_id,
+      kickoff_at: s.kickoff_at,
+    });
+    setSugestoes([]);
+  }
+  return (
+    <div>
+      <input
+        value={value}
+        onChange={e => { onChange(e.target.value); buscar(e.target.value); }}
+        placeholder="Ex: Flamengo x Palmeiras"
+      />
+      {sugestoes.map(s => (
+        <div key={s.fixture_id} onClick={() => selecionar(s)}>
+          {s.nome} — {s.campeonato}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+7. Mandando pro FreeBet PRO
+Quando o usuário salvar o procedimento, incluir os 2 campos novos no POST /api/integracoes/betshark/procedimentos:
+
+{
+  "external_id": "bsk:abc-123",
+  "titulo": "...",
+  "casa_aposta": "Bet365",
+  "partida_descricao": "Flamengo x Palmeiras",
+  "fixture_id": 1234567,                       // ← NOVO
+  "kickoff_at": "2026-05-10T19:00:00.000Z",    // ← NOVO
+  "data_partida": "2026-05-10",
+  "horario_partida": "16:00",
+  ...resto do payload
+}
+
+fixture_id e kickoff_at já são aceitos pelo schema do FreeBet sem mudança nenhuma.
+
+8. Checklist de implementação (Shark)
+ Cadastrar API_FOOTBALL_KEY como env var no backend.
+ Implementar fetchFixtures() com cache de 12h e 3 dias de horizonte.
+ Expor GET /api/eventos/buscar?q=... no backend.
+ Criar EventoAutocomplete no frontend com debounce 250ms + AbortController.
+ Capturar fixture_id e kickoff_at quando o usuário selecionar uma sugestão.
+ Limpar fixture_id/kickoff_at quando o usuário editar manualmente o texto da partida.
+ Incluir os 2 novos campos no payload do POST/PATCH pro FreeBet.
+ Testar: criar procedimento via autocomplete, conferir no FreeBet PRO se o badge AO VIVO aparece quando o jogo começa.
+9. Próximo doc
+03 — Lógica Ganhar FreeBet / Queimar FreeBet
+
+03 — Lógica Ganhar FreeBet / Queimar FreeBet
+Objetivo: Explicar pro time do Shark como o FreeBet PRO interpreta o tipo do procedimento e a cadeia de FB via external_referencia_id. Sem implementar isso direito, o ciclo da freebet nunca fecha automaticamente — o usuário fica com FBs "ganhas" eternas.
+
+1. Os 3 estados básicos
+O campo tipo do procedimento tem 3 valores principais (existe um quarto, DUPLO, equivalente a Normal mas com flag adicional):
+
+tipo	Quando usar	Comportamento no FreeBet PRO
+NORMAL (ou alias SEM_FB)	Procedimento sem freebet envolvida — só cash, lucro/prejuízo direto.	Card normal, sem cadeia.
+GANHAR_FB	Procedimento que gera uma freebet futura (ex: "aposte R$50 e ganhe FB R$50 em caso de empate").	Card com selo "Ganhar FB". Origem da cadeia. Quando o resultado é definido como freebet_creditada=SIM, vira um item em FreeBets Ganhas disponível pra ser referenciado por uma queima.
+QUEIMAR_FB	Procedimento que gasta uma FB já ganha (ex: "vou usar minha FB de R$50 da Bet365 nesse Real x Barça").	Card com selo "Queimar FB". Precisa apontar pra origem via external_referencia_id. Quando concluído com lucro, fecha a origem automaticamente (cascade FB).
+2. A cadeia via external_referencia_id
+Cada procedimento tem um external_id (UUID/string que identifica ele unicamente do lado de vocês). Quando vocês criam um QUEIMAR_FB, mandam o external_id do GANHAR_FB que originou aquela FB no campo external_referencia_id.
+
+Exemplo concreto
+Passo 1 — Criar o GANHAR_FB:
+
+POST /api/integracoes/betshark/procedimentos
+{
+  "external_id": "bsk:ganhar-2026-05-03-001",
+  "titulo": "SuperOdd Bet365 — empate FB R$50",
+  "casa_aposta": "Bet365",
+  "tipo": "GANHAR_FB",
+  "freebet_valor_previsto": 50.00,
+  "lucro_prejuizo_previsto": -5.00
+}
+
+→ FreeBet responde 201 com id interno (ex: 35).
+
+Passo 2 — Definir resultado (vocês também enviam isso, ou o admin do FreeBet faz):
+
+A freebet é creditada → freebet_creditada=SIM. Agora o item aparece na aba "FreeBets Ganhas" como falta_girar.
+
+Passo 3 — Criar o QUEIMAR_FB referenciando a origem:
+
+POST /api/integracoes/betshark/procedimentos
+{
+  "external_id": "bsk:queimar-2026-05-04-001",
+  "titulo": "Real x Barça — usando FB Bet365",
+  "casa_aposta": "Bet365",
+  "tipo": "QUEIMAR_FB",
+  "freebet_valor_previsto": 50.00,
+  "external_referencia_id": "bsk:ganhar-2026-05-03-001",  // ← ORIGEM
+  "lucro_prejuizo_previsto": 35.00
+}
+
+→ FreeBet faz lookup: procedimentos_tarefas WHERE external_id = 'bsk:ganhar-2026-05-03-001', pega o id interno (35), grava como procedimento_referencia.
+
+→ Se o UUID não for encontrado, retorna 422 UNRESOLVED_REFERENCE. É erro de integridade — vocês mandaram uma queima apontando pra origem que nunca foi enviada (ou foi excluída).
+
+Passo 4 — Definir resultado da queima:
+
+Quando o queimador é fechado com status_operacao=CONCLUIDO ou LUCRO_DIRETO e lucro_prejuizo preenchido, o backend fecha automaticamente a origem (cascade FB):
+
+A origem (GANHAR_FB) que estava em FREEBET_PENDENTE vai pra CONCLUIDO.
+O ciclo é considerado completo.
+A aba "FreeBets Ganhas" mostra esse par como concluida, com lucro líquido = etapa1.lucro + etapa2.lucro.
+3. deduzirTipoFB() — o backend "corrige" o tipo
+⚠ Regra crítica: o backend do FreeBet PRO ignora o tipo mandado se houver sinais cruzados. A lógica está em server/routes/integracoesBetshark.ts:271-282.
+
+3.1 As regras
+Se tem `external_referencia_id` (resolvido pra `procedimento_referencia`):
+  → força tipo = QUEIMAR_FB
+Senão se `freebet_valor > 0`:
+  → força tipo = GANHAR_FB
+Senão:
+  → mantém o tipo enviado (default NORMAL)
+
+3.2 Por quê?
+Histórico: do lado do FreeBet PRO, o checkbox manual de "tipo" no modal era fonte de erro frequente. O usuário marcava NORMAL mas digitava freebet_valor=50 — o card ficava como "normal com FB", quebrando a aba FreeBets Ganhas. A regra "nunca confiar só no checkbox" virou padrão.
+
+3.3 Implicação pro Shark
+Vocês podem mandar tipo=NORMAL mesmo em procedimento com FB — o backend corrige. Mas pra debugging ficar fácil, mandem o tipo certo. Se a regra do deduzirTipoFB divergir do que vocês esperam, o frontend de vocês vai mostrar uma coisa e o FreeBet outra.
+
+3.4 Tabela de "como o backend interpreta"
+Você manda	+ tem freebet_valor>0?	+ tem external_referencia_id?	Resultado no FreeBet
+NORMAL	Não	Não	NORMAL ✓
+NORMAL	Sim	Não	GANHAR_FB (sobrescrito)
+NORMAL	(qualquer)	Sim	QUEIMAR_FB (sobrescrito)
+GANHAR_FB	Sim	Não	GANHAR_FB ✓
+GANHAR_FB	Não	Não	NORMAL (sobrescrito)
+GANHAR_FB	(qualquer)	Sim	QUEIMAR_FB (sobrescrito)
+QUEIMAR_FB	Sim	Sim	QUEIMAR_FB ✓
+QUEIMAR_FB	Sim	Não	GANHAR_FB (sobrescrito — sem ref, não é queima!)
+SEM_FB	(qualquer)	Não	NORMAL (alias)
+4. Cascade FB — o "auto-fechar origem"
+Implementado em server/routes/procedimentos.ts:1510-1542.
+
+Disparo: PATCH /api/procedimentos-tarefas/:id num procedimento QUEIMAR_FB que muda de status pra CONCLUIDO ou LUCRO_DIRETO, com lucro_prejuizo preenchido.
+
+Ação: o backend busca o procedimento de origem (via procedimento_referencia ID interno) e:
+
+Se a origem está em FREEBET_PENDENTE, atualiza pra CONCLUIDO.
+Salva o status_operacao_anterior pra permitir Undo.
+Retorna cascadeUpdated no JSON da resposta — o frontend usa isso pra exibir um toast "Origem #N também foi fechada — Desfazer?".
+Por que exigir lucro_prejuizo preenchido: evita auto-fechar a origem antes do usuário registrar o resultado real da queima. Sem L/P, o ciclo fica em "queimando" — vide doc 04.
+
+Implicação pro Shark
+Se vocês também sincronizam o status_operacao do queimador via PATCH, lembrem que o FreeBet vai fechar a origem sozinho. Não tentem fechar manualmente também — vai gerar conflito de updated_at e logs duplicados.
+
+5. Erros comuns e como evitar
+Erro	Causa	Como prevenir
+422 UNRESOLVED_REFERENCE	external_referencia_id aponta pra UUID que não existe na tabela.	Garantir que o GANHAR_FB foi enviado antes do QUEIMAR_FB. Se vocês têm fila de envio, ordenar por dependência.
+Procedimento "ganha FB" mas não aparece em FreeBets Ganhas	Vocês esqueceram de definir freebet_creditada=SIM no resultado.	Implementar a tela de resultado (vide doc 04 §3).
+Origem nunca fecha	Queimador foi criado sem external_referencia_id (ficou solto) ou lucro_prejuizo ficou vazio.	Validar client-side antes de mandar: queima exige ambos.
+tipo aparece diferente entre Shark e FreeBet	deduzirTipoFB sobrescreveu.	Conferir as regras do §3 acima.
+6. Checklist de implementação (Shark)
+ Modal de Novo Procedimento tem 3 botões/radio claros: Normal, Ganhar FB, Queimar FB.
+ Quando "Queimar FB" é selecionado, aparece autocomplete obrigatório "Origem da FB" — busca entre os GANHAR_FB com freebet_creditada=SIM que ainda não foram queimados.
+ Validação client-side: queima sem ref bloqueia o salvar.
+ No payload, external_referencia_id recebe o external_id do GANHAR_FB selecionado.
+ Garantir ordem de envio: GANHAR_FB sempre antes do QUEIMAR_FB que o referencia.
+ Tela de resultado permite marcar freebet_creditada como SIM/NAO/AGUARDANDO.
+ Tela de resultado do QUEIMAR_FB exige lucro_prejuizo preenchido pra auto-fechar a origem.
+ Implementar deduzirTipoFB espelhada do lado de vocês também — pra não exibir "Normal" e mandar "GANHAR_FB" pro FreeBet.
+7. Próximo doc
+04 — Aba "FreeBets Ganhas"
+
+04 — Aba "FreeBets Ganhas"
+Objetivo: Documentar a tela "FreeBets Ganhas" do FreeBet PRO (Painel de Envios → 3ª aba) pro time do Shark replicar — assim o usuário tem controle visual do ciclo da FB sem precisar abrir o painel do FreeBet.
+
+1. O que essa aba mostra
+Lista todos os procedimentos que ganharam freebet (resultado_freebet_ganha > 0), com 3 estados derivados:
+
+Status	Critério	Cor / posição
+Falta girar	Tem FB ganha, não tem queimador apontando pra ele.	🔴 Topo da lista — "ação pendente".
+Queimando	Tem queimador (QUEIMAR_FB referenciando este), mas o queimador ainda não tem resultado.	🟡 Meio.
+Concluída	Queimador definido + queimador com lucro_prejuizo preenchido.	🟢 Base — "ciclo fechado".
+A ordenação prioriza ações pendentes no topo: falta_girar > queimando > concluida.
+
+2. KPIs no topo
+4 cards mostram contagem agregada:
+
+Total de FBs ganhas (período selecionado)
+Aguardando crédito (freebet_creditada=AGUARDANDO) — soma valor
+Creditadas (freebet_creditada=SIM) — soma valor
+Não vieram (freebet_creditada=NAO) — contagem
+E um KPI principal: Lucro líquido total = soma de etapa1.lucro_prejuizo + etapa2.lucro_prejuizo apenas dos ciclos completos.
+
+3. Filtros pills (período × status)
+Período (4 opções)
+Hoje (default)
+7 dias
+Mês atual
+Tudo
+Persistido em localStorage pra próxima visita reabrir igual.
+
+Status (3 abas)
+Todas (default)
+Falta girar
+Concluídas
+4. Endpoint que alimenta a tela
+GET /api/procedimentos-tarefas/freebets-ganhas?periodo=mes&status=todos
+
+Query params:
+
+periodo — hoje | semana | mes | todos. Default mes. Filtra por updated_at.
+status — AGUARDANDO | SIM | NAO | todos. Default todos. Filtra freebet_creditada.
+Response:
+
+{
+  "items": [
+    {
+      "id": 35,
+      "numero": 500,
+      "casa_aposta": "Bet365",
+      "partida_descricao": "Flamengo x Palmeiras",
+      "freebet_valor": "50.00",
+      "freebet_creditada": "SIM",
+      "status_operacao": "FREEBET_PENDENTE",
+      "data_partida": "2026-05-03",
+      "kickoff_at": "2026-05-03T19:00:00.000Z",
+      "updated_at": "2026-05-03T20:15:00.000Z",
+      "fb_ganha_valor": "50.00",
+      "etapa1_lp": "-5.00",
+      "queimador_id": 36,
+      "queimador_numero": 501,
+      "queimador_resultado_lucro": "35.00",
+      "queimador_lucro_prejuizo": "35.00",
+      "queimador_status": "CONCLUIDO",
+      "lucro_liquido_ciclo": "30.00",
+      "ciclo_completo": true
+    }
+  ],
+  "kpis": {
+    "total_count": 12,
+    "total_valor": 600.00,
+    "aguardando_count": 3,
+    "aguardando_valor": 150.00,
+    "creditadas_count": 8,
+    "creditadas_valor": 400.00,
+    "nao_creditadas_count": 1,
+    "ciclos_completos_count": 7,
+    "lucro_liquido_total": 245.00
+  },
+  "periodo": "mes",
+  "status": "todos"
+}
+
+Lógica do lucro_liquido_ciclo
+lucro_liquido_ciclo = etapa1_lp + COALESCE(queimador_resultado_lucro, queimador_lucro_prejuizo, 0)
+
+Onde etapa1_lp = resultado_lucro do procedimento original (a perda que vocês registraram em lucro_prejuizo_previsto quando criaram o GANHAR_FB).
+
+5. Replicando do lado do Shark
+5.1 SQL equivalente (pseudo)
+Se vocês usam Postgres também:
+
+SELECT
+  g.id, g.numero, g.casa_aposta, g.partida_descricao,
+  g.freebet_valor, g.freebet_creditada, g.status_operacao,
+  g.data_partida, g.kickoff_at, g.updated_at,
+  -- Valor da FB ganha (preferir o resultado real, fallback no previsto)
+  COALESCE(g.resultado_freebet_ganha, g.freebet_valor, 0) AS fb_ganha_valor,
+  -- L/P da etapa 1 (cash do ganhar)
+  COALESCE(g.resultado_lucro, 0) AS etapa1_lp,
+  -- Queimador vinculado
+  q.id   AS queimador_id,
+  q.numero AS queimador_numero,
+  q.resultado_lucro AS queimador_resultado_lucro,
+  q.status_operacao AS queimador_status,
+  -- Lucro líquido total
+  (COALESCE(g.resultado_lucro, 0) + COALESCE(q.resultado_lucro, q.lucro_prejuizo, 0))
+    AS lucro_liquido_ciclo,
+  -- Flag ciclo completo
+  (q.id IS NOT NULL AND (q.resultado_lucro IS NOT NULL OR q.lucro_prejuizo IS NOT NULL))
+    AS ciclo_completo
+FROM procedimentos g
+LEFT JOIN procedimentos q
+  ON q.procedimento_referencia_id = g.id
+  AND q.arquivado IS NOT TRUE
+WHERE g.arquivado IS NOT TRUE
+  AND COALESCE(g.resultado_freebet_ganha, 0) > 0
+ORDER BY g.updated_at DESC
+LIMIT 500;
+
+5.2 Filtros de período (Postgres com timezone Brasília)
+-- hoje
+AND g.updated_at >= date_trunc('day', NOW() AT TIME ZONE 'America/Sao_Paulo')
+                    AT TIME ZONE 'America/Sao_Paulo'
+-- semana
+AND g.updated_at >= NOW() - INTERVAL '7 days'
+-- mes
+AND g.updated_at >= date_trunc('month', NOW() AT TIME ZONE 'America/Sao_Paulo')
+                    AT TIME ZONE 'America/Sao_Paulo'
+
+5.3 Frontend (estrutura mínima)
+function FreebetsGanhasView() {
+  const [periodo, setPeriodo] = useState('mes');
+  const [statusFiltro, setStatusFiltro] = useState('todas');
+  const { data } = useQuery(['freebets-ganhas', periodo], async () => {
+    const r = await fetch(`/api/freebets-ganhas?periodo=${periodo}`);
+    return r.json();
+  });
+  const items = (data?.items || []).filter(p => {
+    if (statusFiltro === 'falta_girar') return !p.queimador_id;
+    if (statusFiltro === 'concluida') return p.ciclo_completo;
+    return true;
+  });
+  return (
+    <div>
+      <KpiBar kpis={data?.kpis} />
+      <PeriodoPills periodo={periodo} onChange={setPeriodo} />
+      <StatusTabs status={statusFiltro} onChange={setStatusFiltro} />
+      {items.map(p => <FreebetRow key={p.id} item={p} />)}
+    </div>
+  );
+}
+
+6. Por que essa tela importa
+Sem ela, o usuário perde controle de quais FBs já foram giradas. Acumula FBs vencidas (perdem a validade), gira a mesma duas vezes, ou esquece de marcar freebet_creditada=SIM quando a casa libera.
+
+A tela é o "espelho" do estado interno: tudo o que o cascade FB (doc 03 §4) gerencia automaticamente fica visível e auditável aqui.
+
+7. Checklist de implementação (Shark)
+ Endpoint GET /api/freebets-ganhas?periodo=... no backend de vocês.
+ LEFT JOIN entre procedimento original e queimador (via procedimento_referencia_id).
+ Cálculo do lucro_liquido_ciclo somando etapa 1 + etapa 2.
+ Flag ciclo_completo derivada (queimador existe + tem L/P).
+ UI: 3ª aba no painel de envios com filtros pills (período × status).
+ 4 cards de KPI no topo (total / aguardando / creditadas / não vieram) + lucro líquido total.
+ Ordenação: falta_girar no topo, queimando no meio, concluida na base.
+ Persistir filtro de período em localStorage (shark_freebets_ganhas_periodo).
+8. Encerramento
+Esses 4 documentos cobrem o gap funcional entre os dois modais. Quando essas 4 implementações estiverem prontas no Shark, o usuário não vai mais precisar abrir o Painel de Envios do FreeBet PRO pra checar nada — tudo está lá no lado de vocês também.
+
+Fim do pacote. Voltar pro README.
