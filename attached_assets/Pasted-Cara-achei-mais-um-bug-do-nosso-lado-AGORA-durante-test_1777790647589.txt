@@ -1,0 +1,20 @@
+Cara, achei mais um bug do nosso lado AGORA durante teste preliminar (criei par #9 GANHAR_FB → #10 QUEIMAR_FB pra validar visualmente os fixes antes de chamar você pro E2E). Vale a pena você verificar o equivalente do lado de vocês:
+
+🐛 Bug que achei aqui: O cascade de fechamento da origem não estava rodando no PATCH /:id/resultado (rota usada pelo nosso modal "Definir Resultados" interno). Eram 2 problemas combinados:
+
+O cascade só existia numa rota antiga (PUT /:id), não no PATCH atual
+Mesmo se rodasse, a condição era origem.status_operacao === 'FREEBET_PENDENTE', mas no fluxo atual a origem fica em FALTA_GIRAR_FB — então nunca batia
+Resultado visível: Fechei o #10 (QUEIMAR_FB referenciando #9), o #10 virou LUCRO_DIRETO certinho, mas o #9 ficou travado em "Falta Girar Freebet" pra sempre. Origem nunca virou CONCLUÍDA via cascade.
+
+Fix nosso: Adicionei cascade ao PATCH /:id/resultado aceitando ambos os status legado (FREEBET_PENDENTE) e atual (FALTA_GIRAR_FB) como "aguardando queima".
+
+🔍 Vale você verificar do seu lado: Quando vocês fecham um QUEIMAR_FB e mandam o POST /resultado pro nosso endpoint — beleza, nosso cascade backend roda e fecha a origem do nosso lado. Mas a origem do lado de VOCÊS (no Supabase de vocês) também fecha automaticamente? Se não, o usuário Shark vai ver no admin de vocês a mesma coisa que vi aqui: queimador concluído + origem perpetuamente em "Falta Girar". Pontos de checagem:
+
+Quando o useUpdateResultado (ou equivalente) finaliza a QUEIMAR_FB no Supabase de vocês, tem trigger/edge que olha pra procedimento_referencia e atualiza o status da origem pra CONCLUÍDA?
+Se sim, a condição aceita tanto FREEBET_PENDENTE quanto FALTA_GIRAR_FB como estado "aguardando queima" da origem?
+Bonus: vale também testar no fluxo reverso (Limpar resultado do queimador → origem volta pra FALTA_GIRAR_FB) pra garantir que o undo funciona simétrico.
+Se quiser, posso te mandar o snippet do nosso fix como referência (TS/Drizzle, fácil de adaptar pro Supabase de vocês). Ou se vocês já tem isso resolvido, ótimo — só me confirma que aí podemos rodar o E2E final em paz.
+
+No nosso lado vou fazer Republish agora pra subir esse cascade em prod junto com a coluna "Ganhar Freebet" mostrando "—" pra QUEIMAR_FB (corrigi outro bug visual menor: tava mostrando R$ 20 na coluna Ganhar quando era queima — induzia a achar que ia gerar nova FB).
+
+Te aviso quando tiver no ar! 🚀
