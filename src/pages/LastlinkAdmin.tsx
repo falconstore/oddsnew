@@ -803,6 +803,11 @@ function PaymentsTable({
                       {p.lastlink_is_test && (
                         <Badge variant="outline" className="text-[9px] bg-amber-500/10 text-amber-300 border-amber-500/30">TESTE</Badge>
                       )}
+                      {p.cohort === 'direct' ? (
+                        <Badge variant="outline" className="text-[9px] bg-cyan-500/10 text-cyan-300 border-cyan-500/30" data-testid={`badge-direct-${p.id}`}>DIRETO</Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-[9px] bg-emerald-500/10 text-emerald-300 border-emerald-500/30" data-testid={`badge-trial-${p.id}`}>TRIAL</Badge>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell className="py-3">
@@ -882,6 +887,11 @@ function PaymentsTable({
                 </div>
               </div>
               {subStatusBadge(p.subscription_status)}
+              {p.cohort === 'direct' ? (
+                <Badge variant="outline" className="text-[9px] bg-cyan-500/10 text-cyan-300 border-cyan-500/30">DIRETO</Badge>
+              ) : (
+                <Badge variant="outline" className="text-[9px] bg-emerald-500/10 text-emerald-300 border-emerald-500/30">TRIAL</Badge>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div>
@@ -944,6 +954,11 @@ function LeadDetail({ lead }: { lead: TrialLead }) {
                 <h2 className="text-lg font-bold truncate" data-testid="detail-buyer-name">{lead.buyer_name || lead.name}</h2>
                 {lead.lastlink_is_test && (
                   <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-300 border-amber-500/30">TESTE</Badge>
+                )}
+                {lead.cohort === 'direct' ? (
+                  <Badge variant="outline" className="text-[10px] bg-cyan-500/10 text-cyan-300 border-cyan-500/30" data-testid="badge-direct-detail">COMPRA DIRETA</Badge>
+                ) : (
+                  <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-300 border-emerald-500/30" data-testid="badge-trial-detail">VIA TRIAL</Badge>
                 )}
               </div>
               <p className="text-sm text-muted-foreground truncate flex items-center gap-1.5">

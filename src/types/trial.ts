@@ -42,7 +42,7 @@ export interface TrialLead {
   removed_at: string | null;
   reminder_sent_at: string | null;
   previous_lead_id: string | null;
-  cohort: 'v1' | 'v2';
+  cohort: 'v1' | 'v2' | 'direct';
   bonus_invite_link: string | null;
   bonus_entered_at: string | null;
   bonus_removed_at: string | null;

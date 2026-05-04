@@ -445,6 +445,109 @@ serve(async (req) => {
       return json({ ok: true, action: "matched", event: eventType, lead_id: leadId, is_test: isTest });
     }
 
+    // Sem match por email/order/subscription — se for evento de compra E tiver
+    // email, cria um novo lead com cohort='direct' (compra direta, sem trial).
+    // Isso garante que compradores que não passaram pelo trial apareçam na aba
+    // Lastlink Admin do BetShark.
+    const LEAD_CREATION_EVENTS = new Set([
+      ...PAID_EVENTS,
+      ...CANCELED_EVENTS,
+      ...REFUNDED_EVENTS,
+      ...REFUND_REQUESTED_EVENTS,
+    ]);
+
+    if (buyerEmail && !isTest && LEAD_CREATION_EVENTS.has(eventType)) {
+      const newLead: Record<string, unknown> = {
+        name: buyerName || buyerEmail.split("@")[0],
+        email: buyerEmail,
+        // whatsapp e telegram_username têm UNIQUE constraint; pra compras diretas
+        // (sem trial), usamos placeholders únicos baseados no email. Se tiver
+        // telefone real do buyer, usamos ele pra whatsapp.
+        whatsapp: buyerPhone || `direct_${buyerEmail}`,
+        telegram_username: `direct_${buyerEmail}`,
+        status: PAID_EVENTS.has(eventType) ? "converted" : "pending",
+        cohort: "direct",
+        lastlink_last_event: eventType,
+        lastlink_last_event_at: new Date().toISOString(),
+        lastlink_event_id: eventId ?? null,
+        lastlink_is_test: false,
+        lastlink_raw: payload,
+      };
+      if (orderId) newLead.lastlink_order_id = orderId;
+      if (subscriptionId) newLead.lastlink_subscription_id = subscriptionId;
+      if (productId) newLead.lastlink_product_id = productId;
+      if (productName) newLead.plan_name = productName;
+      if (paymentId) newLead.lastlink_payment_id = paymentId;
+      if (paymentMethod) newLead.payment_method = paymentMethod;
+      if (installments != null) newLead.installments = installments;
+      if (priceValue != null) newLead.paid_amount = priceValue;
+      if (priceCurrency) newLead.paid_currency = priceCurrency;
+      if (originalPrice != null) newLead.original_price = originalPrice;
+      if (recurrency != null) newLead.recurrency_months = recurrency;
+      if (nextBilling) newLead.next_billing_at = nextBilling;
+      if (invoiceUrl) newLead.lastlink_invoice_url = invoiceUrl;
+      if (originUrl) newLead.lastlink_origin_url = originUrl;
+      if (affiliateEmail) newLead.lastlink_affiliate_email = affiliateEmail;
+      if (couponCode) newLead.coupon_code = couponCode;
+      if (utm) newLead.lastlink_utm = utm;
+      if (offerId) newLead.lastlink_offer_id = offerId;
+      if (offerName) newLead.lastlink_offer_name = offerName;
+      if (offerUrl) newLead.lastlink_offer_url = offerUrl;
+      if (buyerName) newLead.buyer_name = buyerName;
+      if (buyerDocument) newLead.buyer_document = buyerDocument;
+      if (buyerPhone) newLead.buyer_phone = buyerPhone;
+      if (buyerAddress) newLead.buyer_address = buyerAddress;
+      if (PAID_EVENTS.has(eventType)) {
+        newLead.paid_at = paidAt;
+        newLead.subscription_status = "active";
+      } else if (CANCELED_EVENTS.has(eventType)) {
+        newLead.subscription_status = "canceled";
+        newLead.canceled_at = new Date().toISOString();
+      } else if (REFUNDED_EVENTS.has(eventType)) {
+        newLead.subscription_status = "refunded";
+        newLead.refunded_at = new Date().toISOString();
+      } else if (REFUND_REQUESTED_EVENTS.has(eventType)) {
+        newLead.subscription_status = "refund_requested";
+      }
+
+      const { data: created, error: insErr } = await supabase
+        .from("trial_leads")
+        .insert(newLead)
+        .select("id")
+        .single();
+
+      if (insErr) {
+        console.error("lastlink create-lead failed", insErr);
+      } else {
+        leadId = created.id;
+        // Atualiza o evento de auditoria com o lead recém-criado
+        await supabase
+          .from("lastlink_events")
+          .update({ matched_lead: created.id })
+          .eq("id", (await supabase.from("lastlink_events").select("id").eq("buyer_email", buyerEmail).order("received_at", { ascending: false }).limit(1).single()).data?.id ?? "");
+
+        log("created-direct", {
+          event: eventType,
+          lead_id: created.id,
+          buyer_email: buyerEmail,
+          amount: priceValue,
+        });
+
+        await sendAlertTelegramDM({
+          eventType,
+          buyerName: buyerName ?? null,
+          buyerEmail: buyerEmail ?? null,
+          amount: priceValue,
+          currency: priceCurrency,
+          reason: cancelOrRefundReason,
+          leadId: created.id,
+          isTest,
+        }).catch((err) => log("alert-telegram-throw", { error: String(err) }));
+
+        return json({ ok: true, action: "created-direct", event: eventType, lead_id: created.id });
+      }
+    }
+
     log("no-match", {
       event: eventType,
       is_test: isTest,
