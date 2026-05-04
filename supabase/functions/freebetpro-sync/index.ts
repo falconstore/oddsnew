@@ -89,6 +89,14 @@ serve(async (req) => {
       return json({ ok: true, skipped: "pre_cutoff" });
     }
 
+    // ---- Validação pré-sync ----
+    if (action === "upsert" && !(proc.platform as string)?.trim()) {
+      const errMsg = "Plataforma não preenchida — edite o procedimento";
+      log("skip_no_platform", { procId });
+      await supa.from("procedures").update({ freebetpro_last_error: errMsg }).eq("id", procId);
+      return json({ ok: false, error: errMsg }, 422);
+    }
+
     // ---- Despacho por ação ----
     let res;
     if (action === "upsert") {

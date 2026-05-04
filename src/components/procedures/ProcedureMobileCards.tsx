@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Star, Pencil, Trash2, ExternalLink, Tag, Calendar, Building2, Archive, ArchiveRestore, Trophy, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Procedure } from '@/types/procedures';
 import { formatProcedureDate, translateCategory } from '@/lib/procedureUtils';
@@ -33,6 +34,7 @@ export function ProcedureMobileCards({ procedures, onEdit, onDelete, onToggleFav
   };
 
   return (
+    <TooltipProvider delayDuration={200}>
     <div className="lg:hidden space-y-3">
       {procedures.map((proc) => {
         const showCheck = onCheckResult && canCheckResult(proc) && !proc.archived;
@@ -64,22 +66,28 @@ export function ProcedureMobileCards({ procedures, onEdit, onDelete, onToggleFav
                     </Badge>
                   )}
                   {proc.freebetpro_synced_at && !proc.freebetpro_last_error && (
-                    <span
-                      title={`Sincronizado com FreeBet Pro${proc.freebetpro_numero ? ` (#${proc.freebetpro_numero})` : ''}`}
-                      data-testid={`icon-fbp-synced-mobile-${proc.id}`}
-                      className="inline-flex"
-                    >
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400/70" />
-                    </span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span data-testid={`icon-fbp-synced-mobile-${proc.id}`} tabIndex={0} className="inline-flex cursor-help">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400/70" />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        <p>Sincronizado com FreeBet Pro{proc.freebetpro_numero ? ` (#${proc.freebetpro_numero})` : ''}</p>
+                      </TooltipContent>
+                    </Tooltip>
                   )}
                   {proc.freebetpro_last_error && (
-                    <span
-                      title={`Erro FreeBet Pro: ${proc.freebetpro_last_error}`}
-                      data-testid={`icon-fbp-error-mobile-${proc.id}`}
-                      className="inline-flex"
-                    >
-                      <AlertCircle className="w-3.5 h-3.5 text-amber-400/80" />
-                    </span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span data-testid={`icon-fbp-error-mobile-${proc.id}`} tabIndex={0} className="inline-flex cursor-help">
+                          <AlertCircle className="w-3.5 h-3.5 text-amber-400/80" />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs">
+                        <p className="text-amber-300">Erro FreeBet Pro: {proc.freebetpro_last_error}</p>
+                      </TooltipContent>
+                    </Tooltip>
                   )}
                 </div>
                 <div className="flex items-center gap-3 mt-1 flex-wrap">
@@ -205,5 +213,6 @@ export function ProcedureMobileCards({ procedures, onEdit, onDelete, onToggleFav
         </div>
       );})}
     </div>
+    </TooltipProvider>
   );
 }

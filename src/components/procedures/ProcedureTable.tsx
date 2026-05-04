@@ -1,6 +1,7 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Star, Pencil, Trash2, ExternalLink, Tag, Archive, ArchiveRestore, Trophy, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Procedure } from '@/types/procedures';
 import { formatProcedureDate, translateCategory } from '@/lib/procedureUtils';
@@ -35,6 +36,7 @@ export function ProcedureTable({ procedures, visibleColumns, onEdit, onDelete, o
   };
 
   return (
+    <TooltipProvider delayDuration={200}>
     <div className="hidden lg:block overflow-x-auto">
       <Table>
         <TableHeader>
@@ -84,20 +86,28 @@ export function ProcedureTable({ procedures, visibleColumns, onEdit, onDelete, o
                   <span className="text-sm font-bold text-foreground">{proc.procedure_number}</span>
                   {proc.archived && <Archive className="w-3 h-3 inline ml-1 text-muted-foreground/60" />}
                   {proc.freebetpro_synced_at && !proc.freebetpro_last_error && (
-                    <span
-                      title={`Sincronizado com FreeBet Pro${proc.freebetpro_numero ? ` (#${proc.freebetpro_numero})` : ''}`}
-                      data-testid={`icon-fbp-synced-${proc.id}`}
-                    >
-                      <CheckCircle2 className="w-3 h-3 inline ml-1 text-emerald-400/70" />
-                    </span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span data-testid={`icon-fbp-synced-${proc.id}`} tabIndex={0} className="inline-flex ml-1 cursor-help">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-400/70" />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        <p>Sincronizado com FreeBet Pro{proc.freebetpro_numero ? ` (#${proc.freebetpro_numero})` : ''}</p>
+                      </TooltipContent>
+                    </Tooltip>
                   )}
                   {proc.freebetpro_last_error && (
-                    <span
-                      title={`Erro FreeBet Pro: ${proc.freebetpro_last_error}`}
-                      data-testid={`icon-fbp-error-${proc.id}`}
-                    >
-                      <AlertCircle className="w-3 h-3 inline ml-1 text-amber-400/80" />
-                    </span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span data-testid={`icon-fbp-error-${proc.id}`} tabIndex={0} className="inline-flex ml-1 cursor-help">
+                          <AlertCircle className="w-3 h-3 text-amber-400/80" />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs">
+                        <p className="text-amber-300">Erro FreeBet Pro: {proc.freebetpro_last_error}</p>
+                      </TooltipContent>
+                    </Tooltip>
                   )}
                 </TableCell>
               )}
@@ -254,5 +264,6 @@ export function ProcedureTable({ procedures, visibleColumns, onEdit, onDelete, o
         </TableBody>
       </Table>
     </div>
+    </TooltipProvider>
   );
 }
