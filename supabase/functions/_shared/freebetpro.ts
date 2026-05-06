@@ -21,6 +21,7 @@ export async function hmacSha256Hex(secret: string, msg: string): Promise<string
 // Mapeamento Procedure (BetShark) → payload da §6.3 da spec.
 type ProcRow = Record<string, unknown> & {
   id: string;
+  procedure_number: string | null;
   platform: string;
   promotion_name: string | null;
   category: string;
@@ -77,8 +78,17 @@ export function buildUpsertPayload(p: ProcRow) {
   const dec = (n: number | null | undefined) =>
     n == null ? null : Number(n).toFixed(2);
 
+  // Doc: time da FreeBet PRO pediu (06/05/2026) que o `numero` do procedimento
+  // viaje no body pra refletir no painel deles. `procedure_number` é text livre
+  // no nosso schema (pode ser "Bônus 29"); só envia quando parsa pra int puro.
+  const numeroParsed =
+    p.procedure_number && /^\d+$/.test(p.procedure_number.trim())
+      ? Number.parseInt(p.procedure_number.trim(), 10)
+      : null;
+
   return {
     external_id: p.id,
+    numero: numeroParsed,
     titulo,
     casa_aposta: p.platform,
     categoria,
