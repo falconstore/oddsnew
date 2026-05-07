@@ -1,1 +1,13 @@
 project_id = "hyccrhpvedvfnzhetxkz"
+
+[functions.lastlink-webhook]
+verify_jwt = false
+
+[functions.trial-webhook]
+verify_jwt = false
+
+[functions.trial-signup]
+verify_jwt = false
+
+[functions.trial-pixel-track]
+verify_jwt = false
