@@ -19,6 +19,7 @@ import {
   Gift,
   Receipt,
   Trophy,
+  Stamp,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -42,6 +43,7 @@ const navigation: NavigationItem[] = [
   { name: 'Casas', href: '/cadastros', icon: Building2, pageKey: PAGE_KEYS.LEAGUES, color: 'text-indigo-400' },
   { name: 'Trial Telegram', href: '/trial-admin', icon: Gift, pageKey: PAGE_KEYS.TRIAL, color: 'text-pink-400' },
   { name: 'Pagamentos Lastlink', href: '/lastlink-admin', icon: Receipt, pageKey: PAGE_KEYS.LASTLINK, color: 'text-emerald-400' },
+  { name: "Marca d'Água", href: '/watermark', icon: Stamp, pageKey: PAGE_KEYS.WATERMARK, color: 'text-green-400' },
   { name: 'Configurações', href: '/settings', icon: Settings, pageKey: PAGE_KEYS.SETTINGS, color: 'text-slate-400' },
   { name: 'Usuários', href: '/admin/users', icon: UserCog, pageKey: PAGE_KEYS.ADMIN_USERS, color: 'text-red-400' },
 ];

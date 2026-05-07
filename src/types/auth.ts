@@ -68,6 +68,7 @@ export const PAGE_KEYS = {
   ADMIN_LOGS: 'admin_logs',
   SCRAPER_STATUS: 'scraper_status',
   TELEGRAM_BOT: 'telegram_bot',
+  WATERMARK: 'watermark',
   // Manter keys legadas para não quebrar referências existentes
   LEAGUES: 'sharkodds',
   TEAMS: 'sharkodds',
@@ -93,6 +94,7 @@ export const PAGE_KEY_TO_COLUMN: Record<string, keyof UserPermissionRow> = {
   settings: 'can_view_dashboard', // settings acessível se tem dashboard
   scraper_status: 'can_view_admin',
   telegram_bot: 'can_view_admin',
+  watermark: 'can_view_dashboard',
 };
 
 // Colunas de permissão editáveis (para o admin UI)

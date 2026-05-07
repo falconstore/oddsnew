@@ -25,6 +25,7 @@ import TrialLanding from '@/pages/TrialLanding';
 import TrialUpgrade from '@/pages/TrialUpgrade';
 import TrialAdmin from '@/pages/TrialAdmin';
 import LastlinkAdmin from '@/pages/LastlinkAdmin';
+import WatermarkStudio from '@/pages/WatermarkStudio';
 import NotFound from '@/pages/NotFound';
 
 // Componente para redirect que preserva query params
@@ -219,6 +220,13 @@ export function AnimatedRoutes() {
           <RequireAuth pageKey={PAGE_KEYS.LASTLINK}>
             <PageTransition>
               <LastlinkAdmin />
+            </PageTransition>
+          </RequireAuth>
+        } />
+        <Route path="/watermark" element={
+          <RequireAuth pageKey={PAGE_KEYS.WATERMARK}>
+            <PageTransition>
+              <WatermarkStudio />
             </PageTransition>
           </RequireAuth>
         } />
