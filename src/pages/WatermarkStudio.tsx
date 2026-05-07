@@ -81,8 +81,14 @@ export default function WatermarkStudio() {
   }, [toast, validateFile]);
 
   const handleLogoFile = useCallback(async (file: File) => {
-    const err = validateFile(file);
-    if (err) { toast({ title: 'Erro', description: err, variant: 'destructive' }); return; }
+    if (file.type !== 'image/png' && file.type !== 'image/webp') {
+      toast({ title: 'Erro', description: 'A logo deve ser PNG ou WEBP (com transparência).', variant: 'destructive' });
+      return;
+    }
+    if (file.size > MAX_BYTES) {
+      toast({ title: 'Erro', description: 'Logo maior que 10MB.', variant: 'destructive' });
+      return;
+    }
     try {
       const dataUrl = await fileToDataURL(file);
       const img = await loadImage(dataUrl);
