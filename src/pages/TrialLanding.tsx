@@ -219,16 +219,18 @@ const FAQ_ITEMS = [
 ];
 
 const TICKER_ITEMS = [
-  'João fez R$312 ontem seguindo os sinais',
-  'Maria saiu no verde hoje cedo — R$187',
-  'Rafael: lucro no intervalo do trabalho',
-  '+500 alunos lucrando diariamente',
-  '7 dias grátis · sem cartão de crédito',
-  'Carla fez R$487 no período de trial',
-  'Dinheiro na conta — Saque via PIX',
-  'Ana: R$380 na primeira semana, zero experiência',
-  'Pedro saiu positivo na primeira operação',
-  'Fernanda: verde todo dia da semana',
+  'Lucas M. fez R$312 em 5 dias de trial — São Paulo/SP',
+  'Carla S.: R$487 na primeira semana, sem experiência',
+  'Rafael O.: R$219 em 4 dias — Curitiba/PR',
+  'Ana P.: R$380 em 7 dias — Rio de Janeiro/RJ',
+  'Rodrigo T.: primeiro green na manhã do dia 1',
+  '+500 alunos ativos em todo o Brasil',
+  '7 dias grátis · acesso imediato · sem cartão',
+  'Fernanda G.: R$290 trabalhando 1h por dia',
+  'Marcos V.: sacou R$430 via PIX na primeira semana',
+  'Juliana C.: zero experiência → R$260 em 6 dias',
+  'Thiago B.: operou no intervalo do almoço e saiu positivo',
+  'Beatriz L.: R$195 no dia 2 de trial — Fortaleza/CE',
 ];
 
 export default function TrialLanding() {
@@ -624,6 +626,42 @@ export default function TrialLanding() {
                 />
               </div>
             ))}
+          </div>
+
+          {/* Depoimentos textuais */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-8">
+            <TestimonialCard
+              name="Lucas M."
+              city="São Paulo – SP"
+              result="R$ 312 em 5 dias de trial"
+              text="Entrei sem saber nada de apostas. O procedimento chegou no grupo às 10h, fiz em 3 minutos no Bet365 e saí verde. Repeti isso 8 vezes no trial e fechei R$ 312 limpos."
+              stars={5}
+              testId="card-full-testimonial-1"
+            />
+            <TestimonialCard
+              name="Carla S."
+              city="Belo Horizonte – MG"
+              result="R$ 487 na primeira semana"
+              text="Fui muito cética no começo — achei que era mais um grupo de palpite. Mas os sinais chegam antes do mercado se mover e o passo a passo é literal. Saquei R$ 487 via PIX no sétimo dia."
+              stars={5}
+              testId="card-full-testimonial-2"
+            />
+            <TestimonialCard
+              name="Rafael O."
+              city="Curitiba – PR"
+              result="R$ 219 em 4 dias, sem experiência"
+              text="Opero no intervalo do trabalho. Em 4 dias de trial fechei R$ 219 positivo. Nunca tinha apostado em nada na vida. O grupo responde rápido quando trava alguma coisa na plataforma."
+              stars={5}
+              testId="card-full-testimonial-3"
+            />
+            <TestimonialCard
+              name="Ana P."
+              city="Rio de Janeiro – RJ"
+              result="R$ 380 na primeira semana"
+              text="Comecei com medo de errar, mas cada operação vem explicada: qual mercado, qual odd mínima, quanto colocar. Em 7 dias fechei R$ 380 e assinei na mesma hora. Não abro mão."
+              stars={5}
+              testId="card-full-testimonial-4"
+            />
           </div>
         </section>
 
