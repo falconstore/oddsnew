@@ -67,6 +67,14 @@ function serveFile(res, filePath, statusOverride) {
   });
 }
 
+// Domínios que devem redirecionar / → /trial automaticamente.
+// Útil quando sharkgreen.com.br aponta para este app mas a rota
+// raiz deve exibir a landing page de trial, não o painel admin.
+const TRIAL_REDIRECT_HOSTS = new Set([
+  'sharkgreen.com.br',
+  'www.sharkgreen.com.br',
+]);
+
 const server = http.createServer((req, res) => {
   let urlPath;
   try {
@@ -78,6 +86,12 @@ const server = http.createServer((req, res) => {
   // Bloqueia path traversal
   if (urlPath.includes('..') || urlPath.includes('\0')) {
     return send(res, 400, 'Bad Request');
+  }
+
+  // Redireciona raiz → /trial para domínios de entrada pública.
+  const host = (req.headers['host'] || '').split(':')[0].toLowerCase();
+  if (TRIAL_REDIRECT_HOSTS.has(host) && (urlPath === '/' || urlPath === '')) {
+    return send(res, 302, '', { Location: '/trial' });
   }
 
   if (urlPath.endsWith('/')) urlPath += 'index.html';
