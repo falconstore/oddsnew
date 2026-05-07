@@ -15,12 +15,12 @@ export interface WatermarkConfig {
 }
 
 export const DEFAULT_CONFIG: WatermarkConfig = {
-  opacity: 70,
-  position: 'bottom-right',
-  size: 25,
+  opacity: 20,
+  position: 'middle-center',
+  size: 62,
   fillMode: 'single',
   rotation: 0,
-  margin: 24,
+  margin: 0,
 };
 
 export function loadImage(src: string): Promise<HTMLImageElement> {

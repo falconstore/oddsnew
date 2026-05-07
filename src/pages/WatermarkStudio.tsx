@@ -262,9 +262,28 @@ export default function WatermarkStudio() {
                   <ImageIcon className="h-4 w-4 text-primary" /> Preview
                 </CardTitle>
                 <div className="flex items-center gap-2">
+                  {baseImg && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="sm"
+                          disabled={busy !== null}
+                          onClick={doCopy}
+                          data-testid="button-copy-top"
+                          className="bg-amber-400 hover:bg-amber-300 text-black font-semibold shadow-[0_0_14px_rgba(251,191,36,0.55)] hover:shadow-[0_0_22px_rgba(251,191,36,0.75)] transition-all border-0"
+                        >
+                          {busy === 'copy'
+                            ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                            : <Copy className="h-4 w-4 mr-1.5" />}
+                          Copiar imagem
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Copiar para a área de transferência (Ctrl+C)</TooltipContent>
+                    </Tooltip>
+                  )}
                   {dimensions && <span className="text-xs text-muted-foreground font-mono">{dimensions}</span>}
                   {baseImg && (
-                    <div className="flex items-center gap-1 ml-2 border-l pl-2">
+                    <div className="flex items-center gap-1 ml-1 border-l pl-2">
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button variant="ghost" size="icon" className="h-7 w-7"
@@ -430,9 +449,6 @@ export default function WatermarkStudio() {
                   <SliderRow label="Rotação" value={config.rotation} unit="°" min={-180} max={180} step={1}
                     tooltip="Gira a logo no sentido horário (positivo) ou anti-horário (negativo)"
                     onChange={(v) => setConfig({ ...config, rotation: v })} testId="slider-rotation" />
-                  <SliderRow label="Margem" value={config.margin} unit="px" min={0} max={100} step={1}
-                    tooltip="Distância da logo até a borda da imagem (modo Única)"
-                    onChange={(v) => setConfig({ ...config, margin: v })} testId="slider-margin" />
 
                   <div className="space-y-2">
                     <Label className="text-xs">Posição</Label>
@@ -541,32 +557,19 @@ export default function WatermarkStudio() {
                       onChange={setQuality} testId="slider-quality" />
                   )}
 
-                  <div className="grid grid-cols-2 gap-2 pt-2">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="outline" disabled={!baseImg || busy !== null}
-                          onClick={doCopy} data-testid="button-copy"
-                        >
-                          {busy === 'copy' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Copy className="h-4 w-4 mr-2" />}
-                          Copiar
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Copiar imagem para a área de transferência (Ctrl+C)</TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          disabled={!baseImg || busy !== null}
-                          onClick={doDownload} data-testid="button-download"
-                        >
-                          {busy === 'download' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
-                          Baixar
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Baixar arquivo (Ctrl+S)</TooltipContent>
-                    </Tooltip>
-                  </div>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        className="w-full"
+                        disabled={!baseImg || busy !== null}
+                        onClick={doDownload} data-testid="button-download"
+                      >
+                        {busy === 'download' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+                        Baixar arquivo
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Baixar arquivo (Ctrl+S)</TooltipContent>
+                  </Tooltip>
 
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
