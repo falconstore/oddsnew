@@ -115,6 +115,11 @@ export default function WatermarkStudio() {
     setConfig(DEFAULT_CONFIG);
     setBaseImg(null);
     setPreviewUrl('');
+    setZoom(100);
+    setFormat('png');
+    setQuality(92);
+    setFilename('imagem-com-marca');
+    loadImage(defaultLogoUrl).then(setLogoImg).catch(() => {});
     toast({ title: 'Editor resetado' });
   }, [toast]);
 
