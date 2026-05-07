@@ -369,19 +369,30 @@ export default function TrialLanding() {
       data-testid="bg-shark-wallpaper"
     >
       {/* Overlays */}
+      {/* Camada base: escurece top→bottom progressivamente */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
           background:
-            'linear-gradient(180deg, hsl(150 35% 3% / 0.35) 0%, hsl(150 35% 3% / 0.20) 25%, hsl(150 35% 3% / 0.55) 60%, hsl(150 35% 3% / 0.92) 90%, hsl(150 35% 3% / 0.98) 100%)',
+            'linear-gradient(180deg, hsl(150 35% 3% / 0.72) 0%, hsl(150 35% 3% / 0.60) 20%, hsl(150 35% 3% / 0.68) 45%, hsl(150 35% 3% / 0.88) 70%, hsl(150 35% 3% / 0.97) 88%, hsl(150 35% 3% / 1.0) 100%)',
         }}
         aria-hidden="true"
       />
+      {/* Camada lateral esquerda: garante leitura do copy no desktop */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
           background:
-            'radial-gradient(ellipse 70% 60% at 50% 35%, transparent 40%, hsl(150 35% 3% / 0.55) 100%)',
+            'linear-gradient(90deg, hsl(150 35% 3% / 0.65) 0%, hsl(150 35% 3% / 0.40) 40%, transparent 65%)',
+        }}
+        aria-hidden="true"
+      />
+      {/* Vinheta radial: suaviza bordas e centro brilhante */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background:
+            'radial-gradient(ellipse 80% 55% at 60% 38%, transparent 25%, hsl(150 35% 3% / 0.50) 100%)',
         }}
         aria-hidden="true"
       />
@@ -422,7 +433,7 @@ export default function TrialLanding() {
               </div>
 
               <h1
-                className="text-3xl sm:text-4xl md:text-[2.6rem] font-bold leading-[1.2] tracking-tight drop-shadow-[0_4px_24px_rgba(0,0,0,0.85)]"
+                className="text-[1.65rem] sm:text-[2rem] md:text-[2.25rem] font-bold leading-[1.28] tracking-tight drop-shadow-[0_4px_24px_rgba(0,0,0,0.85)]"
                 data-testid="text-hero-title"
               >
                 Nossos{' '}
@@ -433,7 +444,7 @@ export default function TrialLanding() {
                 <span className="bg-gradient-to-r from-emerald-300 via-green-400 to-emerald-500 bg-clip-text text-transparent">
                   +R$200 por dia
                 </span>{' '}
-                gastando em média 1 a 2h com Promoções Esportivas.
+                gastando em média 1 a 2h com Promoções Esportivas Bonificadas.
               </h1>
 
               {/* Trial callout */}
