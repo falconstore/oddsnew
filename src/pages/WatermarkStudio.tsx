@@ -131,23 +131,45 @@ export default function WatermarkStudio() {
   }, [toast]);
 
   const doCopy = useCallback(async () => {
-    if (!previewRef.current) return;
+    const canvas = previewRef.current;
+    if (!canvas) return;
     setBusy('copy');
-    try {
-      const blob = await canvasToBlob(previewRef.current, 'png');
-      if (typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
-        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-        toast({ title: 'Imagem copiada para a área de transferência' });
-      } else {
-        // Fallback: download
+    const downloadFallback = async (reason?: string) => {
+      try {
+        const blob = await canvasToBlob(canvas, 'png');
         const a = document.createElement('a');
         const url = URL.createObjectURL(blob);
         a.href = url; a.download = `${filename || 'imagem'}.png`;
         a.click(); URL.revokeObjectURL(url);
-        toast({ title: 'Navegador não suporta copiar — baixei o arquivo', variant: 'default' });
+        toast({
+          title: reason ? 'Cópia bloqueada — baixei o arquivo' : 'Navegador não suporta copiar — baixei o arquivo',
+          description: reason,
+        });
+      } catch (e) {
+        toast({ title: 'Falha ao copiar', description: String(e), variant: 'destructive' });
       }
-    } catch (e) {
-      toast({ title: 'Falha ao copiar', description: String(e), variant: 'destructive' });
+    };
+    try {
+      if (typeof ClipboardItem === 'undefined' || !navigator.clipboard?.write) {
+        await downloadFallback();
+        return;
+      }
+      // Garante foco no documento antes do write (NotAllowedError comum quando perde foco).
+      if (typeof window.focus === 'function') window.focus();
+      // Passa a Promise direto pro ClipboardItem pra preservar o gesto do usuário.
+      const blobPromise = new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob(
+          (b) => (b ? resolve(b) : reject(new Error('Falha ao gerar imagem'))),
+          'image/png',
+        );
+      });
+      try {
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blobPromise })]);
+        toast({ title: 'Imagem copiada para a área de transferência' });
+      } catch (err: any) {
+        // Permissão negada / contexto sem foco / Safari restrito → cai pro download.
+        await downloadFallback(err?.message || 'Permissão negada pelo navegador');
+      }
     } finally { setBusy(null); }
   }, [filename, toast]);
 
