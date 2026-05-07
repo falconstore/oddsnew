@@ -130,6 +130,7 @@ export const PAGE_CONFIG: Record<string, { label: string; description: string }>
   [PAGE_KEYS.SETTINGS]: { label: 'Configurações', description: 'Configurações do sistema' },
   [PAGE_KEYS.SCRAPER_STATUS]: { label: 'Status Scrapers', description: 'Monitoramento dos scrapers' },
   [PAGE_KEYS.TELEGRAM_BOT]: { label: 'Bot Telegram', description: 'Configurar bot de Duplo Green' },
+  [PAGE_KEYS.WATERMARK]: { label: "Marca d'Água", description: 'Editor client-side para aplicar logo Shark sobre imagens' },
 };
 
 // Permissões padrão para novos usuários aprovados

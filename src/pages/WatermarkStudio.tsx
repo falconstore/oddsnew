@@ -121,6 +121,7 @@ export default function WatermarkStudio() {
     setConfig(DEFAULT_CONFIG);
     setBaseImg(null);
     setPreviewUrl('');
+    previewRef.current = null;
     setZoom(100);
     setFormat('png');
     setQuality(92);
