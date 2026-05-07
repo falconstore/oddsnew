@@ -670,7 +670,7 @@ export default function TrialLanding() {
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <Button
                 onClick={() => openForm('mid-cta')}
-                className="h-13 px-8 py-3 bg-gradient-to-r from-emerald-400 to-green-500 hover:from-emerald-300 hover:to-green-400 text-black font-bold text-base border-0 shadow-xl shadow-emerald-500/40 transition-transform hover:scale-[1.02]"
+                className="h-14 px-8 py-3 bg-gradient-to-r from-emerald-400 to-green-500 hover:from-emerald-300 hover:to-green-400 text-black font-bold text-base border-0 shadow-xl shadow-emerald-500/40 transition-transform hover:scale-[1.02]"
                 data-testid="button-mid-cta-trial"
               >
                 <Sparkles className="w-5 h-5 mr-2" />
@@ -1242,6 +1242,7 @@ function TestimonialCard({
   stars: number;
   testId: string;
 }) {
+  const initials = name.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase();
   return (
     <div
       className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 hover:border-emerald-500/25 transition-colors"
@@ -1253,12 +1254,17 @@ function TestimonialCard({
         ))}
       </div>
       <p className="text-white/75 text-sm leading-relaxed mb-4">"{text}"</p>
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="font-bold text-sm">{name}</p>
-          <p className="text-white/40 text-xs">{city}</p>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500/40 to-green-700/30 border border-emerald-500/30 flex items-center justify-center flex-shrink-0">
+            <span className="text-[10px] font-bold text-emerald-300">{initials}</span>
+          </div>
+          <div>
+            <p className="font-bold text-sm">{name}</p>
+            <p className="text-white/40 text-xs">{city}</p>
+          </div>
         </div>
-        <div className="text-right">
+        <div className="text-right flex-shrink-0">
           <span className="text-emerald-400 font-bold text-sm">{result}</span>
         </div>
       </div>
