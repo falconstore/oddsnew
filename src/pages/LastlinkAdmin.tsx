@@ -486,6 +486,7 @@ export default function LastlinkAdmin() {
           rangeFrom={rangeFrom}
           rangeTo={rangeTo}
           rangeLabel={RANGE_LABELS[range]}
+          isLoading={isLoading}
         />
 
         {/* Filtros */}

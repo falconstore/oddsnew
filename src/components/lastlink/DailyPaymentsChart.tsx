@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import {
-  ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis,
+  ResponsiveContainer, ComposedChart, Bar, XAxis, YAxis,
   Tooltip, CartesianGrid, ReferenceLine,
 } from 'recharts';
 import { ShoppingCart } from 'lucide-react';
@@ -11,8 +11,6 @@ import type { TrialLead } from '@/types/trial';
 interface ChartPoint {
   label: string;
   count: number;
-  revenue: number;
-  avgRevenue: number;
 }
 
 interface DailyPaymentsChartProps {
@@ -20,6 +18,7 @@ interface DailyPaymentsChartProps {
   rangeFrom: Date | null;
   rangeTo: Date | null;
   rangeLabel: string;
+  isLoading?: boolean;
 }
 
 const fmtMoney = (v: number) =>
@@ -33,36 +32,24 @@ interface TooltipPayloadEntry {
 function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: TooltipPayloadEntry[]; label?: string }) {
   if (!active || !payload || !payload.length) return null;
   const count = payload.find(p => p.dataKey === 'count')?.value ?? 0;
-  const revenue = payload.find(p => p.dataKey === 'revenue')?.value ?? 0;
   return (
-    <div className="glass border border-white/10 rounded-xl p-3 shadow-xl min-w-[180px]">
+    <div className="glass border border-white/10 rounded-xl p-3 shadow-xl min-w-[160px]">
       <p className="text-[11px] text-muted-foreground mb-2 font-medium">{label}</p>
-      <div className="space-y-1.5">
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-[11px] flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-400" />
-            Pagamentos
-          </span>
-          <span className="text-[12px] font-semibold text-emerald-300">{count}</span>
-        </div>
-        {revenue > 0 && (
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-[11px] flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-cyan-400" />
-              Receita
-            </span>
-            <span className="text-[12px] font-semibold text-cyan-300">{fmtMoney(revenue)}</span>
-          </div>
-        )}
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[11px] flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-emerald-400" />
+          Pagamentos
+        </span>
+        <span className="text-[12px] font-semibold text-emerald-300">{count}</span>
       </div>
     </div>
   );
 }
 
-export function DailyPaymentsChart({ payments, rangeFrom, rangeTo, rangeLabel }: DailyPaymentsChartProps) {
+export function DailyPaymentsChart({ payments, rangeFrom, rangeTo, rangeLabel, isLoading = false }: DailyPaymentsChartProps) {
   const { data, avgCount, avgRevenue, isEmpty } = useMemo(() => {
     const confirmed = payments.filter(p => !!p.paid_at);
-    if (confirmed.length === 0 && !rangeFrom) {
+    if (!rangeFrom && confirmed.length === 0) {
       return { data: [] as ChartPoint[], avgCount: 0, avgRevenue: 0, isEmpty: true };
     }
 
@@ -88,32 +75,31 @@ export function DailyPaymentsChart({ payments, rangeFrom, rangeTo, rangeLabel }:
       return { data: [] as ChartPoint[], avgCount: 0, avgRevenue: 0, isEmpty: false };
     }
 
-    const dayMap = new Map<string, { count: number; revenue: number }>();
+    const dayCount = new Map<string, number>();
     for (const d of days) {
-      dayMap.set(format(d, 'yyyy-MM-dd'), { count: 0, revenue: 0 });
+      dayCount.set(format(d, 'yyyy-MM-dd'), 0);
     }
+    let totalRevenue = 0;
 
     for (const p of confirmed) {
       const key = format(new Date(p.paid_at!), 'yyyy-MM-dd');
-      const entry = dayMap.get(key);
-      if (entry) {
-        entry.count += 1;
-        entry.revenue += p.paid_amount ?? 0;
+      const existing = dayCount.get(key);
+      if (existing !== undefined) {
+        dayCount.set(key, existing + 1);
+        totalRevenue += p.paid_amount ?? 0;
       }
     }
 
     const arr: ChartPoint[] = [];
     let totalCount = 0;
-    let totalRevenue = 0;
-    for (const [key, { count, revenue }] of dayMap) {
-      arr.push({ label: format(parseISO(key), 'dd/MM', { locale: ptBR }), count, revenue, avgRevenue: 0 });
+    for (const [key, count] of dayCount) {
+      arr.push({ label: format(parseISO(key), 'dd/MM', { locale: ptBR }), count });
       totalCount += count;
-      totalRevenue += revenue;
     }
 
-    const ac = arr.length > 0 ? totalCount / arr.length : 0;
-    const ar = arr.length > 0 ? totalRevenue / arr.length : 0;
-    for (const pt of arr) pt.avgRevenue = ar;
+    const numDays = arr.length || 1;
+    const ac = totalCount / numDays;
+    const ar = totalRevenue / numDays;
 
     return { data: arr, avgCount: ac, avgRevenue: ar, isEmpty: totalCount === 0 };
   }, [payments, rangeFrom, rangeTo]);
@@ -131,14 +117,25 @@ export function DailyPaymentsChart({ payments, rangeFrom, rangeTo, rangeLabel }:
             <h3 className="text-sm md:text-base font-semibold">Novos pagamentos por dia</h3>
             <p className="text-[11px] md:text-xs text-muted-foreground">
               {rangeLabel} · média {avgCount.toFixed(1)} pag/dia
-              {avgRevenue > 0 && ` · ${fmtMoney(avgRevenue)}/dia`}
+              {avgRevenue > 0 && ` · média ${fmtMoney(avgRevenue)}/dia`}
             </p>
           </div>
         </div>
       </div>
 
       <div className="p-3 md:p-4">
-        {tooMany ? (
+        {isLoading ? (
+          <div className="h-48 flex flex-col gap-2 justify-end" data-testid="skeleton-daily-payments">
+            {[0.6, 0.9, 0.5, 1, 0.7, 0.8, 0.4].map((h, i) => (
+              <div key={i} className="flex items-end gap-1 h-full">
+                <div
+                  className="flex-1 rounded-t bg-emerald-500/10 animate-pulse"
+                  style={{ height: `${h * 100}%` }}
+                />
+              </div>
+            ))}
+          </div>
+        ) : tooMany ? (
           <div className="h-48 flex items-center justify-center text-xs text-muted-foreground" data-testid="text-daily-payments-period-large">
             Selecione um período menor (até 90 dias) para ver o gráfico diário.
           </div>
@@ -166,49 +163,51 @@ export function DailyPaymentsChart({ payments, rangeFrom, rangeTo, rangeLabel }:
                   minTickGap={20}
                 />
                 <YAxis
-                  yAxisId="count"
                   tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
                   axisLine={false}
                   tickLine={false}
                   allowDecimals={false}
                   width={28}
                 />
-                <YAxis
-                  yAxisId="revenue"
-                  orientation="right"
-                  tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
-                  axisLine={false}
-                  tickLine={false}
-                  tickFormatter={(v: number) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`}
-                  width={44}
-                />
                 <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--muted-foreground) / 0.06)' }} />
                 <Bar
-                  yAxisId="count"
                   dataKey="count"
                   name="Pagamentos"
                   fill="url(#paymentsBarGradient)"
                   radius={[4, 4, 0, 0]}
                   maxBarSize={32}
                 />
+                {/* Média de pagamentos/dia — linha de referência tracejada */}
                 <ReferenceLine
-                  yAxisId="count"
                   y={avgCount}
                   stroke="hsl(160 84% 70%)"
-                  strokeDasharray="5 4"
+                  strokeDasharray="6 4"
                   strokeWidth={1.5}
-                  strokeOpacity={0.7}
+                  strokeOpacity={0.75}
+                  label={{
+                    value: `~${avgCount.toFixed(1)}/dia`,
+                    position: 'insideTopRight',
+                    fontSize: 10,
+                    fill: 'hsl(160 84% 70%)',
+                    dy: -4,
+                  }}
                 />
-                <Line
-                  yAxisId="revenue"
-                  type="monotone"
-                  dataKey="revenue"
-                  name="Receita"
-                  stroke="hsl(190 80% 60%)"
-                  strokeWidth={2}
-                  dot={{ r: 2.5, fill: 'hsl(190 80% 60%)', strokeWidth: 0 }}
-                  activeDot={{ r: 4, fill: 'hsl(190 80% 60%)', stroke: 'hsl(190 80% 80%)', strokeWidth: 2 }}
-                />
+                {/* Média de receita/dia — linha tracejada laranja como referência visual de valor */}
+                {avgRevenue > 0 && (
+                  <ReferenceLine
+                    y={avgCount}
+                    stroke="hsl(40 90% 60%)"
+                    strokeDasharray="3 5"
+                    strokeWidth={0}
+                    label={{
+                      value: `${fmtMoney(avgRevenue)}/dia`,
+                      position: 'insideTopLeft',
+                      fontSize: 10,
+                      fill: 'hsl(40 90% 65%)',
+                      dy: -4,
+                    }}
+                  />
+                )}
               </ComposedChart>
             </ResponsiveContainer>
           </div>

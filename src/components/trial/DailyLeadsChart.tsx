@@ -1,58 +1,47 @@
 import { useMemo } from 'react';
 import {
-  ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis,
+  ResponsiveContainer, ComposedChart, Bar, XAxis, YAxis,
   Tooltip, CartesianGrid, ReferenceLine,
 } from 'recharts';
 import { Users } from 'lucide-react';
-import { format, startOfDay, eachDayOfInterval, startOfMonth, endOfMonth, parseISO } from 'date-fns';
+import { format, eachDayOfInterval, startOfDay, endOfDay, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import type { TrialLead } from '@/types/trial';
 
 interface ChartPoint {
   label: string;
   count: number;
-  avg: number;
 }
 
 interface DailyLeadsChartProps {
   leads: TrialLead[];
   monthFilter: string;
+  isLoading?: boolean;
 }
 
 interface TooltipPayloadEntry {
   dataKey?: string;
   value?: number;
-  color?: string;
 }
 
 function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: TooltipPayloadEntry[]; label?: string }) {
   if (!active || !payload || !payload.length) return null;
   const count = payload.find(p => p.dataKey === 'count')?.value ?? 0;
-  const avg = payload.find(p => p.dataKey === 'avg')?.value ?? 0;
   return (
-    <div className="glass border border-white/10 rounded-xl p-3 shadow-xl min-w-[160px]">
+    <div className="glass border border-white/10 rounded-xl p-3 shadow-xl min-w-[150px]">
       <p className="text-[11px] text-muted-foreground mb-2 font-medium">{label}</p>
-      <div className="space-y-1.5">
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-[11px] flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-pink-400" />
-            Leads
-          </span>
-          <span className="text-[12px] font-semibold text-pink-300">{count}</span>
-        </div>
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-[11px] flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-sm border border-dashed border-pink-300/60" />
-            Média
-          </span>
-          <span className="text-[12px] font-semibold text-muted-foreground">{avg.toFixed(1)}/dia</span>
-        </div>
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[11px] flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-pink-400" />
+          Leads
+        </span>
+        <span className="text-[12px] font-semibold text-pink-300">{count}</span>
       </div>
     </div>
   );
 }
 
-export function DailyLeadsChart({ leads, monthFilter }: DailyLeadsChartProps) {
+export function DailyLeadsChart({ leads, monthFilter, isLoading = false }: DailyLeadsChartProps) {
   const { data, avg, isEmpty, monthLabel } = useMemo(() => {
     let from: Date;
     let to: Date;
@@ -62,7 +51,7 @@ export function DailyLeadsChart({ leads, monthFilter }: DailyLeadsChartProps) {
       if (leads.length === 0) return { data: [] as ChartPoint[], avg: 0, isEmpty: true, monthLabel: 'Todo o período' };
       const dates = leads.map(l => new Date(l.created_at).getTime());
       from = startOfDay(new Date(Math.min(...dates)));
-      to = startOfDay(new Date(Math.max(...dates)));
+      to = endOfDay(new Date(Math.max(...dates)));
       mLabel = 'Todo o período';
     } else {
       const ref = parseISO(`${monthFilter}-01`);
@@ -79,24 +68,21 @@ export function DailyLeadsChart({ leads, monthFilter }: DailyLeadsChartProps) {
 
     for (const lead of leads) {
       const key = format(new Date(lead.created_at), 'yyyy-MM-dd');
-      if (dayMap.has(key)) {
-        dayMap.set(key, (dayMap.get(key) ?? 0) + 1);
+      const existing = dayMap.get(key);
+      if (existing !== undefined) {
+        dayMap.set(key, existing + 1);
       }
     }
 
     const arr: ChartPoint[] = [];
-    const countValues: number[] = [];
+    let totalCount = 0;
     for (const [key, count] of dayMap) {
-      const label = format(parseISO(key), 'dd/MM', { locale: ptBR });
-      arr.push({ label, count, avg: 0 });
-      countValues.push(count);
+      arr.push({ label: format(parseISO(key), 'dd/MM', { locale: ptBR }), count });
+      totalCount += count;
     }
 
-    const avgVal = countValues.length > 0 ? countValues.reduce((s, v) => s + v, 0) / countValues.length : 0;
-    for (const pt of arr) pt.avg = avgVal;
-
-    const totalLeads = countValues.reduce((s, v) => s + v, 0);
-    return { data: arr, avg: avgVal, isEmpty: totalLeads === 0, monthLabel: mLabel };
+    const avgVal = arr.length > 0 ? totalCount / arr.length : 0;
+    return { data: arr, avg: avgVal, isEmpty: totalCount === 0, monthLabel: mLabel };
   }, [leads, monthFilter]);
 
   return (
@@ -109,14 +95,24 @@ export function DailyLeadsChart({ leads, monthFilter }: DailyLeadsChartProps) {
           <div>
             <h3 className="text-sm md:text-base font-semibold">Novos leads por dia</h3>
             <p className="text-[11px] md:text-xs text-muted-foreground">
-              {monthLabel} · média de {avg.toFixed(1)} leads/dia
+              {monthLabel} · média {avg.toFixed(1)} leads/dia
             </p>
           </div>
         </div>
       </div>
 
       <div className="p-3 md:p-4">
-        {isEmpty ? (
+        {isLoading ? (
+          <div className="h-48 flex items-end gap-1 px-4 pb-2" data-testid="skeleton-daily-leads">
+            {[0.5, 0.8, 0.6, 1, 0.7, 0.9, 0.4, 0.75, 0.55, 0.85].map((h, i) => (
+              <div
+                key={i}
+                className="flex-1 rounded-t bg-pink-500/10 animate-pulse"
+                style={{ height: `${h * 100}%` }}
+              />
+            ))}
+          </div>
+        ) : isEmpty ? (
           <div className="h-48 flex items-center justify-center text-xs text-muted-foreground" data-testid="text-daily-leads-empty">
             Nenhum lead no período selecionado.
           </div>
@@ -127,7 +123,7 @@ export function DailyLeadsChart({ leads, monthFilter }: DailyLeadsChartProps) {
                 <defs>
                   <linearGradient id="leadsBarGradient" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="hsl(330 80% 60%)" stopOpacity={0.85} />
-                    <stop offset="100%" stopColor="hsl(330 80% 60%)" stopOpacity={0.35} />
+                    <stop offset="100%" stopColor="hsl(330 80% 60%)" stopOpacity={0.3} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.18} vertical={false} />
@@ -154,19 +150,20 @@ export function DailyLeadsChart({ leads, monthFilter }: DailyLeadsChartProps) {
                   radius={[4, 4, 0, 0]}
                   maxBarSize={32}
                 />
+                {/* Linha tracejada — média diária de leads */}
                 <ReferenceLine
                   y={avg}
                   stroke="hsl(330 80% 70%)"
-                  strokeDasharray="5 4"
+                  strokeDasharray="6 4"
                   strokeWidth={1.5}
-                  strokeOpacity={0.7}
-                />
-                <Line
-                  dataKey="avg"
-                  stroke="transparent"
-                  dot={false}
-                  activeDot={false}
-                  legendType="none"
+                  strokeOpacity={0.75}
+                  label={{
+                    value: `~${avg.toFixed(1)}/dia`,
+                    position: 'insideTopRight',
+                    fontSize: 10,
+                    fill: 'hsl(330 80% 70%)',
+                    dy: -4,
+                  }}
                 />
               </ComposedChart>
             </ResponsiveContainer>

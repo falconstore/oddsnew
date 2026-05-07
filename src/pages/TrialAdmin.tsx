@@ -668,7 +668,7 @@ export default function TrialAdmin() {
         </div>
 
         {/* Gráfico diário de leads */}
-        <DailyLeadsChart leads={filtered} monthFilter={monthFilter} />
+        <DailyLeadsChart leads={filtered} monthFilter={monthFilter} isLoading={isLoading} />
 
         {/* Table / Cards */}
         {isLoading ? (
