@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { format } from 'date-fns';
+import { format, startOfMonth, endOfMonth, parseISO, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
   Receipt, Search, Sparkles, Users, CreditCard, RefreshCcw, TrendingUp,
@@ -31,6 +31,7 @@ import {
 import { useLastlinkPayments, useLastlinkEvents, useLastlinkLeadEvents } from '@/hooks/useLastlinkData';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
 import { RevenueChart } from '@/components/lastlink/RevenueChart';
+import { DailyPaymentsChart } from '@/components/lastlink/DailyPaymentsChart';
 import type { TrialLead, LastlinkEvent, LastlinkBuyerAddress, LastlinkUtm } from '@/types/trial';
 
 // ─── helpers ──────────────────────────────────────────────────────────────
@@ -128,7 +129,7 @@ const eventBadge = (type: string | null) => {
 
 // ─── period ────────────────────────────────────────────────────────────────
 
-type RangeKey = 'today' | '7d' | '30d' | 'all' | 'custom';
+type RangeKey = 'today' | '7d' | '30d' | 'all' | 'custom' | 'month';
 
 const RANGE_LABELS: Record<RangeKey, string> = {
   today: 'Hoje',
@@ -136,12 +137,29 @@ const RANGE_LABELS: Record<RangeKey, string> = {
   '30d': 'Últimos 30 dias',
   all: 'Todo o período',
   custom: 'Período personalizado',
+  month: 'Mês específico',
 };
 
-function rangeBounds(range: RangeKey, customFrom?: Date, customTo?: Date): { from: Date | null; to: Date | null } {
+function generateMonthOptions() {
+  const now = new Date();
+  const options: { value: string; label: string }[] = [];
+  for (let i = 0; i < 12; i++) {
+    const d = subMonths(now, i);
+    options.push({ value: format(d, 'yyyy-MM'), label: format(d, 'MMMM/yyyy', { locale: ptBR }) });
+  }
+  return options;
+}
+
+const MONTH_OPTIONS = generateMonthOptions();
+
+function rangeBounds(range: RangeKey, customFrom?: Date, customTo?: Date, selectedMonth?: string): { from: Date | null; to: Date | null } {
   const now = new Date();
   if (range === 'all') return { from: null, to: null };
   if (range === 'custom') return { from: customFrom ?? null, to: customTo ?? null };
+  if (range === 'month') {
+    const ref = parseISO(`${selectedMonth ?? format(now, 'yyyy-MM')}-01`);
+    return { from: startOfMonth(ref), to: endOfMonth(ref) };
+  }
   const to = new Date(now);
   const from = new Date(now);
   if (range === 'today') {
@@ -188,8 +206,9 @@ export default function LastlinkAdmin() {
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(initialLead);
   const [range, setRange] = useState<RangeKey>(() => {
     const v = searchParams.get('range') as RangeKey | null;
-    return v && ['today', '7d', '30d', 'all', 'custom'].includes(v) ? v : '30d';
+    return v && ['today', '7d', '30d', 'all', 'custom', 'month'].includes(v) ? v : '30d';
   });
+  const [selectedMonth, setSelectedMonth] = useState<string>(() => searchParams.get('month') ?? format(new Date(), 'yyyy-MM'));
   const [customFrom, setCustomFrom] = useState<Date | undefined>(() => {
     const v = searchParams.get('from');
     return v ? new Date(`${v}T00:00:00`) : undefined;
@@ -225,6 +244,7 @@ export default function LastlinkAdmin() {
     if (tab !== 'pagantes') setIf('tab', tab);
     setIf('lead', selectedLeadId);
     if (range !== '30d') setIf('range', range);
+    if (range === 'month') setIf('month', selectedMonth);
     if (customFrom) setIf('from', format(customFrom, 'yyyy-MM-dd'));
     if (customTo) setIf('to', format(customTo, 'yyyy-MM-dd'));
     if (statusFilter !== 'all') setIf('status', statusFilter);
@@ -238,7 +258,7 @@ export default function LastlinkAdmin() {
     if (next.toString() !== searchParams.toString()) {
       setSearchParams(next, { replace: true });
     }
-  }, [tab, selectedLeadId, range, customFrom, customTo, statusFilter, methodFilter, coupons, affiliates, plans, utmSources, hideTest, search, searchParams, setSearchParams]);
+  }, [tab, selectedLeadId, range, selectedMonth, customFrom, customTo, statusFilter, methodFilter, coupons, affiliates, plans, utmSources, hideTest, search, searchParams, setSearchParams]);
 
   // Realtime — atualiza tabela e drawer (timeline) quando chegar pagamento/evento novo
   useRealtimeSubscription({
@@ -255,8 +275,8 @@ export default function LastlinkAdmin() {
   });
 
   const { from: rangeFrom, to: rangeTo } = useMemo(
-    () => rangeBounds(range, customFrom, customTo),
-    [range, customFrom, customTo],
+    () => rangeBounds(range, customFrom, customTo, selectedMonth),
+    [range, customFrom, customTo, selectedMonth],
   );
 
   const couponOptions = useMemo(
@@ -348,6 +368,7 @@ export default function LastlinkAdmin() {
 
   const clearFilters = () => {
     setRange('30d');
+    setSelectedMonth(format(new Date(), 'yyyy-MM'));
     setCustomFrom(undefined);
     setCustomTo(undefined);
     setStatusFilter('all');
@@ -459,6 +480,14 @@ export default function LastlinkAdmin() {
           rangeLabel={RANGE_LABELS[range]}
         />
 
+        {/* Gráfico de novos pagamentos por dia */}
+        <DailyPaymentsChart
+          payments={filtered}
+          rangeFrom={rangeFrom}
+          rangeTo={rangeTo}
+          rangeLabel={RANGE_LABELS[range]}
+        />
+
         {/* Filtros */}
         <div className="glass rounded-3xl border border-white/8 p-4 md:p-5 space-y-3">
           <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -491,10 +520,23 @@ export default function LastlinkAdmin() {
                   <SelectItem value="today">Hoje</SelectItem>
                   <SelectItem value="7d">Últimos 7 dias</SelectItem>
                   <SelectItem value="30d">Últimos 30 dias</SelectItem>
+                  <SelectItem value="month">Mês específico</SelectItem>
                   <SelectItem value="all">Todo o período</SelectItem>
                   <SelectItem value="custom">Personalizado</SelectItem>
                 </SelectContent>
               </Select>
+              {range === 'month' && (
+                <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                  <SelectTrigger className="bg-white/5 border-white/10 h-8 text-xs mt-1" data-testid="filter-selected-month">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MONTH_OPTIONS.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
               {range === 'custom' && (
                 <div className="grid grid-cols-2 gap-1 mt-1">
                   <DatePickerButton value={customFrom} onChange={setCustomFrom} placeholder="Início" testId="filter-custom-from" />

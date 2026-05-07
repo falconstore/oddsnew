@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
-import { format, formatDistanceToNow } from 'date-fns';
+import { format, formatDistanceToNow, startOfMonth, endOfMonth, parseISO, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
   Gift, Search, Sparkles, Users, CheckCircle2, Clock, Ban, UserMinus,
@@ -10,6 +10,7 @@ import {
   ShieldAlert, Unlock, Radio, ServerCog, Receipt, Eraser,
 } from 'lucide-react';
 import { Layout } from '@/components/Layout';
+import { DailyLeadsChart } from '@/components/trial/DailyLeadsChart';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -79,6 +80,17 @@ export default function TrialAdmin() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | TrialStatus>('all');
   const [cohortFilter, setCohortFilter] = useState<'all' | 'v1' | 'v2'>('all');
+  const [monthFilter, setMonthFilter] = useState<string>(() => format(new Date(), 'yyyy-MM'));
+
+  const monthOptions = useMemo(() => {
+    const now = new Date();
+    const opts: { value: string; label: string }[] = [{ value: 'all', label: 'Todos os meses' }];
+    for (let i = 0; i < 12; i++) {
+      const d = subMonths(now, i);
+      opts.push({ value: format(d, 'yyyy-MM'), label: format(d, 'MMMM/yyyy', { locale: ptBR }) });
+    }
+    return opts;
+  }, []);
   const [confirmKick, setConfirmKick] = useState<TrialLead | null>(null);
   const [linkLead, setLinkLead] = useState<TrialLead | null>(null);
   const [manualUserId, setManualUserId] = useState('');
@@ -106,6 +118,9 @@ export default function TrialAdmin() {
 
   const filtered = useMemo(() => {
     let list = leads;
+    if (monthFilter !== 'all') {
+      list = list.filter(l => l.created_at.startsWith(monthFilter));
+    }
     if (statusFilter !== 'all') list = list.filter(l => l.status === statusFilter);
     if (cohortFilter !== 'all') list = list.filter(l => l.cohort === cohortFilter);
     if (search) {
@@ -120,7 +135,7 @@ export default function TrialAdmin() {
       );
     }
     return list;
-  }, [leads, statusFilter, cohortFilter, search]);
+  }, [leads, monthFilter, statusFilter, cohortFilter, search]);
 
   return (
     <Layout>
@@ -608,6 +623,16 @@ export default function TrialAdmin() {
               data-testid="input-trial-search"
             />
           </div>
+          <Select value={monthFilter} onValueChange={setMonthFilter}>
+            <SelectTrigger className="bg-white/5 border-white/10 h-9 text-sm w-[190px]" data-testid="select-trial-month-filter">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {monthOptions.map(opt => (
+                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Select value={statusFilter} onValueChange={v => setStatusFilter(v as 'all' | TrialStatus)}>
             <SelectTrigger className="bg-white/5 border-white/10 h-9 text-sm w-[180px]" data-testid="select-trial-status-filter">
               <SelectValue />
@@ -633,14 +658,17 @@ export default function TrialAdmin() {
               <SelectItem value="v1">v1 — grupo antigo ({stats.v1})</SelectItem>
             </SelectContent>
           </Select>
-          {(search || statusFilter !== 'all' || cohortFilter !== 'all') && (
+          {(search || statusFilter !== 'all' || cohortFilter !== 'all' || monthFilter !== 'all') && (
             <Button variant="ghost" size="sm" className="h-9 text-xs text-muted-foreground hover:text-foreground"
-              onClick={() => { setSearch(''); setStatusFilter('all'); setCohortFilter('all'); }}
+              onClick={() => { setSearch(''); setStatusFilter('all'); setCohortFilter('all'); setMonthFilter('all'); }}
               data-testid="button-trial-clear-filters">
               Limpar filtros
             </Button>
           )}
         </div>
+
+        {/* Gráfico diário de leads */}
+        <DailyLeadsChart leads={filtered} monthFilter={monthFilter} />
 
         {/* Table / Cards */}
         {isLoading ? (
