@@ -480,15 +480,6 @@ export default function LastlinkAdmin() {
           rangeLabel={RANGE_LABELS[range]}
         />
 
-        {/* Gráfico de novos pagamentos por dia */}
-        <DailyPaymentsChart
-          payments={filtered}
-          rangeFrom={rangeFrom}
-          rangeTo={rangeTo}
-          rangeLabel={RANGE_LABELS[range]}
-          isLoading={isLoading}
-        />
-
         {/* Filtros */}
         <div className="glass rounded-3xl border border-white/8 p-4 md:p-5 space-y-3">
           <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -674,7 +665,15 @@ export default function LastlinkAdmin() {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="pagantes" className="mt-0">
+          <TabsContent value="pagantes" className="mt-0 space-y-4">
+            {/* Gráfico de novos pagamentos por dia */}
+            <DailyPaymentsChart
+              payments={filtered}
+              rangeFrom={rangeFrom}
+              rangeTo={rangeTo}
+              rangeLabel={RANGE_LABELS[range]}
+              isLoading={isLoading}
+            />
             <PaymentsTable
               payments={filtered}
               isLoading={isLoading}

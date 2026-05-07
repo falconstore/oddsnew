@@ -238,6 +238,24 @@ export function DailyPaymentsChart({ payments, rangeFrom, rangeTo, rangeLabel, i
                   dot={false}
                   activeDot={{ r: 4, fill: 'hsl(40 90% 60%)', stroke: 'hsl(40 90% 80%)', strokeWidth: 2 }}
                 />
+                {/* Média diária de R$ — linha de referência horizontal tracejada */}
+                {avgRevenue > 0 && (
+                  <ReferenceLine
+                    yAxisId="revenue"
+                    y={avgRevenue}
+                    stroke="hsl(40 90% 60%)"
+                    strokeDasharray="4 6"
+                    strokeWidth={1}
+                    strokeOpacity={0.5}
+                    label={{
+                      value: `~${fmtMoneyShort(avgRevenue)}/dia`,
+                      position: 'insideTopRight',
+                      fontSize: 10,
+                      fill: 'hsl(40 90% 65%)',
+                      dy: -4,
+                    }}
+                  />
+                )}
               </ComposedChart>
             </ResponsiveContainer>
           </div>
