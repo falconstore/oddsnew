@@ -16,7 +16,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useToast } from '@/hooks/use-toast';
 import {
   Upload, Copy, Download, RotateCcw, Image as ImageIcon, Stamp,
-  Loader2, Sparkles,
+  Loader2, Sparkles, ZoomIn, ZoomOut, Maximize2,
 } from 'lucide-react';
 import {
   DEFAULT_CONFIG, WatermarkConfig, WatermarkPosition, WatermarkFillMode,
@@ -50,6 +50,7 @@ export default function WatermarkStudio() {
   const [busy, setBusy] = useState<'copy' | 'download' | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string>('');
+  const [zoom, setZoom] = useState<number>(100);
   const previewRef = useRef<HTMLCanvasElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -224,7 +225,44 @@ export default function WatermarkStudio() {
                 <CardTitle className="text-base flex items-center gap-2">
                   <ImageIcon className="h-4 w-4 text-primary" /> Preview
                 </CardTitle>
-                {dimensions && <span className="text-xs text-muted-foreground font-mono">{dimensions}</span>}
+                <div className="flex items-center gap-2">
+                  {dimensions && <span className="text-xs text-muted-foreground font-mono">{dimensions}</span>}
+                  {baseImg && (
+                    <div className="flex items-center gap-1 ml-2 border-l pl-2">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-7 w-7"
+                            onClick={() => setZoom((z) => Math.max(25, z - 25))}
+                            data-testid="button-zoom-out" aria-label="Diminuir zoom">
+                            <ZoomOut className="h-3.5 w-3.5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Diminuir zoom</TooltipContent>
+                      </Tooltip>
+                      <span className="text-xs font-mono text-muted-foreground tabular-nums w-10 text-center" data-testid="text-zoom-level">{zoom}%</span>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-7 w-7"
+                            onClick={() => setZoom((z) => Math.min(400, z + 25))}
+                            data-testid="button-zoom-in" aria-label="Aumentar zoom">
+                            <ZoomIn className="h-3.5 w-3.5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Aumentar zoom</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-7 w-7"
+                            onClick={() => setZoom(100)}
+                            data-testid="button-zoom-reset" aria-label="Resetar zoom">
+                            <Maximize2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Ajustar à tela (100%)</TooltipContent>
+                      </Tooltip>
+                    </div>
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
                 {!baseImg ? (
@@ -269,12 +307,13 @@ export default function WatermarkStudio() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    <div className="relative bg-[#0a0a0a] rounded-xl overflow-hidden border flex items-center justify-center min-h-[400px]">
+                    <div className="relative bg-[#0a0a0a] rounded-xl overflow-auto border flex items-center justify-center min-h-[400px] max-h-[70vh]">
                       {previewUrl ? (
                         <img
                           src={previewUrl}
                           alt="Preview com marca d'água"
-                          className="max-w-full max-h-[70vh] object-contain"
+                          style={{ width: `${zoom}%`, height: 'auto', maxWidth: zoom <= 100 ? '100%' : 'none' }}
+                          className="object-contain transition-[width] duration-150"
                           data-testid="img-watermark-preview"
                         />
                       ) : (
@@ -347,12 +386,16 @@ export default function WatermarkStudio() {
                 </CardHeader>
                 <CardContent className="space-y-5">
                   <SliderRow label="Opacidade" value={config.opacity} unit="%" min={0} max={100} step={1}
+                    tooltip="Transparência da logo (0 = invisível, 100 = opaca)"
                     onChange={(v) => setConfig({ ...config, opacity: v })} testId="slider-opacity" />
-                  <SliderRow label="Tamanho" value={config.size} unit="%" min={5} max={100} step={1}
+                  <SliderRow label="Tamanho" value={config.size} unit="%" min={10} max={100} step={1}
+                    tooltip="Largura da logo relativa à largura da imagem base"
                     onChange={(v) => setConfig({ ...config, size: v })} testId="slider-size" />
                   <SliderRow label="Rotação" value={config.rotation} unit="°" min={-180} max={180} step={1}
+                    tooltip="Gira a logo no sentido horário (positivo) ou anti-horário (negativo)"
                     onChange={(v) => setConfig({ ...config, rotation: v })} testId="slider-rotation" />
-                  <SliderRow label="Margem" value={config.margin} unit="px" min={0} max={200} step={1}
+                  <SliderRow label="Margem" value={config.margin} unit="px" min={0} max={100} step={1}
+                    tooltip="Distância da logo até a borda da imagem (modo Única)"
                     onChange={(v) => setConfig({ ...config, margin: v })} testId="slider-margin" />
 
                   <div className="space-y-2">
@@ -393,9 +436,24 @@ export default function WatermarkStudio() {
                       onValueChange={(v) => v && setConfig({ ...config, fillMode: v as WatermarkFillMode })}
                       className="grid grid-cols-3 gap-1.5"
                     >
-                      <ToggleGroupItem value="single" data-testid="toggle-fill-single">Única</ToggleGroupItem>
-                      <ToggleGroupItem value="pattern" data-testid="toggle-fill-pattern">Repetida</ToggleGroupItem>
-                      <ToggleGroupItem value="diagonal" data-testid="toggle-fill-diagonal">Diagonal</ToggleGroupItem>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <ToggleGroupItem value="single" data-testid="toggle-fill-single" aria-label="Logo única">Única</ToggleGroupItem>
+                        </TooltipTrigger>
+                        <TooltipContent>Uma logo na posição escolhida</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <ToggleGroupItem value="pattern" data-testid="toggle-fill-pattern" aria-label="Logos repetidas em grade">Repetida</ToggleGroupItem>
+                        </TooltipTrigger>
+                        <TooltipContent>Logos repetidas cobrindo toda a imagem</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <ToggleGroupItem value="diagonal" data-testid="toggle-fill-diagonal" aria-label="Logos em diagonal">Diagonal</ToggleGroupItem>
+                        </TooltipTrigger>
+                        <TooltipContent>Logos repetidas inclinadas em diagonal (anti-cópia)</TooltipContent>
+                      </Tooltip>
                     </ToggleGroup>
                   </div>
                 </CardContent>
@@ -423,34 +481,55 @@ export default function WatermarkStudio() {
                       onValueChange={(v) => setFormat(v as 'png' | 'jpg')}
                       className="flex gap-4"
                     >
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <RadioGroupItem value="png" data-testid="radio-format-png" /> PNG
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <RadioGroupItem value="jpg" data-testid="radio-format-jpg" /> JPG
-                      </label>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <RadioGroupItem value="png" data-testid="radio-format-png" /> PNG
+                          </label>
+                        </TooltipTrigger>
+                        <TooltipContent>PNG: sem perda, suporta transparência (arquivo maior)</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <RadioGroupItem value="jpg" data-testid="radio-format-jpg" /> JPG
+                          </label>
+                        </TooltipTrigger>
+                        <TooltipContent>JPG: arquivo menor, sem transparência</TooltipContent>
+                      </Tooltip>
                     </RadioGroup>
                   </div>
                   {format === 'jpg' && (
                     <SliderRow label="Qualidade JPG" value={quality} unit="%" min={50} max={100} step={1}
+                      tooltip="Mais qualidade = arquivo maior"
                       onChange={setQuality} testId="slider-quality" />
                   )}
 
                   <div className="grid grid-cols-2 gap-2 pt-2">
-                    <Button
-                      variant="outline" disabled={!baseImg || busy !== null}
-                      onClick={doCopy} data-testid="button-copy"
-                    >
-                      {busy === 'copy' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Copy className="h-4 w-4 mr-2" />}
-                      Copiar
-                    </Button>
-                    <Button
-                      disabled={!baseImg || busy !== null}
-                      onClick={doDownload} data-testid="button-download"
-                    >
-                      {busy === 'download' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
-                      Baixar
-                    </Button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline" disabled={!baseImg || busy !== null}
+                          onClick={doCopy} data-testid="button-copy"
+                        >
+                          {busy === 'copy' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Copy className="h-4 w-4 mr-2" />}
+                          Copiar
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Copiar imagem para a área de transferência (Ctrl+C)</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          disabled={!baseImg || busy !== null}
+                          onClick={doDownload} data-testid="button-download"
+                        >
+                          {busy === 'download' ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+                          Baixar
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Baixar arquivo (Ctrl+S)</TooltipContent>
+                    </Tooltip>
                   </div>
 
                   <AlertDialog>
@@ -484,16 +563,25 @@ export default function WatermarkStudio() {
 }
 
 function SliderRow({
-  label, value, unit, min, max, step, onChange, testId,
+  label, value, unit, min, max, step, onChange, testId, tooltip,
 }: {
   label: string; value: number; unit: string;
   min: number; max: number; step: number;
-  onChange: (v: number) => void; testId?: string;
+  onChange: (v: number) => void; testId?: string; tooltip?: string;
 }) {
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <Label className="text-xs">{label}</Label>
+        {tooltip ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Label className="text-xs cursor-help underline-offset-2 decoration-dotted decoration-muted-foreground/40 hover:decoration-primary">{label}</Label>
+            </TooltipTrigger>
+            <TooltipContent>{tooltip}</TooltipContent>
+          </Tooltip>
+        ) : (
+          <Label className="text-xs">{label}</Label>
+        )}
         <span className="text-xs font-mono text-primary tabular-nums">{value}{unit}</span>
       </div>
       <Slider
