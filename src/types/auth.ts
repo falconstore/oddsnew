@@ -27,6 +27,7 @@ export interface UserPermissionRow {
   can_view_betbra: boolean;
   can_view_trial: boolean;
   can_view_lastlink: boolean;
+  can_view_watermark: boolean;
   is_super_admin?: boolean;
   created_date: string;
   updated_date: string;
@@ -94,7 +95,7 @@ export const PAGE_KEY_TO_COLUMN: Record<string, keyof UserPermissionRow> = {
   settings: 'can_view_dashboard', // settings acessível se tem dashboard
   scraper_status: 'can_view_admin',
   telegram_bot: 'can_view_admin',
-  watermark: 'can_view_dashboard',
+  watermark: 'can_view_watermark',
 };
 
 // Colunas de permissão editáveis (para o admin UI)
@@ -110,6 +111,7 @@ export const PERMISSION_COLUMNS: { column: keyof UserPermissionRow; label: strin
   { column: 'can_view_betbra', label: 'Betbra', description: 'Dados de afiliação Betbra' },
   { column: 'can_view_trial', label: 'Trial Telegram', description: 'CRM dos leads de trial do grupo Telegram' },
   { column: 'can_view_lastlink', label: 'Pagamentos Lastlink', description: 'Painel de pagamentos e assinaturas via Lastlink' },
+  { column: 'can_view_watermark', label: "Marca d'Água", description: "Editor de marca d'água com logo Shark" },
 ];
 
 // Configuração de páginas com labels e descrições (mantido para sidebar/UI)

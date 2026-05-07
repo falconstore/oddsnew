@@ -235,6 +235,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           can_view_conta_corrente: false,
           can_view_plataformas: false,
           can_view_betbra: false,
+          can_view_watermark: false,
           is_super_admin: false,
         } as any, { onConflict: 'user_email' });
     } catch (e) {
