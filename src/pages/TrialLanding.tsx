@@ -8,6 +8,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import sharkHeroImg from '@assets/image_1776543554081.png';
+import proof1 from '@assets/WhatsApp_Image_2026-05-07_at_20.43.24_(3)_1778197516426.jpeg';
+import proof2 from '@assets/WhatsApp_Image_2026-05-07_at_20.43.24_(2)_1778197516427.jpeg';
+import proof3 from '@assets/WhatsApp_Image_2026-05-07_at_20.43.24_(1)_1778197516427.jpeg';
+import proof4 from '@assets/WhatsApp_Image_2026-05-07_at_20.43.24_1778197516427.jpeg';
+import proof5 from '@assets/WhatsApp_Image_2026-05-03_at_05.16.04_1777796184266-CnYvy8Lp_1778197516428.jpeg';
+import proof6 from '@assets/WhatsApp_Image_2026-05-03_at_05.16.03_1777796184266-Cu4xMMoY_1778197516428.jpeg';
+import proof7 from '@assets/WhatsApp_Image_2026-05-03_at_05.16.04_(1)_1777796184266-Bv3rf_1778197516428.jpeg';
+import proof8 from '@assets/WhatsApp_Image_2026-05-04_at_18.43.57_1778197516429.jpeg';
 
 const SUPABASE_URL = import.meta.env.VITE_MAIN_SUPABASE_URL as string;
 const SUPABASE_ANON = import.meta.env.VITE_MAIN_SUPABASE_ANON_KEY as string;
@@ -591,39 +599,31 @@ export default function TrialLanding() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <TestimonialCard
-              name="Lucas M."
-              city="São Paulo – SP"
-              result="R$ 312 na primeira semana"
-              text="Na primeira semana fiz R$ 312 seguindo os sinais. Nem precisei entender nada de odds ou planilha. O procedimento chega tão mastigado que é impossível errar."
-              stars={5}
-              testId="card-full-testimonial-1"
-            />
-            <TestimonialCard
-              name="Carla S."
-              city="Belo Horizonte – MG"
-              result="R$ 487 em 5 dias de trial"
-              text="Achei que era mais um grupo de palpite, não ia nem tentar. Mas os sinais chegam antes da odd mudar de verdade. Fiz R$ 487 nos primeiros 5 dias."
-              stars={5}
-              testId="card-full-testimonial-2"
-            />
-            <TestimonialCard
-              name="Rafael O."
-              city="Curitiba – PR"
-              result="R$ 219 em 4 dias, zero experiência"
-              text="Green na primeira operação. Em 4 dias de trial já estava com R$ 219 no positivo, sem nenhuma experiência prévia com apostas esportivas."
-              stars={5}
-              testId="card-full-testimonial-3"
-            />
-            <TestimonialCard
-              name="Ana P."
-              city="Rio de Janeiro – RJ"
-              result="R$ 380 em uma semana"
-              text="Zero de experiência com apostas. Segui o passo-a-passo e deu R$ 380 em uma semana. O mais importante: nunca fiquei perdida, o suporte do grupo é muito bom."
-              stars={5}
-              testId="card-full-testimonial-4"
-            />
+          {/* Grade de prints reais dos membros */}
+          <div className="columns-2 md:columns-3 lg:columns-4 gap-3 space-y-3" data-testid="section-proof-grid">
+            {[
+              { src: proof1, alt: 'Print R$1.050 — Everton vs Manchester City' },
+              { src: proof6, alt: 'Print carro comprado com 5 meses de Shark' },
+              { src: proof7, alt: 'Print mais de mil reais em 6 dias / placa 10K' },
+              { src: proof2, alt: 'Print mais de 3k de lucro — DOKU City duplo' },
+              { src: proof8, alt: 'Print R$1.803 no duplo segunda-feira' },
+              { src: proof4, alt: 'Print R$300 protegendo duplo Newcastle' },
+              { src: proof5, alt: 'Print PC do filho pago com o Shark' },
+              { src: proof3, alt: 'Print duplos nos 3 primeiros dias do mês' },
+            ].map(({ src, alt }, i) => (
+              <div
+                key={i}
+                className="break-inside-avoid rounded-xl overflow-hidden border border-emerald-500/20 shadow-lg shadow-black/40 hover:border-emerald-400/50 hover:scale-[1.02] transition-transform duration-200"
+                data-testid={`img-proof-${i + 1}`}
+              >
+                <img
+                  src={src}
+                  alt={alt}
+                  loading="lazy"
+                  className="w-full h-auto block"
+                />
+              </div>
+            ))}
           </div>
         </section>
 
