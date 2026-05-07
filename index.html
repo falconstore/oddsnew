@@ -3,24 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- TODO: Set the document title to the name of your application -->
     <title>Shark 100% Green</title>
     <meta name="description" content="Acesso VIP Shark 100% Green">
     <meta name="author" content="Lovable" />
 
-    <!-- TODO: Update og:title to match your application name -->
-    
-    
     <meta property="og:type" content="website" />
     <meta property="og:image" content="https://storage.googleapis.com/gpt-engineer-file-uploads/idpRajER2ialBVZQqwyobC0rlSY2/social-images/social-1769461845764-Gemini_Generated_Image_cetdutcetdutcetd.png">
 
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@Lovable" />
     <meta name="twitter:image" content="https://storage.googleapis.com/gpt-engineer-file-uploads/idpRajER2ialBVZQqwyobC0rlSY2/social-images/social-1769461845764-Gemini_Generated_Image_cetdutcetdutcetd.png">
-    
-  
-  
-  
+
   <link rel="icon" type="image/png" href="https://storage.googleapis.com/gpt-engineer-file-uploads/idpRajER2ialBVZQqwyobC0rlSY2/uploads/1769461842348-Gemini_Generated_Image_cetdutcetdutcetd.png">
   <meta property="og:title" content="Shark 100% Green">
   <meta name="twitter:title" content="Shark 100% Green">
@@ -29,10 +22,78 @@
 
   <!-- track4you (Arthur / performance) -->
   <script src="https://track4you.app/9fdc319a-0e6e-4feb-b4a4-471c0293465c.js" defer></script>
+
+  <!-- TAREFA 2: Meta Pixel Code -->
+  <script>
+  !function(f,b,e,v,n,t,s)
+  {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+  n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+  if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+  n.queue=[];t=b.createElement(e);t.async=!0;
+  t.src=v;s=b.getElementsByTagName(e)[0];
+  s.parentNode.insertBefore(t,s)}(window, document,'script',
+  'https://connect.facebook.net/en_US/fbevents.js');
+  fbq('init', '1672225667108236');
+  fbq('track', 'PageView');
+  </script>
+  <!-- End Meta Pixel Code -->
 </head>
 
   <body>
+    <!-- Meta Pixel noscript fallback (deve ficar no body) -->
+    <noscript><img height="1" width="1" style="display:none"
+    src="https://www.facebook.com/tr?id=1672225667108236&ev=PageView&noscript=1"
+    /></noscript>
+
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+
+    <!-- TAREFA 3: Adscala Rastreamento de Conversão -->
+    <script>
+    (function() {
+      var params = new URLSearchParams(window.location.search);
+      var ct = params.get('ct');
+      if (ct) {
+        localStorage.setItem('adscala_ct', ct);
+        localStorage.setItem('multiads_ct', ct);
+      }
+
+      function sendConversion(pedidoId, valor) {
+        var code = localStorage.getItem('adscala_ct') || localStorage.getItem('multiads_ct');
+        if (!code) return;
+        fetch('https://adscala.com.br/api/webhook/venda', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ trackingCode: code, pedidoId: pedidoId || Date.now(), valor: valor || 0 })
+        });
+      }
+
+      window.adscala_sendConversion = sendConversion;
+      window.multiads_sendConversion = sendConversion;
+    })();
+    </script>
+    <!-- Fim Adscala Rastreamento de Conversão -->
+
+    <!-- TAREFA 4: Adscala Tracking Pixel -->
+    <script>
+    (function(){
+      var mid="CT-USER-001-ADMIN";
+      var api="https://adscala.com.br/api/tracking";
+      function send(e,d){
+        fetch(api,{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({event:e,nodeId:mid,url:location.href,...d})});
+      }
+      send("pageview",{});
+      document.addEventListener("click",function(e){
+        var t=e.target.closest("a,button,[data-track]");
+        if(t)send("click",{element:t.tagName,text:(t.innerText||"").slice(0,80)});
+      });
+      window.addEventListener("scroll",function(){
+        var pct=Math.round(window.scrollY/(document.body.scrollHeight-window.innerHeight)*100);
+        if(pct===25||pct===50||pct===75||pct===100)send("scroll",{depth:pct+"%"});
+      },{passive:true});
+    })();
+    </script>
+    <!-- Fim Adscala Tracking Pixel -->
   </body>
 </html>

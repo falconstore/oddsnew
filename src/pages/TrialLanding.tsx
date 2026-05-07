@@ -240,6 +240,29 @@ export default function TrialLanding() {
     track('view', { page: 'trial-landing' });
   }, []);
 
+  // TAREFA 5: Microsoft Clarity — carrega só na rota /trial.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const CLARITY_ID = 'wn6p12ffga';
+    const SCRIPT_ATTR = 'data-clarity-trial';
+    if (document.querySelector(`script[${SCRIPT_ATTR}]`)) return;
+
+    (function(c: Window & typeof globalThis, l: Document, a: string, r: string, i: string) {
+      (c as any)[a] = (c as any)[a] || function() { ((c as any)[a].q = (c as any)[a].q || []).push(arguments); };
+      const t = l.createElement(r) as HTMLScriptElement;
+      t.async = true;
+      t.src = 'https://www.clarity.ms/tag/' + i;
+      t.setAttribute(SCRIPT_ATTR, '1');
+      const y = l.getElementsByTagName(r)[0];
+      y.parentNode!.insertBefore(t, y);
+    })(window, document, 'clarity', 'script', CLARITY_ID);
+
+    return () => {
+      const s = document.querySelector(`script[${SCRIPT_ATTR}]`);
+      if (s) s.remove();
+    };
+  }, []);
+
   // Meta Pixel — carrega só enquanto a rota /trial está montada. Ao sair da
   // rota (SPA navigation), o cleanup remove o script injetado e zera
   // window.fbq pra que o Meta Pixel Helper marque "no pixel detected" em
