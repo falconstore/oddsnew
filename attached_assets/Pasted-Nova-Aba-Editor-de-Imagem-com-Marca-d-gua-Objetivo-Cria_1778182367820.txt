@@ -1,0 +1,96 @@
+Nova Aba: Editor de Imagem com Marca d'Água
+🎯 Objetivo
+Criar uma nova aba no sistema chamada "Marca d'Água" (ou "Watermark Studio") que permite ao usuário aplicar uma logo/marca d'água sobre uma imagem carregada, com controles avançados de personalização e opção de copiar/baixar o resultado final.
+
+🔧 Funcionalidades Principais
+1. Upload da Imagem Base
+
+Área de drag & drop para arrastar imagens
+Botão "Selecionar arquivo" para upload tradicional
+Suporte a colar imagem direto do clipboard (Ctrl+V) — útil para prints
+Aceitar formatos: PNG, JPG, JPEG, WEBP
+Preview imediato após carregar
+Validação de tamanho máximo (ex: 10MB) com mensagem de erro amigável
+
+2. Logo/Marca d'Água
+
+Logo padrão do sistema pré-carregada (a que vou enviar)
+Opção do usuário fazer upload de uma logo personalizada (caso queira)
+Suporte a PNG com transparência
+
+3. Controles de Personalização (Sidebar ou Painel Lateral)
+Controle de Opacidade:
+
+Slider (chave de correr) de 0% a 100%
+Valor numérico exibido ao lado do slider
+Atualização em tempo real no preview
+
+Melhorias sugeridas que adicionei:
+
+Posição da Logo: seletor com 9 posições (grid 3x3 — superior esquerdo, superior centro, superior direito, meio esquerdo, centro, meio direito, inferior esquerdo, inferior centro, inferior direito)
+Tamanho da Logo: slider para ajustar de 10% a 100% do tamanho relativo à imagem base
+Modo de Preenchimento:
+
+Única: apenas uma logo na posição escolhida
+Repetida (pattern): logo se repete formando um padrão por toda a imagem (ótimo para proteção contra cópia)
+Diagonal: logo aplicada em diagonal repetidamente
+
+
+Rotação da Logo: slider de -180° a +180°
+Margem/Espaçamento: controle de distância da borda quando posicionada
+Cor de fundo opcional: caso o usuário queira adicionar um tom por trás (com opacidade própria)
+
+4. Preview em Tempo Real
+
+Canvas mostrando o resultado ao vivo conforme o usuário ajusta os controles
+Indicador de dimensões da imagem (largura x altura)
+Zoom in/out no preview para detalhes
+
+5. Ações Finais
+Botão "Copiar Imagem":
+
+Copia a imagem gerada para o clipboard
+Feedback visual: toast/notificação "Imagem copiada com sucesso!"
+Funciona em navegadores modernos via Clipboard API
+
+Botão "Baixar Imagem":
+
+Download do arquivo gerado
+Permite escolher formato de saída (PNG ou JPG)
+Para JPG: slider de qualidade de compressão (50% a 100%)
+Nome do arquivo personalizável (com sugestão padrão tipo imagem-com-marca-{timestamp}.png)
+
+Botão "Resetar":
+
+Limpa todos os campos e volta ao estado inicial
+Confirmação antes de resetar
+
+Botão "Salvar Preset": (melhoria extra)
+
+Permite o usuário salvar configurações favoritas (posição, opacidade, tamanho) para reutilizar depois
+Armazenamento em localStorage
+
+
+🎨 UX/UI
+
+Layout responsivo (desktop e mobile)
+Tema seguindo o padrão visual do sistema atual
+Loading states durante o processamento
+Mensagens de erro claras e em português
+Tooltips explicativos em cada controle
+Atalhos de teclado:
+
+Ctrl+V → colar imagem
+Ctrl+C → copiar resultado
+Ctrl+S → baixar resultado
+
+
+
+
+⚙️ Stack Técnica Sugerida
+
+Frontend: React (mantendo o padrão do sistema atual)
+Manipulação de Imagem: Canvas API nativo OU biblioteca fabric.js / konva.js para mais flexibilidade
+Clipboard: navigator.clipboard.write() com ClipboardItem
+Upload: input file + drag-and-drop API
+Tudo client-side — sem necessidade de upload para servidor (mais rápido e seguro)
