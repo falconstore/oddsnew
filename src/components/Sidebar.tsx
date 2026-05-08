@@ -20,6 +20,7 @@ import {
   Receipt,
   Trophy,
   Stamp,
+  BookOpen,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -38,6 +39,7 @@ const navigation: NavigationItem[] = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard, pageKey: PAGE_KEYS.DASHBOARD, color: 'text-primary' },
   { name: 'Procedimentos', href: '/procedures', icon: FileText, pageKey: PAGE_KEYS.PROCEDURE_CONTROL, color: 'text-cyan-400' },
   { name: 'FreeBets Ganhas', href: '/procedures/freebets-ganhas', icon: Trophy, pageKey: PAGE_KEYS.PROCEDURE_CONTROL, color: 'text-emerald-400' },
+  { name: 'Templates Bot', href: '/bot-templates', icon: BookOpen, pageKey: PAGE_KEYS.PROCEDURE_CONTROL, color: 'text-orange-400' },
   { name: 'Betbra Affiliate', href: '/betbra', icon: TrendingUp, pageKey: PAGE_KEYS.BETBRA_AFFILIATE, color: 'text-amber-400' },
   { name: 'Assinaturas', href: '/subscriptions', icon: CreditCard, pageKey: PAGE_KEYS.SUBSCRIPTIONS, color: 'text-purple-400' },
   { name: 'Casas', href: '/cadastros', icon: Building2, pageKey: PAGE_KEYS.LEAGUES, color: 'text-indigo-400' },
