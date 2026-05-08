@@ -26,7 +26,7 @@ const FREE_GROUPS_URL =
   (import.meta.env.VITE_FREE_GROUPS_URL as string | undefined) ||
   'https://t.me/+uxaDoyMx845kMGUx';
 
-const PIXEL_ID = '1486249896237184';
+const PIXEL_ID = '1672225667108236';
 const PIXEL_SCRIPT_SRC = 'https://connect.facebook.net/en_US/fbevents.js';
 const PIXEL_SCRIPT_DATA_ATTR = 'data-trial-pixel';
 

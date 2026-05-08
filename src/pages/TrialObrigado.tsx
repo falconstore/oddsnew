@@ -9,7 +9,7 @@ const VSL_EMBED_URL = '';
 
 const SUPABASE_URL = import.meta.env.VITE_MAIN_SUPABASE_URL as string;
 const SUPABASE_ANON = import.meta.env.VITE_MAIN_SUPABASE_ANON_KEY as string;
-const PIXEL_ID = '1486249896237184';
+const PIXEL_ID = '1672225667108236';
 const PIXEL_SCRIPT_SRC = 'https://connect.facebook.net/en_US/fbevents.js';
 const PIXEL_SCRIPT_DATA_ATTR = 'data-obrigado-pixel';
 
