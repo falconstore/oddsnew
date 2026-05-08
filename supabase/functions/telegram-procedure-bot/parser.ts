@@ -277,10 +277,13 @@ function detectTipo(text: string): ProcedureTipo {
   return "SEM_FB";
 }
 
-function detectCategory(text: string): string {
+function detectCategory(text: string, tipo: ProcedureTipo): string {
   if (/\bSUPERODD\b/i.test(text)) return "Superodd";
   if (/\bMISS[ÃA]O\b/i.test(text)) return "Extra";
-  if (/\bAPOSTA\s+GR[AÁ]TIS\b|\bFREEBET\b/i.test(text)) return "Freebet";
+  // Categoria Freebet só quando o procedimento de fato GANHA uma freebet
+  // (tipo GANHAR_FB). Se tem LUCRO: mas menciona "aposta grátis" no título,
+  // é uma promoção normal, não uma Freebet.
+  if (tipo === "GANHAR_FB") return "Freebet";
   return "Promoção";
 }
 
@@ -320,7 +323,7 @@ export function parseMessage(text: string): ParseResult {
   const tipo = detectTipo(text);
 
   // 7. Categoria
-  const category = detectCategory(text);
+  const category = detectCategory(text, tipo);
 
   // 8. Valores monetários
   const lucroResult = extractLucro(text);
