@@ -22,6 +22,7 @@ import Subscriptions from '@/pages/Subscriptions';
 
 import TelegramBot from '@/pages/TelegramBot';
 import TrialLanding from '@/pages/TrialLanding';
+import TrialObrigado from '@/pages/TrialObrigado';
 import TrialUpgrade from '@/pages/TrialUpgrade';
 import TrialAdmin from '@/pages/TrialAdmin';
 import LastlinkAdmin from '@/pages/LastlinkAdmin';
@@ -94,6 +95,11 @@ export function AnimatedRoutes() {
             </PageTransition>
           } />
           <Route path="/trial" element={<Navigate to="/" replace />} />
+          <Route path="/obrigado" element={
+            <PageTransition>
+              <TrialObrigado />
+            </PageTransition>
+          } />
           <Route path="/trial-upgrade" element={
             <PageTransition>
               <TrialUpgrade />

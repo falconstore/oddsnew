@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import {
-  Send, CheckCircle2, AlertCircle, ExternalLink, Clock,
+  CheckCircle2, AlertCircle, Clock,
   Star, ChevronDown, MessageCircle, Target, TrendingUp,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -877,19 +878,18 @@ function ProofNum({ value, label }: { value: string; label: string }) {
 function InlineSignupForm({
   onFocusTrack,
   onSuccessTrack,
-  onT4YTrack,
 }: {
   onFocusTrack: () => void;
   onSuccessTrack: (eventId: string) => void;
   onT4YTrack: (event: string, params: Record<string, unknown>) => void;
 }) {
+  const navigate = useNavigate();
   const [form, setForm] = useState<FormState>({
     name: '', email: '', whatsapp: '', telegram_username: '',
   });
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<{ botStartUrl: string; inviteLink: string } | null>(null);
   const [focusTracked, setFocusTracked] = useState(false);
   const firstInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -945,11 +945,20 @@ function InlineSignupForm({
         setServerError(json?.error || 'Não foi possível processar sua solicitação. Tente novamente.');
         return;
       }
-      setSuccess({
-        botStartUrl: json.bot_start_url,
-        inviteLink: json.invite_link,
-      });
       onSuccessTrack(leadEventId);
+      try {
+        sessionStorage.setItem(
+          'trial_success',
+          JSON.stringify({
+            botStartUrl: json.bot_start_url,
+            inviteLink: json.invite_link,
+            leadEventId,
+          }),
+        );
+      } catch {
+        /* sessionStorage indisponível */
+      }
+      navigate('/obrigado');
     } catch {
       setServerError('Erro de conexão. Verifique sua internet e tente novamente.');
     } finally {
@@ -962,83 +971,7 @@ function InlineSignupForm({
       className="rounded-2xl border border-emerald-500/30 bg-[hsl(150_30%_5%/0.95)] p-5 md:p-6 backdrop-blur shadow-2xl shadow-emerald-500/10"
       data-testid="card-inline-signup"
     >
-      {success ? (
-        <div className="flex flex-col items-center text-center space-y-5 py-2" data-testid="card-trial-success">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500/30 to-emerald-500/5 border border-emerald-500/30 flex items-center justify-center">
-            <CheckCircle2 className="w-8 h-8 text-emerald-400" />
-          </div>
-          <div className="space-y-2">
-            <h2 className="text-2xl font-bold">Quase lá! 🎉</h2>
-            <p className="text-white/70 text-sm">
-              <b>Passo 1:</b> abra o nosso bot no Telegram e toque em <b>Iniciar</b>. Ele vai te mandar o link do grupo VIP em segundos.
-            </p>
-          </div>
-          <a
-            href={success.botStartUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full"
-            data-testid="link-bot-start"
-            onClick={() =>
-              onT4YTrack('cta_telegram', {
-                button: 'bot_start',
-                destination: 'trial_bot',
-                url: success.botStartUrl,
-              })
-            }
-          >
-            <Button className="w-full h-12 bg-gradient-to-r from-emerald-400 to-green-500 hover:from-emerald-300 hover:to-green-400 text-black font-bold text-base border-0 shadow-lg shadow-emerald-500/40">
-              <Send className="w-5 h-5 mr-2" />
-              Abrir bot no Telegram
-            </Button>
-          </a>
-          <div className="w-full rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-3 text-left">
-            <div className="flex gap-3">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
-              <div className="space-y-1.5 text-xs">
-                <p className="font-semibold text-emerald-200">Por que esse passo?</p>
-                <p className="text-white/60">
-                  Sem apertar Iniciar, o Telegram não permite que o bot te mande mensagens — e você perderia os avisos importantes durante o trial.
-                </p>
-              </div>
-            </div>
-          </div>
-          <details className="w-full text-left">
-            <summary className="text-[11px] text-white/50 cursor-pointer hover:text-white/70">
-              Não consegue abrir o bot? Use o link direto do grupo
-            </summary>
-            <a
-              href={success.inviteLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-2 inline-block text-xs text-emerald-300 underline break-all"
-              data-testid="link-telegram-invite-fallback"
-              onClick={() =>
-                onT4YTrack('cta_telegram', {
-                  button: 'invite_fallback',
-                  destination: 'vip_invite',
-                  url: success.inviteLink,
-                })
-              }
-            >
-              {success.inviteLink}
-            </a>
-            <p className="text-[10px] text-white/40 mt-1">
-              Atenção: usando o link direto, você não recebe os avisos automáticos do bot.
-            </p>
-          </details>
-          <a
-            href={success.inviteLink}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-emerald-300 flex items-center gap-1 hover:text-emerald-200"
-            data-testid="link-invite-external"
-          >
-            <ExternalLink className="w-3 h-3" /> Acessar o grupo VIP
-          </a>
-        </div>
-      ) : (
-        <>
+      <>
           <h3 className="font-bold text-white text-base mb-4">Garantir meu acesso grátis</h3>
           <form onSubmit={submit} className="space-y-3" data-testid="form-trial-signup">
             <Field
@@ -1126,7 +1059,6 @@ function InlineSignupForm({
             </p>
           </form>
         </>
-      )}
     </div>
   );
 }
