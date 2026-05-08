@@ -83,7 +83,8 @@ function detectRegisterCommand(text: string): string | null {
   // Não pode conter quebra de linha (procedimentos sempre têm várias linhas)
   if (/\n/.test(t)) return null;
 
-  const re = /^REGISTRA?R?E?\s+(?:O\s+)?(?:PROC(?:EDIMENTO)?\s+)?#?(\d+)\s*$/i;
+  // Verbos aceitos: REGISTRE, REGISTRA, REGISTRAR (exatamente esses)
+  const re = /^REGISTR(?:E|A|AR)\s+(?:O\s+)?(?:PROC(?:EDIMENTO)?\s+)?#?(\d+)\s*$/i;
   const m = t.match(re);
   return m ? m[1] : null;
 }
