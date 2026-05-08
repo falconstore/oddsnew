@@ -1,0 +1,143 @@
+PARTE 1 — TEMPLATES DE MENSAGEM (Gerente do Shark)
+Template 1 — QUEIMAR FreeBet (referencia outro procedimento)
+🟢 PROCEDIMENTO [NNN] - [DD/MM/AAAA]
+🟢 PROCEDIMENTO REFERENTE ÀS FREEBETS DO PROCEDIMENTO [NNN_REF] EXTRA 🔥
+CASA: [NOME DA CASA]
+UTILIZAREMOS A PARTIDA ENTRE:
+[TIME A] X [TIME B] - [DD/MM/AAAA] ÀS [HH:MM]
+🟥 Atenção: sempre confere data e horário da partida nos bilhetes também.
+🟥 Atenção: Sempre confira se os links dos bilhetes são os mesmos da imagem.
+🔴 CASO HAJA ALTERAÇÃO NAS ODDS, CHAME O SUPORTE
+🟡 LUCRO: 💵 [VALOR] 💵
+😍 chance de duplo green 😍
+
+Template 2 — GANHAR FreeBet (promoção com aposta grátis)
+🟢 PROCEDIMENTO [NNN] - [DD/MM/AAAA]
+🟢 PROCEDIMENTO REFERENTE À PROMOÇÃO DA [CASA] - [NOME DA CAMPANHA] COM APOSTA GRÁTIS 🔥
+UTILIZAREMOS AS PARTIDAS ENTRE:
+[TIME A] X [TIME B] - [DD/MM/AAAA] ÀS [HH:MM]
+[TIME C] X [TIME D] - [DD/MM/AAAA] ÀS [HH:MM]
+🟥 Atenção: sempre confere data e horário da partida nos bilhetes também.
+🟥 Atenção: Sempre confira se os links dos bilhetes são os mesmos da imagem.
+🔴 CASO HAJA ALTERAÇÃO NAS ODDS, UTILIZE A CALCULADORA
+🟡 RECOMPENSA: 🎁 [VALOR],00 EM FREEBET
+😍 chance de duplo green 😍
+
+Template 3 — GANHAR FreeBet (missão / campanha especial)
+🟢 PROCEDIMENTO [NNN] - [DD/MM/AAAA]
+🟢 PROCEDIMENTO REFERENTE À MISSÃO [NOME DA MISSÃO] 🔥
+CASA: [NOME DA CASA]
+UTILIZAREMOS A PARTIDA ENTRE:
+[TIME A] X [TIME B] - [DD/MM/AAAA] ÀS [HH:MM]
+[TIME C] X [TIME D] - [DD/MM/AAAA] ÀS [HH:MM]
+🟥 atenção: sempre confere data e horário da partida nos bilhetes também.
+🔴 CASO HAJA ALTERAÇÃO NAS ODDS, UTILIZE A CALCULADORA
+🟡 RECOMPENSA: 🎁 [VALOR],00 EM FREEBET
+😍 chance de duplo green para um lado 😍
+
+Template 4 — SUPERODD (lucro em cash fixo)
+🔵 PROCEDIMENTO [NNN] - [DD/MM/AAAA]
+🟢 PROCEDIMENTO REFERENTE A SUPERODD DA [CASA] 🔥
+UTILIZAREMOS O JOGO ENTRE:
+[TIME A] X [TIME B] - [DD/MM/AAAA] ÀS [HH:MM]
+🔴 CASO HAJA ALTERAÇÃO NAS ODDS, UTILIZE CALCULADORA 🧮
+🟡 OBJETIVO DUPLO GREEN - 💵 [VALOR],00
+😍 chance de duplo green 😍
+
+Template 5 — SUPERODD / Promoção (lucro em range)
+🟢 PROCEDIMENTO [NNN] - [DD/MM/AAAA]
+🟢 PROCEDIMENTO REFERENTE À PROMOÇÃO [NOME DA PROMOÇÃO] COM APOSTA GRÁTIS 🔥
+CASA: [NOME DA CASA]
+UTILIZAREMOS A PARTIDA ENTRE:
+[TIME A] X [TIME B] - [DD/MM/AAAA] ÀS [HH:MM]
+🔴 CASO HAJA ALTERAÇÃO NAS ODDS, UTILIZE A CALCULADORA 👆
+🟡 LUCRO: 💵 [VALOR_MIN] À [VALOR_MAX] 💵
+😍 chance de duplo green 😍
+
+PARTE 2 — PROMPT DO BOT (para o Replit do Shark)
+Você é um bot que monitora o canal Telegram "SHARK 100% GREEN VIP" e registra 
+automaticamente cada procedimento na API do FreeBet PRO.
+=== GATILHO ===
+Sempre que uma nova mensagem começar com "🟢 PROCEDIMENTO" ou "🔵 PROCEDIMENTO",
+você deve processar e registrar via API.
+=== EXTRAÇÃO DOS CAMPOS ===
+1. NÚMERO DO PROCEDIMENTO
+   - Padrão: "PROCEDIMENTO NNN - DD/MM/AAAA"
+   - Usar como external_id: "bsk:NNN"
+   - Exemplo: "PROCEDIMENTO 113" → external_id = "bsk:113"
+2. CASA DE APOSTA (obrigatório)
+   - Procurar na linha "CASA: [NOME]" OU dentro da descrição do procedimento
+   - Exemplos de extração:
+     → "PROMOÇÃO DA SPORTINGBET" → casa = "Sportingbet"
+     → "SUPERODD DA BETESPORTE" → casa = "Betesporte"
+     → "CASA: BET365" → casa = "Bet365"
+   - SE não encontrar casa → NÃO registrar, logar erro: "Casa não identificada"
+3. TIPO DO PROCEDIMENTO
+   - Se contém "FREEBETS DO PROCEDIMENTO [N]" → tipo = "QUEIMAR_FB"
+     → também extrair procedimento_referencia_external_id = "bsk:N"
+   - Se contém "RECOMPENSA" e "FREEBET" → tipo = "GANHAR_FB"
+   - Se contém "LUCRO:" → tipo = "NORMAL"
+   - Se contém "OBJETIVO DUPLO GREEN" → tipo = "NORMAL"
+4. CATEGORIA
+   - "SUPERODD" → categoria = "SUPERODD"
+   - "MISSÃO" → categoria = "EXTRA"
+   - "APOSTA GRÁTIS" ou "FREEBET" → categoria = "FREEBET"
+   - "LIGAS EUROPEIAS" sem freebet → categoria = "PROMOCAO"
+   - padrão → categoria = "PROMOCAO"
+5. TÍTULO
+   - Pegar a linha de descrição completa do procedimento (segunda linha em negrito/itálico)
+   - Limpar emojis e formatar: máx 200 caracteres
+   - Exemplo: "Promoção Sportingbet — Ligas Europeias com Aposta Grátis"
+6. PARTIDA (regra: pegar sempre a mais próxima no tempo)
+   - Identificar todas as linhas no padrão: "[TIMES] - DD/MM/AAAA ÀS HH:MM"
+   - Converter datas para comparação
+   - Selecionar a partida com o datetime MAIS CEDO
+   - Extrair:
+     → partida_descricao = "TIME A X TIME B" (apenas os times, sem data)
+     → data_partida = "AAAA-MM-DD" (converter de DD/MM/AAAA)
+     → horario_partida = "HH:MM"
+7. VALOR FINANCEIRO
+   - "LUCRO: 💵 17.00 💵" → lucro_prejuizo = 17.00
+   - "LUCRO: 💵 3.25 À 3.75 💵" → lucro_prejuizo = 3.75 (usar valor maior)
+   - "RECOMPENSA: 🎁 20,00 EM FREEBET" → freebet_valor = 20.00
+   - "OBJETIVO DUPLO GREEN - 💵 210,00" → lucro_prejuizo = 210.00
+8. DUPLO GREEN
+   - Se contém "chance de duplo green" → prioridade = "ALTA"
+   - Caso contrário → prioridade = "MEDIA"
+=== CHAMADA DA API ===
+POST https://app.freebetpro.com.br/api/integracoes/betshark/v1/procedimentos
+Headers:
+  Content-Type: application/json
+  X-BetShark-Key-Id: [SEU_KEY_ID]
+  X-BetShark-Signature: sha256=[CALCULAR_HMAC]
+  X-BetShark-Timestamp: [EPOCH_SEGUNDOS_UTC]
+  Idempotency-Key: [UUID_GERADO_PARA_CADA_ENVIO]
+Body:
+{
+  "external_id": "bsk:NNN",
+  "titulo": "[TITULO_EXTRAIDO]",
+  "casa_aposta": "[CASA]",
+  "categoria": "[CATEGORIA]",
+  "tipo": "[TIPO]",
+  "prioridade": "[ALTA|MEDIA]",
+  "partida_descricao": "[TIME A X TIME B]",
+  "data_partida": "AAAA-MM-DD",
+  "horario_partida": "HH:MM",
+  "lucro_prejuizo": [VALOR OU null],
+  "freebet_valor": [VALOR OU null],
+  "procedimento_referencia_external_id": "bsk:NNN_REF" (só se QUEIMAR_FB)
+}
+=== CÁLCULO DO HMAC ===
+mensagem = X-BetShark-Timestamp + "." + corpo_json_exato
+assinatura = hex( HMAC-SHA256(SECRET, mensagem) )
+header = "sha256=" + assinatura
+=== RESPOSTAS ESPERADAS ===
+201 → Procedimento criado com sucesso → logar: "✅ bsk:NNN criado"
+200 → Procedimento atualizado (já existia) → logar: "🔄 bsk:NNN atualizado"
+4xx/5xx → logar erro completo + não retentar por 5 min
+=== TEMPLATE NOVO (não reconhecido) ===
+Se a mensagem começa com "PROCEDIMENTO" mas não encaixa em nenhum padrão acima,
+o bot deve:
+1. Logar: "⚠️ Template novo detectado: [primeiras 100 chars da mensagem]"
+2. Pedir confirmação manual antes de registrar
+3. Aprender o novo padrão para usos futuros
