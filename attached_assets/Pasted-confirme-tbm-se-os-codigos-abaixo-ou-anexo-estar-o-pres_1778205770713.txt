@@ -1,0 +1,83 @@
+confirme tbm se os codigos abaixo ou anexo estarão presentes tanto na pagina da vsl e na trial atual 
+
+TAREFA 2
+
+PEDIR AO REPLIT PRA INCLUIR O CÓDIGO PIXEL NO INDEX E NA PÁGINA DE TRIAL E PÁGINA PRINCIPAL DO SITE
+
+<!-- Meta Pixel Code -->
+<script>
+!function(f,b,e,v,n,t,s)
+{if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+n.queue=[];t=b.createElement(e);t.async=!0;
+t.src=v;s=b.getElementsByTagName(e)[0];
+s.parentNode.insertBefore(t,s)}(window, document,'script',
+'https://connect.facebook.net/en_US/fbevents.js');
+fbq('init', '1672225667108236');
+fbq('track', 'PageView');
+</script>
+<noscript><img height="1" width="1" style="display:none"
+src="https://www.facebook.com/tr?id=1672225667108236&ev=PageView&noscript=1"
+/></noscript>
+<!-- End Meta Pixel Code -->
+----------------------------------------------------------------------
+TAREFA 3
+
+INSTALAR CÓDIGO DO ADSCALA
+
+Cole no rodapé de todas as suas páginas (landing, quiz, checkout, obrigado) — antes de </body>.
+
+
+<!-- Adscala Rastreamento de Conversão -->
+<script>
+(function() {
+  var params = new URLSearchParams(window.location.search);
+  var ct = params.get('ct');
+  if (ct) {
+    localStorage.setItem('adscala_ct', ct);
+    localStorage.setItem('multiads_ct', ct); // legado, manter por compat
+  }
+
+  function sendConversion(pedidoId, valor) {
+    var code = localStorage.getItem('adscala_ct') || localStorage.getItem('multiads_ct');
+    if (!code) return;
+    fetch('https://adscala.com.br/api/webhook/venda', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ trackingCode: code, pedidoId: pedidoId || Date.now(), valor: valor || 0 })
+    });
+  }
+
+  window.adscala_sendConversion = sendConversion;
+  window.multiads_sendConversion = sendConversion; // legado, manter por compat
+})();
+</script>
+<!-- Fim Rastreamento -->
+----------------------------------------------------------------------
+TAREFA 4
+
+INSTALAR CÓDIGO DO ADSCALA
+
+<!-- Adscala Tracking Pixel -->
+<script>
+(function(){
+  var mid="CT-USER-001-ADMIN";
+  var api="https://adscala.com.br/api/tracking";
+  function send(e,d){
+    fetch(api,{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({event:e,nodeId:mid,url:location.href,...d})});
+  }
+  send("pageview",{});
+  document.addEventListener("click",function(e){
+    var t=e.target.closest("a,button,[data-track]");
+    if(t)send("click",{element:t.tagName,text:(t.innerText||"").slice(0,80)});
+  });
+  window.addEventListener("scroll",function(){
+    var pct=Math.round(window.scrollY/(document.body.scrollHeight-window.innerHeight)*100);
+    if(pct===25||pct===50||pct===75||pct===100)send("scroll",{depth:pct+"%"});
+  },{passive:true});
+})();
+</script>
+<!-- Fim Adscala Pixel -->
+----------------------------------------------------------------------
