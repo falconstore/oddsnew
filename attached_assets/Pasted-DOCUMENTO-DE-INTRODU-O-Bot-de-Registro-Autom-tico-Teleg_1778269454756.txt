@@ -1,0 +1,69 @@
+DOCUMENTO DE INTRODUÇÃO
+Bot de Registro Automático — Telegram × Painel BetShark
+Contexto
+O Shark 100% Green VIP opera diariamente enviando procedimentos para seus membros via canal Telegram. Cada procedimento precisa ser registrado manualmente no Painel BetShark para que o fluxo operacional completo funcione.
+
+O Painel BetShark já possui integração com o FreeBet PRO — plataforma usada pelos clientes para acompanhar e executar as operações. Essa integração está funcionando: quando um procedimento é registrado no painel, ele aparece automaticamente para os clientes PRO em menos de 2 segundos.
+
+O problema: o registro manual no painel exige disciplina. Na prática, procedimentos saem no Telegram mas ficam sem registro — quebrando o fluxo para os clientes PRO.
+
+A solução: um bot que elimina o trabalho manual.
+
+O que o bot faz
+Gerente posta o procedimento no Telegram
+              ↓
+    Bot lê a mensagem automaticamente
+              ↓
+  Bot registra no Painel BetShark
+              ↓
+  Integração BetShark × FreeBet PRO (já funciona)
+              ↓
+  Clientes PRO recebem o procedimento em tempo real
+
+O gerente não precisa abrir o painel. Não precisa preencher formulário. Não precisa fazer nada além de escrever a mensagem no Telegram no formato correto.
+
+O que muda para o gerente
+Uma única regra: seguir o template à risca.
+
+O bot é completamente automático, mas depende de mensagens padronizadas para funcionar. Se a mensagem sair fora do formato, o bot não consegue extrair os dados e o procedimento não é registrado.
+
+Regras obrigatórias em toda mensagem:
+Campo	Exemplo
+Número do procedimento	PROCEDIMENTO 113 - 08/05/2026
+Nome da casa de aposta	CASA: BET365 ou dentro da descrição
+Partida com data e hora	BORUSSIA X FRANKFURT - 08/05/2026 ÀS 15:30
+Resultado esperado	LUCRO: 💵 17,00 ou RECOMPENSA: 🎁 20,00 EM FREEBET
+Os tipos de procedimento
+O bot reconhece automaticamente o tipo com base no texto da mensagem.
+
+Tipo 1 — Queimar FreeBet
+Quando a freebet ganha em um procedimento anterior vai ser usada agora.
+A mensagem menciona: "REFERENTE ÀS FREEBETS DO PROCEDIMENTO [N]"
+
+Tipo 2 — Ganhar FreeBet
+Quando a promoção dá freebet como recompensa.
+A mensagem menciona: "RECOMPENSA: X,00 EM FREEBET"
+
+Tipo 3 — Lucro Direto / SuperOdd
+Quando o resultado é lucro em dinheiro.
+A mensagem menciona: "LUCRO: 💵 X,00" ou "OBJETIVO DUPLO GREEN"
+
+Quando há mais de uma partida na mensagem
+Alguns procedimentos usam duas partidas. O bot registra automaticamente a partida com horário mais próximo — a mais urgente — para que os clientes saibam se ainda há tempo de executar.
+
+O que o bot NÃO faz
+Não envia mensagens para os clientes (isso é o Telegram do Shark)
+Não calcula odds nem stakes (isso é o FreeBet PRO)
+Não registra resultados após o jogo (isso ainda é manual no painel)
+Não processa mensagens fora do padrão de template
+Responsabilidades
+Quem	O que faz
+Gerente do Shark	Escreve a mensagem seguindo o template
+Bot (Replit do Shark)	Lê o Telegram e registra no Painel BetShark
+Painel BetShark	Sincroniza com o FreeBet PRO automaticamente
+FreeBet PRO	Exibe o procedimento para os clientes PRO
+Próximos passos
+Shark configura o bot no Replit seguindo o documento técnico
+Gerentes recebem o guia de templates
+Teste com 3 procedimentos reais antes de ativar
+Bot entra em produção — registro passa a ser automático
