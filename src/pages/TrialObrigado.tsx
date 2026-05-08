@@ -226,8 +226,8 @@ export default function TrialObrigado() {
           data-testid="text-obrigado-headline"
         >
           Comece por Aqui e Aprenda a Fazer{' '}
-          <span className="bg-gradient-to-r from-emerald-300 via-green-400 to-emerald-500 bg-clip-text text-transparent">
-            R$ 200 no dia
+          <span className="bg-gradient-to-r from-emerald-300 via-green-400 to-emerald-500 bg-clip-text text-transparent whitespace-nowrap">
+            R$&nbsp;200 no dia
           </span>{' '}
           sem dor de cabeça e sem vender nada pra ninguém...
         </h1>
@@ -266,11 +266,11 @@ export default function TrialObrigado() {
           target="_blank"
           rel="noopener noreferrer"
           onClick={handleBotClick}
-          className="pulse-glow-btn relative w-full max-w-md flex items-center justify-center gap-3 rounded-xl px-6 py-5 font-extrabold text-base sm:text-lg uppercase tracking-wide text-black bg-gradient-to-r from-emerald-400 to-green-500 shadow-xl shadow-emerald-500/40 transition-transform hover:scale-[1.02] active:scale-[0.98]"
+          className="pulse-glow-btn relative w-full max-w-md flex items-center justify-center gap-2 rounded-xl px-4 py-5 font-extrabold text-sm sm:text-base md:text-lg uppercase tracking-wide text-black bg-gradient-to-r from-emerald-400 to-green-500 shadow-xl shadow-emerald-500/40 transition-transform hover:scale-[1.02] active:scale-[0.98]"
           data-testid="link-bot-start-obrigado"
         >
           <Send className="w-5 h-5 flex-shrink-0" />
-          ACESSAR GRUPO LIBERADO + CURSO GRÁTIS
+          ACESSAR GRUPO + CURSO GRÁTIS
         </a>
 
         {/* Instrução rápida */}
