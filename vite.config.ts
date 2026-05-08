@@ -15,4 +15,17 @@ export default defineConfig(({ mode }) => ({
       "@assets": path.resolve(__dirname, "./attached_assets"),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          "vendor-react": ["react", "react-dom"],
+          "vendor-motion": ["framer-motion"],
+          "vendor-supabase": ["@supabase/supabase-js"],
+          "vendor-query": ["@tanstack/react-query"],
+          "vendor-router": ["react-router-dom"],
+        },
+      },
+    },
+  },
 }));

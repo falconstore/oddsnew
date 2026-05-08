@@ -1,10 +1,25 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap");
-@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap");
-@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap");
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Fallback @font-face com size-adjust para reduzir CLS no swap de fontes */
+@font-face {
+  font-family: 'Inter-fallback';
+  src: local('Arial'), local('Helvetica Neue'), local('sans-serif');
+  size-adjust: 107%;
+  ascent-override: 90%;
+  descent-override: 22%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: 'Space Grotesk-fallback';
+  src: local('Arial'), local('Helvetica Neue'), local('sans-serif');
+  size-adjust: 104%;
+  ascent-override: 93%;
+  descent-override: 20%;
+  line-gap-override: 0%;
+}
 
 @layer base {
   :root {
@@ -62,7 +77,7 @@
     --chart-4: 270 70% 55%;
     --chart-5: 340 75% 55%;
 
-    --font-sans: 'Inter', 'Space Grotesk', ui-sans-serif, system-ui, -apple-system, sans-serif;
+    --font-sans: 'Inter', 'Inter-fallback', 'Space Grotesk', 'Space Grotesk-fallback', ui-sans-serif, system-ui, -apple-system, sans-serif;
     --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 
     --shadow-2xs: 0 1px 2px 0px hsl(0 0% 0% / 0.03);

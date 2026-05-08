@@ -7,7 +7,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import sharkHeroImg from '@assets/image_1776543554081.png';
 import proof1 from '@assets/WhatsApp_Image_2026-05-07_at_20.43.24_(3)_1778197516426.jpeg';
 import proof2 from '@assets/WhatsApp_Image_2026-05-07_at_20.43.24_(2)_1778197516427.jpeg';
 import proof3 from '@assets/WhatsApp_Image_2026-05-07_at_20.43.24_(1)_1778197516427.jpeg';
@@ -16,6 +15,8 @@ import proof5 from '@assets/WhatsApp_Image_2026-05-03_at_05.16.04_1777796184266-
 import proof6 from '@assets/WhatsApp_Image_2026-05-03_at_05.16.03_1777796184266-Cu4xMMoY_1778197516428.jpeg';
 import proof7 from '@assets/WhatsApp_Image_2026-05-03_at_05.16.04_(1)_1777796184266-Bv3rf_1778197516428.jpeg';
 import proof8 from '@assets/WhatsApp_Image_2026-05-04_at_18.43.57_1778197516429.jpeg';
+
+const HERO_WEBP_URL = '/images/hero.webp';
 
 const SUPABASE_URL = import.meta.env.VITE_MAIN_SUPABASE_URL as string;
 const SUPABASE_ANON = import.meta.env.VITE_MAIN_SUPABASE_ANON_KEY as string;
@@ -254,13 +255,20 @@ export default function TrialLanding() {
 
   useEffect(() => {
     const SESSION_KEY = 'trial-landing:view-tracked';
-    try {
-      if (sessionStorage.getItem(SESSION_KEY)) return;
-      sessionStorage.setItem(SESSION_KEY, '1');
-    } catch {
-      /* sessionStorage indisponível */
+    const run = () => {
+      try {
+        if (sessionStorage.getItem(SESSION_KEY)) return;
+        sessionStorage.setItem(SESSION_KEY, '1');
+      } catch {
+        /* sessionStorage indisponível */
+      }
+      track('view', { page: 'trial-landing' });
+    };
+    if (typeof requestIdleCallback !== 'undefined') {
+      requestIdleCallback(run, { timeout: 2000 });
+    } else {
+      setTimeout(run, 2000);
     }
-    track('view', { page: 'trial-landing' });
   }, []);
 
   useEffect(() => {
@@ -317,7 +325,12 @@ export default function TrialLanding() {
     }
     const pageviewEventId = makeEventId();
     window.fbq?.('track', 'PageView', {}, { eventID: pageviewEventId });
-    trackCapi('PageView', pageviewEventId);
+    const runCapi = () => trackCapi('PageView', pageviewEventId);
+    if (typeof requestIdleCallback !== 'undefined') {
+      requestIdleCallback(runCapi, { timeout: 2000 });
+    } else {
+      setTimeout(runCapi, 2000);
+    }
 
     return () => {
       document
@@ -370,11 +383,12 @@ export default function TrialLanding() {
       className="min-h-screen text-white relative"
       style={{
         backgroundColor: 'hsl(150 30% 4%)',
-        backgroundImage: `url(${sharkHeroImg})`,
+        backgroundImage: `url(${HERO_WEBP_URL})`,
         backgroundRepeat: 'no-repeat',
         backgroundSize: 'cover',
         backgroundPosition: 'center top',
         backgroundAttachment: 'fixed',
+        minHeight: '100svh',
       }}
       data-testid="bg-shark-wallpaper"
     >
@@ -622,6 +636,9 @@ export default function TrialLanding() {
                   src={src}
                   alt={alt}
                   loading="lazy"
+                  decoding="async"
+                  width={400}
+                  height={300}
                   className="w-full h-auto block"
                 />
               </div>
