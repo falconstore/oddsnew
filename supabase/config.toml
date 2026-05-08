@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.trial-pixel-track]
 verify_jwt = false
+
+[functions.telegram-procedure-bot]
+verify_jwt = false
