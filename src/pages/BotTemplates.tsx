@@ -92,12 +92,15 @@ const TEMPLATES: TemplateConfig[] = [
       return [
         `🟢 PROCEDIMENTO ${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
         linha2,
-        `CASA: ${(f.casa || 'CASA').toUpperCase()}`,
+        `CASA: 🏠 ${(f.casa || 'CASA').toUpperCase()}`,
+        ``,
         `UTILIZAREMOS O JOGO ENTRE:`,
         `${(f.timeA || 'TIME A').toUpperCase()} X ${(f.timeB || 'TIME B').toUpperCase()} - ${fmtDate(f.dataPartida)} ÀS ${fmtTime(f.horaPartida)}`,
+        ``,
         `🟥 Atenção: sempre confere data e horário da partida nos bilhetes também.`,
         `🟥 Atenção: Sempre confira se os links dos bilhetes são os mesmos da imagem.`,
         `🔴 CASO HAJA ALTERAÇÃO NAS ODDS, CHAME O SUPORTE`,
+        ``,
         `🟡 LUCRO: 💵 ${fmtVal(f.lucro)} 💵`,
         `😍 chance de duplo green 😍`,
       ].join('\n');
@@ -125,21 +128,26 @@ const TEMPLATES: TemplateConfig[] = [
       { id: 'dataP2', label: 'Data Partida 2', placeholder: '', type: 'date', optional: true },
       { id: 'horaP2', label: 'Horário Partida 2', placeholder: 'Opcional', type: 'time', optional: true },
       { id: 'freebetValor', label: 'Valor da Freebet (ex: 25,00)', placeholder: '25,00', type: 'text' },
+      { id: 'obsRecompensa', label: 'Observação da Recompensa (opcional)', placeholder: 'Ex: A CADA GOL DO SANTOS', type: 'text', uppercase: true, hint: 'Aparece após "EM FREEBET". Deixe vazio se não houver condição especial.' },
     ],
     generate: (f) => {
       const partidas = [`${(f.timeA || 'TIME A').toUpperCase()} X ${(f.timeB || 'TIME B').toUpperCase()} - ${fmtDate(f.dataP1)} ÀS ${fmtTime(f.horaP1)}`];
       if (f.timeC && f.timeD && f.dataP2 && f.horaP2) {
         partidas.push(`${f.timeC.toUpperCase()} X ${f.timeD.toUpperCase()} - ${fmtDate(f.dataP2)} ÀS ${fmtTime(f.horaP2)}`);
       }
+      const recompensa = `🟡 RECOMPENSA: 🎁 ${fmtVal(f.freebetValor)} EM FREEBET${f.obsRecompensa ? ` - ${f.obsRecompensa.toUpperCase()}` : ''}`;
       return [
         `🟢 PROCEDIMENTO ${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
         `🟢 PROCEDIMENTO REFERENTE A PROMOÇÃO DA ${(f.casa || 'CASA').toUpperCase()} - ${(f.campanha || 'CAMPANHA').toUpperCase()} COM APOSTA GRÁTIS 🔥`,
+        ``,
         `UTILIZAREMOS A PARTIDA ENTRE:`,
         ...partidas,
+        ``,
         `🟥 Atenção: sempre confere data e horário da partida nos bilhetes também.`,
         `🟥 Atenção: Sempre confira se os links dos bilhetes são os mesmos da imagem.`,
         `🔴 CASO HAJA ALTERAÇÃO NAS ODDS, UTILIZE A CALCULADORA`,
-        `🟡 RECOMPENSA: 🎁 ${fmtVal(f.freebetValor)} EM FREEBET`,
+        ``,
+        recompensa,
         `😍 chance de duplo green 😍`,
       ].join('\n');
     },
@@ -166,21 +174,26 @@ const TEMPLATES: TemplateConfig[] = [
       { id: 'dataP2', label: 'Data Partida 2', placeholder: '', type: 'date', optional: true },
       { id: 'horaP2', label: 'Horário Partida 2', placeholder: 'Opcional', type: 'time', optional: true },
       { id: 'freebetValor', label: 'Valor da Freebet (ex: 50,00)', placeholder: '50,00', type: 'text' },
+      { id: 'obsRecompensa', label: 'Observação da Recompensa (opcional)', placeholder: 'Ex: A CADA GOL DO SANTOS', type: 'text', uppercase: true, hint: 'Aparece após "EM FREEBET". Deixe vazio se não houver condição especial.' },
     ],
     generate: (f) => {
       const partidas = [`${(f.timeA || 'TIME A').toUpperCase()} X ${(f.timeB || 'TIME B').toUpperCase()} - ${fmtDate(f.dataP1)} ÀS ${fmtTime(f.horaP1)}`];
       if (f.timeC && f.timeD && f.dataP2 && f.horaP2) {
         partidas.push(`${f.timeC.toUpperCase()} X ${f.timeD.toUpperCase()} - ${fmtDate(f.dataP2)} ÀS ${fmtTime(f.horaP2)}`);
       }
+      const recompensa = `🟡 RECOMPENSA: 🎁 ${fmtVal(f.freebetValor)} EM FREEBET${f.obsRecompensa ? ` - ${f.obsRecompensa.toUpperCase()}` : ''}`;
       return [
         `🟢 PROCEDIMENTO ${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
         `🟢 PROCEDIMENTO REFERENTE À MISSÃO ${(f.missao || 'NOME DA MISSÃO').toUpperCase()} 🔥`,
-        `CASA: ${(f.casa || 'CASA').toUpperCase()}`,
+        `CASA: 🏠 ${(f.casa || 'CASA').toUpperCase()}`,
+        ``,
         `UTILIZAREMOS A PARTIDA ENTRE:`,
         ...partidas,
+        ``,
         `🟥 atenção: sempre confere data e horário da partida nos bilhetes também.`,
         `🔴 CASO HAJA ALTERAÇÃO NAS ODDS, UTILIZE A CALCULADORA`,
-        `🟡 RECOMPENSA: 🎁 ${fmtVal(f.freebetValor)} EM FREEBET`,
+        ``,
+        recompensa,
         `😍 chance de duplo green para um lado 😍`,
       ].join('\n');
     },
@@ -196,7 +209,7 @@ const TEMPLATES: TemplateConfig[] = [
     fields: [
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 116', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
-      { id: 'casa', label: 'Casa de Apostas', placeholder: 'Ex: Betesporte', type: 'text', uppercase: true },
+      { id: 'casa', label: 'Casa de Apostas', placeholder: 'Ex: Betesporte', type: 'text', uppercase: true, hint: 'A casa aparece na linha 2 ("DA BETESPORTE") — não precisa de linha CASA: separada neste tipo.' },
       { id: 'timeA', label: 'Time A', placeholder: 'Ex: Corinthians', type: 'text', uppercase: true },
       { id: 'timeB', label: 'Time B', placeholder: 'Ex: Vasco', type: 'text', uppercase: true },
       { id: 'dataPartida', label: 'Data da Partida', placeholder: '', type: 'date', default: todayISO },
@@ -207,9 +220,12 @@ const TEMPLATES: TemplateConfig[] = [
       return [
         `🔵 PROCEDIMENTO ${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
         `🟢 PROCEDIMENTO REFERENTE A SUPERODD DA ${(f.casa || 'CASA').toUpperCase()} 🔥`,
+        ``,
         `UTILIZAREMOS O JOGO ENTRE:`,
         `${(f.timeA || 'TIME A').toUpperCase()} X ${(f.timeB || 'TIME B').toUpperCase()} - ${fmtDate(f.dataPartida)} ÀS ${fmtTime(f.horaPartida)}`,
+        ``,
         `🔴 CASO HAJA ALTERAÇÃO NAS ODDS, UTILIZE CALCULADORA 🧮`,
+        ``,
         `🟡 OBJETIVO DUPLO GREEN - 💵 ${fmtVal(f.valorDG)}`,
         `😍 chance de duplo green 😍`,
       ].join('\n');
@@ -239,10 +255,13 @@ const TEMPLATES: TemplateConfig[] = [
       return [
         `🟢 PROCEDIMENTO ${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
         `🟢 PROCEDIMENTO REFERENTE À PROMOÇÃO ${(f.campanha || 'CAMPANHA').toUpperCase()} COM APOSTA GRÁTIS 🔥`,
-        `CASA: ${(f.casa || 'CASA').toUpperCase()}`,
+        `CASA: 🏠 ${(f.casa || 'CASA').toUpperCase()}`,
+        ``,
         `UTILIZAREMOS A PARTIDA ENTRE:`,
         `${(f.timeA || 'TIME A').toUpperCase()} X ${(f.timeB || 'TIME B').toUpperCase()} - ${fmtDate(f.dataPartida)} ÀS ${fmtTime(f.horaPartida)}`,
+        ``,
         `🔴 CASO HAJA ALTERAÇÃO NAS ODDS, UTILIZE A CALCULADORA 👆`,
+        ``,
         `🟡 LUCRO: 💵 ${fmtVal(f.lucroMin)} À ${fmtVal(f.lucroMax)} 💵`,
         `😍 chance de duplo green 😍`,
       ].join('\n');
