@@ -1,0 +1,105 @@
+
+Renderizar solicitações de bloqueio Economia estimada de 2.280 ms
+As solicitações estão bloqueando a renderização inicial da página, o que pode atrasar a LCP. Essas solicitações de rede podem ser deferidas ou colocadas inline para que fiquem fora do caminho crítico.LCPFCPFora da pontuação
+URL
+Tamanho da transferência
+Duração
+sharkgreen.com.br Própria
+147,3 KiB	1.750 ms
+/assets/index-C7HI7vxj.css(trial.sharkgreen.com.br)
+147,3 KiB
+1.750 ms
+Google Fonts cdn 
+4,4 KiB	2.260 ms
+/css2?family=JetBrains+Mono:wght@400;500;700&display=swap(fonts.googleapis.com)
+1,4 KiB
+750 ms
+/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap(fonts.googleapis.com)
+1,4 KiB
+750 ms
+/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap(fonts.googleapis.com)
+1,6 KiB
+750 ms
+Use ciclos de vida eficientes de cache Economia estimada de 253 KiB
+Um cache com ciclo de vida longo pode acelerar visitas repetidas à sua página. Saiba mais.LCPFCPFora da pontuação
+Solicitação
+Cache TTL
+Tamanho da transferência
+Facebook social 
+275 KiB
+…config/118…?v=…(connect.facebook.net)
+20 min
+103 KiB
+/en_US/fbevents.js(connect.facebook.net)
+20 min
+101 KiB
+…config/167…?v=…(connect.facebook.net)
+20 min
+48 KiB
+…config/129…?v=…(connect.facebook.net)
+20 min
+22 KiB
+/tr/?id=…(www.facebook.com)
+None
+0 KiB
+/tr/?id=…(www.facebook.com)
+None
+0 KiB
+/tr/?id=…(www.facebook.com)
+None
+0 KiB
+Clarity utility 
+25 KiB
+/0.8.62/clarity.js(scripts.clarity.ms)
+1 dia
+25 KiB
+Causas da troca de layout
+As mudanças de layout ocorrem quando os elementos se movem sem qualquer interação do usuário. Investigue as causas de mudanças no layout, como elementos adicionados, removidos ou com fontes alteradas durante o carregamento da página.CLSFora da pontuação
+Elemento
+Pontuação da troca de layout
+Total
+0,145
+QUERO MEUS 7 DIAS GRÁTIS
+<button class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl…" data-testid="button-hero-primary-cta">
+0,145
+…v20/UcC73FwrK….woff2(fonts.gstatic.com)
+Fonte da Web
+Reflow forçado
+Um reflow forçado ocorre quando o JavaScript consulta propriedades geométricas (como offsetWidth) depois que os estilos são invalidados por uma mudança no estado do DOM. Isso pode resultar em desempenho ruim. Saiba mais sobre reflows forçados e possíveis reduções de risco.Fora da pontuação
+Chamada de função principal
+Tempo total de reflow
+/assets/index-DXp_bI3z.js:711:52659(trial.sharkgreen.com.br)
+122 ms
+Fonte
+Tempo total de reflow
+/assets/index-DXp_bI3z.js:710:120810(trial.sharkgreen.com.br)
+122 ms
+/assets/index-DXp_bI3z.js:641:7806(trial.sharkgreen.com.br)
+0 ms
+[sem atribuição]
+22 ms
+/0.8.62/clarity.js:2:23243(scripts.clarity.ms)
+0 ms
+Árvore de dependência da rede
+Evite encadear solicitações críticas reduzindo o tamanho das cadeias, o tamanho do download de recursos ou adiando o download de recursos desnecessários para melhorar o carregamento da página.LCPFora da pontuação
+Latência máxima do caminho crítico: 2.212 ms
+Navegação inicial
+https://trial.sharkgreen.com.br - 569 ms, 4,82 KiB
+/assets/index-DXp_bI3z.js(trial.sharkgreen.com.br) - 1.201 ms, 1.744,39 KiB
+…v1/trial-pixel-track(wspsuempnswljkphatur.supabase.co) - 1.499 ms, 0,00 KiB
+…v1/trial-upgrade-track(wspsuempnswljkphatur.supabase.co) - 2.212 ms, 1,10 KiB
+/assets/index-C7HI7vxj.css(trial.sharkgreen.com.br) - 1.084 ms, 147,32 KiB
+/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap(fonts.googleapis.com) - 1.089 ms, 1,58 KiB
+…v20/UcC73FwrK….woff2(fonts.gstatic.com) - 1.488 ms, 48,09 KiB
+/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap(fonts.googleapis.com) - 1.090 ms, 1,42 KiB
+/css2?family=JetBrains+Mono:wght@400;500;700&display=swap(fonts.googleapis.com) - 1.091 ms, 1,44 KiB
+/api/tracking(adscala.com.br) - 1.611 ms, 0,96 KiB
+Origens pré-conectadas
+As dicas de pré-conexão ajudam o navegador a estabelecer uma conexão mais cedo durante o carregamento da página, poupando tempo quando a primeira solicitação para essa origem é feita. A página fez a pré-conexão com as seguintes origens:
+nenhuma origem foi pré-conectada
+Candidatos à pré-conexão
+Adicione dicas de pré-conexão às suas origens mais importantes, mas tente não usar mais que 4.
+Origem
+Economia estimada de LCP
+https://ipapi.co
+330 ms
