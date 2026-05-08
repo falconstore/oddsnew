@@ -142,6 +142,10 @@ function buildInsertRow(
     freebet_value: parsed.freebet_valor_previsto,
     profit_loss: 0,
     dp: parsed.dp,
+    // Ref. FB (texto legível) para QUEIMAR_FB — exibido na coluna REF. FB do painel
+    freebet_reference: parsed.tipo === "QUEIMAR_FB" && parsed.ref_procedure_number
+      ? parsed.ref_procedure_number
+      : undefined,
     tags: [],
     is_favorite: false,
     archived: false,
