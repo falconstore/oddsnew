@@ -419,6 +419,48 @@ export function useToggleFavorite() {
   });
 }
 
+// Confirmar dados de procedimento registrado pelo bot Telegram
+// Limpa bot_needs_review e bot_missing_fields — indica que o gerente verificou os dados
+export function useConfirmBotProcedure() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      if (!isProceduresSupabaseConfigured()) {
+        throw new Error('Procedures Supabase not configured');
+      }
+
+      const { data, error } = await supabaseProcedures
+        .from('procedures')
+        .update({
+          bot_needs_review: false,
+          bot_missing_fields: null,
+          updated_date: new Date().toISOString(),
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: PROCEDURES_KEY });
+      toast({
+        title: 'Dados confirmados',
+        description: 'Procedimento marcado como verificado.',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Erro',
+        description: `Falha ao confirmar: ${error.message}`,
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
 // Bulk create procedures (for CSV import)
 export function useBulkCreateProcedures() {
   const queryClient = useQueryClient();

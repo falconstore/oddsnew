@@ -3,6 +3,11 @@
 // Recebe mensagens do Telegram via webhook, faz parse e insere
 // o procedimento diretamente no banco, disparando a sync com o FreeBet PRO.
 //
+// Comportamento de inserção:
+//   - Parse completo → insere com bot_needs_review=true (gerente confirma dados)
+//   - Parse parcial  → insere com bot_needs_review=true + bot_missing_fields=[...]
+//   - Sem número     → rejeita (não cria registro)
+//
 // Suporta também o comando manual "REGISTRE O PROCEDIMENTO N":
 //   - Se proc N já existe no banco → re-dispara freebetpro-sync
 //   - Se não existe e o comando é reply de uma mensagem de proc → parseia e registra
@@ -17,7 +22,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { json } from "../_shared/cors.ts";
-import { parseMessage, ParsedProcedure } from "./parser.ts";
+import { parseMessage, ParsedProcedure, PartialParsedProcedure } from "./parser.ts";
 
 const log = (event: string, data: Record<string, unknown>) => {
   console.log(JSON.stringify({ tag: "telegram-procedure-bot", event, ...data }));
@@ -98,21 +103,72 @@ interface InsertResult {
   procedureId: string;
   procedureNumber: string;
   parsed: ParsedProcedure;
+  isPartial: false;
+}
+interface PartialInsertResult {
+  ok: true;
+  procedureId: string;
+  procedureNumber: string;
+  parsedPartial: PartialParsedProcedure;
+  isPartial: true;
 }
 interface InsertFailure {
   ok: false;
   error: string;
 }
 
+function buildInsertRow(
+  parsed: ParsedProcedure | PartialParsedProcedure,
+  rawMessage: string,
+  missingFields?: string[],
+): Record<string, unknown> {
+  return {
+    procedure_number: parsed.procedure_number,
+    external_id: parsed.external_id,
+    titulo: parsed.titulo || undefined,
+    date: parsed.date,
+    created_date: parsed.date,
+    platform: parsed.platform ?? "—",
+    category: parsed.category,
+    status: "Enviado",
+    tipo: parsed.tipo,
+    prioridade: parsed.prioridade,
+    partida_descricao: parsed.partida_descricao,
+    kickoff_at: parsed.kickoff_at,
+    data_partida: parsed.data_partida,
+    horario_partida: parsed.horario_partida,
+    lucro_prejuizo_previsto: parsed.lucro_prejuizo_previsto,
+    freebet_valor_previsto: parsed.freebet_valor_previsto,
+    freebet_value: parsed.freebet_valor_previsto,
+    profit_loss: 0,
+    dp: parsed.dp,
+    tags: [],
+    is_favorite: false,
+    archived: false,
+    tachado: false,
+    reenviado_count: 0,
+    duplo_green_confirmado: parsed.is_duplo_green,
+    esporte: "futebol",
+    // Bot review
+    bot_needs_review: true,
+    bot_raw_message: rawMessage,
+    bot_missing_fields: missingFields && missingFields.length > 0 ? missingFields : null,
+  };
+}
+
 async function parseAndInsertProcedure(
   supa: any,
   text: string,
-): Promise<InsertResult | InsertFailure | { ok: "missing"; missingFields: string[] }> {
+): Promise<InsertResult | PartialInsertResult | InsertFailure | { ok: "no_number"; missingFields: string[] }> {
   const parseResult = parseMessage(text);
-  if (!parseResult.ok) {
-    return { ok: "missing", missingFields: parseResult.missingFields };
+
+  // Mensagem não reconhecida como procedimento (sem número)
+  if (parseResult.ok === false) {
+    return { ok: "no_number", missingFields: parseResult.missingFields };
   }
-  const parsed = parseResult.data;
+
+  const isPartial = parseResult.ok === "partial";
+  const parsed = isPartial ? parseResult.data : parseResult.data;
 
   // Resolver UUID do procedimento de referência (QUEIMAR_FB)
   let freebetReferenceId: string | null = null;
@@ -127,34 +183,10 @@ async function parseAndInsertProcedure(
     if (refProc) freebetReferenceId = refProc.id;
   }
 
-  const insertRow: Record<string, unknown> = {
-    procedure_number: parsed.procedure_number,
-    external_id: parsed.external_id,
-    titulo: parsed.titulo || undefined,
-    date: parsed.date,
-    created_date: parsed.date,
-    platform: parsed.platform,
-    category: parsed.category,
-    status: "Enviado",
-    tipo: parsed.tipo,
-    prioridade: parsed.prioridade,
-    partida_descricao: parsed.partida_descricao,
-    kickoff_at: parsed.kickoff_at,
-    data_partida: parsed.data_partida,
-    horario_partida: parsed.horario_partida,
-    lucro_prejuizo_previsto: parsed.lucro_prejuizo_previsto,
-    freebet_valor_previsto: parsed.freebet_valor_previsto,
-    freebet_value: parsed.freebet_valor_previsto,
+  const missingFields = isPartial ? (parseResult as any).data.missingFields : [];
+  const insertRow = {
+    ...buildInsertRow(parsed, text, missingFields),
     freebet_reference_id: freebetReferenceId,
-    profit_loss: 0,
-    dp: parsed.dp,
-    tags: [],
-    is_favorite: false,
-    archived: false,
-    tachado: false,
-    reenviado_count: 0,
-    duplo_green_confirmado: parsed.is_duplo_green,
-    esporte: "futebol",
   };
 
   const { data: inserted, error: insertErr } = await supa
@@ -167,18 +199,31 @@ async function parseAndInsertProcedure(
     return { ok: false, error: insertErr?.message ?? "insert failed" };
   }
 
-  // Sync com FreeBet PRO (fire-and-forget)
-  void supa.functions.invoke("freebetpro-sync", {
-    body: { procedure_id: inserted.id, action: "upsert" },
-  }).catch((e: any) => {
-    console.warn("[proc-bot] freebetpro-sync invoke failed (best-effort)", e?.message);
-  });
+  // Sync com FreeBet PRO (fire-and-forget) — só para parse completo
+  if (!isPartial) {
+    void supa.functions.invoke("freebetpro-sync", {
+      body: { procedure_id: inserted.id, action: "upsert" },
+    }).catch((e: any) => {
+      console.warn("[proc-bot] freebetpro-sync invoke failed (best-effort)", e?.message);
+    });
+  }
+
+  if (isPartial) {
+    return {
+      ok: true,
+      procedureId: inserted.id,
+      procedureNumber: parsed.procedure_number,
+      parsedPartial: (parseResult as any).data,
+      isPartial: true,
+    };
+  }
 
   return {
     ok: true,
     procedureId: inserted.id,
     procedureNumber: parsed.procedure_number,
-    parsed,
+    parsed: parseResult.data as ParsedProcedure,
+    isPartial: false,
   };
 }
 
@@ -191,7 +236,12 @@ function buildConfirmMsg(parsed: ParsedProcedure): string {
   const eventoStr = parsed.partida_descricao
     ? ` · ${escHtml(parsed.partida_descricao)}`
     : "";
-  return `✅ Procedimento ${escHtml(parsed.procedure_number)} registrado — ${tipoLabel[parsed.tipo]} · ${escHtml(parsed.platform)}${eventoStr}`;
+  return `✅ Procedimento ${escHtml(parsed.procedure_number)} registrado — ${tipoLabel[parsed.tipo]} · ${escHtml(parsed.platform)}${eventoStr}\n⚠️ <i>Verifique os dados no painel e confirme.</i>`;
+}
+
+function buildPartialConfirmMsg(parsed: PartialParsedProcedure): string {
+  const camposFaltando = parsed.missingFields.join(", ");
+  return `⚠️ Procedimento ${escHtml(parsed.procedure_number)} salvo com campos em falta: <b>${escHtml(camposFaltando)}</b>.\n📋 <i>Acesse o painel para completar e confirmar os dados.</i>`;
 }
 
 // ──────────────────────────────────────────────────────────
@@ -333,7 +383,7 @@ serve(async (req) => {
       }
 
       const result = await parseAndInsertProcedure(supa, replyText);
-      if (result.ok === "missing") {
+      if (result.ok === "no_number") {
         await tgSend(
           BOT_TOKEN,
           chatId,
@@ -351,8 +401,11 @@ serve(async (req) => {
         );
         return json({ ok: false, error: result.error }, { status: 500 });
       }
-      await tgSend(BOT_TOKEN, chatId, buildConfirmMsg(result.parsed), messageId);
-      log("command_registered", { procedure_id: result.procedureId, number: cmdNumber });
+      const replyMsg = result.isPartial
+        ? buildPartialConfirmMsg(result.parsedPartial)
+        : buildConfirmMsg(result.parsed);
+      await tgSend(BOT_TOKEN, chatId, replyMsg, messageId);
+      log("command_registered", { procedure_id: result.procedureId, number: cmdNumber, partial: result.isPartial });
       return json({ ok: true, action: "command_registered", procedure_id: result.procedureId });
     }
 
@@ -372,11 +425,10 @@ serve(async (req) => {
   // ──────────────────────────────────────────────────────────
   const result = await parseAndInsertProcedure(supa, text);
 
-  if (result.ok === "missing") {
-    const errMsg = `❌ Não consegui registrar. Campos ausentes: ${escHtml(result.missingFields.join(", "))}.`;
-    log("parse_failed", { update_id: updateId, missing: result.missingFields });
-    await tgSend(BOT_TOKEN, chatId, errMsg, messageId);
-    return json({ ok: true, action: "parse_failed", missing: result.missingFields });
+  if (result.ok === "no_number") {
+    // Não é uma mensagem de procedimento reconhecível — ignorar silenciosamente
+    log("ignored_no_number", { update_id: updateId, missing: result.missingFields });
+    return json({ ok: true, action: "ignored_no_number" });
   }
 
   if (!result.ok) {
@@ -384,6 +436,22 @@ serve(async (req) => {
     log("insert_error", { err: result.error, update_id: updateId });
     await tgSend(BOT_TOKEN, chatId, errMsg, messageId);
     return json({ ok: false, error: result.error }, { status: 500 });
+  }
+
+  if (result.isPartial) {
+    log("inserted_partial", {
+      procedure_id: result.procedureId,
+      procedure_number: result.procedureNumber,
+      missing: result.parsedPartial.missingFields,
+    });
+    await tgSend(BOT_TOKEN, chatId, buildPartialConfirmMsg(result.parsedPartial), messageId);
+    return json({
+      ok: true,
+      action: "registered_partial",
+      procedure_id: result.procedureId,
+      procedure_number: result.procedureNumber,
+      missing: result.parsedPartial.missingFields,
+    });
   }
 
   log("inserted", { procedure_id: result.procedureId, procedure_number: result.procedureNumber });

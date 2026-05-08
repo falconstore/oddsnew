@@ -73,6 +73,10 @@ export interface Procedure {
   // Paridade FreeBet PRO doc 06 — bloco DG (Duplo Green) do modal Definir Resultados
   duplo_green_confirmado: boolean;
   duplo_green_lucro: number | null;
+  // Bot Telegram — sinalizador de verificação (doc bot-review)
+  bot_needs_review: boolean;
+  bot_missing_fields: string[] | null;
+  bot_raw_message: string | null;
 }
 
 export interface ProcedureFilters {

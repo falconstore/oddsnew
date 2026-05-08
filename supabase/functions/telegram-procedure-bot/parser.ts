@@ -25,8 +25,31 @@ export interface ParsedProcedure {
   dp: boolean;
 }
 
+/** Resultado parcial: tem número mas faltam campos. */
+export interface PartialParsedProcedure {
+  procedure_number: string;
+  external_id: string;
+  titulo: string;
+  date: string;
+  platform: string | null;
+  category: string;
+  tipo: ProcedureTipo;
+  prioridade: Prioridade;
+  partida_descricao: string | null;
+  kickoff_at: string | null;
+  data_partida: string | null;
+  horario_partida: string | null;
+  lucro_prejuizo_previsto: number | null;
+  freebet_valor_previsto: number | null;
+  ref_procedure_number: string | null;
+  is_duplo_green: boolean;
+  dp: boolean;
+  missingFields: string[];
+}
+
 export type ParseResult =
   | { ok: true; data: ParsedProcedure }
+  | { ok: "partial"; data: PartialParsedProcedure }
   | { ok: false; missingFields: string[] };
 
 // ──────────────────────────────────────────────────────────
@@ -301,9 +324,11 @@ export function parseMessage(text: string): ParseResult {
   const defaultYear = now.getFullYear();
   const missing: string[] = [];
 
-  // 1. Número
+  // 1. Número — crítico: sem ele não há como criar um registro útil
   const procedureNumber = extractProcedureNumber(text);
-  if (!procedureNumber) missing.push("número do procedimento (PROCEDIMENTO NNN - DD/MM/AAAA)");
+  if (!procedureNumber) {
+    return { ok: false, missingFields: ["número do procedimento (PROCEDIMENTO NNN - DD/MM/AAAA)"] };
+  }
 
   // 2. Data de referência (usa hoje como fallback)
   const dateStr = extractDate(text, defaultYear) ?? now.toISOString().slice(0, 10);
@@ -354,15 +379,38 @@ export function parseMessage(text: string): ParseResult {
   const hasDuploMention = /chance\s+de\s+duplo\s+green/i.test(text) || isDuploGreen;
   const prioridade: Prioridade = hasDuploMention ? "ALTA" : "MEDIA";
 
+  // Resultado parcial: tem número mas falta(m) campo(s)
   if (missing.length > 0) {
-    return { ok: false, missingFields: missing };
+    return {
+      ok: "partial",
+      data: {
+        procedure_number: procedureNumber,
+        external_id: `bsk:${procedureNumber}`,
+        titulo,
+        date: dateStr,
+        platform: platform ?? null,
+        category,
+        tipo,
+        prioridade,
+        partida_descricao: chosenEvent?.description ?? null,
+        kickoff_at: chosenEvent?.kickoffUtc ?? null,
+        data_partida: chosenEvent?.isoDate ?? null,
+        horario_partida: chosenEvent?.time ?? null,
+        lucro_prejuizo_previsto: lucroResult?.value ?? null,
+        freebet_valor_previsto: freebetValor,
+        ref_procedure_number: refProcNumber,
+        is_duplo_green: isDuploGreen,
+        dp: hasDuploMention,
+        missingFields: missing,
+      },
+    };
   }
 
   return {
     ok: true,
     data: {
-      procedure_number: procedureNumber!,
-      external_id: `bsk:${procedureNumber!}`,
+      procedure_number: procedureNumber,
+      external_id: `bsk:${procedureNumber}`,
       titulo,
       date: dateStr,
       platform: platform!,

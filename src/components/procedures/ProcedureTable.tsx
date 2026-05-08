@@ -2,7 +2,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Star, Pencil, Trash2, ExternalLink, Tag, Archive, ArchiveRestore, Trophy, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Star, Pencil, Trash2, ExternalLink, Tag, Archive, ArchiveRestore, Trophy, CheckCircle2, AlertCircle, ShieldCheck, AlertTriangle, ShieldAlert } from 'lucide-react';
 import { Procedure } from '@/types/procedures';
 import { formatProcedureDate, translateCategory } from '@/lib/procedureUtils';
 import { canCheckResult } from '@/lib/procedureGameTime';
@@ -17,9 +17,10 @@ interface ProcedureTableProps {
   onToggleFavorite: (proc: Procedure) => void;
   onArchive?: (proc: Procedure) => void;
   onCheckResult?: (proc: Procedure) => void;
+  onConfirmBot?: (id: string) => void;
 }
 
-export function ProcedureTable({ procedures, visibleColumns, onEdit, onDelete, onToggleFavorite, onArchive, onCheckResult }: ProcedureTableProps) {
+export function ProcedureTable({ procedures, visibleColumns, onEdit, onDelete, onToggleFavorite, onArchive, onCheckResult, onConfirmBot }: ProcedureTableProps) {
   const getStatusBadge = (status: string) => {
     if (status === 'Concluído' || status === 'Lucro Direto') {
       return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
@@ -61,11 +62,13 @@ export function ProcedureTable({ procedures, visibleColumns, onEdit, onDelete, o
         <TableBody>
           {procedures.map((proc) => {
             const showCheck = onCheckResult && canCheckResult(proc) && !proc.archived;
+            const hasIncomplete = proc.bot_needs_review && proc.bot_missing_fields && proc.bot_missing_fields.length > 0;
+            const needsReviewOnly = proc.bot_needs_review && (!proc.bot_missing_fields || proc.bot_missing_fields.length === 0);
             return (
             <TableRow
               key={proc.id}
               data-testid={`row-procedure-${proc.id}`}
-              className={`border-white/5 hover:bg-white/[0.03] transition-colors group ${proc.archived ? 'opacity-50' : ''} ${proc.tachado ? 'opacity-50 grayscale' : ''}`}
+              className={`border-white/5 hover:bg-white/[0.03] transition-colors group ${proc.archived ? 'opacity-50' : ''} ${proc.tachado ? 'opacity-50 grayscale' : ''} ${hasIncomplete ? 'border-l-2 border-l-orange-500/40' : needsReviewOnly ? 'border-l-2 border-l-yellow-500/30' : ''}`}
             >
               <TableCell className="w-8 py-2 px-2">
                 <Button
@@ -106,6 +109,32 @@ export function ProcedureTable({ procedures, visibleColumns, onEdit, onDelete, o
                       </TooltipTrigger>
                       <TooltipContent side="top" className="max-w-xs">
                         <p className="text-amber-300">Erro FreeBet Pro: {proc.freebetpro_last_error}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+                  {hasIncomplete && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span data-testid={`icon-bot-incomplete-${proc.id}`} tabIndex={0} className="inline-flex ml-1 cursor-help">
+                          <AlertTriangle className="w-3 h-3 text-orange-400" />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs">
+                        <p className="text-orange-300 font-semibold text-[11px] mb-0.5">Incompleto (bot)</p>
+                        <p className="text-[11px]">Falta: {proc.bot_missing_fields!.join(', ')}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+                  {needsReviewOnly && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span data-testid={`icon-bot-review-${proc.id}`} tabIndex={0} className="inline-flex ml-1 cursor-help">
+                          <ShieldAlert className="w-3 h-3 text-yellow-400/90" />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs">
+                        <p className="text-yellow-300 font-semibold text-[11px] mb-0.5">Verificar dados (bot)</p>
+                        <p className="text-[11px]">Registrado pelo bot — confirme se os dados estão corretos.</p>
                       </TooltipContent>
                     </Tooltip>
                   )}
@@ -207,55 +236,75 @@ export function ProcedureTable({ procedures, visibleColumns, onEdit, onDelete, o
               )}
               {visibleColumns.includes('actions') && (
                 <TableCell className="py-2 px-2">
-                  <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                    {showCheck && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => onCheckResult!(proc)}
-                        title="Conferir resultado"
-                        data-testid={`button-conferir-${proc.id}`}
-                        className="h-7 w-7 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10"
-                      >
-                        <Trophy className="w-3.5 h-3.5" />
-                      </Button>
+                  <div className="flex gap-0.5">
+                    {proc.bot_needs_review && !proc.archived && onConfirmBot && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => onConfirmBot(proc.id)}
+                            data-testid={`button-confirm-bot-${proc.id}`}
+                            className={`h-7 w-7 ${hasIncomplete ? 'text-orange-400 hover:text-orange-300 hover:bg-orange-500/10' : 'text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/10'}`}
+                          >
+                            <ShieldCheck className="w-3.5 h-3.5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                          <p>{hasIncomplete ? 'Confirmar após completar os dados' : 'Confirmar dados do bot'}</p>
+                        </TooltipContent>
+                      </Tooltip>
                     )}
-                    {onEdit && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => onEdit(proc)}
-                        title="Editar"
-                        data-testid={`button-edit-${proc.id}`}
-                        className="h-7 w-7 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10"
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                      </Button>
-                    )}
-                    {onArchive && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => onArchive(proc)}
-                        title={proc.archived ? 'Restaurar' : 'Arquivar'}
-                        data-testid={`button-archive-${proc.id}`}
-                        className="h-7 w-7 text-amber-400 hover:text-amber-300 hover:bg-amber-500/10"
-                      >
-                        {proc.archived ? <ArchiveRestore className="w-3.5 h-3.5" /> : <Archive className="w-3.5 h-3.5" />}
-                      </Button>
-                    )}
-                    {onDelete && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => onDelete(proc.id)}
-                        title="Excluir"
-                        data-testid={`button-delete-${proc.id}`}
-                        className="h-7 w-7 text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                    )}
+                    <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {showCheck && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => onCheckResult!(proc)}
+                          title="Conferir resultado"
+                          data-testid={`button-conferir-${proc.id}`}
+                          className="h-7 w-7 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10"
+                        >
+                          <Trophy className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
+                      {onEdit && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => onEdit(proc)}
+                          title="Editar"
+                          data-testid={`button-edit-${proc.id}`}
+                          className="h-7 w-7 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
+                      {onArchive && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => onArchive(proc)}
+                          title={proc.archived ? 'Restaurar' : 'Arquivar'}
+                          data-testid={`button-archive-${proc.id}`}
+                          className="h-7 w-7 text-amber-400 hover:text-amber-300 hover:bg-amber-500/10"
+                        >
+                          {proc.archived ? <ArchiveRestore className="w-3.5 h-3.5" /> : <Archive className="w-3.5 h-3.5" />}
+                        </Button>
+                      )}
+                      {onDelete && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => onDelete(proc.id)}
+                          title="Excluir"
+                          data-testid={`button-delete-${proc.id}`}
+                          className="h-7 w-7 text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </TableCell>
               )}

@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Star, Pencil, Trash2, ExternalLink, Tag, Calendar, Building2, Archive, ArchiveRestore, Trophy, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Star, Pencil, Trash2, ExternalLink, Tag, Calendar, Building2, Archive, ArchiveRestore, Trophy, Clock, CheckCircle2, AlertCircle, ShieldCheck, AlertTriangle, ShieldAlert } from 'lucide-react';
 import { Procedure } from '@/types/procedures';
 import { formatProcedureDate, translateCategory } from '@/lib/procedureUtils';
 import { canCheckResult } from '@/lib/procedureGameTime';
@@ -15,9 +15,10 @@ interface ProcedureMobileCardsProps {
   onToggleFavorite: (proc: Procedure) => void;
   onArchive?: (proc: Procedure) => void;
   onCheckResult?: (proc: Procedure) => void;
+  onConfirmBot?: (id: string) => void;
 }
 
-export function ProcedureMobileCards({ procedures, onEdit, onDelete, onToggleFavorite, onArchive, onCheckResult }: ProcedureMobileCardsProps) {
+export function ProcedureMobileCards({ procedures, onEdit, onDelete, onToggleFavorite, onArchive, onCheckResult, onConfirmBot }: ProcedureMobileCardsProps) {
   const getStatusBadge = (status: string) => {
     if (status === 'Concluído' || status === 'Lucro Direto') {
       return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
@@ -38,11 +39,13 @@ export function ProcedureMobileCards({ procedures, onEdit, onDelete, onToggleFav
     <div className="lg:hidden space-y-3">
       {procedures.map((proc) => {
         const showCheck = onCheckResult && canCheckResult(proc) && !proc.archived;
+        const hasIncomplete = proc.bot_needs_review && proc.bot_missing_fields && proc.bot_missing_fields.length > 0;
+        const needsReviewOnly = proc.bot_needs_review && (!proc.bot_missing_fields || proc.bot_missing_fields.length === 0);
         return (
         <div
           key={proc.id}
           data-testid={`card-procedure-${proc.id}`}
-          className={`glass rounded-2xl border p-4 card-hover overflow-hidden ${proc.archived ? 'border-white/5 opacity-60' : 'border-white/5'} ${proc.tachado ? 'opacity-50 grayscale' : ''}`}
+          className={`glass rounded-2xl border p-4 card-hover overflow-hidden ${proc.archived ? 'border-white/5 opacity-60' : hasIncomplete ? 'border-orange-500/30' : needsReviewOnly ? 'border-yellow-500/20' : 'border-white/5'} ${proc.tachado ? 'opacity-50 grayscale' : ''}`}
         >
           <div className="flex justify-between items-start mb-3">
             <div className="flex items-start gap-3">
@@ -64,6 +67,40 @@ export function ProcedureMobileCards({ procedures, onEdit, onDelete, onToggleFav
                     <Badge variant="outline" className="border-muted-foreground/30 text-muted-foreground text-[10px] px-1.5 py-0">
                       <Archive className="w-2.5 h-2.5 mr-1" /> Arquivado
                     </Badge>
+                  )}
+                  {hasIncomplete && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Badge
+                          data-testid={`badge-bot-incomplete-${proc.id}`}
+                          className="bg-orange-500/15 text-orange-400 border border-orange-500/30 text-[10px] px-1.5 py-0 cursor-help gap-1"
+                        >
+                          <AlertTriangle className="w-2.5 h-2.5" />
+                          INCOMPLETO
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs">
+                        <p className="text-orange-300 font-semibold text-[11px] mb-0.5">Campos em falta:</p>
+                        <p className="text-[11px]">{proc.bot_missing_fields!.join(', ')}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+                  {needsReviewOnly && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Badge
+                          data-testid={`badge-bot-review-${proc.id}`}
+                          className="bg-yellow-500/15 text-yellow-400 border border-yellow-500/30 text-[10px] px-1.5 py-0 cursor-help gap-1"
+                        >
+                          <ShieldAlert className="w-2.5 h-2.5" />
+                          VERIFICAR
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs">
+                        <p className="text-yellow-300 font-semibold text-[11px] mb-0.5">Registrado pelo bot</p>
+                        <p className="text-[11px]">Confirme se os dados (jogo, data, casa) estão corretos.</p>
+                      </TooltipContent>
+                    </Tooltip>
                   )}
                   {proc.freebetpro_synced_at && !proc.freebetpro_last_error && (
                     <Tooltip>
@@ -159,8 +196,20 @@ export function ProcedureMobileCards({ procedures, onEdit, onDelete, onToggleFav
             </div>
           )}
 
-          {(onEdit || onDelete || onArchive || showCheck) && (
+          {(onEdit || onDelete || onArchive || showCheck || (proc.bot_needs_review && onConfirmBot)) && (
             <div className="flex gap-2 pt-3 border-t border-white/5 flex-wrap">
+              {proc.bot_needs_review && !proc.archived && onConfirmBot && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onConfirmBot(proc.id)}
+                  data-testid={`button-confirm-bot-mobile-${proc.id}`}
+                  className={`flex-1 h-8 ${hasIncomplete ? 'border-orange-500/30 text-orange-400 hover:bg-orange-500/10 hover:text-orange-300' : 'border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10 hover:text-yellow-300'}`}
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 mr-1.5" />
+                  {hasIncomplete ? 'Confirmar (incompleto)' : 'Confirmar dados'}
+                </Button>
+              )}
               {showCheck && (
                 <Button
                   variant="outline"

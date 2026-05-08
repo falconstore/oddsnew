@@ -11,7 +11,7 @@ import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-import { useProcedures, useDeleteProcedure, useToggleFavorite, useArchiveProcedure } from '@/hooks/useProcedures';
+import { useProcedures, useDeleteProcedure, useToggleFavorite, useArchiveProcedure, useConfirmBotProcedure } from '@/hooks/useProcedures';
 import { Procedure, ProcedureFilters as FiltersType, AVAILABLE_COLUMNS } from '@/types/procedures';
 import { getGameTimeBucket } from '@/lib/procedureGameTime';
 import { DefinirResultadosModal } from '@/components/procedures/DefinirResultadosModal';
@@ -56,6 +56,7 @@ export default function ProcedureControl() {
   const deleteProcedure = useDeleteProcedure();
   const toggleFavorite = useToggleFavorite();
   const archiveProcedure = useArchiveProcedure();
+  const confirmBotProcedure = useConfirmBotProcedure();
   
   const [showModal, setShowModal] = useState(false);
   const [editingProcedure, setEditingProcedure] = useState<Procedure | null>(null);
@@ -109,6 +110,10 @@ export default function ProcedureControl() {
 
   const handleToggleFavorite = (proc: Procedure) => {
     toggleFavorite.mutate({ id: proc.id, is_favorite: !proc.is_favorite });
+  };
+
+  const handleConfirmBot = (id: string) => {
+    confirmBotProcedure.mutate(id);
   };
 
   const filteredProcedures = useMemo(() => {
@@ -404,6 +409,7 @@ export default function ProcedureControl() {
               onArchive={canEdit ? handleArchive : undefined}
               onCheckResult={canEdit ? handleCheckResult : undefined}
               onToggleFavorite={handleToggleFavorite}
+              onConfirmBot={canEdit ? handleConfirmBot : undefined}
             />
           </div>
           <div className="p-3">
@@ -414,6 +420,7 @@ export default function ProcedureControl() {
               onArchive={canEdit ? handleArchive : undefined}
               onCheckResult={canEdit ? handleCheckResult : undefined}
               onToggleFavorite={handleToggleFavorite}
+              onConfirmBot={canEdit ? handleConfirmBot : undefined}
             />
           </div>
         </div>
