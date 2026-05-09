@@ -193,11 +193,9 @@ async function parseAndInsertProcedure(
     freebet_reference_id: freebetReferenceId,
   };
 
+  // Usa RPC (função SQL direta) para bypassar o schema cache do PostgREST
   const { data: inserted, error: insertErr } = await supa
-    .from("procedures")
-    .insert([insertRow])
-    .select()
-    .single();
+    .rpc("bot_insert_procedure", { p_data: insertRow });
 
   if (insertErr || !inserted) {
     return { ok: false, error: insertErr?.message ?? "insert failed" };
