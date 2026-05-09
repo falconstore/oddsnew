@@ -4,7 +4,7 @@ import { startOfMonth, endOfMonth, endOfDay, differenceInDays, format } from 'da
 import { ptBR } from 'date-fns/locale';
 import { 
   Plus, TrendingUp, Calendar, Activity, FileText, 
-  Clock, Trophy, Columns, Upload, ChevronDown, List
+  Clock, Trophy, Columns, Upload, ChevronDown, List, Bot
 } from 'lucide-react';
 
 import { Layout } from '@/components/Layout';
@@ -42,6 +42,7 @@ import { ProcedureMobileCards } from '@/components/procedures/ProcedureMobileCar
 import { ProcedureModal } from '@/components/procedures/ProcedureModal';
 import { ImportModal } from '@/components/procedures/ImportModal';
 import { GerarRelatorioModal } from '@/components/procedures/GerarRelatorioModal';
+import { RegisterBotMessageModal } from '@/components/procedures/RegisterBotMessageModal';
 import { ColumnCustomizer } from '@/components/procedures/ColumnCustomizer';
 import { NotificationPanel } from '@/components/procedures/NotificationPanel';
 import { MountainChart } from '@/components/procedures/MountainChart';
@@ -66,6 +67,7 @@ export default function ProcedureControl() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [showRelatorioModal, setShowRelatorioModal] = useState(false);
   const [showColumnCustomizer, setShowColumnCustomizer] = useState(false);
+  const [showRegisterBotModal, setShowRegisterBotModal] = useState(false);
   
   const [filters, setFilters] = usePersistedState<FiltersType>('proc_filters', {
     searchNumber: '',
@@ -211,6 +213,16 @@ export default function ProcedureControl() {
           </div>
           {canEdit && (
             <div className="flex gap-2 flex-shrink-0">
+              <Button
+                variant="outline"
+                onClick={() => setShowRegisterBotModal(true)}
+                size="sm"
+                className="border-primary/30 hover:bg-primary/10 text-primary h-9"
+                data-testid="button-registrar-bot"
+              >
+                <Bot className="w-3.5 h-3.5 mr-1.5" />
+                Registrar via Bot
+              </Button>
               <Button
                 variant="outline"
                 onClick={() => setShowRelatorioModal(true)}
@@ -446,6 +458,10 @@ export default function ProcedureControl() {
         open={showRelatorioModal}
         onOpenChange={setShowRelatorioModal}
         procedures={procedures}
+      />
+      <RegisterBotMessageModal
+        open={showRegisterBotModal}
+        onClose={() => setShowRegisterBotModal(false)}
       />
 
       {showColumnCustomizer && (
