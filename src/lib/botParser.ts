@@ -255,6 +255,10 @@ function detectTipo(text: string): ProcedureTipo {
 }
 
 function detectCategory(text: string, tipo: ProcedureTipo): string {
+  // 1. Linha explícita emitida pelo template: 📋 CATEGORIA: X
+  const explicit = text.match(/^📋?\s*CATEGORIA:\s*(.+?)(?:\s*[\n\r]|$)/im);
+  if (explicit && explicit[1].trim()) return explicit[1].trim();
+  // 2. Fallback por keyword
   if (/\bSUPERODD\b/i.test(text)) return "Superodd";
   if (/\bMISS[ÃA]O\b/i.test(text)) return "Extra";
   if (tipo === "GANHAR_FB") return "Freebet";

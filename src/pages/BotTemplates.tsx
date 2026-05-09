@@ -12,10 +12,14 @@ import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { Sidebar } from '@/components/Sidebar';
 import { parseMessage, type ParseResult } from '@/lib/botParser';
 import { EventoAutocomplete } from '@/components/procedures/EventoAutocomplete';
+import { PROCEDURE_CATEGORIES } from '@/types/procedures';
 
 // ─────────────────────────────────────────
 // Helpers
@@ -55,7 +59,7 @@ interface FieldConfig {
   id: string;
   label: string;
   placeholder: string;
-  type: 'text' | 'date' | 'time' | 'evento';
+  type: 'text' | 'date' | 'time' | 'evento' | 'select';
   default?: () => string;
   hint?: string;
   optional?: boolean;
@@ -82,6 +86,7 @@ interface CustomTemplate {
 }
 
 const CUSTOM_TEMPLATES_KEY = 'bsk_custom_templates';
+const CUSTOM_CATEGORIES_KEY = 'bsk_procedure_categories';
 
 function loadCustomTemplates(): CustomTemplate[] {
   try {
@@ -94,6 +99,19 @@ function loadCustomTemplates(): CustomTemplate[] {
 
 function saveCustomTemplates(templates: CustomTemplate[]) {
   localStorage.setItem(CUSTOM_TEMPLATES_KEY, JSON.stringify(templates));
+}
+
+function loadCustomCategories(): string[] {
+  try {
+    const raw = localStorage.getItem(CUSTOM_CATEGORIES_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveCustomCategories(cats: string[]) {
+  localStorage.setItem(CUSTOM_CATEGORIES_KEY, JSON.stringify(cats));
 }
 
 // ─────────────────────────────────────────
@@ -116,6 +134,7 @@ const TEMPLATES: TemplateConfig[] = [
       { id: 'casa', label: 'Casa de Apostas', placeholder: 'Ex: Bet365', type: 'text', uppercase: true },
       { id: 'evento1', label: 'Partida', placeholder: 'Ex: Flamengo x Palmeiras', type: 'evento' },
       { id: 'lucro', label: 'Lucro Previsto (ex: 17,00)', placeholder: '17,00', type: 'text' },
+      { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Freebet' },
     ],
     generate: (f) => {
       const linha2 = f.numRef
@@ -134,6 +153,7 @@ const TEMPLATES: TemplateConfig[] = [
         `🔴 CASO HAJA ALTERAÇÃO NAS ODDS, CHAME O SUPORTE`,
         ``,
         `🟡 LUCRO: 💵 ${fmtVal(f.lucro)} 💵`,
+        `📋 CATEGORIA: ${f.categoria || 'Freebet'}`,
         `😍 chance de duplo green 😍`,
       ].join('\n');
     },
@@ -154,6 +174,7 @@ const TEMPLATES: TemplateConfig[] = [
       { id: 'evento1', label: 'Partida 1', placeholder: 'Ex: RB Leipzig x St Pauli', type: 'evento' },
       { id: 'freebetValor', label: 'Valor da Freebet (ex: 25,00)', placeholder: '25,00', type: 'text' },
       { id: 'obsRecompensa', label: 'Observação da Recompensa (opcional)', placeholder: 'Ex: A CADA GOL DO SANTOS', type: 'text', uppercase: true, hint: 'Aparece após "EM FREEBET". Deixe vazio se não houver condição especial.' },
+      { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Freebet' },
       { id: 'evento2', label: 'Partida 2', placeholder: 'Ex: Real Madrid x Barcelona', type: 'evento', optional: true },
     ],
     generate: (f) => {
@@ -174,6 +195,7 @@ const TEMPLATES: TemplateConfig[] = [
         `🔴 CASO HAJA ALTERAÇÃO NAS ODDS, UTILIZE A CALCULADORA`,
         ``,
         recompensa,
+        `📋 CATEGORIA: ${f.categoria || 'Freebet'}`,
         `😍 chance de duplo green 😍`,
       ].join('\n');
     },
@@ -194,6 +216,7 @@ const TEMPLATES: TemplateConfig[] = [
       { id: 'evento1', label: 'Partida 1', placeholder: 'Ex: Bayern x PSG', type: 'evento' },
       { id: 'freebetValor', label: 'Valor da Freebet (ex: 50,00)', placeholder: '50,00', type: 'text' },
       { id: 'obsRecompensa', label: 'Observação da Recompensa (opcional)', placeholder: 'Ex: A CADA GOL DO SANTOS', type: 'text', uppercase: true, hint: 'Aparece após "EM FREEBET". Deixe vazio se não houver condição especial.' },
+      { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Extra' },
       { id: 'evento2', label: 'Partida 2', placeholder: 'Ex: Real Madrid x Barcelona', type: 'evento', optional: true },
     ],
     generate: (f) => {
@@ -214,6 +237,7 @@ const TEMPLATES: TemplateConfig[] = [
         `🔴 CASO HAJA ALTERAÇÃO NAS ODDS, UTILIZE A CALCULADORA`,
         ``,
         recompensa,
+        `📋 CATEGORIA: ${f.categoria || 'Extra'}`,
         `😍 chance de duplo green para um lado 😍`,
       ].join('\n');
     },
@@ -232,6 +256,7 @@ const TEMPLATES: TemplateConfig[] = [
       { id: 'casa', label: 'Casa de Apostas', placeholder: 'Ex: Betesporte', type: 'text', uppercase: true, hint: 'A casa aparece na linha 2 ("DA BETESPORTE") — não precisa de linha CASA: separada neste tipo.' },
       { id: 'evento1', label: 'Partida', placeholder: 'Ex: Corinthians x Vasco', type: 'evento' },
       { id: 'valorDG', label: 'Objetivo Duplo Green (ex: 210,00)', placeholder: '210,00', type: 'text' },
+      { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Superodd' },
     ],
     generate: (f) => [
       `🔵 PROCEDIMENTO ${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
@@ -243,6 +268,7 @@ const TEMPLATES: TemplateConfig[] = [
       `🔴 CASO HAJA ALTERAÇÃO NAS ODDS, UTILIZE CALCULADORA 🧮`,
       ``,
       `🟡 OBJETIVO DUPLO GREEN - 💵 ${fmtVal(f.valorDG)}`,
+      `📋 CATEGORIA: ${f.categoria || 'Superodd'}`,
       `😍 chance de duplo green 😍`,
     ].join('\n'),
   },
@@ -262,6 +288,7 @@ const TEMPLATES: TemplateConfig[] = [
       { id: 'evento1', label: 'Partida', placeholder: 'Ex: São Paulo x Santos', type: 'evento' },
       { id: 'lucroMin', label: 'Lucro Mínimo (ex: 3,25)', placeholder: '3,25', type: 'text' },
       { id: 'lucroMax', label: 'Lucro Máximo (ex: 3,75)', placeholder: '3,75', type: 'text' },
+      { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Promoção' },
     ],
     generate: (f) => [
       `🟢 PROCEDIMENTO ${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
@@ -274,6 +301,7 @@ const TEMPLATES: TemplateConfig[] = [
       `🔴 CASO HAJA ALTERAÇÃO NAS ODDS, UTILIZE A CALCULADORA 👆`,
       ``,
       `🟡 LUCRO: 💵 ${fmtVal(f.lucroMin)} À ${fmtVal(f.lucroMax)} 💵`,
+      `📋 CATEGORIA: ${f.categoria || 'Promoção'}`,
       `😍 chance de duplo green 😍`,
     ].join('\n'),
   },
@@ -293,6 +321,7 @@ const TEMPLATES: TemplateConfig[] = [
       { id: 'evento1', label: 'Partida', placeholder: 'Ex: Bahia x Cruzeiro', type: 'evento' },
       { id: 'lucro1', label: 'Opção 1 — Lucro cash se ganhar (ex: 2,00)', placeholder: '2,00', type: 'text' },
       { id: 'free1', label: 'Opção 1 — Freebet se ganhar fora (ex: 10,00)', placeholder: '10,00', type: 'text' },
+      { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Promoção' },
       { id: 'obs', label: 'Opção 2 (opcional) — vai para observações', placeholder: 'Ex: LUCRO DE 16,00 / FORA FREE DE 100,00', type: 'text', optional: true, hint: 'Se houver uma segunda opção de valor, registre aqui. Fica salvo no campo Observações do procedimento.' },
     ],
     generate: (f) => {
@@ -313,6 +342,7 @@ const TEMPLATES: TemplateConfig[] = [
       if (f.obs && f.obs.trim()) {
         lines.push(`📝 OBS: OPÇÃO 2 — ${f.obs.trim().toUpperCase()}`);
       }
+      lines.push(`📋 CATEGORIA: ${f.categoria || 'Promoção'}`);
       lines.push(`😍 chance de duplo green 😍`);
       return lines.join('\n');
     },
@@ -598,9 +628,13 @@ export default function BotTemplates() {
   const [customTemplates, setCustomTemplates] = useState<CustomTemplate[]>([]);
   const [customEditText, setCustomEditText] = useState('');
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [customCategories, setCustomCategories] = useState<string[]>([]);
+  const [addingCategoryFor, setAddingCategoryFor] = useState<string | null>(null);
+  const [newCategoryName, setNewCategoryName] = useState('');
 
   useEffect(() => {
     setCustomTemplates(loadCustomTemplates());
+    setCustomCategories(loadCustomCategories());
   }, []);
 
   const template = TEMPLATES[activeIdx];
@@ -693,6 +727,26 @@ export default function BotTemplates() {
       setActiveCustomId(null);
     }
     setDeleteConfirmId(null);
+  }
+
+  const allCategories = useMemo(
+    () => [...PROCEDURE_CATEGORIES, ...customCategories],
+    [customCategories],
+  );
+
+  function handleAddCategory(fieldId: string) {
+    const trimmed = newCategoryName.trim();
+    if (!trimmed) return;
+    const updated = allCategories.includes(trimmed)
+      ? customCategories
+      : [...customCategories, trimmed];
+    if (!allCategories.includes(trimmed)) {
+      setCustomCategories(updated);
+      saveCustomCategories(updated);
+    }
+    setField(fieldId, trimmed);
+    setAddingCategoryFor(null);
+    setNewCategoryName('');
   }
 
   const requiredFields = template.fields.filter(f => !f.optional);
@@ -975,6 +1029,64 @@ export default function BotTemplates() {
                           inputClassName="h-9 text-sm bg-background/50"
                         />
                       </div>
+                    ) : f.type === 'select' ? (
+                      <div key={f.id} className="flex flex-col gap-1">
+                        <Label className="text-xs font-medium text-muted-foreground">{f.label}</Label>
+                        <Select
+                          value={fields[f.id] ?? ''}
+                          onValueChange={v => {
+                            if (v === '__add_new__') {
+                              setAddingCategoryFor(f.id);
+                              setNewCategoryName('');
+                            } else {
+                              setField(f.id, v);
+                              setAddingCategoryFor(null);
+                            }
+                          }}
+                        >
+                          <SelectTrigger className="h-9 text-sm bg-background/50" data-testid={`select-${f.id}`}>
+                            <SelectValue placeholder="Selecione..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {allCategories.map(c => (
+                              <SelectItem key={c} value={c}>{c}</SelectItem>
+                            ))}
+                            <SelectItem value="__add_new__" className="text-primary font-medium">
+                              ➕ Adicionar nova...
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {addingCategoryFor === f.id && (
+                          <div className="flex gap-2 mt-1">
+                            <Input
+                              value={newCategoryName}
+                              onChange={e => setNewCategoryName(e.target.value)}
+                              placeholder="Nome da nova categoria..."
+                              className="h-8 text-sm bg-background/50 flex-1"
+                              onKeyDown={e => { if (e.key === 'Enter') handleAddCategory(f.id); }}
+                              autoFocus
+                              data-testid="input-new-category"
+                            />
+                            <Button
+                              size="sm"
+                              className="h-8 px-3 text-xs"
+                              onClick={() => handleAddCategory(f.id)}
+                              data-testid="btn-confirm-new-category"
+                            >
+                              Adicionar
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 px-2"
+                              onClick={() => setAddingCategoryFor(null)}
+                              data-testid="btn-cancel-new-category"
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        )}
+                      </div>
                     ) : (
                       <FieldInput key={f.id} field={f} value={fields[f.id] ?? ''} onChange={v => setField(f.id, v)} />
                     )
@@ -1012,6 +1124,67 @@ export default function BotTemplates() {
                                 onChange={partial => setEventoField(f.id, partial)}
                                 inputClassName="h-9 text-sm bg-background/50"
                               />
+                            </div>
+                          ) : f.type === 'select' ? (
+                            <div key={f.id} className="flex flex-col gap-1">
+                              <Label className="text-xs font-medium text-muted-foreground">
+                                {f.label}
+                                <span className="ml-1 text-muted-foreground/50">(opcional)</span>
+                              </Label>
+                              <Select
+                                value={fields[f.id] ?? ''}
+                                onValueChange={v => {
+                                  if (v === '__add_new__') {
+                                    setAddingCategoryFor(f.id);
+                                    setNewCategoryName('');
+                                  } else {
+                                    setField(f.id, v);
+                                    setAddingCategoryFor(null);
+                                  }
+                                }}
+                              >
+                                <SelectTrigger className="h-9 text-sm bg-background/50" data-testid={`select-${f.id}`}>
+                                  <SelectValue placeholder="Selecione..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {allCategories.map(c => (
+                                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                                  ))}
+                                  <SelectItem value="__add_new__" className="text-primary font-medium">
+                                    ➕ Adicionar nova...
+                                  </SelectItem>
+                                </SelectContent>
+                              </Select>
+                              {addingCategoryFor === f.id && (
+                                <div className="flex gap-2 mt-1">
+                                  <Input
+                                    value={newCategoryName}
+                                    onChange={e => setNewCategoryName(e.target.value)}
+                                    placeholder="Nome da nova categoria..."
+                                    className="h-8 text-sm bg-background/50 flex-1"
+                                    onKeyDown={e => { if (e.key === 'Enter') handleAddCategory(f.id); }}
+                                    autoFocus
+                                    data-testid="input-new-category"
+                                  />
+                                  <Button
+                                    size="sm"
+                                    className="h-8 px-3 text-xs"
+                                    onClick={() => handleAddCategory(f.id)}
+                                    data-testid="btn-confirm-new-category"
+                                  >
+                                    Adicionar
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-8 px-2"
+                                    onClick={() => setAddingCategoryFor(null)}
+                                    data-testid="btn-cancel-new-category"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              )}
                             </div>
                           ) : (
                             <FieldInput key={f.id} field={f} value={fields[f.id] ?? ''} onChange={v => setField(f.id, v)} />
