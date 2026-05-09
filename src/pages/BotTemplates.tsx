@@ -15,6 +15,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Sidebar } from '@/components/Sidebar';
 import { parseMessage, type ParseResult } from '@/lib/botParser';
+import { EventoAutocomplete } from '@/components/procedures/EventoAutocomplete';
 
 // ─────────────────────────────────────────
 // Helpers
@@ -31,6 +32,21 @@ function fmtDate(iso: string): string {
 function fmtTime(t: string): string { return t || 'HH:MM'; }
 function fmtVal(v: string): string { return v || '0,00'; }
 
+function kickoffToDateStr(iso: string | null): string {
+  if (!iso) return 'DD/MM/AAAA';
+  return new Date(iso).toLocaleDateString('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    day: '2-digit', month: '2-digit', year: 'numeric',
+  });
+}
+function kickoffToTimeStr(iso: string | null): string {
+  if (!iso) return 'HH:MM';
+  return new Date(iso).toLocaleTimeString('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    hour: '2-digit', minute: '2-digit',
+  });
+}
+
 // ─────────────────────────────────────────
 // Tipos
 // ─────────────────────────────────────────
@@ -39,7 +55,7 @@ interface FieldConfig {
   id: string;
   label: string;
   placeholder: string;
-  type: 'text' | 'date' | 'time';
+  type: 'text' | 'date' | 'time' | 'evento';
   default?: () => string;
   hint?: string;
   optional?: boolean;
@@ -98,10 +114,7 @@ const TEMPLATES: TemplateConfig[] = [
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'numRef', label: 'Nº do Proc de Referência (FB)', placeholder: 'Ex: 110', type: 'text' },
       { id: 'casa', label: 'Casa de Apostas', placeholder: 'Ex: Bet365', type: 'text', uppercase: true },
-      { id: 'timeA', label: 'Time A', placeholder: 'Ex: Flamengo', type: 'text', uppercase: true },
-      { id: 'timeB', label: 'Time B', placeholder: 'Ex: Palmeiras', type: 'text', uppercase: true },
-      { id: 'dataPartida', label: 'Data da Partida', placeholder: '', type: 'date', default: todayISO },
-      { id: 'horaPartida', label: 'Horário da Partida', placeholder: '20:00', type: 'time', default: () => '20:00' },
+      { id: 'evento1', label: 'Partida', placeholder: 'Ex: Flamengo x Palmeiras', type: 'evento' },
       { id: 'lucro', label: 'Lucro Previsto (ex: 17,00)', placeholder: '17,00', type: 'text' },
     ],
     generate: (f) => {
@@ -114,7 +127,7 @@ const TEMPLATES: TemplateConfig[] = [
         `CASA: 🏠 ${(f.casa || 'CASA').toUpperCase()}`,
         ``,
         `UTILIZAREMOS O JOGO ENTRE:`,
-        `${(f.timeA || 'TIME A').toUpperCase()} X ${(f.timeB || 'TIME B').toUpperCase()} - ${fmtDate(f.dataPartida)} ÀS ${fmtTime(f.horaPartida)}`,
+        `${f.evento1 || 'TIME A X TIME B'} - ${f.evento1_data || 'DD/MM/AAAA'} ÀS ${f.evento1_hora || 'HH:MM'}`,
         ``,
         `🟥 Atenção: sempre confere data e horário da partida nos bilhetes também.`,
         `🟥 Atenção: Sempre confira se os links dos bilhetes são os mesmos da imagem.`,
@@ -138,21 +151,15 @@ const TEMPLATES: TemplateConfig[] = [
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'casa', label: 'Casa de Apostas', placeholder: 'Ex: Sportingbet', type: 'text', uppercase: true },
       { id: 'campanha', label: 'Nome da Campanha', placeholder: 'Ex: SUPER SEXTOU', type: 'text', uppercase: true },
-      { id: 'timeA', label: 'Time A (partida 1)', placeholder: 'Ex: RB Leipzig', type: 'text', uppercase: true },
-      { id: 'timeB', label: 'Time B (partida 1)', placeholder: 'Ex: St Pauli', type: 'text', uppercase: true },
-      { id: 'dataP1', label: 'Data Partida 1', placeholder: '', type: 'date', default: todayISO },
-      { id: 'horaP1', label: 'Horário Partida 1', placeholder: '10:30', type: 'time', default: () => '10:30' },
-      { id: 'timeC', label: 'Time A (partida 2)', placeholder: 'Opcional', type: 'text', uppercase: true, optional: true },
-      { id: 'timeD', label: 'Time B (partida 2)', placeholder: 'Opcional', type: 'text', uppercase: true, optional: true },
-      { id: 'dataP2', label: 'Data Partida 2', placeholder: '', type: 'date', optional: true },
-      { id: 'horaP2', label: 'Horário Partida 2', placeholder: 'Opcional', type: 'time', optional: true },
+      { id: 'evento1', label: 'Partida 1', placeholder: 'Ex: RB Leipzig x St Pauli', type: 'evento' },
       { id: 'freebetValor', label: 'Valor da Freebet (ex: 25,00)', placeholder: '25,00', type: 'text' },
       { id: 'obsRecompensa', label: 'Observação da Recompensa (opcional)', placeholder: 'Ex: A CADA GOL DO SANTOS', type: 'text', uppercase: true, hint: 'Aparece após "EM FREEBET". Deixe vazio se não houver condição especial.' },
+      { id: 'evento2', label: 'Partida 2', placeholder: 'Ex: Real Madrid x Barcelona', type: 'evento', optional: true },
     ],
     generate: (f) => {
-      const partidas = [`${(f.timeA || 'TIME A').toUpperCase()} X ${(f.timeB || 'TIME B').toUpperCase()} - ${fmtDate(f.dataP1)} ÀS ${fmtTime(f.horaP1)}`];
-      if (f.timeC && f.timeD && f.dataP2 && f.horaP2) {
-        partidas.push(`${f.timeC.toUpperCase()} X ${f.timeD.toUpperCase()} - ${fmtDate(f.dataP2)} ÀS ${fmtTime(f.horaP2)}`);
+      const partidas = [`${f.evento1 || 'TIME A X TIME B'} - ${f.evento1_data || 'DD/MM/AAAA'} ÀS ${f.evento1_hora || 'HH:MM'}`];
+      if (f.evento2) {
+        partidas.push(`${f.evento2} - ${f.evento2_data || 'DD/MM/AAAA'} ÀS ${f.evento2_hora || 'HH:MM'}`);
       }
       const recompensa = `🟡 RECOMPENSA: 🎁 ${fmtVal(f.freebetValor)} EM FREEBET${f.obsRecompensa ? ` - ${f.obsRecompensa.toUpperCase()}` : ''}`;
       return [
@@ -184,21 +191,15 @@ const TEMPLATES: TemplateConfig[] = [
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'missao', label: 'Nome da Missão', placeholder: 'Ex: LIGA DOS CAMPEÕES', type: 'text', uppercase: true },
       { id: 'casa', label: 'Casa de Apostas', placeholder: 'Ex: Betano', type: 'text', uppercase: true },
-      { id: 'timeA', label: 'Time A (partida 1)', placeholder: 'Ex: Bayern', type: 'text', uppercase: true },
-      { id: 'timeB', label: 'Time B (partida 1)', placeholder: 'Ex: PSG', type: 'text', uppercase: true },
-      { id: 'dataP1', label: 'Data Partida 1', placeholder: '', type: 'date', default: todayISO },
-      { id: 'horaP1', label: 'Horário Partida 1', placeholder: '16:00', type: 'time', default: () => '16:00' },
-      { id: 'timeC', label: 'Time A (partida 2)', placeholder: 'Opcional', type: 'text', uppercase: true, optional: true },
-      { id: 'timeD', label: 'Time B (partida 2)', placeholder: 'Opcional', type: 'text', uppercase: true, optional: true },
-      { id: 'dataP2', label: 'Data Partida 2', placeholder: '', type: 'date', optional: true },
-      { id: 'horaP2', label: 'Horário Partida 2', placeholder: 'Opcional', type: 'time', optional: true },
+      { id: 'evento1', label: 'Partida 1', placeholder: 'Ex: Bayern x PSG', type: 'evento' },
       { id: 'freebetValor', label: 'Valor da Freebet (ex: 50,00)', placeholder: '50,00', type: 'text' },
       { id: 'obsRecompensa', label: 'Observação da Recompensa (opcional)', placeholder: 'Ex: A CADA GOL DO SANTOS', type: 'text', uppercase: true, hint: 'Aparece após "EM FREEBET". Deixe vazio se não houver condição especial.' },
+      { id: 'evento2', label: 'Partida 2', placeholder: 'Ex: Real Madrid x Barcelona', type: 'evento', optional: true },
     ],
     generate: (f) => {
-      const partidas = [`${(f.timeA || 'TIME A').toUpperCase()} X ${(f.timeB || 'TIME B').toUpperCase()} - ${fmtDate(f.dataP1)} ÀS ${fmtTime(f.horaP1)}`];
-      if (f.timeC && f.timeD && f.dataP2 && f.horaP2) {
-        partidas.push(`${f.timeC.toUpperCase()} X ${f.timeD.toUpperCase()} - ${fmtDate(f.dataP2)} ÀS ${fmtTime(f.horaP2)}`);
+      const partidas = [`${f.evento1 || 'TIME A X TIME B'} - ${f.evento1_data || 'DD/MM/AAAA'} ÀS ${f.evento1_hora || 'HH:MM'}`];
+      if (f.evento2) {
+        partidas.push(`${f.evento2} - ${f.evento2_data || 'DD/MM/AAAA'} ÀS ${f.evento2_hora || 'HH:MM'}`);
       }
       const recompensa = `🟡 RECOMPENSA: 🎁 ${fmtVal(f.freebetValor)} EM FREEBET${f.obsRecompensa ? ` - ${f.obsRecompensa.toUpperCase()}` : ''}`;
       return [
@@ -229,10 +230,7 @@ const TEMPLATES: TemplateConfig[] = [
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 116', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'casa', label: 'Casa de Apostas', placeholder: 'Ex: Betesporte', type: 'text', uppercase: true, hint: 'A casa aparece na linha 2 ("DA BETESPORTE") — não precisa de linha CASA: separada neste tipo.' },
-      { id: 'timeA', label: 'Time A', placeholder: 'Ex: Corinthians', type: 'text', uppercase: true },
-      { id: 'timeB', label: 'Time B', placeholder: 'Ex: Vasco', type: 'text', uppercase: true },
-      { id: 'dataPartida', label: 'Data da Partida', placeholder: '', type: 'date', default: todayISO },
-      { id: 'horaPartida', label: 'Horário da Partida', placeholder: '19:00', type: 'time', default: () => '19:00' },
+      { id: 'evento1', label: 'Partida', placeholder: 'Ex: Corinthians x Vasco', type: 'evento' },
       { id: 'valorDG', label: 'Objetivo Duplo Green (ex: 210,00)', placeholder: '210,00', type: 'text' },
     ],
     generate: (f) => [
@@ -240,7 +238,7 @@ const TEMPLATES: TemplateConfig[] = [
       `🟢 PROCEDIMENTO REFERENTE A SUPERODD DA ${(f.casa || 'CASA').toUpperCase()} 🔥`,
       ``,
       `UTILIZAREMOS O JOGO ENTRE:`,
-      `${(f.timeA || 'TIME A').toUpperCase()} X ${(f.timeB || 'TIME B').toUpperCase()} - ${fmtDate(f.dataPartida)} ÀS ${fmtTime(f.horaPartida)}`,
+      `${f.evento1 || 'TIME A X TIME B'} - ${f.evento1_data || 'DD/MM/AAAA'} ÀS ${f.evento1_hora || 'HH:MM'}`,
       ``,
       `🔴 CASO HAJA ALTERAÇÃO NAS ODDS, UTILIZE CALCULADORA 🧮`,
       ``,
@@ -261,10 +259,7 @@ const TEMPLATES: TemplateConfig[] = [
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'campanha', label: 'Nome da Promoção/Campanha', placeholder: 'Ex: SUPER ODDS WEEK', type: 'text', uppercase: true },
       { id: 'casa', label: 'Casa de Apostas', placeholder: 'Ex: Betfair', type: 'text', uppercase: true },
-      { id: 'timeA', label: 'Time A', placeholder: 'Ex: São Paulo', type: 'text', uppercase: true },
-      { id: 'timeB', label: 'Time B', placeholder: 'Ex: Santos', type: 'text', uppercase: true },
-      { id: 'dataPartida', label: 'Data da Partida', placeholder: '', type: 'date', default: todayISO },
-      { id: 'horaPartida', label: 'Horário da Partida', placeholder: '18:30', type: 'time', default: () => '18:30' },
+      { id: 'evento1', label: 'Partida', placeholder: 'Ex: São Paulo x Santos', type: 'evento' },
       { id: 'lucroMin', label: 'Lucro Mínimo (ex: 3,25)', placeholder: '3,25', type: 'text' },
       { id: 'lucroMax', label: 'Lucro Máximo (ex: 3,75)', placeholder: '3,75', type: 'text' },
     ],
@@ -274,7 +269,7 @@ const TEMPLATES: TemplateConfig[] = [
       `CASA: 🏠 ${(f.casa || 'CASA').toUpperCase()}`,
       ``,
       `UTILIZAREMOS A PARTIDA ENTRE:`,
-      `${(f.timeA || 'TIME A').toUpperCase()} X ${(f.timeB || 'TIME B').toUpperCase()} - ${fmtDate(f.dataPartida)} ÀS ${fmtTime(f.horaPartida)}`,
+      `${f.evento1 || 'TIME A X TIME B'} - ${f.evento1_data || 'DD/MM/AAAA'} ÀS ${f.evento1_hora || 'HH:MM'}`,
       ``,
       `🔴 CASO HAJA ALTERAÇÃO NAS ODDS, UTILIZE A CALCULADORA 👆`,
       ``,
@@ -295,10 +290,7 @@ const TEMPLATES: TemplateConfig[] = [
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'casa', label: 'Casa de Apostas', placeholder: 'Ex: Sportingbet', type: 'text', uppercase: true },
       { id: 'campanha', label: 'Nome da Campanha', placeholder: 'Ex: APOSTA PROTEGIDA', type: 'text', uppercase: true },
-      { id: 'timeA', label: 'Time A', placeholder: 'Ex: Bahia', type: 'text', uppercase: true },
-      { id: 'timeB', label: 'Time B', placeholder: 'Ex: Cruzeiro', type: 'text', uppercase: true },
-      { id: 'dataPartida', label: 'Data da Partida', placeholder: '', type: 'date', default: todayISO },
-      { id: 'horaPartida', label: 'Horário da Partida', placeholder: '21:00', type: 'time', default: () => '21:00' },
+      { id: 'evento1', label: 'Partida', placeholder: 'Ex: Bahia x Cruzeiro', type: 'evento' },
       { id: 'lucro1', label: 'Opção 1 — Lucro cash se ganhar (ex: 2,00)', placeholder: '2,00', type: 'text' },
       { id: 'free1', label: 'Opção 1 — Freebet se ganhar fora (ex: 10,00)', placeholder: '10,00', type: 'text' },
       { id: 'obs', label: 'Opção 2 (opcional) — vai para observações', placeholder: 'Ex: LUCRO DE 16,00 / FORA FREE DE 100,00', type: 'text', optional: true, hint: 'Se houver uma segunda opção de valor, registre aqui. Fica salvo no campo Observações do procedimento.' },
@@ -310,7 +302,7 @@ const TEMPLATES: TemplateConfig[] = [
         `CASA: 🏠 ${(f.casa || 'CASA').toUpperCase()}`,
         ``,
         `UTILIZAREMOS A PARTIDA ENTRE:`,
-        `${(f.timeA || 'TIME A').toUpperCase()} X ${(f.timeB || 'TIME B').toUpperCase()} - ${fmtDate(f.dataPartida)} ÀS ${fmtTime(f.horaPartida)}`,
+        `${f.evento1 || 'TIME A X TIME B'} - ${f.evento1_data || 'DD/MM/AAAA'} ÀS ${f.evento1_hora || 'HH:MM'}`,
         ``,
         `🟥 Atenção: sempre confere data e horário da partida nos bilhetes também.`,
         `🔴 CASO HAJA ALTERAÇÃO NAS ODDS, UTILIZE A CALCULADORA`,
@@ -599,11 +591,11 @@ export default function BotTemplates() {
   const [activeIdx, setActiveIdx] = useState(0);
   const [activeCustomId, setActiveCustomId] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
+  const [eventoData, setEventoData] = useState<Record<string, { partida_descricao: string; fixture_id: number | null; kickoff_at: string | null }>>({});
   const [copied, setCopied] = useState(false);
   const [showOptional, setShowOptional] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [customTemplates, setCustomTemplates] = useState<CustomTemplate[]>([]);
-  // For custom template editing before copy
   const [customEditText, setCustomEditText] = useState('');
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
@@ -620,11 +612,11 @@ export default function BotTemplates() {
       defaults[f.id] = f.default ? f.default() : '';
     });
     setFields(defaults);
+    setEventoData({});
     setShowOptional(false);
     setCopied(false);
   }, [activeIdx, activeCustomId]);
 
-  // When switching to a custom template, pre-fill edit text
   useEffect(() => {
     if (!activeCustomId) return;
     const ct = customTemplates.find(t => t.id === activeCustomId);
@@ -636,13 +628,29 @@ export default function BotTemplates() {
     setFields(prev => ({ ...prev, [id]: value }));
   }, []);
 
+  const setEventoField = useCallback((id: string, partial: { partida_descricao: string; fixture_id: number | null; kickoff_at: string | null }) => {
+    setEventoData(prev => ({ ...prev, [id]: partial }));
+  }, []);
+
   const resetFields = useCallback(() => {
     const defaults: Record<string, string> = {};
     template.fields.forEach(f => {
       defaults[f.id] = f.default ? f.default() : '';
     });
     setFields(defaults);
+    setEventoData({});
   }, [template]);
+
+  // Build enriched fields: inject evento1/evento1_data/evento1_hora etc.
+  const enrichedFields = useMemo(() => {
+    const merged: Record<string, string> = { ...fields };
+    for (const [id, ev] of Object.entries(eventoData)) {
+      merged[id] = ev.partida_descricao;
+      merged[`${id}_data`] = kickoffToDateStr(ev.kickoff_at);
+      merged[`${id}_hora`] = kickoffToTimeStr(ev.kickoff_at);
+    }
+    return merged;
+  }, [fields, eventoData]);
 
   function selectBuiltin(idx: number) {
     setActiveIdx(idx);
@@ -653,7 +661,7 @@ export default function BotTemplates() {
     setActiveCustomId(id);
   }
 
-  const preview = activeCustomId ? customEditText : template.generate(fields);
+  const preview = activeCustomId ? customEditText : template.generate(enrichedFields);
 
   const handleCopy = async () => {
     try {
@@ -955,9 +963,22 @@ export default function BotTemplates() {
                 </div>
 
                 <div className="flex flex-col gap-3">
-                  {requiredFields.map(f => (
-                    <FieldInput key={f.id} field={f} value={fields[f.id] ?? ''} onChange={v => setField(f.id, v)} />
-                  ))}
+                  {requiredFields.map(f =>
+                    f.type === 'evento' ? (
+                      <div key={f.id} className="flex flex-col gap-1">
+                        <Label className="text-xs font-medium text-muted-foreground">{f.label}</Label>
+                        <EventoAutocomplete
+                          partidaDescricao={eventoData[f.id]?.partida_descricao ?? ''}
+                          fixtureId={eventoData[f.id]?.fixture_id ?? null}
+                          kickoffAt={eventoData[f.id]?.kickoff_at ?? null}
+                          onChange={partial => setEventoField(f.id, partial)}
+                          inputClassName="h-9 text-sm bg-background/50"
+                        />
+                      </div>
+                    ) : (
+                      <FieldInput key={f.id} field={f} value={fields[f.id] ?? ''} onChange={v => setField(f.id, v)} />
+                    )
+                  )}
                 </div>
 
                 {optionalFields.length > 0 && (
@@ -977,9 +998,25 @@ export default function BotTemplates() {
                         animate={{ opacity: 1, height: 'auto' }}
                         className="flex flex-col gap-3 mt-3 overflow-hidden"
                       >
-                        {optionalFields.map(f => (
-                          <FieldInput key={f.id} field={f} value={fields[f.id] ?? ''} onChange={v => setField(f.id, v)} />
-                        ))}
+                        {optionalFields.map(f =>
+                          f.type === 'evento' ? (
+                            <div key={f.id} className="flex flex-col gap-1">
+                              <Label className="text-xs font-medium text-muted-foreground">
+                                {f.label}
+                                <span className="ml-1 text-muted-foreground/50">(opcional)</span>
+                              </Label>
+                              <EventoAutocomplete
+                                partidaDescricao={eventoData[f.id]?.partida_descricao ?? ''}
+                                fixtureId={eventoData[f.id]?.fixture_id ?? null}
+                                kickoffAt={eventoData[f.id]?.kickoff_at ?? null}
+                                onChange={partial => setEventoField(f.id, partial)}
+                                inputClassName="h-9 text-sm bg-background/50"
+                              />
+                            </div>
+                          ) : (
+                            <FieldInput key={f.id} field={f} value={fields[f.id] ?? ''} onChange={v => setField(f.id, v)} />
+                          )
+                        )}
                       </motion.div>
                     )}
                   </div>
