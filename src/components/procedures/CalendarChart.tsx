@@ -27,14 +27,14 @@ export function CalendarChart({ data, title, selectedMonth }: CalendarChartProps
   const getColorIntensity = (profit: number) => {
     if (profit > 0) {
       const intensity = Math.min((profit / maxProfit) * 100, 100);
-      const opacity = (intensity / 100) * 0.65 + 0.22;
+      const opacity = (intensity / 100) * 0.65 + 0.25;
       return { colorClass: 'bg-success', borderClass: 'border-success', opacity, textClass: 'text-white', isProfit: true, isLoss: false };
     } else if (profit < 0) {
       const intensity = Math.min((Math.abs(profit) / Math.abs(maxLoss)) * 100, 100);
-      const opacity = (intensity / 100) * 0.65 + 0.22;
+      const opacity = (intensity / 100) * 0.65 + 0.25;
       return { colorClass: 'bg-destructive', borderClass: 'border-destructive', opacity, textClass: 'text-white', isProfit: false, isLoss: true };
     }
-    return { colorClass: 'bg-muted', borderClass: 'border-border', opacity: 0.2, textClass: 'text-muted-foreground', isProfit: false, isLoss: false };
+    return { colorClass: 'bg-muted', borderClass: 'border-border', opacity: 0.15, textClass: 'text-muted-foreground', isProfit: false, isLoss: false };
   };
 
   const firstDayOfWeek = monthStart.getDay();
@@ -42,12 +42,12 @@ export function CalendarChart({ data, title, selectedMonth }: CalendarChartProps
 
   return (
     <Card>
-      <CardHeader className="pb-1">
+      <CardHeader className="pb-2">
         <CardTitle className="text-base">{title}</CardTitle>
       </CardHeader>
       <CardContent>
         {/* Cabeçalho dos dias da semana */}
-        <div className="grid grid-cols-7 gap-1 mb-1">
+        <div className="grid grid-cols-7 gap-1.5 mb-1.5">
           {weekDays.map(day => (
             <div key={day} className="text-center text-xs sm:text-sm font-semibold text-muted-foreground pb-1">
               {day}
@@ -56,7 +56,7 @@ export function CalendarChart({ data, title, selectedMonth }: CalendarChartProps
         </div>
 
         {/* Grid do calendário */}
-        <div className="grid grid-cols-7 gap-1">
+        <div className="grid grid-cols-7 gap-1.5">
           {[...Array(firstDayOfWeek)].map((_, index) => (
             <div key={`empty-${index}`} className="aspect-[4/3]" />
           ))}
@@ -74,7 +74,7 @@ export function CalendarChart({ data, title, selectedMonth }: CalendarChartProps
               <div
                 key={day.toString()}
                 className={cn(
-                  "aspect-[4/3] min-h-[90px] rounded-lg border flex flex-col items-stretch justify-between transition-all hover:scale-[1.03] group relative overflow-hidden",
+                  "aspect-[4/3] min-h-[100px] rounded-xl border flex flex-col items-stretch justify-between transition-all hover:scale-[1.03] group relative overflow-hidden",
                   colors.borderClass,
                   isToday && 'ring-2 ring-primary ring-offset-1 ring-offset-background'
                 )}
@@ -85,18 +85,18 @@ export function CalendarChart({ data, title, selectedMonth }: CalendarChartProps
               >
                 {/* Número do dia */}
                 <div className={cn(
-                  "px-1.5 pt-1 text-sm sm:text-base md:text-lg font-bold leading-none",
-                  hasData ? colors.textClass : 'text-muted-foreground'
+                  "px-2 pt-1.5 text-sm sm:text-base md:text-lg font-bold leading-none",
+                  hasData ? colors.textClass : 'text-muted-foreground/60'
                 )}>
                   {format(day, 'd')}
                 </div>
 
                 {hasData ? (
-                  <div className="px-1.5 pb-1.5 flex flex-col gap-0.5 w-full">
+                  <div className="px-2 pb-2 flex flex-col gap-1 w-full">
                     {/* LUCRO — número principal grande */}
                     <div className={cn(
                       "font-black leading-none tabular-nums",
-                      "text-sm sm:text-base md:text-xl lg:text-2xl",
+                      "text-sm sm:text-lg md:text-xl lg:text-2xl",
                       colors.isProfit ? 'text-white drop-shadow-sm' : colors.isLoss ? 'text-white drop-shadow-sm' : colors.textClass
                     )}>
                       {colors.isProfit ? '+' : ''}R${dayData.profit >= 0
@@ -106,10 +106,10 @@ export function CalendarChart({ data, title, selectedMonth }: CalendarChartProps
 
                     {/* 🏆 Duplo Green */}
                     {dgCount > 0 && (
-                      <div className="flex items-center gap-0.5 leading-tight">
-                        <span className="text-[9px] sm:text-[10px] md:text-[11px] leading-none">🏆</span>
+                      <div className="flex items-center gap-1 leading-tight">
+                        <span className="text-[10px] sm:text-xs leading-none">🏆</span>
                         <span className={cn(
-                          "text-[8px] sm:text-[9px] md:text-[10px] font-bold leading-tight",
+                          "text-[10px] sm:text-[11px] md:text-xs font-bold leading-tight",
                           colors.isProfit || colors.isLoss ? 'text-white/95' : 'text-muted-foreground'
                         )}>
                           {dgCount} DUPLO GREEN
@@ -119,10 +119,10 @@ export function CalendarChart({ data, title, selectedMonth }: CalendarChartProps
 
                     {/* 🎁 FreeBets GANHAS */}
                     {fbCount > 0 && (
-                      <div className="flex items-center gap-0.5 leading-tight">
-                        <span className="text-[9px] sm:text-[10px] md:text-[11px] leading-none">🎁</span>
+                      <div className="flex items-center gap-1 leading-tight">
+                        <span className="text-[10px] sm:text-xs leading-none">🎁</span>
                         <span className={cn(
-                          "text-[8px] sm:text-[9px] md:text-[10px] font-bold leading-tight",
+                          "text-[10px] sm:text-[11px] md:text-xs font-bold leading-tight",
                           colors.isProfit || colors.isLoss ? 'text-white/90' : 'text-muted-foreground'
                         )}>
                           {fbCount} FreeBet{fbCount > 1 ? 's' : ''} GANHAS
@@ -132,14 +132,14 @@ export function CalendarChart({ data, title, selectedMonth }: CalendarChartProps
 
                     {/* Procedimentos */}
                     <div className={cn(
-                      "text-[8px] sm:text-[9px] md:text-[10px] font-medium leading-none opacity-75",
-                      colors.isProfit || colors.isLoss ? 'text-white' : 'text-muted-foreground'
+                      "text-[10px] sm:text-[11px] md:text-xs font-semibold leading-none",
+                      colors.isProfit || colors.isLoss ? 'text-white/80' : 'text-muted-foreground/70'
                     )}>
                       {dayData.count} proc.
                     </div>
                   </div>
                 ) : (
-                  <div className="px-1.5 pb-1.5 text-[8px] sm:text-[9px] md:text-[10px] text-muted-foreground/50 leading-none">
+                  <div className="px-2 pb-2 text-[9px] sm:text-[10px] md:text-[11px] text-muted-foreground/40 leading-none">
                     Sem dados
                   </div>
                 )}
@@ -169,7 +169,7 @@ export function CalendarChart({ data, title, selectedMonth }: CalendarChartProps
         </div>
 
         {/* Legenda */}
-        <div className="mt-3 flex flex-wrap items-center justify-center gap-4 text-xs text-muted-foreground">
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-4 text-xs text-muted-foreground">
           <div className="flex items-center gap-1.5">
             <div className="w-3 h-3 rounded border bg-destructive/70 border-destructive" />
             <span>Prejuízo</span>
