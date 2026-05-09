@@ -238,7 +238,7 @@ export function AnimatedRoutes() {
           </RequireAuth>
         } />
         <Route path="/bot-templates" element={
-          <RequireAuth pageKey={PAGE_KEYS.PROCEDURE_CONTROL}>
+          <RequireAuth pageKey={PAGE_KEYS.DASHBOARD}>
             <PageTransition>
               <BotTemplates />
             </PageTransition>
