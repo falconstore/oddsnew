@@ -4,7 +4,7 @@ import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 
 interface CalendarChartProps {
-  data: { date: string; profit: number; count: number; fbCount?: number; fbTotal?: number }[];
+  data: { date: string; profit: number; count: number; fbCount?: number; fbTotal?: number; dgCount?: number }[];
   title: string;
   selectedMonth: Date;
 }
@@ -21,7 +21,7 @@ export function CalendarChart({ data, title, selectedMonth }: CalendarChartProps
 
   const getDayData = (day: Date) => {
     const dateKey = format(day, 'dd/MM', { locale: ptBR });
-    return data.find(d => d.date === dateKey) || { date: dateKey, profit: 0, count: 0, fbCount: 0, fbTotal: 0 };
+    return data.find(d => d.date === dateKey) || { date: dateKey, profit: 0, count: 0, fbCount: 0, fbTotal: 0, dgCount: 0 };
   };
 
   const getColorIntensity = (profit: number) => {
@@ -67,6 +67,7 @@ export function CalendarChart({ data, title, selectedMonth }: CalendarChartProps
             const isToday = isSameDay(day, new Date());
             const fbCount = dayData.fbCount ?? 0;
             const fbTotal = dayData.fbTotal ?? 0;
+            const dgCount = dayData.dgCount ?? 0;
             const hasData = dayData.count > 0;
 
             return (
@@ -103,6 +104,19 @@ export function CalendarChart({ data, title, selectedMonth }: CalendarChartProps
                         : dayData.profit.toFixed(0)}
                     </div>
 
+                    {/* 🏆 Duplo Green */}
+                    {dgCount > 0 && (
+                      <div className="flex items-center gap-0.5 leading-tight">
+                        <span className="text-[9px] sm:text-[10px] md:text-[11px] leading-none">🏆</span>
+                        <span className={cn(
+                          "text-[8px] sm:text-[9px] md:text-[10px] font-bold leading-tight",
+                          colors.isProfit || colors.isLoss ? 'text-white/95' : 'text-muted-foreground'
+                        )}>
+                          {dgCount} DUPLO GREEN
+                        </span>
+                      </div>
+                    )}
+
                     {/* 🎁 FreeBets GANHAS */}
                     {fbCount > 0 && (
                       <div className="flex items-center gap-0.5 leading-tight">
@@ -137,6 +151,11 @@ export function CalendarChart({ data, title, selectedMonth }: CalendarChartProps
                       {colors.isProfit ? '+' : ''}R$ {dayData.profit.toFixed(2)}
                     </p>
                     <p className="text-[11px] text-muted-foreground mt-0.5">{dayData.count} procedimentos</p>
+                    {dgCount > 0 && (
+                      <p className="text-[11px] text-yellow-400 mt-0.5">
+                        🏆 {dgCount} Duplo Green
+                      </p>
+                    )}
                     {fbCount > 0 && (
                       <p className="text-[11px] text-emerald-400 mt-0.5">
                         🎁 {fbCount} FreeBet{fbCount > 1 ? 's' : ''} GANHAS • R$ {fbTotal.toFixed(2)}
@@ -162,6 +181,10 @@ export function CalendarChart({ data, title, selectedMonth }: CalendarChartProps
           <div className="flex items-center gap-1.5">
             <div className="w-3 h-3 rounded border bg-success/70 border-success" />
             <span>Lucro</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span>🏆</span>
+            <span>Duplo Green</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span>🎁</span>
