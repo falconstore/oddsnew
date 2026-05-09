@@ -60,11 +60,28 @@ export function ProcedureTable({ procedures, visibleColumns, onEdit, onDelete, o
           </TableRow>
         </TableHeader>
         <TableBody>
-          {procedures.map((proc) => {
+          {procedures.flatMap((proc, idx) => {
             const showCheck = onCheckResult && canCheckResult(proc) && !proc.archived;
             const hasIncomplete = proc.bot_needs_review && proc.bot_missing_fields && proc.bot_missing_fields.length > 0;
             const needsReviewOnly = proc.bot_needs_review && (!proc.bot_missing_fields || proc.bot_missing_fields.length === 0);
-            return (
+            const prevDate = idx > 0 ? procedures[idx - 1].date : null;
+            const showSeparator = idx === 0 || proc.date !== prevDate;
+            const rows = [];
+            if (showSeparator) {
+              rows.push(
+                <TableRow key={`sep-${proc.date}-${idx}`} className="border-0 hover:bg-transparent">
+                  <TableCell colSpan={20} className="py-0 px-0">
+                    <div className="flex items-center gap-2 px-2 pt-2 pb-0.5">
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">
+                        {formatProcedureDate(proc.date)}
+                      </span>
+                      <div className="flex-1 h-px bg-white/5" />
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            }
+            rows.push(
             <TableRow
               key={proc.id}
               data-testid={`row-procedure-${proc.id}`}
@@ -309,7 +326,9 @@ export function ProcedureTable({ procedures, visibleColumns, onEdit, onDelete, o
                 </TableCell>
               )}
             </TableRow>
-          );})}
+            );
+            return rows;
+          })}
         </TableBody>
       </Table>
     </div>
