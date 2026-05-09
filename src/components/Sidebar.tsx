@@ -33,13 +33,14 @@ type NavigationItem = {
   icon: React.ComponentType<{ className?: string }>;
   pageKey: PageKey;
   color?: string;
+  alwaysVisible?: boolean;
 };
 
 const navigation: NavigationItem[] = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard, pageKey: PAGE_KEYS.DASHBOARD, color: 'text-primary' },
   { name: 'Procedimentos', href: '/procedures', icon: FileText, pageKey: PAGE_KEYS.PROCEDURE_CONTROL, color: 'text-cyan-400' },
   { name: 'FreeBets Ganhas', href: '/procedures/freebets-ganhas', icon: Trophy, pageKey: PAGE_KEYS.PROCEDURE_CONTROL, color: 'text-emerald-400' },
-  { name: 'Templates Bot', href: '/bot-templates', icon: BookOpen, pageKey: PAGE_KEYS.DASHBOARD, color: 'text-orange-400' },
+  { name: 'Templates Bot', href: '/bot-templates', icon: BookOpen, pageKey: PAGE_KEYS.DASHBOARD, color: 'text-orange-400', alwaysVisible: true },
   { name: 'Betbra Affiliate', href: '/betbra', icon: TrendingUp, pageKey: PAGE_KEYS.BETBRA_AFFILIATE, color: 'text-amber-400' },
   { name: 'Assinaturas', href: '/subscriptions', icon: CreditCard, pageKey: PAGE_KEYS.SUBSCRIPTIONS, color: 'text-purple-400' },
   { name: 'Casas', href: '/cadastros', icon: Building2, pageKey: PAGE_KEYS.LEAGUES, color: 'text-indigo-400' },
@@ -52,7 +53,7 @@ const navigation: NavigationItem[] = [
 
 export function Sidebar() {
   const location = useLocation();
-  const { user, isAdmin, signOut, canViewPage } = useAuth();
+  const { user, isAdmin, isApproved, signOut, canViewPage } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const { onTouchStart, onTouchMove, onTouchEnd, swipeDistance } = useSwipeGesture({
@@ -60,7 +61,9 @@ export function Sidebar() {
     onSwipeLeft: () => setMobileOpen(false),
   });
 
-  const filteredNavigation = navigation.filter(item => canViewPage(item.pageKey));
+  const filteredNavigation = navigation.filter(item =>
+    item.alwaysVisible ? isApproved : canViewPage(item.pageKey)
+  );
 
   const handleSignOut = async () => {
     await signOut();
