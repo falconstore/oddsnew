@@ -347,6 +347,39 @@ const TEMPLATES: TemplateConfig[] = [
       return lines.join('\n');
     },
   },
+  {
+    id: 'superodd_bolsa',
+    name: 'Superodd — Bolsa de Aposta',
+    shortName: 'Bolsa',
+    description: 'Super Odd via Bolsa de Aposta (Smarkets, Betfair Exchange etc). Lucro em range com "OU ANULA".',
+    color: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30',
+    dotColor: 'bg-cyan-400',
+    emoji: '🟢',
+    fields: [
+      { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 140', type: 'text' },
+      { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
+      { id: 'valorTotal', label: 'Valor total a utilizar (ex: 100,00)', placeholder: '100,00', type: 'text' },
+      { id: 'lucroMin', label: 'Lucro mínimo (ex: 8,00)', placeholder: '8,00', type: 'text' },
+      { id: 'lucroMax', label: 'Lucro máximo (ex: 20,00)', placeholder: '20,00', type: 'text', hint: 'O texto "OU ANULA" é adicionado automaticamente.' },
+      { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Superodd' },
+    ],
+    generate: (f) => [
+      `🟢 PROCEDIMENTO ${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
+      ``,
+      `🟢 PROCEDIMENTO REFERENTE A SUPER ODD DA BOLSA 🦈🔥`,
+      ``,
+      `🟢PLATAFORMAS`,
+      ``,
+      `( BOLSA DE APOSTA ) - UTILIZARÁ AO TODO ( 💵 ${fmtVal(f.valorTotal)} )`,
+      ``,
+      `🟥 Atenção : sempre confere data e horário da partida nos bilhetes também.`,
+      `🟥 Atenção: Sempre confira se os links dos bilhetes são os mesmos da imagem .`,
+      ``,
+      `🟡 LUCRO : 💵 ${fmtVal(f.lucroMin)} À ${fmtVal(f.lucroMax)} OU ANULA 💵`,
+      `📋 CATEGORIA: ${f.categoria || 'Superodd'}`,
+      `😍 chance de duplo green 😍`,
+    ].join('\n'),
+  },
 ];
 
 // ─────────────────────────────────────────
