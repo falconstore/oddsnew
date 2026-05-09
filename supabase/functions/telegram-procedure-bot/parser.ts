@@ -129,10 +129,16 @@ function extractDate(text: string, defaultYear: number): string | null {
  *  3. Linha isolada curta que parece nome de casa
  */
 function extractPlatform(text: string, descricaoLinha: string): string | null {
-  // 1. Explícito "CASA: X"
+  // 1a. Explícito "CASA: X"
   const casaM = text.match(/^CASA:\s*(.+?)(?:\s*[\n\r]|$)/im);
   if (casaM) {
     const v = stripEmojis(casaM[1]).trim();
+    if (v) return v;
+  }
+  // 1b. "CASA - X" ou "CASA – X" (traço em vez de dois-pontos)
+  const casaDashM = text.match(/^CASA\s*[-–—]\s*(.+?)(?:\s*[\n\r]|$)/im);
+  if (casaDashM) {
+    const v = stripEmojis(casaDashM[1]).trim();
     if (v) return v;
   }
 
@@ -281,13 +287,34 @@ function extractLucro(text: string): { value: number; isDuploGreen: boolean } | 
   const dm = text.match(directRe);
   if (dm) return { value: parseBrNumber(dm[1]), isDuploGreen: false };
 
+  // "LUCRO OPÇÃO N: ... LUCRO DE 💲 X,XX / SE GANHAR FORA FREE DE ..."
+  // Pega todos os matches de "LUCRO DE X,XX" e usa o maior
+  const lucroDeRe = new RegExp(`LUCRO\\s+DE[^\\n\\d]*${BR_NUM.source}`, "gi");
+  const lucroDeMatches = [...text.matchAll(lucroDeRe)];
+  if (lucroDeMatches.length > 0) {
+    const values = lucroDeMatches.map(m => parseBrNumber(m[1])).filter(v => !isNaN(v));
+    if (values.length > 0) return { value: Math.max(...values), isDuploGreen: false };
+  }
+
   return null;
 }
 
 function extractFreebetValor(text: string): number | null {
+  // Padrão clássico: "X,XX EM FREEBET"
   const re = new RegExp(`${BR_NUM.source}\\s*EM\\s*FREEBET`, "i");
   const m = text.match(re);
-  return m ? parseBrNumber(m[1]) : null;
+  if (m) return parseBrNumber(m[1]);
+
+  // Novo formato: "SE GANHAR FORA FREE DE 🎁 X,XX"
+  // Pode aparecer múltiplas vezes (OPÇÃO 1, OPÇÃO 2...) — pega o maior
+  const foraFreeRe = new RegExp(`FORA\\s+FREE\\s+DE[^\\n\\d]*${BR_NUM.source}`, "gi");
+  const foraMatches = [...text.matchAll(foraFreeRe)];
+  if (foraMatches.length > 0) {
+    const values = foraMatches.map(m => parseBrNumber(m[1])).filter(v => !isNaN(v));
+    if (values.length > 0) return Math.max(...values);
+  }
+
+  return null;
 }
 
 // ──────────────────────────────────────────────────────────
