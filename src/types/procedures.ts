@@ -77,6 +77,8 @@ export interface Procedure {
   bot_needs_review: boolean;
   bot_missing_fields: string[] | null;
   bot_raw_message: string | null;
+  // Observações opcionais (ex: Opção 2 da Aposta Protegida)
+  observacoes: string | null;
 }
 
 export interface ProcedureFilters {

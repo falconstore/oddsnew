@@ -282,6 +282,49 @@ const TEMPLATES: TemplateConfig[] = [
       `😍 chance de duplo green 😍`,
     ].join('\n'),
   },
+  {
+    id: 'aposta_protegida',
+    name: 'Aposta Protegida',
+    shortName: 'Aposta Protegida',
+    description: 'Promoção OU lucra cash OU ganha freebet (cenários excludentes). Opção 2 vai para observações.',
+    color: 'bg-orange-500/15 text-orange-400 border-orange-500/30',
+    dotColor: 'bg-orange-400',
+    emoji: '🟢',
+    fields: [
+      { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 138', type: 'text' },
+      { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
+      { id: 'casa', label: 'Casa de Apostas', placeholder: 'Ex: Sportingbet', type: 'text', uppercase: true },
+      { id: 'campanha', label: 'Nome da Campanha', placeholder: 'Ex: APOSTA PROTEGIDA', type: 'text', uppercase: true },
+      { id: 'timeA', label: 'Time A', placeholder: 'Ex: Bahia', type: 'text', uppercase: true },
+      { id: 'timeB', label: 'Time B', placeholder: 'Ex: Cruzeiro', type: 'text', uppercase: true },
+      { id: 'dataPartida', label: 'Data da Partida', placeholder: '', type: 'date', default: todayISO },
+      { id: 'horaPartida', label: 'Horário da Partida', placeholder: '21:00', type: 'time', default: () => '21:00' },
+      { id: 'lucro1', label: 'Opção 1 — Lucro cash se ganhar (ex: 2,00)', placeholder: '2,00', type: 'text' },
+      { id: 'free1', label: 'Opção 1 — Freebet se ganhar fora (ex: 10,00)', placeholder: '10,00', type: 'text' },
+      { id: 'obs', label: 'Opção 2 (opcional) — vai para observações', placeholder: 'Ex: LUCRO DE 16,00 / FORA FREE DE 100,00', type: 'text', optional: true, hint: 'Se houver uma segunda opção de valor, registre aqui. Fica salvo no campo Observações do procedimento.' },
+    ],
+    generate: (f) => {
+      const lines = [
+        `🟢 PROCEDIMENTO ${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
+        `🟢 PROCEDIMENTO REFERENTE A PROMOÇÃO DA ${(f.casa || 'CASA').toUpperCase()} - ${(f.campanha || 'CAMPANHA').toUpperCase()} COM APOSTA GRÁTIS 🔥`,
+        `CASA: 🏠 ${(f.casa || 'CASA').toUpperCase()}`,
+        ``,
+        `UTILIZAREMOS A PARTIDA ENTRE:`,
+        `${(f.timeA || 'TIME A').toUpperCase()} X ${(f.timeB || 'TIME B').toUpperCase()} - ${fmtDate(f.dataPartida)} ÀS ${fmtTime(f.horaPartida)}`,
+        ``,
+        `🟥 Atenção: sempre confere data e horário da partida nos bilhetes também.`,
+        `🔴 CASO HAJA ALTERAÇÃO NAS ODDS, UTILIZE A CALCULADORA`,
+        ``,
+        `🟡 LUCRO: 💵 ${fmtVal(f.lucro1)}`,
+        `🟡 RECOMPENSA: 🎁 ${fmtVal(f.free1)} EM FREEBET`,
+      ];
+      if (f.obs && f.obs.trim()) {
+        lines.push(`📝 OBS: OPÇÃO 2 — ${f.obs.trim().toUpperCase()}`);
+      }
+      lines.push(`😍 chance de duplo green 😍`);
+      return lines.join('\n');
+    },
+  },
 ];
 
 // ─────────────────────────────────────────

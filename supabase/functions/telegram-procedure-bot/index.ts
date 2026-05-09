@@ -153,6 +153,7 @@ function buildInsertRow(
     reenviado_count: 0,
     duplo_green_confirmado: parsed.is_duplo_green,
     esporte: "futebol",
+    observacoes: parsed.observacoes ?? undefined,
     // Bot review
     bot_needs_review: true,
     bot_raw_message: rawMessage,

@@ -23,6 +23,7 @@ export interface ParsedProcedure {
   ref_procedure_number: string | null; // número do proc de referência (QUEIMAR_FB)
   is_duplo_green: boolean;
   dp: boolean;
+  observacoes: string | null;   // linha "📝 OBS: ..." (ex: Opção 2 da Aposta Protegida)
 }
 
 /** Resultado parcial: tem número mas faltam campos. */
@@ -44,6 +45,7 @@ export interface PartialParsedProcedure {
   ref_procedure_number: string | null;
   is_duplo_green: boolean;
   dp: boolean;
+  observacoes: string | null;
   missingFields: string[];
 }
 
@@ -192,6 +194,12 @@ function extractTitulo(text: string): string {
 function extractRefProcedureNumber(text: string): string | null {
   const m = text.match(/REFERENTE\s+[AÀ][OS]?\s+FREEBETS?\s+DO\s+PROCEDIMENTO\s+#?(\d+)/i);
   return m ? m[1] : null;
+}
+
+/** Extrai linha "📝 OBS: ..." — usada para Opção 2 da Aposta Protegida e outros comentários */
+function extractObservacoes(text: string): string | null {
+  const m = text.match(/^📝?\s*OBS:\s*(.+?)(?:\s*[\n\r]|$)/im);
+  return m ? m[1].trim() || null : null;
 }
 
 // ──────────────────────────────────────────────────────────
@@ -380,6 +388,7 @@ export function parseMessage(text: string): ParseResult {
   // 8. Valores monetários
   const lucroResult = extractLucro(text);
   const freebetValor = extractFreebetValor(text);
+  const observacoes = extractObservacoes(text);
 
   if (tipo === "GANHAR_FB" && freebetValor == null) {
     missing.push("valor de freebet (X,XX EM FREEBET)");
@@ -428,6 +437,7 @@ export function parseMessage(text: string): ParseResult {
         ref_procedure_number: refProcNumber,
         is_duplo_green: isDuploGreen,
         dp: hasDuploMention,
+        observacoes,
         missingFields: missing,
       },
     };
@@ -453,6 +463,7 @@ export function parseMessage(text: string): ParseResult {
       ref_procedure_number: refProcNumber,
       is_duplo_green: isDuploGreen,
       dp: hasDuploMention,
+      observacoes,
     },
   };
 }
