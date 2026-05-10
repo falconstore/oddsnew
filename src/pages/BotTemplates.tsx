@@ -294,9 +294,9 @@ const TEMPLATES: TemplateConfig[] = [
       { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Promoção' },
     ],
     generate: (f) => [
-      `🟢PROCEDIMENTO ${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
+      `🟢 PROCEDIMENTO ${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
       ``,
-      `🟢PROCEDIMENTO REFERENTE AO AUMENTO DE 25%🔥`,
+      `🟢 PROCEDIMENTO REFERENTE AO AUMENTO DE 25%🔥`,
       ``,
       `CASA: ${(f.casa || 'CASA').toUpperCase()}`,
       ``,
