@@ -8,6 +8,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -63,7 +64,7 @@ interface FieldConfig {
   id: string;
   label: string;
   placeholder: string;
-  type: 'text' | 'date' | 'time' | 'evento' | 'select';
+  type: 'text' | 'date' | 'time' | 'evento' | 'select' | 'toggle';
   default?: () => string;
   hint?: string;
   optional?: boolean;
@@ -132,6 +133,7 @@ const TEMPLATES: TemplateConfig[] = [
     dotColor: 'bg-emerald-400',
     emoji: '🟢',
     fields: [
+      { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 130', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'numRef', label: 'Nº do Proc de Referência (FB)', placeholder: 'Ex: 110', type: 'text' },
@@ -145,7 +147,7 @@ const TEMPLATES: TemplateConfig[] = [
         ? `🟢 PROCEDIMENTO REFERENTE ÀS FREEBETS DO PROCEDIMENTO ${f.numRef} EXTRA 🔥`
         : `🟢 PROCEDIMENTO REFERENTE ÀS FREEBETS DO PROCEDIMENTO [REF] EXTRA 🔥`;
       return [
-        `🟢 PROCEDIMENTO ${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
+        `🟢 PROCEDIMENTO ${f.isExtra === 'true' ? 'EXTRA ' : ''}${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
         linha2,
         `CASA: 🏠 ${(f.casa || 'CASA').toUpperCase()}`,
         ``,
@@ -171,6 +173,7 @@ const TEMPLATES: TemplateConfig[] = [
     dotColor: 'bg-cyan-400',
     emoji: '🟢',
     fields: [
+      { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 129', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'casa', label: 'Casa de Apostas', placeholder: 'Ex: Sportingbet', type: 'text', uppercase: true },
@@ -188,7 +191,7 @@ const TEMPLATES: TemplateConfig[] = [
       }
       const recompensa = `🟡 RECOMPENSA: 🎁 ${fmtVal(f.freebetValor)} EM FREEBET${f.obsRecompensa ? ` - ${f.obsRecompensa.toUpperCase()}` : ''}`;
       return [
-        `🟢 PROCEDIMENTO ${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
+        `🟢 PROCEDIMENTO ${f.isExtra === 'true' ? 'EXTRA ' : ''}${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
         `🟢 PROCEDIMENTO REFERENTE A PROMOÇÃO DA ${(f.casa || 'CASA').toUpperCase()} - ${(f.campanha || 'CAMPANHA').toUpperCase()} COM APOSTA GRÁTIS 🔥`,
         ``,
         `UTILIZAREMOS A PARTIDA ENTRE:`,
@@ -213,6 +216,7 @@ const TEMPLATES: TemplateConfig[] = [
     dotColor: 'bg-violet-400',
     emoji: '🟢',
     fields: [
+      { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 115', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'missao', label: 'Nome da Missão', placeholder: 'Ex: LIGA DOS CAMPEÕES', type: 'text', uppercase: true },
@@ -230,7 +234,7 @@ const TEMPLATES: TemplateConfig[] = [
       }
       const recompensa = `🟡 RECOMPENSA: 🎁 ${fmtVal(f.freebetValor)} EM FREEBET${f.obsRecompensa ? ` - ${f.obsRecompensa.toUpperCase()}` : ''}`;
       return [
-        `🟢 PROCEDIMENTO ${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
+        `🟢 PROCEDIMENTO ${f.isExtra === 'true' ? 'EXTRA ' : ''}${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
         `🟢 PROCEDIMENTO REFERENTE À MISSÃO ${(f.missao || 'NOME DA MISSÃO').toUpperCase()} 🔥`,
         `CASA: 🏠 ${(f.casa || 'CASA').toUpperCase()}`,
         ``,
@@ -255,6 +259,7 @@ const TEMPLATES: TemplateConfig[] = [
     dotColor: 'bg-blue-400',
     emoji: '🔵',
     fields: [
+      { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 116', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'casa', label: 'Casa de Apostas', placeholder: 'Ex: Betesporte', type: 'text', uppercase: true, hint: 'A casa aparece na linha 2 ("DA BETESPORTE") — não precisa de linha CASA: separada neste tipo.' },
@@ -263,7 +268,7 @@ const TEMPLATES: TemplateConfig[] = [
       { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Superodd' },
     ],
     generate: (f) => [
-      `🔵 PROCEDIMENTO ${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
+      `🔵 PROCEDIMENTO ${f.isExtra === 'true' ? 'EXTRA ' : ''}${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
       `🟢 PROCEDIMENTO REFERENTE A SUPERODD DA ${(f.casa || 'CASA').toUpperCase()} 🔥`,
       ``,
       `UTILIZAREMOS O JOGO ENTRE:`,
@@ -285,6 +290,7 @@ const TEMPLATES: TemplateConfig[] = [
     dotColor: 'bg-green-400',
     emoji: '🟢',
     fields: [
+      { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 141', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'casa', label: 'Casa de Apostas', placeholder: 'Ex: BET365', type: 'text', uppercase: true },
@@ -294,7 +300,7 @@ const TEMPLATES: TemplateConfig[] = [
       { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Promoção' },
     ],
     generate: (f) => [
-      `🟢 PROCEDIMENTO ${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
+      `🟢 PROCEDIMENTO ${f.isExtra === 'true' ? 'EXTRA ' : ''}${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
       ``,
       `🟢 PROCEDIMENTO REFERENTE AO AUMENTO DE 25%🔥`,
       ``,
@@ -324,6 +330,7 @@ const TEMPLATES: TemplateConfig[] = [
     dotColor: 'bg-amber-400',
     emoji: '🟢',
     fields: [
+      { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 117', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'campanha', label: 'Nome da Promoção/Campanha', placeholder: 'Ex: SUPER ODDS WEEK', type: 'text', uppercase: true },
@@ -334,7 +341,7 @@ const TEMPLATES: TemplateConfig[] = [
       { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Promoção' },
     ],
     generate: (f) => [
-      `🟢 PROCEDIMENTO ${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
+      `🟢 PROCEDIMENTO ${f.isExtra === 'true' ? 'EXTRA ' : ''}${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
       `🟢 PROCEDIMENTO REFERENTE À PROMOÇÃO ${(f.campanha || 'CAMPANHA').toUpperCase()} COM APOSTA GRÁTIS 🔥`,
       `CASA: 🏠 ${(f.casa || 'CASA').toUpperCase()}`,
       ``,
@@ -357,6 +364,7 @@ const TEMPLATES: TemplateConfig[] = [
     dotColor: 'bg-orange-400',
     emoji: '🟢',
     fields: [
+      { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 138', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'casa', label: 'Casa de Apostas', placeholder: 'Ex: Sportingbet', type: 'text', uppercase: true },
@@ -369,7 +377,7 @@ const TEMPLATES: TemplateConfig[] = [
     ],
     generate: (f) => {
       const lines = [
-        `🟢 PROCEDIMENTO ${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
+        `🟢 PROCEDIMENTO ${f.isExtra === 'true' ? 'EXTRA ' : ''}${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
         `🟢 PROCEDIMENTO REFERENTE A PROMOÇÃO DA ${(f.casa || 'CASA').toUpperCase()} - ${(f.campanha || 'CAMPANHA').toUpperCase()} COM APOSTA GRÁTIS 🔥`,
         `CASA: 🏠 ${(f.casa || 'CASA').toUpperCase()}`,
         ``,
@@ -399,6 +407,7 @@ const TEMPLATES: TemplateConfig[] = [
     dotColor: 'bg-cyan-400',
     emoji: '🟢',
     fields: [
+      { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 140', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'valorTotal', label: 'Valor total a utilizar (ex: 100,00)', placeholder: '100,00', type: 'text' },
@@ -407,7 +416,7 @@ const TEMPLATES: TemplateConfig[] = [
       { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Superodd' },
     ],
     generate: (f) => [
-      `🟢 PROCEDIMENTO ${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
+      `🟢 PROCEDIMENTO ${f.isExtra === 'true' ? 'EXTRA ' : ''}${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
       ``,
       `🟢 PROCEDIMENTO REFERENTE A SUPER ODD DA BOLSA 🦈🔥`,
       ``,
@@ -432,6 +441,7 @@ const TEMPLATES: TemplateConfig[] = [
     dotColor: 'bg-violet-400',
     emoji: '🟡',
     fields: [
+      { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 139', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'casa', label: 'Casa de Apostas', placeholder: 'Ex: Betano', type: 'text', uppercase: true },
@@ -440,7 +450,7 @@ const TEMPLATES: TemplateConfig[] = [
       { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Superodd' },
     ],
     generate: (f) => [
-      `PROCEDIMENTO ${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
+      `PROCEDIMENTO ${f.isExtra === 'true' ? 'EXTRA ' : ''}${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
       ``,
       `PROCEDIMENTO REFERENTE : TENTATIVA DUPLO GREEN`,
       ``,
@@ -1461,6 +1471,22 @@ function FieldInput({
   const handleChange = (v: string) => {
     onChange(field.uppercase ? v.toUpperCase() : v);
   };
+
+  if (field.type === 'toggle') {
+    return (
+      <div className="flex items-center justify-between gap-3 py-1">
+        <Label className="text-xs font-medium text-muted-foreground cursor-pointer" htmlFor={`toggle-${field.id}`}>
+          {field.label}
+        </Label>
+        <Switch
+          id={`toggle-${field.id}`}
+          checked={value === 'true'}
+          onCheckedChange={(checked) => onChange(checked ? 'true' : 'false')}
+          data-testid={`toggle-field-${field.id}`}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-1">
