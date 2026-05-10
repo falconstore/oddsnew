@@ -18,7 +18,7 @@ function buildInsertRow(parsed: any, rawMessage: string, missingFields?: string[
   return {
     procedure_number: parsed.procedure_number,
     external_id: parsed.external_id,
-    titulo: parsed.titulo || undefined,
+    promotion_name: parsed.titulo || undefined,
     date: parsed.date,
     created_date: parsed.date,
     platform: parsed.platform ?? '—',
