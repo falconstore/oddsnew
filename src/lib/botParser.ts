@@ -95,14 +95,14 @@ function kickoffToUtc(isoDate: string, time: string): string {
 // ──────────────────────────────────────────────────────────
 
 function extractProcedureNumber(text: string): string | null {
-  const m = text.match(/PROCEDIMENTO\s+#?(\d+)\s*[-–—]/i);
+  const m = text.match(/PROCEDIMENTO\s+(?:EXTRA\s+)?#?(\d+)\s*[-–—]/i);
   if (m) return m[1];
-  const m2 = text.match(/PROCEDIMENTO\s+#?(\d+)/i);
+  const m2 = text.match(/PROCEDIMENTO\s+(?:EXTRA\s+)?#?(\d+)/i);
   return m2 ? m2[1] : null;
 }
 
 function extractDate(text: string, defaultYear: number): string | null {
-  const m = text.match(/PROCEDIMENTO\s+#?\d+\s*[-–—]\s*(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)/i);
+  const m = text.match(/PROCEDIMENTO\s+(?:EXTRA\s+)?#?\d+\s*[-–—]\s*(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)/i);
   if (m) {
     const p = parseDateDMY(m[1], defaultYear);
     if (p) return toISODate(p.d, p.m, p.y);
@@ -270,7 +270,7 @@ function detectCategory(text: string, tipo: ProcedureTipo): string {
 // ──────────────────────────────────────────────────────────
 
 export function parseMessage(text: string): ParseResult {
-  if (!/(?:🟢|🔵|PROCEDIMENTO)\s*PROCEDIMENTO|\bPROCEDIMENTO\s+\d+/i.test(text)) {
+  if (!/(?:🟢|🔵|PROCEDIMENTO)\s*PROCEDIMENTO|\bPROCEDIMENTO\s+(?:EXTRA\s+)?\d+/i.test(text)) {
     return { ok: false, missingFields: ["mensagem não reconhecida como procedimento"] };
   }
 
