@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Copy, Check, Bot, RefreshCw, ChevronDown, ChevronUp,
   Plus, Trash2, ShieldCheck, AlertTriangle, XCircle, Pencil, X,
+  Power, PowerOff, Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,6 +21,9 @@ import { Sidebar } from '@/components/Sidebar';
 import { parseMessage, type ParseResult } from '@/lib/botParser';
 import { EventoAutocomplete } from '@/components/procedures/EventoAutocomplete';
 import { PROCEDURE_CATEGORIES } from '@/types/procedures';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 
 // ─────────────────────────────────────────
 // Helpers
@@ -684,6 +688,8 @@ function CreateTemplateModal({
 // ─────────────────────────────────────────
 
 export default function BotTemplates() {
+  const { isAdmin } = useAuth();
+  const queryClient = useQueryClient();
   const [activeIdx, setActiveIdx] = useState(0);
   const [activeCustomId, setActiveCustomId] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
@@ -697,6 +703,36 @@ export default function BotTemplates() {
   const [customCategories, setCustomCategories] = useState<string[]>([]);
   const [addingCategoryFor, setAddingCategoryFor] = useState<string | null>(null);
   const [newCategoryName, setNewCategoryName] = useState('');
+
+  // ── Bot enabled toggle ────────────────────────────────────
+  const { data: botSettings, isLoading: botLoading } = useQuery({
+    queryKey: ['system_settings_bot'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('system_settings')
+        .select('bot_enabled')
+        .eq('id', 1)
+        .maybeSingle();
+      if (error) throw error;
+      return data as { bot_enabled: boolean } | null;
+    },
+    staleTime: 30_000,
+  });
+
+  const botEnabled = botSettings?.bot_enabled ?? true;
+
+  const toggleBot = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const { error } = await supabase
+        .from('system_settings')
+        .update({ bot_enabled: enabled, updated_at: new Date().toISOString() })
+        .eq('id', 1);
+      if (error) throw error;
+    },
+    onSuccess: (_data, enabled) => {
+      queryClient.setQueryData(['system_settings_bot'], { bot_enabled: enabled });
+    },
+  });
 
   useEffect(() => {
     setCustomTemplates(loadCustomTemplates());
@@ -831,14 +867,49 @@ export default function BotTemplates() {
       <main className="flex-1 md:ml-64 p-4 md:p-6 flex flex-col gap-6 min-w-0">
 
         {/* Header */}
-        <div className="flex items-center gap-3 pt-10 md:pt-0">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-emerald-400 flex items-center justify-center shadow-lg shrink-0">
-            <Bot className="h-5 w-5 text-white" />
+        <div className="flex items-start justify-between gap-3 pt-10 md:pt-0">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-emerald-400 flex items-center justify-center shadow-lg shrink-0">
+              <Bot className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-foreground leading-tight">Templates do Bot</h1>
+              <p className="text-sm text-muted-foreground">Preencha e copie o procedimento pronto para enviar no Telegram</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-bold text-foreground leading-tight">Templates do Bot</h1>
-            <p className="text-sm text-muted-foreground">Preencha e copie o procedimento pronto para enviar no Telegram</p>
-          </div>
+
+          {/* Toggle ligar/desligar bot — visível para admins */}
+          {isAdmin && (
+            <div className="flex flex-col items-end gap-1 shrink-0">
+              <button
+                onClick={() => toggleBot.mutate(!botEnabled)}
+                disabled={botLoading || toggleBot.isPending}
+                data-testid="btn-toggle-bot"
+                className={cn(
+                  'flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-semibold transition-all duration-200',
+                  botEnabled
+                    ? 'bg-primary/15 border-primary/40 text-primary hover:bg-primary/25'
+                    : 'bg-red-500/15 border-red-500/40 text-red-400 hover:bg-red-500/25',
+                  (botLoading || toggleBot.isPending) && 'opacity-60 cursor-not-allowed',
+                )}
+              >
+                {botLoading || toggleBot.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : botEnabled ? (
+                  <Power className="h-4 w-4" />
+                ) : (
+                  <PowerOff className="h-4 w-4" />
+                )}
+                Bot {botEnabled ? 'Ligado' : 'Desligado'}
+              </button>
+              <span className={cn(
+                'text-[11px] font-medium',
+                botEnabled ? 'text-primary/70' : 'text-red-400/70',
+              )}>
+                {botEnabled ? 'Registrando procedimentos' : 'Ignorando mensagens'}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Template selector tabs */}
