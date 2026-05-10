@@ -330,6 +330,18 @@ serve(async (req) => {
     auth: { persistSession: false },
   });
 
+  // ── Verificar se o bot está habilitado ───────────────────
+  const { data: settings } = await supa
+    .from("system_settings")
+    .select("bot_enabled")
+    .eq("id", 1)
+    .maybeSingle();
+
+  if (settings && settings.bot_enabled === false) {
+    log("ignored", { reason: "bot_disabled", update_id: updateId });
+    return json({ ok: true, ignored: "bot_disabled" });
+  }
+
   // ──────────────────────────────────────────────────────────
   // 1. Detectar comando manual "REGISTRE O PROCEDIMENTO N"
   // ──────────────────────────────────────────────────────────
