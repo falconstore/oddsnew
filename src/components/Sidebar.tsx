@@ -62,7 +62,7 @@ export function Sidebar() {
   });
 
   const filteredNavigation = navigation.filter(item =>
-    item.alwaysVisible ? isApproved : canViewPage(item.pageKey)
+    item.alwaysVisible ? !!user : canViewPage(item.pageKey)
   );
 
   const handleSignOut = async () => {
