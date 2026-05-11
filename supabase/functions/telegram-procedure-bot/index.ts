@@ -60,8 +60,12 @@ async function tgSend(
 // Panel logging (substitui tgSend pra erros)
 // ──────────────────────────────────────────────────────────
 
+// logToPanel usa fetch direto na REST API do Supabase (service_role).
+// NÃO usa o cliente JS porque supa.from().insert() retorna { error } em vez de lançar
+// exceção, fazendo o erro sumir silenciosamente no try/catch.
 async function logToPanel(
-  supa: any,
+  supabaseUrl: string,
+  serviceRoleKey: string,
   opts: {
     level: "error" | "warning" | "info";
     event: string;
@@ -73,19 +77,34 @@ async function logToPanel(
     context?: Record<string, unknown> | null;
   },
 ): Promise<void> {
+  const payload = {
+    level: opts.level,
+    event: opts.event,
+    message: opts.message,
+    procedure_number: opts.procedureNumber ?? null,
+    update_id: opts.updateId ?? null,
+    message_id: opts.messageId ?? null,
+    raw_text: opts.rawText ?? null,
+    context: opts.context ?? null,
+  };
+  console.log(JSON.stringify({ tag: "telegram-procedure-bot", event: "log_to_panel", ...payload }));
   try {
-    await supa.from("bot_logs").insert({
-      level: opts.level,
-      event: opts.event,
-      message: opts.message,
-      procedure_number: opts.procedureNumber ?? null,
-      update_id: opts.updateId ?? null,
-      message_id: opts.messageId ?? null,
-      raw_text: opts.rawText ?? null,
-      context: opts.context ?? null,
+    const res = await fetch(`${supabaseUrl}/rest/v1/bot_logs`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": serviceRoleKey,
+        "Authorization": `Bearer ${serviceRoleKey}`,
+        "Prefer": "return=minimal",
+      },
+      body: JSON.stringify(payload),
     });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      console.error(`[proc-bot] logToPanel HTTP error ${res.status}: ${body}`);
+    }
   } catch (e: any) {
-    console.warn("[proc-bot] logToPanel failed", e?.message);
+    console.error("[proc-bot] logToPanel fetch exception:", e?.message);
   }
 }
 
@@ -353,8 +372,7 @@ serve(async (req) => {
 
     if (lookupErr) {
       log("command_lookup_error", { err: lookupErr.message });
-      // Erro vai pro painel, não pro grupo
-      await logToPanel(supa, {
+      await logToPanel(SUPABASE_URL, SERVICE_ROLE, {
         level: "error",
         event: "command_lookup_error",
         message: `Erro ao consultar banco para procedimento #${cmdNumber}: ${lookupErr.message}`,
@@ -399,7 +417,7 @@ serve(async (req) => {
 
       const result = await parseAndInsertProcedure(supa, replyText);
       if (result.ok === "no_number") {
-        await logToPanel(supa, {
+        await logToPanel(SUPABASE_URL, SERVICE_ROLE, {
           level: "warning",
           event: "command_parse_failed",
           message: `Não foi possível registrar procedimento #${cmdNumber}: campos ausentes na mensagem original (${result.missingFields.join(", ")})`,
@@ -412,7 +430,7 @@ serve(async (req) => {
         return json({ ok: true, action: "command_parse_failed", missing: result.missingFields });
       }
       if (!result.ok) {
-        await logToPanel(supa, {
+        await logToPanel(SUPABASE_URL, SERVICE_ROLE, {
           level: "error",
           event: "command_insert_error",
           message: `Erro ao registrar procedimento #${cmdNumber} no banco: ${result.error}`,
@@ -455,8 +473,7 @@ serve(async (req) => {
 
   if (!result.ok) {
     log("insert_error", { err: result.error, update_id: updateId });
-    // Erro vai silenciosamente pro painel — grupo não é perturbado
-    await logToPanel(supa, {
+    await logToPanel(SUPABASE_URL, SERVICE_ROLE, {
       level: "error",
       event: "insert_error",
       message: `Falha ao registrar procedimento no banco: ${result.error}`,
