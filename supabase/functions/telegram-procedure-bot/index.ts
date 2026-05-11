@@ -223,14 +223,6 @@ async function parseAndInsertProcedure(
     return { ok: false, error: insertErr?.message ?? "insert failed" };
   }
 
-  if (!isPartial) {
-    void supa.functions.invoke("freebetpro-sync", {
-      body: { procedure_id: inserted.id, action: "upsert" },
-    }).catch((e: any) => {
-      console.warn("[proc-bot] freebetpro-sync invoke failed (best-effort)", e?.message);
-    });
-  }
-
   if (isPartial) {
     return {
       ok: true,
@@ -248,6 +240,49 @@ async function parseAndInsertProcedure(
     parsed: parseResult.data as ParsedProcedure,
     isPartial: false,
   };
+}
+
+// ──────────────────────────────────────────────────────────
+// Sync com FreeBet PRO — awaited, erros vão pro painel
+// ──────────────────────────────────────────────────────────
+
+async function syncWithFreebetPro(
+  supa: any,
+  supabaseUrl: string,
+  serviceRoleKey: string,
+  procedureId: string,
+  procedureNumber: string,
+  updateId: number | null,
+  messageId: number | undefined,
+): Promise<void> {
+  try {
+    const { error } = await supa.functions.invoke("freebetpro-sync", {
+      body: { procedure_id: procedureId, action: "upsert" },
+    });
+    if (error) {
+      log("freebetpro_sync_failed", { procedureId, procedureNumber, err: error.message });
+      await logToPanel(supabaseUrl, serviceRoleKey, {
+        level: "error",
+        event: "freebetpro_sync_failed",
+        message: `Falha ao sincronizar proc #${procedureNumber} com FreeBet PRO: ${error.message ?? JSON.stringify(error)}`,
+        procedureNumber,
+        updateId,
+        messageId,
+        context: { procedure_id: procedureId, error: error.message },
+      });
+    }
+  } catch (e: any) {
+    log("freebetpro_sync_exception", { procedureId, procedureNumber, err: e?.message });
+    await logToPanel(supabaseUrl, serviceRoleKey, {
+      level: "error",
+      event: "freebetpro_sync_exception",
+      message: `Exceção ao invocar sync FreeBet PRO para proc #${procedureNumber}: ${e?.message ?? "unknown"}`,
+      procedureNumber,
+      updateId,
+      messageId,
+      context: { procedure_id: procedureId, error: e?.message },
+    });
+  }
 }
 
 function buildConfirmMsg(parsed: ParsedProcedure): string {
@@ -385,17 +420,13 @@ serve(async (req) => {
     }
 
     if (existing) {
-      void supa.functions.invoke("freebetpro-sync", {
-        body: { procedure_id: existing.id, action: "upsert" },
-      }).catch((e: any) => {
-        console.warn("[proc-bot] freebetpro-sync invoke failed (best-effort)", e?.message);
-      });
       await tgSend(
         BOT_TOKEN,
         chatId,
         `🔄 ${escHtml(externalId)} já existia — re-sincronizado com o FreeBet PRO.`,
         messageId,
       );
+      await syncWithFreebetPro(supa, SUPABASE_URL, SERVICE_ROLE, existing.id, cmdNumber, updateId, messageId);
       log("command_resynced", { procedure_id: existing.id, number: cmdNumber });
       return json({ ok: true, action: "resynced", procedure_id: existing.id });
     }
@@ -446,6 +477,9 @@ serve(async (req) => {
         ? buildPartialConfirmMsg(result.parsedPartial)
         : buildConfirmMsg(result.parsed);
       await tgSend(BOT_TOKEN, chatId, replyMsg, messageId);
+      if (!result.isPartial) {
+        await syncWithFreebetPro(supa, SUPABASE_URL, SERVICE_ROLE, result.procedureId, result.procedureNumber, updateId, messageId);
+      }
       log("command_registered", { procedure_id: result.procedureId, number: cmdNumber, partial: result.isPartial });
       return json({ ok: true, action: "command_registered", procedure_id: result.procedureId });
     }
@@ -503,6 +537,7 @@ serve(async (req) => {
 
   log("inserted", { procedure_id: result.procedureId, procedure_number: result.procedureNumber });
   await tgSend(BOT_TOKEN, chatId, buildConfirmMsg(result.parsed), messageId);
+  await syncWithFreebetPro(supa, SUPABASE_URL, SERVICE_ROLE, result.procedureId, result.procedureNumber, updateId, messageId);
 
   return json({
     ok: true,
