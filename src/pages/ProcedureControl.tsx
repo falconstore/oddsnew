@@ -1,15 +1,10 @@
 import { useState, useMemo } from 'react';
 import { usePersistedState } from '@/hooks/usePersistedState';
-import { startOfMonth, endOfMonth, endOfDay, differenceInDays, format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import { 
-  Plus, TrendingUp, Calendar, Activity, FileText, 
-  Clock, Trophy, Columns, Upload, ChevronDown, List, Bot
-} from 'lucide-react';
+import { startOfMonth, endOfMonth, endOfDay, differenceInDays } from 'date-fns';
+import { Plus, FileText, Columns, Upload, List, Bot } from 'lucide-react';
 
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 import { useProcedures, useDeleteProcedure, useToggleFavorite, useArchiveProcedure, useConfirmBotProcedure } from '@/hooks/useProcedures';
 import { Procedure, ProcedureFilters as FiltersType, AVAILABLE_COLUMNS } from '@/types/procedures';
@@ -17,25 +12,11 @@ import { getGameTimeBucket } from '@/lib/procedureGameTime';
 import { DefinirResultadosModal } from '@/components/procedures/DefinirResultadosModal';
 import {
   parseDate,
-  getCurrentMonthProfit,
-  getAverageDailyProfit,
-  getAverageProceduresPerDay,
-  getTotalProceduresForMonth,
-  getOpenProcedures,
-  getOpenMatches,
-  getBestPlatform,
-  getDayWithMostProfit,
-  getDayWithMostProcedures,
-  getMountainChartData,
-  getDailyProfitData,
   getAllPlatforms,
   getAllStatuses,
   getAllTags,
-  generateMonthOptions,
-  capitalizeMonth
 } from '@/lib/procedureUtils';
 
-import { StatCard } from '@/components/procedures/ProcedureStats';
 import { ProcedureFilters } from '@/components/procedures/ProcedureFilters';
 import { ProcedureTable } from '@/components/procedures/ProcedureTable';
 import { ProcedureMobileCards } from '@/components/procedures/ProcedureMobileCards';
@@ -45,8 +26,6 @@ import { GerarRelatorioModal } from '@/components/procedures/GerarRelatorioModal
 import { RegisterBotMessageModal } from '@/components/procedures/RegisterBotMessageModal';
 import { ColumnCustomizer } from '@/components/procedures/ColumnCustomizer';
 import { NotificationPanel } from '@/components/procedures/NotificationPanel';
-import { MountainChart } from '@/components/procedures/MountainChart';
-import { CalendarChart } from '@/components/procedures/CalendarChart';
 import { useAuth } from '@/contexts/AuthContext';
 import { PAGE_KEYS } from '@/types/auth';
 
@@ -58,17 +37,18 @@ export default function ProcedureControl() {
   const toggleFavorite = useToggleFavorite();
   const archiveProcedure = useArchiveProcedure();
   const confirmBotProcedure = useConfirmBotProcedure();
-  
+
   const [showModal, setShowModal] = useState(false);
   const [editingProcedure, setEditingProcedure] = useState<Procedure | null>(null);
   const [resultProcedure, setResultProcedure] = useState<Procedure | null>(null);
-  const [selectedMonth, setSelectedMonth] = usePersistedState('proc_month', new Date());
+  // selectedMonth shared via localStorage with Dashboard (same key)
+  const [selectedMonth] = usePersistedState('proc_month', new Date());
   const [showNotifications, setShowNotifications] = useState(true);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showRelatorioModal, setShowRelatorioModal] = useState(false);
   const [showColumnCustomizer, setShowColumnCustomizer] = useState(false);
   const [showRegisterBotModal, setShowRegisterBotModal] = useState(false);
-  
+
   const [filters, setFilters] = usePersistedState<FiltersType>('proc_filters', {
     searchNumber: '',
     searchPromotion: '',
@@ -83,7 +63,7 @@ export default function ProcedureControl() {
     showArchived: false,
     gameTime: 'all',
   });
-  
+
   const [visibleColumns, setVisibleColumns] = usePersistedState<string[]>('proc_columns', AVAILABLE_COLUMNS.map(col => col.key));
 
   const handleEdit = (proc: Procedure) => {
@@ -154,7 +134,7 @@ export default function ProcedureControl() {
         }
         if (filters.urgent === 'pending') {
           const isPending = (
-            cleanStatus === 'falta girar freebet' || 
+            cleanStatus === 'falta girar freebet' ||
             cleanStatus === 'falta girar freeebet' ||
             cleanStatus === 'enviada partida em aberto' ||
             cleanStatus === 'freebet pendente' ||
@@ -177,10 +157,6 @@ export default function ProcedureControl() {
     });
   }, [procedures, selectedMonth, filters]);
 
-  const bestPlatform = getBestPlatform(procedures, selectedMonth);
-  const dayWithMostProfit = getDayWithMostProfit(procedures, selectedMonth);
-  const dayWithMostProcedures = getDayWithMostProcedures(procedures, selectedMonth);
-
   const monthProcedures = useMemo(() => {
     const monthStart = startOfMonth(selectedMonth);
     const monthEnd = endOfDay(endOfMonth(selectedMonth));
@@ -189,8 +165,6 @@ export default function ProcedureControl() {
       return procDate && procDate >= monthStart && procDate <= monthEnd;
     });
   }, [procedures, selectedMonth]);
-
-  const monthlyProfit = getCurrentMonthProfit(procedures, selectedMonth);
 
   return (
     <Layout>
@@ -254,110 +228,7 @@ export default function ProcedureControl() {
           )}
         </div>
 
-        {/* ── Month Selector + Profit Hero ── */}
-        <div className="glass rounded-2xl border border-white/5 p-4 flex flex-col sm:flex-row items-start sm:items-center gap-4">
-          <div className="flex items-center gap-3 flex-1">
-            <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
-              <Calendar className="w-5 h-5 text-primary" />
-            </div>
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Mês selecionado</p>
-              <Select
-                value={selectedMonth.toISOString()}
-                onValueChange={(value) => setSelectedMonth(new Date(value))}
-              >
-                <SelectTrigger className="bg-transparent border-none p-0 h-auto text-lg font-bold hover:text-primary transition-colors w-auto gap-1 focus:ring-0">
-                  <SelectValue>
-                    {capitalizeMonth(format(selectedMonth, 'MMMM', { locale: ptBR }))} {format(selectedMonth, 'yyyy')}
-                  </SelectValue>
-                  <ChevronDown className="w-4 h-4 opacity-50" />
-                </SelectTrigger>
-                <SelectContent>
-                  {generateMonthOptions().map(option => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {capitalizeMonth(option.label)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="flex items-center gap-6">
-            <div className="text-right">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Lucro do Mês</p>
-              <p className={`text-2xl font-bold ${monthlyProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                {monthlyProfit >= 0 ? '+' : ''}R$ {monthlyProfit.toFixed(2)}
-              </p>
-            </div>
-            <div className="text-right">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Total Proc.</p>
-              <p className="text-2xl font-bold text-foreground">{getTotalProceduresForMonth(procedures, selectedMonth)}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* ── Stats Row 1 ── */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 md:gap-3">
-          <StatCard
-            title="Lucro Mensal"
-            value={`R$ ${getCurrentMonthProfit(procedures, selectedMonth).toFixed(2)}`}
-            icon={TrendingUp}
-            color="green"
-          />
-          <StatCard
-            title="Lucro Médio Diário"
-            value={`R$ ${getAverageDailyProfit(procedures, selectedMonth).toFixed(2)}`}
-            icon={Activity}
-            color="purple"
-          />
-          <StatCard
-            title="Média Proc./Dia"
-            value={getAverageProceduresPerDay(procedures, selectedMonth)}
-            icon={FileText}
-            color="cyan"
-          />
-          <StatCard
-            title="Proc. Abertos"
-            value={getOpenProcedures(procedures, selectedMonth)}
-            subtitle="Falta Girar Freebet"
-            icon={Clock}
-            color="amber"
-          />
-          <StatCard
-            title="Partidas Abertas"
-            value={getOpenMatches(procedures, selectedMonth)}
-            subtitle="Aguardando resultado"
-            icon={Activity}
-            color="orange"
-          />
-        </div>
-
-        {/* ── Stats Row 2 ── */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 md:gap-3">
-          <StatCard
-            title="Melhor Plataforma"
-            value={bestPlatform.name}
-            subtitle={`R$ ${bestPlatform.profit.toFixed(2)} • ${bestPlatform.count} proc.`}
-            icon={Trophy}
-            color="yellow"
-          />
-          <StatCard
-            title="Dia com Maior Lucro"
-            value={dayWithMostProfit.date}
-            subtitle={`R$ ${dayWithMostProfit.profit.toFixed(2)}`}
-            icon={TrendingUp}
-            color="green"
-          />
-          <StatCard
-            title="Dia com Mais Proc."
-            value={dayWithMostProcedures.date}
-            subtitle={`${dayWithMostProcedures.count} procedimentos`}
-            icon={FileText}
-            color="pink"
-          />
-        </div>
-
-        {/* ── Notifications ── */}
+        {/* ── Alertas ── */}
         {showNotifications && (
           <NotificationPanel
             procedures={monthProcedures}
@@ -366,7 +237,7 @@ export default function ProcedureControl() {
           />
         )}
 
-        {/* ── Filters ── */}
+        {/* ── Filtros ── */}
         <ProcedureFilters
           filters={filters}
           onFilterChange={setFilters}
@@ -375,20 +246,7 @@ export default function ProcedureControl() {
           availableTags={getAllTags(procedures)}
         />
 
-        {/* ── Charts ── */}
-        <div className="grid grid-cols-1 gap-5">
-          <CalendarChart
-            data={getDailyProfitData(procedures, selectedMonth)}
-            title="Calendário de Lucro/Prejuízo"
-            selectedMonth={selectedMonth}
-          />
-          <MountainChart
-            data={getMountainChartData(procedures, selectedMonth)}
-            title="Evolução do Lucro (Inicial: R$ 1.000)"
-          />
-        </div>
-
-        {/* ── Procedures Table ── */}
+        {/* ── Lista de Procedimentos ── */}
         <div className="glass rounded-2xl border border-white/5 overflow-hidden">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 p-4 border-b border-white/5">
             <div className="flex items-center gap-3">
@@ -438,7 +296,7 @@ export default function ProcedureControl() {
         </div>
       </div>
 
-      {/* ── Modals ── */}
+      {/* ── Modais ── */}
       {showModal && (
         <ProcedureModal
           procedure={editingProcedure}
@@ -463,7 +321,6 @@ export default function ProcedureControl() {
         open={showRegisterBotModal}
         onClose={() => setShowRegisterBotModal(false)}
       />
-
       {showColumnCustomizer && (
         <ColumnCustomizer
           visibleColumns={visibleColumns}
