@@ -197,8 +197,12 @@ function extractTitulo(text: string): string {
 
 /** Número do procedimento de referência (QUEIMAR_FB) */
 function extractRefProcedureNumber(text: string): string | null {
-  const m = text.match(/REFERENTE\s+[AÀ][OS]?\s+FREEBETS?\s+DO\s+PROCEDIMENTO\s+#?(\d+)/i);
-  return m ? m[1] : null;
+  // Formato longo: "REFERENTE ÀS FREEBETS DO PROCEDIMENTO 145"
+  const m1 = text.match(/REFERENTE\s+[AÀ][OS]?\s+FREEBETS?\s+DO\s+PROCEDIMENTO\s+#?(\d+)/i);
+  if (m1) return m1[1];
+  // Formato abreviado: "REF N° 145" / "REF Nº 145" / "REF N 145"
+  const m2 = text.match(/\bREF\s+N[°º]?\s*#?(\d+)/i);
+  return m2 ? m2[1] : null;
 }
 
 /** Extrai linha "📝 OBS: ..." — usada para Opção 2 da Aposta Protegida e outros comentários */
@@ -335,7 +339,8 @@ function extractFreebetValor(text: string): number | null {
 // ──────────────────────────────────────────────────────────
 
 function detectTipo(text: string): ProcedureTipo {
-  if (/REFERENTE\s+[AÀ][OS]?\s+FREEBETS?\s+DO\s+PROCEDIMENTO/i.test(text)) return "QUEIMAR_FB";
+  // Detecta QUEIMAR_FB pelo formato longo ou pelo abreviado (REF N°)
+  if (/REFERENTE\s+[AÀ][OS]?\s+FREEBETS?\s+(?:DO\s+PROCEDIMENTO|[—\-]?\s*REF\s+N)/i.test(text)) return "QUEIMAR_FB";
   if (/\bEM\s+FREEBET\b/i.test(text)) return "GANHAR_FB";
   return "SEM_FB";
 }

@@ -64,7 +64,7 @@ interface FieldConfig {
   id: string;
   label: string;
   placeholder: string;
-  type: 'text' | 'date' | 'time' | 'evento' | 'select' | 'toggle';
+  type: 'text' | 'date' | 'time' | 'evento' | 'select' | 'toggle' | 'freebet_select';
   default?: () => string;
   hint?: string;
   optional?: boolean;
@@ -136,16 +136,15 @@ const TEMPLATES: TemplateConfig[] = [
       { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 130', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
-      { id: 'numRef', label: 'Nº do Proc de Referência (FB)', placeholder: 'Ex: 110', type: 'text' },
+      { id: 'numRef', label: 'Freebet a Queimar', placeholder: '', type: 'freebet_select', hint: 'Selecione o procedimento GANHAR_FB cuja freebet será queimada aqui.' },
       { id: 'casa', label: 'Casa de Apostas', placeholder: 'Ex: Bet365', type: 'text', uppercase: true },
       { id: 'evento1', label: 'Partida', placeholder: 'Ex: Flamengo x Palmeiras', type: 'evento' },
       { id: 'lucro', label: 'Lucro Previsto (ex: 17,00)', placeholder: '17,00', type: 'text' },
       { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Freebet' },
     ],
     generate: (f) => {
-      const linha2 = f.numRef
-        ? `🟢 PROCEDIMENTO REFERENTE ÀS FREEBETS DO PROCEDIMENTO ${f.numRef} EXTRA 🔥`
-        : `🟢 PROCEDIMENTO REFERENTE ÀS FREEBETS DO PROCEDIMENTO [REF] EXTRA 🔥`;
+      const refStr = f.numRef || '[NNN]';
+      const linha2 = `🟢 PROCEDIMENTO REFERENTE ÀS FREEBETS — REF N° ${refStr} 🔥`;
       return [
         `🟢 PROCEDIMENTO ${f.isExtra === 'true' ? 'EXTRA ' : ''}${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
         linha2,
@@ -467,6 +466,78 @@ const TEMPLATES: TemplateConfig[] = [
     ].join('\n'),
   },
 ];
+
+// ─────────────────────────────────────────
+// FreebetSelectField — seletor de FB disponíveis para queimar
+// ─────────────────────────────────────────
+
+interface FreebetOption {
+  procedure_number: string;
+  platform: string | null;
+  freebet_value: number | null;
+  freebet_valor_previsto: number | null;
+}
+
+function FreebetSelectField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const { data: freebets = [], isLoading } = useQuery({
+    queryKey: ['available_freebets_to_burn'],
+    queryFn: async (): Promise<FreebetOption[]> => {
+      const { data, error } = await supabase
+        .from('procedures')
+        .select('procedure_number, platform, freebet_value, freebet_valor_previsto')
+        .eq('tipo', 'GANHAR_FB')
+        .eq('archived', false)
+        .in('freebet_creditada', ['SIM', 'AGUARDANDO'])
+        .order('created_date', { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as FreebetOption[];
+    },
+    staleTime: 30_000,
+  });
+
+  const fmtCurrency = (v: number | null) =>
+    v != null ? `R$ ${v.toFixed(2).replace('.', ',')}` : null;
+
+  if (isLoading) {
+    return (
+      <div className="h-9 flex items-center gap-2 px-3 rounded-md border border-border/50 bg-background/50 text-sm text-muted-foreground">
+        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        Carregando freebets...
+      </div>
+    );
+  }
+
+  if (freebets.length === 0) {
+    return (
+      <div className="h-9 flex items-center px-3 rounded-md border border-amber-500/30 bg-amber-500/5 text-sm text-amber-400/80 italic">
+        Nenhuma freebet disponível para queimar
+      </div>
+    );
+  }
+
+  return (
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger className="h-9 text-sm bg-background/50" data-testid="select-freebet-ref">
+        <SelectValue placeholder="Selecione a freebet a queimar..." />
+      </SelectTrigger>
+      <SelectContent>
+        {freebets.map(fb => {
+          const val = fmtCurrency(fb.freebet_value ?? fb.freebet_valor_previsto);
+          const label = [
+            `#${fb.procedure_number}`,
+            fb.platform ?? '—',
+            val,
+          ].filter(Boolean).join(' · ');
+          return (
+            <SelectItem key={fb.procedure_number} value={fb.procedure_number}>
+              {label}
+            </SelectItem>
+          );
+        })}
+      </SelectContent>
+    </Select>
+  );
+}
 
 // ─────────────────────────────────────────
 // ValidationBadge — resultado de validação
@@ -1271,6 +1342,17 @@ export default function BotTemplates() {
                               <X className="h-3 w-3" />
                             </Button>
                           </div>
+                        )}
+                      </div>
+                    ) : f.type === 'freebet_select' ? (
+                      <div key={f.id} className="flex flex-col gap-1">
+                        <Label className="text-xs font-medium text-muted-foreground">{f.label}</Label>
+                        <FreebetSelectField
+                          value={fields[f.id] ?? ''}
+                          onChange={v => setField(f.id, v)}
+                        />
+                        {f.hint && (
+                          <p className="text-[11px] text-muted-foreground/60">{f.hint}</p>
                         )}
                       </div>
                     ) : (
