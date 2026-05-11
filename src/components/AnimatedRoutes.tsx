@@ -29,6 +29,7 @@ import TrialAdmin from '@/pages/TrialAdmin';
 import LastlinkAdmin from '@/pages/LastlinkAdmin';
 import WatermarkStudio from '@/pages/WatermarkStudio';
 import BotTemplates from '@/pages/BotTemplates';
+import BioLinks from '@/pages/BioLinks';
 import NotFound from '@/pages/NotFound';
 
 // Componente para redirect que preserva query params
@@ -97,6 +98,11 @@ export function AnimatedRoutes() {
             </PageTransition>
           } />
           <Route path="/trial" element={<Navigate to="/" replace />} />
+          <Route path="/links" element={
+            <PageTransition>
+              <BioLinks />
+            </PageTransition>
+          } />
           <Route path="/obrigado" element={
             <PageTransition>
               <TrialObrigado />
@@ -129,6 +135,11 @@ export function AnimatedRoutes() {
         {/* /trial e /trial-upgrade no domínio do admin redirecionam para o subdomínio público */}
         <Route path="/trial" element={<ExternalTrialRedirect path="/" />} />
         <Route path="/trial-upgrade" element={<ExternalTrialRedirect path="/trial-upgrade" />} />
+        <Route path="/links" element={
+          <PageTransition>
+            <BioLinks />
+          </PageTransition>
+        } />
         
         {/* Protected routes with granular permissions */}
         <Route path="/" element={
