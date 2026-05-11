@@ -89,6 +89,11 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
     ...activeBookmakerNames.map(n => ({ value: n, label: n })),
     ...extraPlatforms.map(n => ({ value: n, label: n })),
   ];
+  // Normaliza o valor do Select para casar exatamente com o casing da opção.
+  // Ex: DB tem "SPORTYBET" mas bookmaker cadastrado como "Sportybet" → Select fica vazio sem isso.
+  const selectPlatformValue = platformOptions.find(
+    o => o.value.toLowerCase() === formData.platform.toLowerCase()
+  )?.value ?? formData.platform;
 
   const availableTags = getAllTags(allProcedures);
 
@@ -303,7 +308,7 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
                 <div>
                   <FieldLabel icon={Building2} label="Plataforma" required />
                   <Select
-                    value={formData.platform}
+                    value={selectPlatformValue}
                     onValueChange={(v) => setFormData({ ...formData, platform: v })}
                   >
                     <SelectTrigger className="bg-white/5 border-white/10 focus:border-cyan-500/50 h-9 text-sm" data-testid="select-platform">
