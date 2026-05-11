@@ -180,7 +180,12 @@ function extractTitulo(text: string): string {
   for (const line of lines) {
     const clean = stripEmojis(line).trim();
     if (/^PROCEDIMENTO\s+REFERENTE/i.test(clean)) {
-      return clean.replace(/\s*🔥\s*$/u, "").replace(/\s+EXTRA\s*$/i, "").trim().slice(0, 200);
+      return clean
+        .replace(/\s*🔥\s*$/u, "")
+        .replace(/\s+EXTRA\s*$/i, "")
+        .replace(/^PROCEDIMENTO\s+REFERENTE\s*(?:[AÀ][OS]?\s+|:\s*)?/i, "")
+        .trim()
+        .slice(0, 200);
     }
   }
   // Fallback: 2ª linha não vazia
