@@ -1,6 +1,5 @@
-import { useMemo } from 'react';
 import { usePersistedState } from '@/hooks/usePersistedState';
-import { startOfMonth, endOfMonth, endOfDay, format } from 'date-fns';
+import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Layout } from '@/components/Layout';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -17,7 +16,6 @@ import { StatCard } from '@/components/procedures/ProcedureStats';
 import { MountainChart } from '@/components/procedures/MountainChart';
 import { CalendarChart } from '@/components/procedures/CalendarChart';
 import {
-  parseDate,
   getCurrentMonthProfit,
   getAverageDailyProfit,
   getAverageProceduresPerDay,
@@ -88,18 +86,6 @@ const Dashboard = () => {
   const bestPlatform = getBestPlatform(procedures, selectedMonth);
   const dayWithMostProfit = getDayWithMostProfit(procedures, selectedMonth);
   const dayWithMostProcedures = getDayWithMostProcedures(procedures, selectedMonth);
-
-  const monthProcedures = useMemo(() => {
-    const monthStart = startOfMonth(selectedMonth);
-    const monthEnd = endOfDay(endOfMonth(selectedMonth));
-    return procedures.filter(proc => {
-      const procDate = parseDate(proc.date);
-      return procDate && procDate >= monthStart && procDate <= monthEnd;
-    });
-  }, [procedures, selectedMonth]);
-
-  // suppress unused warning — monthProcedures kept for future use
-  void monthProcedures;
 
   return (
     <Layout>
