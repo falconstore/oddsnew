@@ -145,7 +145,7 @@ export default function BioLinks() {
         {/* Social icons */}
         <div className="flex justify-center gap-4 mb-6">
           <a
-            href="https://www.instagram.com/sharkgreen_apostas"
+            href="https://www.instagram.com/sharkgreenn_/"
             target="_blank"
             rel="noopener noreferrer"
             data-testid="link-instagram"
