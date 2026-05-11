@@ -256,7 +256,7 @@ async function syncWithFreebetPro(
   messageId: number | undefined,
 ): Promise<void> {
   try {
-    const { error } = await supa.functions.invoke("freebetpro-sync", {
+    const { data: syncData, error } = await supa.functions.invoke("freebetpro-sync", {
       body: { procedure_id: procedureId, action: "upsert" },
     });
     if (error) {
@@ -270,6 +270,32 @@ async function syncWithFreebetPro(
         messageId,
         context: { procedure_id: procedureId, error: error.message },
       });
+    } else {
+      const fbId = syncData?.body?.id ?? syncData?.id ?? null;
+      const skipped = syncData?.skipped ?? null;
+      if (skipped) {
+        log("freebetpro_sync_skipped", { procedureId, procedureNumber, reason: skipped });
+        await logToPanel(supabaseUrl, serviceRoleKey, {
+          level: "info",
+          event: "freebetpro_sync_skipped",
+          message: `Proc #${procedureNumber} não enviado ao FreeBet PRO (${skipped})`,
+          procedureNumber,
+          updateId,
+          messageId,
+          context: { procedure_id: procedureId, skipped },
+        });
+      } else {
+        log("freebetpro_sync_ok", { procedureId, procedureNumber, fbId });
+        await logToPanel(supabaseUrl, serviceRoleKey, {
+          level: "info",
+          event: "freebetpro_sync_ok",
+          message: `Proc #${procedureNumber} sincronizado com FreeBet PRO${fbId ? ` (id interno: ${fbId})` : ""}`,
+          procedureNumber,
+          updateId,
+          messageId,
+          context: { procedure_id: procedureId, freebetpro_id: fbId },
+        });
+      }
     }
   } catch (e: any) {
     log("freebetpro_sync_exception", { procedureId, procedureNumber, err: e?.message });
@@ -526,6 +552,15 @@ serve(async (req) => {
       missing: result.parsedPartial.missingFields,
     });
     await tgSend(BOT_TOKEN, chatId, buildPartialConfirmMsg(result.parsedPartial), messageId);
+    await logToPanel(SUPABASE_URL, SERVICE_ROLE, {
+      level: "warning",
+      event: "registered_partial",
+      message: `Proc #${result.procedureNumber} registrado parcialmente — campos ausentes: ${result.parsedPartial.missingFields.join(", ")}`,
+      procedureNumber: result.procedureNumber,
+      updateId,
+      messageId,
+      context: { procedure_id: result.procedureId, missing: result.parsedPartial.missingFields },
+    });
     return json({
       ok: true,
       action: "registered_partial",
