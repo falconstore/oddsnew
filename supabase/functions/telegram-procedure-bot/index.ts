@@ -446,12 +446,6 @@ serve(async (req) => {
     }
 
     if (existing) {
-      await tgSend(
-        BOT_TOKEN,
-        chatId,
-        `🔄 ${escHtml(externalId)} já existia — re-sincronizado com o FreeBet PRO.`,
-        messageId,
-      );
       await syncWithFreebetPro(supa, SUPABASE_URL, SERVICE_ROLE, existing.id, cmdNumber, updateId, messageId);
       log("command_resynced", { procedure_id: existing.id, number: cmdNumber });
       return json({ ok: true, action: "resynced", procedure_id: existing.id });
@@ -462,13 +456,15 @@ serve(async (req) => {
     if (replyTo && replyText && /PROCEDIMENTO/i.test(replyText)) {
       const replyNumberMatch = replyText.match(/PROCEDIMENTO\s+#?(\d+)/i);
       if (replyNumberMatch && replyNumberMatch[1] !== cmdNumber) {
-        // Aviso de mismatch: esse é feedback de UX para o usuário — continua no grupo
-        await tgSend(
-          BOT_TOKEN,
-          chatId,
-          `⚠️ O comando pede o procedimento <b>${escHtml(cmdNumber)}</b>, mas a mensagem respondida é do procedimento <b>${escHtml(replyNumberMatch[1])}</b>. Confira e reenvie.`,
+        await logToPanel(SUPABASE_URL, SERVICE_ROLE, {
+          level: "warning",
+          event: "command_number_mismatch",
+          message: `Comando pede proc #${cmdNumber} mas a mensagem respondida é do proc #${replyNumberMatch[1]}`,
+          procedureNumber: cmdNumber,
+          updateId,
           messageId,
-        );
+          context: { requested: cmdNumber, found: replyNumberMatch[1] },
+        });
         return json({ ok: true, action: "command_number_mismatch" });
       }
 
@@ -477,7 +473,7 @@ serve(async (req) => {
         await logToPanel(SUPABASE_URL, SERVICE_ROLE, {
           level: "warning",
           event: "command_parse_failed",
-          message: `Não foi possível registrar procedimento #${cmdNumber}: campos ausentes na mensagem original (${result.missingFields.join(", ")})`,
+          message: `Não foi possível registrar proc #${cmdNumber}: campos ausentes (${result.missingFields.join(", ")})`,
           procedureNumber: cmdNumber,
           updateId,
           messageId,
@@ -490,7 +486,7 @@ serve(async (req) => {
         await logToPanel(SUPABASE_URL, SERVICE_ROLE, {
           level: "error",
           event: "command_insert_error",
-          message: `Erro ao registrar procedimento #${cmdNumber} no banco: ${result.error}`,
+          message: `Erro ao registrar proc #${cmdNumber} no banco: ${result.error}`,
           procedureNumber: cmdNumber,
           updateId,
           messageId,
@@ -499,24 +495,31 @@ serve(async (req) => {
         });
         return json({ ok: false, error: result.error }, { status: 500 });
       }
-      const replyMsg = result.isPartial
-        ? buildPartialConfirmMsg(result.parsedPartial)
-        : buildConfirmMsg(result.parsed);
-      await tgSend(BOT_TOKEN, chatId, replyMsg, messageId);
       if (!result.isPartial) {
         await syncWithFreebetPro(supa, SUPABASE_URL, SERVICE_ROLE, result.procedureId, result.procedureNumber, updateId, messageId);
+      } else {
+        await logToPanel(SUPABASE_URL, SERVICE_ROLE, {
+          level: "warning",
+          event: "registered_partial",
+          message: `Proc #${result.procedureNumber} registrado parcialmente — campos ausentes: ${result.parsedPartial.missingFields.join(", ")}`,
+          procedureNumber: result.procedureNumber,
+          updateId,
+          messageId,
+          context: { procedure_id: result.procedureId, missing: result.parsedPartial.missingFields },
+        });
       }
       log("command_registered", { procedure_id: result.procedureId, number: cmdNumber, partial: result.isPartial });
       return json({ ok: true, action: "command_registered", procedure_id: result.procedureId });
     }
 
-    // Não existe e não é reply válido → aviso de UX, vai pro grupo
-    await tgSend(
-      BOT_TOKEN,
-      chatId,
-      `⚠️ Procedimento <b>${escHtml(cmdNumber)}</b> não encontrado no banco. Para registrar, responda (reply) à mensagem original do procedimento e repita o comando.`,
+    await logToPanel(SUPABASE_URL, SERVICE_ROLE, {
+      level: "warning",
+      event: "command_not_found",
+      message: `Proc #${cmdNumber} não encontrado no banco — comando REGISTRE sem reply válido`,
+      procedureNumber: cmdNumber,
+      updateId,
       messageId,
-    );
+    });
     log("command_not_found", { number: cmdNumber });
     return json({ ok: true, action: "command_not_found" });
   }
@@ -551,7 +554,6 @@ serve(async (req) => {
       procedure_number: result.procedureNumber,
       missing: result.parsedPartial.missingFields,
     });
-    await tgSend(BOT_TOKEN, chatId, buildPartialConfirmMsg(result.parsedPartial), messageId);
     await logToPanel(SUPABASE_URL, SERVICE_ROLE, {
       level: "warning",
       event: "registered_partial",
@@ -571,7 +573,6 @@ serve(async (req) => {
   }
 
   log("inserted", { procedure_id: result.procedureId, procedure_number: result.procedureNumber });
-  await tgSend(BOT_TOKEN, chatId, buildConfirmMsg(result.parsed), messageId);
   await syncWithFreebetPro(supa, SUPABASE_URL, SERVICE_ROLE, result.procedureId, result.procedureNumber, updateId, messageId);
 
   return json({
