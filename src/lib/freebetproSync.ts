@@ -6,7 +6,7 @@
 // pelo cliente Supabase do frontend.
 import { supabaseProcedures, isProceduresSupabaseConfigured } from '@/lib/supabaseProcedures';
 
-export type FreebetproAction = 'upsert' | 'result' | 'archive';
+export type FreebetproAction = 'upsert' | 'result' | 'archive' | 'delete';
 
 export interface SyncOptions {
   /**

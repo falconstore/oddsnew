@@ -124,6 +124,10 @@ export function useDeleteProcedure() {
         throw new Error('Procedures Supabase not configured');
       }
 
+      // Sinaliza ao FreeBet Pro ANTES de deletar localmente — a edge function
+      // precisa da row no banco pra buscar o external_id e chamar /arquivar.
+      syncProcedureBestEffort(id, 'delete');
+
       const { error } = await supabaseProcedures
         .from('procedures')
         .delete()

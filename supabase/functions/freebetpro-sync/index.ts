@@ -36,7 +36,7 @@ const log = (event: string, data: Record<string, unknown>) => {
   console.log(JSON.stringify({ tag: "freebetpro-sync", event, ...data }));
 };
 
-type Action = "upsert" | "result" | "archive" | "health";
+type Action = "upsert" | "result" | "archive" | "delete" | "health";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -153,6 +153,14 @@ serve(async (req) => {
         method: "POST",
         path: `/procedimentos/${encodeURIComponent(proc.id)}/arquivar`,
         body: { arquivado: !!proc.archived },
+      });
+    } else if (action === "delete") {
+      // Hard delete local → arquiva no FreeBet Pro (eles não têm endpoint de delete).
+      // Deve ser chamado ANTES de deletar a row localmente, pra a busca acima funcionar.
+      res = await callFreebetPro({
+        method: "POST",
+        path: `/procedimentos/${encodeURIComponent(proc.id)}/arquivar`,
+        body: { arquivado: true },
       });
     } else {
       return json({ ok: false, error: "unknown action" }, 400);
