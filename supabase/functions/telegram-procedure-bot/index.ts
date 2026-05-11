@@ -132,7 +132,6 @@ function buildInsertRow(
     category: parsed.category,
     status: "Enviado",
     tipo: parsed.tipo,
-    prioridade: parsed.prioridade,
     partida_descricao: parsed.partida_descricao,
     kickoff_at: parsed.kickoff_at,
     data_partida: parsed.data_partida,
