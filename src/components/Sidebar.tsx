@@ -21,6 +21,7 @@ import {
   Trophy,
   Stamp,
   BookOpen,
+  ScrollText,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -49,6 +50,7 @@ const navigation: NavigationItem[] = [
   { name: "Marca d'Água", href: '/watermark', icon: Stamp, pageKey: PAGE_KEYS.WATERMARK, color: 'text-green-400' },
   { name: 'Configurações', href: '/settings', icon: Settings, pageKey: PAGE_KEYS.SETTINGS, color: 'text-slate-400' },
   { name: 'Usuários', href: '/admin/users', icon: UserCog, pageKey: PAGE_KEYS.ADMIN_USERS, color: 'text-red-400' },
+  { name: 'Logs do Bot', href: '/admin/bot-logs', icon: ScrollText, pageKey: PAGE_KEYS.ADMIN_USERS, color: 'text-orange-400' },
 ];
 
 export function Sidebar() {

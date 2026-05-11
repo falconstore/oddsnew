@@ -15,6 +15,7 @@ import ResetPassword from '@/pages/ResetPassword';
 import AdminUsers from '@/pages/admin/Users';
 import AdminLogs from '@/pages/admin/Logs';
 import ScraperStatus from '@/pages/admin/ScraperStatus';
+import BotLogs from '@/pages/admin/BotLogs';
 import ProcedureControl from '@/pages/ProcedureControl';
 import FreebetsGanhas from '@/pages/FreebetsGanhas';
 import BetbraAffiliate from '@/pages/BetbraAffiliate';
@@ -241,6 +242,13 @@ export function AnimatedRoutes() {
           <RequireAuth pageKey={PAGE_KEYS.DASHBOARD}>
             <PageTransition>
               <BotTemplates />
+            </PageTransition>
+          </RequireAuth>
+        } />
+        <Route path="/admin/bot-logs" element={
+          <RequireAuth pageKey={PAGE_KEYS.ADMIN_USERS}>
+            <PageTransition>
+              <BotLogs />
             </PageTransition>
           </RequireAuth>
         } />

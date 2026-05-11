@@ -3,20 +3,9 @@
 // Recebe mensagens do Telegram via webhook, faz parse e insere
 // o procedimento diretamente no banco, disparando a sync com o FreeBet PRO.
 //
-// Comportamento de inserção:
-//   - Parse completo → insere com bot_needs_review=true (gerente confirma dados)
-//   - Parse parcial  → insere com bot_needs_review=true + bot_missing_fields=[...]
-//   - Sem número     → rejeita (não cria registro)
-//
-// Suporta também o comando manual "REGISTRE O PROCEDIMENTO N":
-//   - Se proc N já existe no banco → re-dispara freebetpro-sync
-//   - Se não existe e o comando é reply de uma mensagem de proc → parseia e registra
-//   - Caso contrário → orienta o usuário a usar reply
-//
-// SECRETS necessários:
-//   TELEGRAM_PROC_BOT_TOKEN       — token do bot (@BotFather)
-//   TELEGRAM_PROC_CHAT_ID         — ID do canal/grupo monitorado
-//   TELEGRAM_PROC_WEBHOOK_SECRET  — secret validado no header do webhook
+// Erros (insert falhou, parse falhou, lookup falhou) são gravados em
+// `public.bot_logs` e NÃO enviados pro grupo do Telegram.
+// Mensagens de sucesso (✅ / ⚠️ parcial) continuam sendo enviadas.
 //
 // deno-lint-ignore-file
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -68,34 +57,53 @@ async function tgSend(
 }
 
 // ──────────────────────────────────────────────────────────
+// Panel logging (substitui tgSend pra erros)
+// ──────────────────────────────────────────────────────────
+
+async function logToPanel(
+  supa: any,
+  opts: {
+    level: "error" | "warning" | "info";
+    event: string;
+    message: string;
+    procedureNumber?: string | null;
+    updateId?: number | null;
+    messageId?: number | null;
+    rawText?: string | null;
+    context?: Record<string, unknown> | null;
+  },
+): Promise<void> {
+  try {
+    await supa.from("bot_logs").insert({
+      level: opts.level,
+      event: opts.event,
+      message: opts.message,
+      procedure_number: opts.procedureNumber ?? null,
+      update_id: opts.updateId ?? null,
+      message_id: opts.messageId ?? null,
+      raw_text: opts.rawText ?? null,
+      context: opts.context ?? null,
+    });
+  } catch (e: any) {
+    console.warn("[proc-bot] logToPanel failed", e?.message);
+  }
+}
+
+// ──────────────────────────────────────────────────────────
 // Detecção de comando manual
 // ──────────────────────────────────────────────────────────
 
-/**
- * Detecta o comando "REGISTRE O PROCEDIMENTO N" e variações.
- * Aceita (case-insensitive):
- *   - REGISTRE O PROCEDIMENTO 130
- *   - REGISTRE PROC 130
- *   - REGISTRAR PROCEDIMENTO 130
- *   - REGISTRAR 130
- *   - REGISTRA 130
- * Retorna o número do procedimento ou null.
- */
 function detectRegisterCommand(text: string): string | null {
   const t = text.trim();
-  // Comando deve ser curto (não confundir com a própria mensagem do procedimento)
   if (t.length > 80) return null;
-  // Não pode conter quebra de linha (procedimentos sempre têm várias linhas)
   if (/\n/.test(t)) return null;
-
-  // Verbos aceitos: REGISTRE, REGISTRA, REGISTRAR (exatamente esses)
   const re = /^REGISTR(?:E|A|AR)\s+(?:O\s+)?(?:PROC(?:EDIMENTO)?\s+)?#?(\d+)\s*$/i;
   const m = t.match(re);
   return m ? m[1] : null;
 }
 
 // ──────────────────────────────────────────────────────────
-// Parse + Insert + Sync (reutilizado pelo fluxo automático e pelo comando)
+// Parse + Insert + Sync
 // ──────────────────────────────────────────────────────────
 
 interface InsertResult {
@@ -141,7 +149,6 @@ function buildInsertRow(
     freebet_value: parsed.freebet_valor_previsto,
     profit_loss: 0,
     dp: parsed.dp,
-    // Ref. FB (texto legível) para QUEIMAR_FB — exibido na coluna REF. FB do painel
     freebet_reference: parsed.tipo === "QUEIMAR_FB" && parsed.ref_procedure_number
       ? parsed.ref_procedure_number
       : undefined,
@@ -153,7 +160,6 @@ function buildInsertRow(
     duplo_green_confirmado: parsed.is_duplo_green,
     esporte: "futebol",
     observacoes: parsed.observacoes ?? undefined,
-    // Bot review
     bot_needs_review: true,
     bot_raw_message: rawMessage,
     bot_missing_fields: missingFields && missingFields.length > 0 ? missingFields : null,
@@ -166,7 +172,6 @@ async function parseAndInsertProcedure(
 ): Promise<InsertResult | PartialInsertResult | InsertFailure | { ok: "no_number"; missingFields: string[] }> {
   const parseResult = parseMessage(text);
 
-  // Mensagem não reconhecida como procedimento (sem número)
   if (parseResult.ok === false) {
     return { ok: "no_number", missingFields: parseResult.missingFields };
   }
@@ -174,7 +179,6 @@ async function parseAndInsertProcedure(
   const isPartial = parseResult.ok === "partial";
   const parsed = isPartial ? parseResult.data : parseResult.data;
 
-  // Resolver UUID do procedimento de referência (QUEIMAR_FB)
   let freebetReferenceId: string | null = null;
   if (parsed.tipo === "QUEIMAR_FB" && parsed.ref_procedure_number) {
     const { data: refProc } = await supa
@@ -193,7 +197,6 @@ async function parseAndInsertProcedure(
     freebet_reference_id: freebetReferenceId,
   };
 
-  // Usa RPC (função SQL direta) para bypassar o schema cache do PostgREST
   const { data: inserted, error: insertErr } = await supa
     .rpc("bot_insert_procedure", { p_data: insertRow });
 
@@ -201,7 +204,6 @@ async function parseAndInsertProcedure(
     return { ok: false, error: insertErr?.message ?? "insert failed" };
   }
 
-  // Sync com FreeBet PRO (fire-and-forget) — só para parse completo
   if (!isPartial) {
     void supa.functions.invoke("freebetpro-sync", {
       body: { procedure_id: inserted.id, action: "upsert" },
@@ -258,7 +260,6 @@ serve(async (req) => {
     return json({ ok: false, error: "method not allowed" }, { status: 405 });
   }
 
-  // ── Configuração ─────────────────────────────────────────
   const BOT_TOKEN = Deno.env.get("TELEGRAM_PROC_BOT_TOKEN");
   const CHAT_ID = Deno.env.get("TELEGRAM_PROC_CHAT_ID");
   const WEBHOOK_SECRET = Deno.env.get("TELEGRAM_PROC_WEBHOOK_SECRET");
@@ -283,7 +284,6 @@ serve(async (req) => {
     return json({ ok: false, error: "forbidden" }, { status: 403 });
   }
 
-  // ── Parse do update ───────────────────────────────────────
   let update: any;
   try {
     update = await req.json();
@@ -311,12 +311,7 @@ serve(async (req) => {
   const msgChatId = String(msg.chat?.id ?? "");
   const expectedChatId = String(CHAT_ID);
   if (msgChatId !== expectedChatId) {
-    log("ignored", {
-      reason: "wrong chat",
-      got: msgChatId,
-      expected: expectedChatId,
-      update_id: updateId,
-    });
+    log("ignored", { reason: "wrong chat", got: msgChatId, expected: expectedChatId, update_id: updateId });
     return json({ ok: true, ignored: "wrong chat" });
   }
 
@@ -329,7 +324,6 @@ serve(async (req) => {
     auth: { persistSession: false },
   });
 
-  // ── Verificar se o bot está habilitado ───────────────────
   const { data: settings } = await supa
     .from("system_settings")
     .select("bot_enabled")
@@ -342,14 +336,13 @@ serve(async (req) => {
   }
 
   // ──────────────────────────────────────────────────────────
-  // 1. Detectar comando manual "REGISTRE O PROCEDIMENTO N"
+  // 1. Comando manual "REGISTRE O PROCEDIMENTO N"
   // ──────────────────────────────────────────────────────────
   const cmdNumber = detectRegisterCommand(text);
   if (cmdNumber) {
     const externalId = `bsk:${cmdNumber}`;
     log("command_detected", { number: cmdNumber, update_id: updateId });
 
-    // Caso 1: já existe no banco → re-sync
     const { data: existing, error: lookupErr } = await supa
       .from("procedures")
       .select("id, procedure_number")
@@ -360,7 +353,16 @@ serve(async (req) => {
 
     if (lookupErr) {
       log("command_lookup_error", { err: lookupErr.message });
-      await tgSend(BOT_TOKEN, chatId, `❌ Erro ao consultar o banco: ${escHtml(lookupErr.message)}`, messageId);
+      // Erro vai pro painel, não pro grupo
+      await logToPanel(supa, {
+        level: "error",
+        event: "command_lookup_error",
+        message: `Erro ao consultar banco para procedimento #${cmdNumber}: ${lookupErr.message}`,
+        procedureNumber: cmdNumber,
+        updateId,
+        messageId,
+        context: { externalId, error: lookupErr.message },
+      });
       return json({ ok: false, error: lookupErr.message }, { status: 500 });
     }
 
@@ -380,13 +382,12 @@ serve(async (req) => {
       return json({ ok: true, action: "resynced", procedure_id: existing.id });
     }
 
-    // Caso 2: não existe, mas é reply de uma mensagem de procedimento → parsear e registrar
     const replyTo = msg.reply_to_message;
     const replyText: string | undefined = replyTo?.text ?? replyTo?.caption;
     if (replyTo && replyText && /PROCEDIMENTO/i.test(replyText)) {
-      // Validar que o número do reply bate com o número do comando (para não criar lixo)
       const replyNumberMatch = replyText.match(/PROCEDIMENTO\s+#?(\d+)/i);
       if (replyNumberMatch && replyNumberMatch[1] !== cmdNumber) {
+        // Aviso de mismatch: esse é feedback de UX para o usuário — continua no grupo
         await tgSend(
           BOT_TOKEN,
           chatId,
@@ -398,21 +399,29 @@ serve(async (req) => {
 
       const result = await parseAndInsertProcedure(supa, replyText);
       if (result.ok === "no_number") {
-        await tgSend(
-          BOT_TOKEN,
-          chatId,
-          `❌ Não consegui registrar o procedimento ${escHtml(cmdNumber)}. Campos ausentes na mensagem original: ${escHtml(result.missingFields.join(", "))}.`,
+        await logToPanel(supa, {
+          level: "warning",
+          event: "command_parse_failed",
+          message: `Não foi possível registrar procedimento #${cmdNumber}: campos ausentes na mensagem original (${result.missingFields.join(", ")})`,
+          procedureNumber: cmdNumber,
+          updateId,
           messageId,
-        );
+          rawText: replyText,
+          context: { missingFields: result.missingFields },
+        });
         return json({ ok: true, action: "command_parse_failed", missing: result.missingFields });
       }
       if (!result.ok) {
-        await tgSend(
-          BOT_TOKEN,
-          chatId,
-          `❌ Não consegui registrar. Erro no banco: ${escHtml(result.error)}.`,
+        await logToPanel(supa, {
+          level: "error",
+          event: "command_insert_error",
+          message: `Erro ao registrar procedimento #${cmdNumber} no banco: ${result.error}`,
+          procedureNumber: cmdNumber,
+          updateId,
           messageId,
-        );
+          rawText: replyText,
+          context: { error: result.error },
+        });
         return json({ ok: false, error: result.error }, { status: 500 });
       }
       const replyMsg = result.isPartial
@@ -423,7 +432,7 @@ serve(async (req) => {
       return json({ ok: true, action: "command_registered", procedure_id: result.procedureId });
     }
 
-    // Caso 3: não existe e não é reply válido → orientar
+    // Não existe e não é reply válido → aviso de UX, vai pro grupo
     await tgSend(
       BOT_TOKEN,
       chatId,
@@ -440,15 +449,22 @@ serve(async (req) => {
   const result = await parseAndInsertProcedure(supa, text);
 
   if (result.ok === "no_number") {
-    // Não é uma mensagem de procedimento reconhecível — ignorar silenciosamente
     log("ignored_no_number", { update_id: updateId, missing: result.missingFields });
     return json({ ok: true, action: "ignored_no_number" });
   }
 
   if (!result.ok) {
-    const errMsg = `❌ Não consegui registrar. Erro no banco: ${escHtml(result.error)}.`;
     log("insert_error", { err: result.error, update_id: updateId });
-    await tgSend(BOT_TOKEN, chatId, errMsg, messageId);
+    // Erro vai silenciosamente pro painel — grupo não é perturbado
+    await logToPanel(supa, {
+      level: "error",
+      event: "insert_error",
+      message: `Falha ao registrar procedimento no banco: ${result.error}`,
+      updateId,
+      messageId,
+      rawText: text,
+      context: { error: result.error },
+    });
     return json({ ok: false, error: result.error }, { status: 500 });
   }
 
