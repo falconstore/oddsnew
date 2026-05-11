@@ -364,8 +364,9 @@ function detectCategory(text: string, tipo: ProcedureTipo): string {
 // ──────────────────────────────────────────────────────────
 
 export function parseMessage(text: string): ParseResult {
-  // Gatilho: mensagem deve começar com 🟢 PROCEDIMENTO ou 🔵 PROCEDIMENTO
-  if (!/(?:🟢|🔵|PROCEDIMENTO)\s*PROCEDIMENTO|\bPROCEDIMENTO\s+(?:EXTRA\s+)?\d+/i.test(text)) {
+  // Gatilho: mensagem deve começar com 🟢 ou 🔵 (opt-in explícito)
+  // Mensagens informativas que mencionam "PROCEDIMENTO NNN" no corpo são ignoradas.
+  if (!/^\s*[🟢🔵]/u.test(text)) {
     return { ok: false, missingFields: ["mensagem não reconhecida como procedimento"] };
   }
 
