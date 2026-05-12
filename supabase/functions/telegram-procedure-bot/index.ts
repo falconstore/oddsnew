@@ -144,10 +144,20 @@ interface InsertFailure {
   error: string;
 }
 
+function buildTelegramLink(chatId: number, messageId: number, chatUsername?: string): string {
+  if (chatUsername) {
+    return `https://t.me/${chatUsername}/${messageId}`;
+  }
+  // Canal privado: chatId vem como -100XXXXXXXXXX → strip "-100"
+  const channelId = String(chatId).replace(/^-100/, "");
+  return `https://t.me/c/${channelId}/${messageId}`;
+}
+
 function buildInsertRow(
   parsed: ParsedProcedure | PartialParsedProcedure,
   rawMessage: string,
   missingFields?: string[],
+  telegramLink?: string,
 ): Record<string, unknown> {
   return {
     procedure_number: parsed.procedure_number,
@@ -182,12 +192,14 @@ function buildInsertRow(
     bot_needs_review: true,
     bot_raw_message: rawMessage,
     bot_missing_fields: missingFields && missingFields.length > 0 ? missingFields : null,
+    telegram_link: telegramLink ?? null,
   };
 }
 
 async function parseAndInsertProcedure(
   supa: any,
   text: string,
+  telegramLink?: string,
 ): Promise<InsertResult | PartialInsertResult | InsertFailure | { ok: "no_number"; missingFields: string[] }> {
   const parseResult = parseMessage(text);
 
@@ -212,7 +224,7 @@ async function parseAndInsertProcedure(
 
   const missingFields = isPartial ? (parseResult as any).data.missingFields : [];
   const insertRow = {
-    ...buildInsertRow(parsed, text, missingFields),
+    ...buildInsertRow(parsed, text, missingFields, telegramLink),
     freebet_reference_id: freebetReferenceId,
   };
 
@@ -488,7 +500,10 @@ serve(async (req) => {
         return json({ ok: true, action: "command_number_mismatch" });
       }
 
-      const result = await parseAndInsertProcedure(supa, replyText);
+      const replyTelegramLink = replyTo.message_id
+        ? buildTelegramLink(chatId, replyTo.message_id, msg.chat?.username)
+        : undefined;
+      const result = await parseAndInsertProcedure(supa, replyText, replyTelegramLink);
       if (result.ok === "no_number") {
         await logToPanel(SUPABASE_URL, SERVICE_ROLE, {
           level: "warning",
@@ -566,6 +581,9 @@ serve(async (req) => {
 
     if (existing) {
       // Proc já existe → atualiza campos derivados do parse, preserva campos operacionais
+      const editTelegramLink = messageId
+        ? buildTelegramLink(chatId, messageId, msg.chat?.username)
+        : undefined;
       const updateFields: Record<string, unknown> = {
         promotion_name: parsed.titulo || undefined,
         platform: parsed.platform ?? undefined,
@@ -584,6 +602,7 @@ serve(async (req) => {
         bot_raw_message: text,
         bot_missing_fields: isPartial ? (parsed as any).missingFields : null,
         bot_needs_review: isPartial,
+        ...(editTelegramLink ? { telegram_link: editTelegramLink } : {}),
       };
 
       // Resolve freebet_reference_id para QUEIMAR_FB
@@ -640,7 +659,10 @@ serve(async (req) => {
   // ──────────────────────────────────────────────────────────
   // 3. Fluxo normal — mensagem de procedimento postada no canal
   // ──────────────────────────────────────────────────────────
-  const result = await parseAndInsertProcedure(supa, text);
+  const telegramLink = messageId
+    ? buildTelegramLink(chatId, messageId, msg.chat?.username)
+    : undefined;
+  const result = await parseAndInsertProcedure(supa, text, telegramLink);
 
   if (result.ok === "no_number") {
     log("ignored_no_number", { update_id: updateId, missing: result.missingFields });
