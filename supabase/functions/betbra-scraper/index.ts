@@ -423,7 +423,26 @@ serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  const cookie = Deno.env.get("BETBRA_COOKIE") ?? "";
+  const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+  const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const supa = createClient(SUPABASE_URL, SERVICE_ROLE);
+
+  // Resolve cookie: DB config takes priority over env secret
+  async function resolveCookie(): Promise<string> {
+    const envCookie = Deno.env.get("BETBRA_COOKIE") ?? "";
+    try {
+      const { data } = await supa
+        .from("betbra_config")
+        .select("value")
+        .eq("key", "BETBRA_COOKIE")
+        .maybeSingle();
+      if (data?.value) return data.value;
+    } catch {
+      /* fall through to env */
+    }
+    return envCookie;
+  }
+
   const userAgent = Deno.env.get("BETBRA_USER_AGENT") ?? DEFAULT_UA;
 
   let body: Record<string, unknown> = {};
@@ -431,21 +450,20 @@ serve(async (req) => {
 
   // Cookie health-check (called from UI before invoking scraper)
   if (body.action === "check") {
+    const cookie = await resolveCookie();
     return json({ ok: true, cookie_configured: cookie.length > 0 });
   }
+
+  const cookie = await resolveCookie();
 
   if (!cookie) {
     return json({
       ok: false,
       cookie_configured: false,
       cookie_expired: false,
-      error: "BETBRA_COOKIE não configurado. Adicione o secret nos secrets do Supabase.",
+      error: "BETBRA_COOKIE não configurado. Configure o cookie nas Configurações de Integração da página Betbra Affiliate.",
     });
   }
-
-  const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-  const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const supa = createClient(SUPABASE_URL, SERVICE_ROLE);
 
   const today = brasiliaToday();
   const startDate = (body.start_date as string | undefined) ?? firstDayOfMonth(today);

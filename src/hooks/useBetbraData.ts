@@ -4,6 +4,12 @@ import { BetbraEntry } from '@/types/betbra';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 
+export interface BetbraCookieStatus {
+  cookie_set: boolean;
+  source: 'db' | 'env' | 'none';
+  updated_at: string | null;
+}
+
 const BETBRA_KEY = ['betbra-affiliate'];
 
 // Fetch all betbra entries
@@ -52,6 +58,63 @@ export function useBetbraScraperCheck() {
     staleTime: 5 * 60 * 1000,
     retry: false,
     enabled: isProceduresSupabaseConfigured(),
+  });
+}
+
+// Get cookie status from betbra-config edge function (admin only)
+// Pass isAdmin=true to enable the query; defaults to disabled for non-admins.
+export function useBetbraCookieStatus(isAdmin = false) {
+  return useQuery({
+    queryKey: ['betbra-cookie-status'],
+    queryFn: async (): Promise<BetbraCookieStatus> => {
+      if (!isProceduresSupabaseConfigured()) return { cookie_set: false, source: 'none', updated_at: null };
+      const { data, error } = await supabaseProcedures.functions.invoke('betbra-config', {
+        body: { action: 'get' },
+      });
+      if (error || !data?.ok) return { cookie_set: false, source: 'none', updated_at: null };
+      return {
+        cookie_set: Boolean(data.cookie_set),
+        source: data.source ?? 'none',
+        updated_at: data.updated_at ?? null,
+      };
+    },
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+    enabled: isProceduresSupabaseConfigured() && isAdmin,
+  });
+}
+
+// Update BetBra cookie via betbra-config edge function (admin only)
+export function useUpdateBetbraCookie() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (cookie: string) => {
+      if (!isProceduresSupabaseConfigured()) {
+        throw new Error('Procedures Supabase não configurado');
+      }
+      const { data, error } = await supabaseProcedures.functions.invoke('betbra-config', {
+        body: { action: 'set', cookie },
+      });
+      if (error) throw new Error(error.message);
+      if (!data?.ok) throw new Error(data?.error ?? 'Erro ao salvar cookie');
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['betbra-cookie-status'] });
+      queryClient.invalidateQueries({ queryKey: ['betbra-scraper-check'] });
+      toast({
+        title: 'Cookie atualizado',
+        description: 'O cookie do BetBra foi salvo com sucesso. O scraper já pode ser usado.',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Erro ao salvar cookie',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
   });
 }
 
@@ -222,7 +285,7 @@ export function useRefreshBetbraScraper() {
       toast({
         title: isCookieError ? 'Cookie expirado' : 'Erro no scraper',
         description: isCookieError
-          ? 'O cookie do BetBra expirou. Atualize o secret BETBRA_COOKIE no Supabase.'
+          ? 'O cookie do BetBra expirou. Atualize o cookie na seção "Configurações de Integração" da página Betbra Affiliate.'
           : error.message,
         variant: 'destructive',
       });

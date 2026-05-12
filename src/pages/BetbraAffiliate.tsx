@@ -2,13 +2,14 @@ import { useState, useMemo } from 'react';
 import { usePersistedState } from '@/hooks/usePersistedState';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Plus, Calendar, RefreshCw, Download, TrendingUp, Zap, Bot, Clock, AlertTriangle } from 'lucide-react';
+import { Plus, Calendar, RefreshCw, Download, TrendingUp, Zap, Bot, Clock, AlertTriangle, Settings2, Cookie, CheckCircle2, ChevronUp, Eye, EyeOff } from 'lucide-react';
 
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 
-import { useBetbraData, useDeleteBetbraEntry, useRefreshBetbraScraper, useBetbraScraperCheck } from '@/hooks/useBetbraData';
+import { useBetbraData, useDeleteBetbraEntry, useRefreshBetbraScraper, useBetbraScraperCheck, useBetbraCookieStatus, useUpdateBetbraCookie } from '@/hooks/useBetbraData';
 import { BetbraEntry } from '@/types/betbra';
 import {
   calculateBetbraStats,
@@ -28,18 +29,28 @@ import { useAuth } from '@/contexts/AuthContext';
 import { PAGE_KEYS } from '@/types/auth';
 
 export default function BetbraAffiliate() {
-  const { canEditPage } = useAuth();
+  const { canEditPage, isAdmin } = useAuth();
   const canEdit = canEditPage(PAGE_KEYS.BETBRA_AFFILIATE);
   const { data: entries = [], refetch, isRefetching } = useBetbraData();
   const deleteEntry = useDeleteBetbraEntry();
   const refreshScraper = useRefreshBetbraScraper();
   const { data: scraperCheck } = useBetbraScraperCheck();
+  // Cookie status is admin-only — avoid unnecessary 403 calls for non-admins
+  const { data: cookieStatus, isLoading: cookieStatusLoading } = useBetbraCookieStatus(isAdmin);
+  const updateCookie = useUpdateBetbraCookie();
 
   const cookieConfigured = scraperCheck?.cookie_configured ?? true; // optimistic while loading
 
   const [showModal, setShowModal] = useState(false);
   const [editingEntry, setEditingEntry] = useState<BetbraEntry | null>(null);
   const [selectedMonth, setSelectedMonth] = usePersistedState('betbra_month', new Date());
+
+  // Cookie config panel state
+  const [showCookiePanel, setShowCookiePanel] = useState(false);
+  const [cookieInput, setCookieInput] = useState('');
+  const [showCookieText, setShowCookieText] = useState(false);
+  // Tracks if the last scraper run failed due to an expired/invalid cookie
+  const [scraperCookieExpired, setScraperCookieExpired] = useState(false);
 
   const filteredEntries = useMemo(() => {
     return filterByMonth(entries, selectedMonth)
@@ -80,9 +91,34 @@ export default function BetbraAffiliate() {
 
   const handleScrape = () => {
     if (!cookieConfigured) {
-      return; // guard: button is disabled, this won't be called
+      // Only open the panel for admins; non-admins see the banner instead
+      if (isAdmin) setShowCookiePanel(true);
+      return;
     }
-    refreshScraper.mutate(selectedMonth);
+    setScraperCookieExpired(false);
+    refreshScraper.mutate(selectedMonth, {
+      onError: (error: any) => {
+        const isCookieError =
+          error?.cookieExpired === true ||
+          error?.message?.toLowerCase().includes('cookie') ||
+          error?.message?.toLowerCase().includes('betbra_cookie');
+        if (isCookieError) {
+          setScraperCookieExpired(true);
+        }
+      },
+    });
+  };
+
+  const handleSaveCookie = () => {
+    const trimmed = cookieInput.trim();
+    if (!trimmed) return;
+    updateCookie.mutate(trimmed, {
+      onSuccess: () => {
+        setCookieInput('');
+        setShowCookiePanel(false);
+        setScraperCookieExpired(false);
+      },
+    });
   };
 
   const handleExportCSV = () => {
@@ -165,20 +201,32 @@ export default function BetbraAffiliate() {
               </Button>
               {canEdit && !cookieConfigured && (
                 <div
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs"
-                  title="Configure o secret BETBRA_COOKIE no Supabase para usar o scraper"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs cursor-pointer hover:bg-red-500/15 transition-colors"
+                  onClick={() => setShowCookiePanel(true)}
                   data-testid="badge-cookie-missing"
                 >
                   <AlertTriangle className="w-3.5 h-3.5" />
-                  BETBRA_COOKIE não configurado
+                  Cookie não configurado — clique para configurar
                 </div>
+              )}
+              {isAdmin && (
+                <Button
+                  variant="glass"
+                  size="sm"
+                  onClick={() => setShowCookiePanel(v => !v)}
+                  data-testid="button-cookie-config"
+                  title="Configurações de Integração Betbra"
+                >
+                  <Settings2 className="w-4 h-4 mr-1.5" />
+                  Integração
+                </Button>
               )}
               {canEdit && (
                 <Button
                   size="sm"
                   onClick={handleScrape}
-                  disabled={refreshScraper.isPending || !cookieConfigured}
-                  title={!cookieConfigured ? 'Configure o secret BETBRA_COOKIE no Supabase para usar o scraper' : 'Buscar dados automaticamente do painel Betbra'}
+                  disabled={refreshScraper.isPending}
+                  title={!cookieConfigured ? 'Cookie não configurado — clique para configurar' : 'Buscar dados automaticamente do painel Betbra'}
                   className="bg-gradient-to-r from-violet-600 to-violet-700 hover:from-violet-500 hover:to-violet-600 text-white font-semibold shadow-lg shadow-violet-500/20 border-0 disabled:opacity-50 disabled:cursor-not-allowed"
                   data-testid="button-scrape"
                 >
@@ -195,6 +243,134 @@ export default function BetbraAffiliate() {
             </div>
           </div>
         </div>
+
+        {/* Cookie Configuration Panel (admin only, collapsible) */}
+        {isAdmin && showCookiePanel && (
+          <div className="glass rounded-2xl border border-amber-500/20 overflow-hidden" data-testid="panel-cookie-config">
+            <div className="flex items-center justify-between p-4 border-b border-white/5">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-500/20 to-amber-500/5 border border-amber-500/15 flex items-center justify-center flex-shrink-0">
+                  <Cookie className="w-4 h-4 text-amber-400" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold">Configurações de Integração</h3>
+                  <p className="text-xs text-muted-foreground">Cookie de autenticação do painel BetBra</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowCookiePanel(false)}
+                className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded-lg hover:bg-white/5"
+                data-testid="button-close-cookie-panel"
+              >
+                <ChevronUp className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-4">
+              {/* Current status */}
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-white/3 border border-white/5">
+                {cookieStatusLoading ? (
+                  <div className="w-2 h-2 rounded-full bg-muted-foreground animate-pulse" />
+                ) : cookieStatus?.cookie_set ? (
+                  <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0" />
+                ) : (
+                  <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0" />
+                )}
+                <div className="flex-1 min-w-0">
+                  {cookieStatusLoading ? (
+                    <span className="text-xs text-muted-foreground">Verificando status...</span>
+                  ) : cookieStatus?.cookie_set ? (
+                    <div>
+                      <span className="text-xs font-medium text-primary">Cookie configurado</span>
+                      {cookieStatus.source === 'db' && cookieStatus.updated_at && (
+                        <span className="text-xs text-muted-foreground ml-2">
+                          • atualizado {formatDistanceToNow(new Date(cookieStatus.updated_at), { locale: ptBR, addSuffix: true })}
+                        </span>
+                      )}
+                      {cookieStatus.source === 'env' && (
+                        <span className="text-xs text-muted-foreground ml-2">• via secret do Supabase</span>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-xs font-medium text-red-400">Cookie não configurado — o scraper não funcionará</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Cookie input */}
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  {cookieStatus?.cookie_set ? 'Atualizar cookie' : 'Colar novo cookie'}
+                </label>
+                <div className="relative">
+                  <Textarea
+                    value={cookieInput}
+                    onChange={e => setCookieInput(e.target.value)}
+                    placeholder="Cole aqui o valor completo do cookie (ex: _session=abc123; other=xyz...)"
+                    className={`font-mono text-xs resize-none bg-white/3 border-white/10 focus:border-amber-500/50 ${showCookieText ? '' : 'text-security-disc'}`}
+                    rows={3}
+                    data-testid="input-cookie-value"
+                    style={showCookieText ? {} : { WebkitTextSecurity: 'disc' } as React.CSSProperties}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowCookieText(v => !v)}
+                    className="absolute right-2 top-2 text-muted-foreground hover:text-foreground transition-colors p-1 rounded"
+                    data-testid="button-toggle-cookie-visibility"
+                    title={showCookieText ? 'Ocultar cookie' : 'Mostrar cookie'}
+                  >
+                    {showCookieText ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Abra o painel da BetBra, pressione F12, vá em Network → copie o header <code className="bg-white/5 px-1 rounded">Cookie</code> de qualquer requisição autenticada.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => { setCookieInput(''); setShowCookiePanel(false); }}
+                  data-testid="button-cancel-cookie"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleSaveCookie}
+                  disabled={!cookieInput.trim() || updateCookie.isPending}
+                  className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-semibold border-0 disabled:opacity-50"
+                  data-testid="button-save-cookie"
+                >
+                  {updateCookie.isPending ? 'Salvando...' : 'Salvar cookie'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Banner: cookie expired after scraper run OR cookie missing */}
+        {canEdit && (scraperCookieExpired || !cookieConfigured) && !showCookiePanel && (
+          <div
+            className={`flex items-start gap-3 p-4 rounded-2xl border transition-colors ${isAdmin ? 'cursor-pointer hover:bg-red-500/12' : ''} bg-red-500/8 border-red-500/20`}
+            onClick={() => isAdmin && setShowCookiePanel(true)}
+            data-testid="banner-cookie-expired"
+          >
+            <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-red-300">
+                {scraperCookieExpired ? 'Cookie do BetBra expirou' : 'Cookie do BetBra não configurado'}
+              </p>
+              <p className="text-xs text-red-400/70 mt-0.5">
+                {isAdmin
+                  ? 'Clique aqui para atualizar o cookie e reativar o scraper automático.'
+                  : 'Entre em contato com o administrador para atualizar o cookie de acesso ao BetBra.'}
+              </p>
+            </div>
+            {isAdmin && <Settings2 className="w-4 h-4 text-red-400/70 flex-shrink-0 mt-0.5" />}
+          </div>
+        )}
 
         {/* Month Selector */}
         <div className="glass rounded-2xl border border-white/5 p-4 flex flex-col sm:flex-row items-start sm:items-center gap-4">
