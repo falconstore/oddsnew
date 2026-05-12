@@ -208,9 +208,17 @@ export function ProcedureTable({ procedures, visibleColumns, onEdit, onDelete, o
               )}
               {visibleColumns.includes('profit_loss') && (
                 <TableCell className="py-2 px-2">
-                  <span className={`text-xs font-bold ${proc.profit_loss >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                    {proc.profit_loss >= 0 ? '+' : ''}R$ {proc.profit_loss?.toFixed(2)}
-                  </span>
+                  {proc.profit_loss !== 0 ? (
+                    <span className={`text-xs font-bold ${proc.profit_loss >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {proc.profit_loss >= 0 ? '+' : ''}R$ {proc.profit_loss?.toFixed(2)}
+                    </span>
+                  ) : proc.lucro_prejuizo_previsto != null && proc.lucro_prejuizo_previsto !== 0 ? (
+                    <span className="text-xs text-muted-foreground/50 font-medium" title="Lucro previsto (resultado ainda não definido)">
+                      ~R$ {Number(proc.lucro_prejuizo_previsto).toFixed(2)}
+                    </span>
+                  ) : (
+                    <span className="text-xs font-bold text-emerald-400">+R$ 0.00</span>
+                  )}
                 </TableCell>
               )}
               {visibleColumns.includes('tags') && (

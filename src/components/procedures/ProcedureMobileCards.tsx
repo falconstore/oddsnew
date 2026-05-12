@@ -162,9 +162,17 @@ export function ProcedureMobileCards({ procedures, onEdit, onDelete, onToggleFav
             </div>
             <div className="bg-white/[0.03] rounded-xl p-2.5 border border-white/5">
               <p className="text-muted-foreground mb-1">Lucro/Prejuízo</p>
-              <span className={`font-bold text-sm ${proc.profit_loss >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                {proc.profit_loss >= 0 ? '+' : ''}R$ {proc.profit_loss?.toFixed(2)}
-              </span>
+              {proc.profit_loss !== 0 ? (
+                <span className={`font-bold text-sm ${proc.profit_loss >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {proc.profit_loss >= 0 ? '+' : ''}R$ {proc.profit_loss?.toFixed(2)}
+                </span>
+              ) : proc.lucro_prejuizo_previsto != null && proc.lucro_prejuizo_previsto !== 0 ? (
+                <span className="text-sm text-muted-foreground/50 font-medium" title="Lucro previsto (resultado ainda não definido)">
+                  ~R$ {Number(proc.lucro_prejuizo_previsto).toFixed(2)}
+                </span>
+              ) : (
+                <span className="font-bold text-sm text-emerald-400">+R$ 0.00</span>
+              )}
             </div>
             {proc.freebet_value && (
               <div className="bg-white/[0.03] rounded-xl p-2.5 border border-white/5">

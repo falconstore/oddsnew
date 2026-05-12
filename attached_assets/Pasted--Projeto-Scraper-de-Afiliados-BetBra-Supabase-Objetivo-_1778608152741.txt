@@ -1,0 +1,200 @@
+# Projeto: Scraper de Afiliados BetBra → Supabase
+
+## Objetivo
+Criar um sistema que faça scraping automático dos dados de afiliação do painel **affiliates.betbra.bet.br**, combine dados de dois "sistemas" (All e Exchange) em uma única tabela, e salve no Supabase. O sistema deve ter um endpoint/botão "Atualizar" que dispare a coleta sob demanda.
+
+---
+
+## 1. Stack
+- **Backend:** Node.js (Express) ou Python (FastAPI) — sua escolha, prefiro Node.js
+- **Banco:** Supabase (PostgreSQL)
+- **Scraping:** `axios` ou `fetch` nativo (não precisa de Playwright, é só uma requisição POST com cookies de sessão)
+- **Frontend:** React simples com um botão "Atualizar" e a tabela renderizada
+
+---
+
+## 2. Fonte dos dados
+
+Existem **duas requisições POST** para o mesmo endpoint, diferenciadas pelo parâmetro `filters[system]`:
+
+**Endpoint:** `https://affiliates.betbra.bet.br/earnings/aListEarnings`
+
+### Requisição A — System "All" (sem filtro de sistema)
+```
+POST /earnings/aListEarnings
+Body: page=1&per_page=25&filters[affiliate_earnings_types][]=commission&filters[affiliate_earnings_types][]=turnover&filters[affiliate_earnings_types][]=cpa&filters[date_range][]=YYYY-MM-01&filters[date_range][]=YYYY-MM-31&extra_param=changed-filter&search=
+```
+
+### Requisição B — System "Exchange" (system=8)
+```
+POST /earnings/aListEarnings
+Body: page=1&per_page=25&filters[affiliate_earnings_types][]=commission&filters[affiliate_earnings_types][]=turnover&filters[affiliate_earnings_types][]=cpa&filters[date_range][]=YYYY-MM-01&filters[date_range][]=YYYY-MM-31&filters[system]=8&extra_param=changed-filter&search=
+```
+
+### Headers obrigatórios em ambas:
+```
+Content-Type: application/x-www-form-urlencoded; charset=UTF-8
+X-Requested-With: XMLHttpRequest
+Origin: https://affiliates.betbra.bet.br
+Referer: https://affiliates.betbra.bet.br/earnings/
+User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:150.0) Gecko/20100101 Firefox/150.0
+Cookie: [COOKIE COMPLETO — armazenado em variável de ambiente]
+```
+
+⚠️ **IMPORTANTE sobre o Cookie:** O cookie contém `PHPSESSID` e `cf_clearance` (Cloudflare). Esses expiram. Armazenar o cookie inteiro numa variável `.env` chamada `BETBRA_COOKIE` para fácil atualização manual quando expirar.
+
+---
+
+## 3. Parsing da resposta
+
+A resposta vem como HTML/texto com tabela. Cada linha de dia tem essa estrutura (em ordem de colunas no HTML):
+
+**System "All":**
+```
+Date | CPA | (?) | Registrations | System | Number_of_bets | (col_X) | Site_NGR | (rev) | Users_Turnover | (status)
+```
+
+Pelos exemplos enviados, identifiquei as colunas que preciso extrair:
+- **Date** (1ª coluna): formato `YYYY-MM-DD`
+- **CPA / Accounts Triggering CPA**: 2ª coluna numérica (do All)
+- **Registrations**: coluna "Registros" do All
+- **Number of bets**: do All
+- **Site NGR**: valor monetário do All
+- **Users Turnover**: do Exchange (substitui o do All)
+
+> 💡 **Faça o parsing inspecionando o HTML real da resposta.** Use Cheerio (Node) ou BeautifulSoup (Python) para parsear a tabela `<tr>` por `<tr>`. Não confie em split por espaços porque os valores têm separador de milhar (espaço) — ex: `145 415` é UM número (145415), não dois.
+
+---
+
+## 4. Schema Supabase
+
+Criar tabela `betbra_earnings`:
+
+```sql
+CREATE TABLE betbra_earnings (
+  id BIGSERIAL PRIMARY KEY,
+  date DATE NOT NULL UNIQUE,           -- chave única para UPSERT
+  date_br VARCHAR(10) NOT NULL,        -- formato DD/MM/YYYY (cache para frontend)
+  registrations INTEGER DEFAULT 0,     -- do All
+  number_of_bets INTEGER DEFAULT 0,    -- do All
+  site_ngr NUMERIC(15, 2) DEFAULT 0,   -- do All
+  users_turnover NUMERIC(15, 2) DEFAULT 0,  -- do Exchange
+  cpa INTEGER DEFAULT 0,               -- do All (Accounts Triggering CPA)
+  raw_all JSONB,                       -- backup da linha bruta do All
+  raw_exchange JSONB,                  -- backup da linha bruta do Exchange
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_betbra_earnings_date ON betbra_earnings(date DESC);
+```
+
+---
+
+## 5. Lógica de UPSERT
+
+Como os dados de um mesmo dia podem mudar (especialmente o dia atual), usar **UPSERT** com `date` como chave de conflito:
+
+```javascript
+await supabase
+  .from('betbra_earnings')
+  .upsert({
+    date: '2026-05-12',
+    date_br: '12/05/2026',
+    registrations: 4,
+    number_of_bets: 30,
+    site_ngr: 29747.98,
+    users_turnover: 28585.91,
+    cpa: 0,
+    raw_all: {...},
+    raw_exchange: {...},
+    updated_at: new Date().toISOString()
+  }, { onConflict: 'date' });
+```
+
+**Sempre sobrescrever** — nunca duplicar linhas.
+
+---
+
+## 6. Conversão de data
+
+- Input do scraper: `2026-05-12`
+- Salvar no banco: campo `date` como `2026-05-12` (tipo DATE) **+** campo `date_br` como `12/05/2026` (string pronta pro frontend)
+
+Função utilitária:
+```javascript
+function toBrDate(isoDate) {
+  const [y, m, d] = isoDate.split('-');
+  return `${d}/${m}/${y}`;
+}
+```
+
+---
+
+## 7. Endpoints da API
+
+### `POST /api/refresh`
+Dispara o scraping. Aceita opcionalmente `{ "start_date": "2026-05-01", "end_date": "2026-05-31" }`. Se não vier, usa o mês atual.
+
+Fluxo:
+1. Faz request A (All) com o range de datas
+2. Faz request B (Exchange) com o range de datas
+3. Parseia ambas as respostas em arrays de linhas
+4. Combina por `date` (chave de join)
+5. UPSERT no Supabase
+6. Retorna `{ success: true, days_updated: N, errors: [] }`
+
+### `GET /api/earnings?from=2026-05-01&to=2026-05-31`
+Retorna os dados já salvos no Supabase, ordenados por `date DESC`.
+
+---
+
+## 8. Frontend (página de Registros)
+
+Replicar o layout escuro da imagem anexada:
+- Header: "Lista de Registros" + contador "Mostrando X de Y registros"
+- Botão **"🔄 Atualizar"** no topo direito — chama `POST /api/refresh` e depois recarrega a tabela
+- Colunas: **Data | Registros | Apostas | NGR | Turnover | CPA | Ações**
+- Formato de números: pt-BR (`29.747,98`)
+- Formato de data: `DD/MM/YYYY`
+- Mostrar loading state durante o refresh
+- Toast de sucesso/erro
+
+---
+
+## 9. Tratamento de erros
+
+- Se o cookie expirar (status 302/401/403), retornar erro claro: `"Cookie expirado, atualize BETBRA_COOKIE em .env"`
+- Se uma das duas requests (All/Exchange) falhar, abortar o ciclo e não salvar nada (transação atômica)
+- Log estruturado de cada refresh: quantos dias inseridos/atualizados
+
+---
+
+## 10. Variáveis de ambiente (.env)
+
+```
+SUPABASE_URL=
+SUPABASE_SERVICE_KEY=
+BETBRA_COOKIE=glc=br; _ga_...; PHPSESSID=...; cf_clearance=...
+BETBRA_USER_AGENT=Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:150.0) Gecko/20100101 Firefox/150.0
+```
+
+---
+
+## 11. Bônus (se der tempo)
+
+- Cron interno opcional: refresh automático a cada 30 minutos
+- Coluna "Ações" com botão de "ver detalhes" expandindo a linha (mostrar `raw_all` e `raw_exchange`)
+- Indicador visual de "última atualização: há X minutos"
+
+---
+
+## Entregáveis esperados
+
+1. Repositório Replit rodando com:
+   - `/scraper` — módulo de scraping com as duas requests
+   - `/parser` — parser do HTML (Cheerio)
+   - `/db` — cliente Supabase + função de upsert
+   - `/api` — rotas Express
+   - `/frontend` — React com a tabela e botão de atualizar
+2. SQL de criação da tabela no Supabase
+3. README com instruções pra atualizar o cookie quando expirar
