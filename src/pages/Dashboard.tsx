@@ -1,11 +1,13 @@
 import { usePersistedState } from '@/hooks/usePersistedState';
+import { useState } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Layout } from '@/components/Layout';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Zap, FileText, TrendingUp, CreditCard, Bot, ArrowRight,
-  Activity, Calendar, Clock, Trophy, ChevronDown,
+  Activity, Calendar, Clock, Trophy, ChevronDown, Users,
+  CheckCircle2, Gift, Layers, Pencil, Check, X,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -29,6 +31,7 @@ import {
   getDailyProfitData,
   generateMonthOptions,
   capitalizeMonth,
+  getDailyStats,
 } from '@/lib/procedureUtils';
 
 const quickLinks = [
@@ -74,6 +77,44 @@ const quickLinks = [
   },
 ];
 
+function CpfInput({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(String(value));
+
+  const confirm = () => {
+    const n = parseInt(draft, 10);
+    if (!isNaN(n) && n > 0) onChange(n);
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <span className="inline-flex items-center gap-1">
+        <input
+          autoFocus
+          type="number"
+          min={1}
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') confirm(); if (e.key === 'Escape') setEditing(false); }}
+          className="w-16 bg-white/10 border border-primary/40 rounded px-1.5 py-0.5 text-sm text-center font-bold outline-none focus:border-primary"
+        />
+        <button onClick={confirm} className="text-emerald-400 hover:text-emerald-300"><Check className="w-3.5 h-3.5" /></button>
+        <button onClick={() => setEditing(false)} className="text-muted-foreground hover:text-foreground"><X className="w-3.5 h-3.5" /></button>
+      </span>
+    );
+  }
+  return (
+    <button
+      onClick={() => { setDraft(String(value)); setEditing(true); }}
+      className="inline-flex items-center gap-1 text-primary font-bold hover:text-primary/80 transition-colors group"
+    >
+      {value}
+      <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-60 transition-opacity" />
+    </button>
+  );
+}
+
 const Dashboard = () => {
   const { canViewPage, user } = useAuth();
   const visibleLinks = quickLinks.filter(link => canViewPage(link.pageKey));
@@ -81,11 +122,16 @@ const Dashboard = () => {
 
   const { data: procedures = [] } = useProcedures();
   const [selectedMonth, setSelectedMonth] = usePersistedState('proc_month', new Date());
+  const [numCpfs, setNumCpfs] = usePersistedState<number>('dashboard_num_cpfs', 10);
 
   const monthlyProfit = getCurrentMonthProfit(procedures, selectedMonth);
   const bestPlatform = getBestPlatform(procedures, selectedMonth);
   const dayWithMostProfit = getDayWithMostProfit(procedures, selectedMonth);
   const dayWithMostProcedures = getDayWithMostProcedures(procedures, selectedMonth);
+  const daily = getDailyStats(procedures);
+
+  const lucroPorCpf = numCpfs > 0 ? daily.lucroBruto / numCpfs : 0;
+  const todayLabel = capitalizeMonth(format(new Date(), "EEEE, dd 'de' MMMM", { locale: ptBR }));
 
   return (
     <Layout>
@@ -111,6 +157,109 @@ const Dashboard = () => {
             <p className="text-muted-foreground text-sm max-w-md mx-auto animate-fade-in-up delay-200">
               Sua plataforma profissional de monitoramento e controle de apostas esportivas
             </p>
+          </div>
+        </div>
+
+        {/* ── RESUMO DO DIA ── */}
+        <div className="relative rounded-2xl overflow-hidden border border-primary/20 bg-gradient-to-br from-[#0a1a0f] via-[#081510] to-[#060d08]">
+          {/* glow de fundo */}
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,hsl(145_80%_48%/0.12)_0%,transparent_60%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,hsl(145_80%_48%/0.07)_0%,transparent_60%)]" />
+
+          <div className="relative z-10 p-5 sm:p-6">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <div className="flex items-center gap-2 mb-0.5">
+                  <div className="w-2 h-2 rounded-full bg-primary animate-pulse-glow" />
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-primary/70">Ao Vivo</span>
+                </div>
+                <h2 className="text-lg font-bold text-foreground">Somatória do Dia</h2>
+                <p className="text-xs text-muted-foreground">{todayLabel}</p>
+              </div>
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10">
+                <Users className="w-3.5 h-3.5 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">CPFs:</span>
+                <CpfInput value={numCpfs} onChange={setNumCpfs} />
+              </div>
+            </div>
+
+            {/* KPIs grid */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+
+              {/* Operações */}
+              <div className="rounded-xl bg-white/5 border border-white/8 p-4 flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-cyan-500/20 flex items-center justify-center">
+                    <Layers className="w-3.5 h-3.5 text-cyan-400" />
+                  </div>
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Operações</span>
+                </div>
+                <p className="text-3xl font-black text-cyan-300 leading-none">{daily.totalOperacoes}</p>
+                <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+                  <span className="flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                    {daily.operacoesEncerradas} encerradas
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Clock className="w-3 h-3 text-amber-400" />
+                    {daily.operacoesAbertas} abertas
+                  </span>
+                </div>
+              </div>
+
+              {/* Freebets */}
+              <div className="rounded-xl bg-white/5 border border-white/8 p-4 flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-purple-500/20 flex items-center justify-center">
+                    <Gift className="w-3.5 h-3.5 text-purple-400" />
+                  </div>
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Freebets</span>
+                </div>
+                <p className="text-3xl font-black text-purple-300 leading-none">{daily.totalFreebets}</p>
+                <p className="text-[10px] text-muted-foreground">
+                  {daily.totalSemFb} sem freebet
+                </p>
+              </div>
+
+              {/* Lucro bruto */}
+              <div className="rounded-xl bg-white/5 border border-white/8 p-4 flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+                    <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+                  </div>
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Lucro Bruto</span>
+                </div>
+                <p className={cn(
+                  'text-3xl font-black leading-none',
+                  daily.lucroBruto >= 0 ? 'text-emerald-300' : 'text-red-400'
+                )}>
+                  {daily.lucroBruto >= 0 ? '+' : ''}R${daily.lucroBruto.toFixed(2)}
+                </p>
+                <p className="text-[10px] text-muted-foreground">resultado real do dia</p>
+              </div>
+
+              {/* Por CPF */}
+              <div className="rounded-xl border p-4 flex flex-col gap-2 relative overflow-hidden
+                bg-gradient-to-br from-primary/15 to-primary/5 border-primary/25">
+                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,hsl(145_80%_48%/0.15)_0%,transparent_70%)]" />
+                <div className="relative flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-primary/30 flex items-center justify-center">
+                    <Users className="w-3.5 h-3.5 text-primary" />
+                  </div>
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Por CPF</span>
+                </div>
+                <p className={cn(
+                  'relative text-3xl font-black leading-none',
+                  lucroPorCpf >= 0 ? 'text-primary' : 'text-red-400'
+                )}>
+                  {lucroPorCpf >= 0 ? '+' : ''}R${lucroPorCpf.toFixed(2)}
+                </p>
+                <p className="relative text-[10px] text-muted-foreground">
+                  com <CpfInput value={numCpfs} onChange={setNumCpfs} /> CPFs
+                </p>
+              </div>
+            </div>
           </div>
         </div>
 

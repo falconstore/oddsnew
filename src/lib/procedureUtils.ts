@@ -339,3 +339,38 @@ export const generateMonthOptions = () => {
 export const capitalizeMonth = (monthStr: string): string => {
   return monthStr.charAt(0).toUpperCase() + monthStr.slice(1);
 };
+
+export interface DailyStats {
+  totalOperacoes: number;
+  totalFreebets: number;
+  totalSemFb: number;
+  lucroBruto: number;
+  operacoesEncerradas: number;
+  operacoesAbertas: number;
+  date: string; // YYYY-MM-DD
+}
+
+export const getDailyStats = (procedures: Procedure[], date?: Date): DailyStats => {
+  const ref = date ?? new Date();
+  const today = format(ref, 'yyyy-MM-dd');
+
+  const todayProcs = getCountableProcedures(procedures).filter(p => {
+    const d = p.date ? parseDate(p.date) : null;
+    return d && format(d, 'yyyy-MM-dd') === today;
+  });
+
+  const totalFreebets = todayProcs.filter(p => p.tipo === 'GANHAR_FB' || p.tipo === 'QUEIMAR_FB').length;
+  const totalSemFb = todayProcs.filter(p => p.tipo === 'SEM_FB').length;
+  const lucroBruto = todayProcs.reduce((s, p) => s + (p.profit_loss || 0), 0);
+  const operacoesEncerradas = todayProcs.filter(p => p.profit_loss !== 0).length;
+
+  return {
+    totalOperacoes: todayProcs.length,
+    totalFreebets,
+    totalSemFb,
+    lucroBruto,
+    operacoesEncerradas,
+    operacoesAbertas: todayProcs.length - operacoesEncerradas,
+    date: today,
+  };
+};
