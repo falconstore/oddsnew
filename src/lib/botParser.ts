@@ -22,6 +22,7 @@ export interface ParsedProcedure {
   ref_procedure_number: string | null;
   is_duplo_green: boolean;
   dp: boolean;
+  tags: string[];
   observacoes: string | null;
 }
 
@@ -43,6 +44,7 @@ export interface PartialParsedProcedure {
   ref_procedure_number: string | null;
   is_duplo_green: boolean;
   dp: boolean;
+  tags: string[];
   observacoes: string | null;
   missingFields: string[];
 }
@@ -235,6 +237,7 @@ function extractLucro(text: string): { value: number; isDuploGreen: boolean } | 
   const dgRe = new RegExp(`DUPLO\\s+GREEN[^\\n]*?${BR_NUM.source}`, "i");
   const dgm = text.match(dgRe);
   if (dgm) return { value: parseBrNumber(dgm[1]), isDuploGreen: true };
+
   const rangeRe = new RegExp(
     `LUCRO:[^\\n]*?${BR_NUM.source}\\s*[AÀà]\\s*${BR_NUM.source}`,
     "i",
@@ -245,9 +248,19 @@ function extractLucro(text: string): { value: number; isDuploGreen: boolean } | 
     const v2 = parseBrNumber(rm[2]);
     return { value: Math.max(v1, v2), isDuploGreen: false };
   }
+
   const directRe = new RegExp(`LUCRO:[^\\n]*?${BR_NUM.source}`, "i");
   const dm = text.match(directRe);
   if (dm) return { value: parseBrNumber(dm[1]), isDuploGreen: false };
+
+  // "LUCRO DE X,XX" — múltiplas ocorrências (OPÇÃO 1, OPÇÃO 2...) → usa o maior
+  const lucroDeRe = new RegExp(`LUCRO\\s+DE[^\\n\\d]*${BR_NUM.source}`, "gi");
+  const lucroDeMatches = [...text.matchAll(lucroDeRe)];
+  if (lucroDeMatches.length > 0) {
+    const values = lucroDeMatches.map(m => parseBrNumber(m[1])).filter(v => !isNaN(v));
+    if (values.length > 0) return { value: Math.max(...values), isDuploGreen: false };
+  }
+
   return null;
 }
 
@@ -333,9 +346,13 @@ export function parseMessage(text: string): ParseResult {
     missing.push("evento e horário (TIME A X TIME B - DD/MM/AAAA ÀS HH:MM)");
   }
 
+  // isDuploGreen = true apenas quando "OBJETIVO DUPLO GREEN - 💵 X,XX" (com valor confirmado)
   const isDuploGreen = lucroResult?.isDuploGreen ?? false;
-  const hasDuploMention = /chance\s+de\s+duplo\s+green/i.test(text) || isDuploGreen;
-  const prioridade: Prioridade = hasDuploMention ? "ALTA" : "MEDIA";
+  // chanceDuploGreen = true quando "chance de duplo green" mas SEM valor confirmado
+  // → gera tag "Chance DG", NÃO ativa dp nem duplo_green_confirmado
+  const chanceDuploGreen = /chance\s+de\s+duplo\s+green/i.test(text) && !isDuploGreen;
+  const prioridade: Prioridade = (isDuploGreen || chanceDuploGreen) ? "ALTA" : "MEDIA";
+  const autoTags: string[] = chanceDuploGreen ? ["Chance DG"] : [];
 
   if (missing.length > 0) {
     return {
@@ -357,7 +374,8 @@ export function parseMessage(text: string): ParseResult {
         freebet_valor_previsto: freebetValor,
         ref_procedure_number: refProcNumber,
         is_duplo_green: isDuploGreen,
-        dp: hasDuploMention,
+        dp: isDuploGreen,
+        tags: autoTags,
         observacoes,
         missingFields: missing,
       },
@@ -383,7 +401,8 @@ export function parseMessage(text: string): ParseResult {
       freebet_valor_previsto: freebetValor,
       ref_procedure_number: refProcNumber,
       is_duplo_green: isDuploGreen,
-      dp: hasDuploMention,
+      dp: isDuploGreen,
+      tags: autoTags,
       observacoes,
     },
   };

@@ -23,6 +23,7 @@ export interface ParsedProcedure {
   ref_procedure_number: string | null; // número do proc de referência (QUEIMAR_FB)
   is_duplo_green: boolean;
   dp: boolean;
+  tags: string[];               // tags automáticas, ex: ["Chance DG"]
   observacoes: string | null;   // linha "📝 OBS: ..." (ex: Opção 2 da Aposta Protegida)
 }
 
@@ -45,6 +46,7 @@ export interface PartialParsedProcedure {
   ref_procedure_number: string | null;
   is_duplo_green: boolean;
   dp: boolean;
+  tags: string[];
   observacoes: string | null;
   missingFields: string[];
 }
@@ -431,9 +433,14 @@ export function parseMessage(text: string): ParseResult {
   }
 
   // 11. Duplo green / prioridade
+  // isDuploGreen = true apenas quando "OBJETIVO DUPLO GREEN - 💵 X,XX" (com valor confirmado)
   const isDuploGreen = lucroResult?.isDuploGreen ?? false;
-  const hasDuploMention = /chance\s+de\s+duplo\s+green/i.test(text) || isDuploGreen;
-  const prioridade: Prioridade = hasDuploMention ? "ALTA" : "MEDIA";
+  // chanceDuploGreen = true quando "chance de duplo green" mas SEM valor confirmado
+  // → gera tag "Chance DG", NÃO ativa dp nem duplo_green_confirmado
+  const chanceDuploGreen = /chance\s+de\s+duplo\s+green/i.test(text) && !isDuploGreen;
+  const prioridade: Prioridade = (isDuploGreen || chanceDuploGreen) ? "ALTA" : "MEDIA";
+  // tags automáticas
+  const autoTags: string[] = chanceDuploGreen ? ["Chance DG"] : [];
 
   // Resultado parcial: tem número mas falta(m) campo(s)
   if (missing.length > 0) {
@@ -456,7 +463,8 @@ export function parseMessage(text: string): ParseResult {
         freebet_valor_previsto: freebetValor,
         ref_procedure_number: refProcNumber,
         is_duplo_green: isDuploGreen,
-        dp: hasDuploMention,
+        dp: isDuploGreen,
+        tags: autoTags,
         observacoes,
         missingFields: missing,
       },
@@ -482,7 +490,8 @@ export function parseMessage(text: string): ParseResult {
       freebet_valor_previsto: freebetValor,
       ref_procedure_number: refProcNumber,
       is_duplo_green: isDuploGreen,
-      dp: hasDuploMention,
+      dp: isDuploGreen,
+      tags: autoTags,
       observacoes,
     },
   };
