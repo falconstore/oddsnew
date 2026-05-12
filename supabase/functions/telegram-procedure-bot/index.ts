@@ -372,7 +372,12 @@ serve(async (req) => {
   }
 
   const updateId = update?.update_id ?? null;
-  const msg = update?.message ?? update?.channel_post;
+  // Suporta mensagens novas E mensagens editadas (edited_channel_post / edited_message).
+  // Edições chegam sem `channel_post`/`message` no update — o bot ignorava silenciosamente.
+  const isEdit = !!(update?.edited_message ?? update?.edited_channel_post) &&
+    !(update?.message ?? update?.channel_post);
+  const msg = update?.message ?? update?.channel_post ??
+    update?.edited_message ?? update?.edited_channel_post;
   if (!msg) {
     log("ignored", { reason: "no message/channel_post", update_id: updateId });
     return json({ ok: true, ignored: "no message" });
@@ -540,7 +545,100 @@ serve(async (req) => {
   }
 
   // ──────────────────────────────────────────────────────────
-  // 2. Fluxo normal — mensagem de procedimento postada no canal
+  // 2. Mensagem editada — atualiza proc existente ou cria novo
+  // ──────────────────────────────────────────────────────────
+  if (isEdit) {
+    const editParse = parseMessage(text);
+    if (editParse.ok === false) {
+      log("edit_ignored_no_number", { update_id: updateId, missing: editParse.missingFields });
+      return json({ ok: true, action: "edit_ignored_no_number" });
+    }
+
+    const isPartial = editParse.ok === "partial";
+    const parsed = editParse.data;
+
+    // Procura proc existente pelo external_id (ex: "bsk:175-20260512")
+    const { data: existing } = await supa
+      .from("procedures")
+      .select("id, procedure_number")
+      .eq("external_id", parsed.external_id)
+      .maybeSingle();
+
+    if (existing) {
+      // Proc já existe → atualiza campos derivados do parse, preserva campos operacionais
+      const updateFields: Record<string, unknown> = {
+        promotion_name: parsed.titulo || undefined,
+        platform: parsed.platform ?? undefined,
+        category: parsed.category,
+        tipo: parsed.tipo,
+        partida_descricao: parsed.partida_descricao,
+        kickoff_at: parsed.kickoff_at,
+        data_partida: parsed.data_partida,
+        horario_partida: parsed.horario_partida,
+        lucro_prejuizo_previsto: parsed.lucro_prejuizo_previsto,
+        freebet_valor_previsto: parsed.freebet_valor_previsto,
+        freebet_value: parsed.freebet_valor_previsto,
+        dp: parsed.dp,
+        tags: parsed.tags ?? [],
+        observacoes: parsed.observacoes ?? null,
+        bot_raw_message: text,
+        bot_missing_fields: isPartial ? (parsed as any).missingFields : null,
+        bot_needs_review: isPartial,
+      };
+
+      // Resolve freebet_reference_id para QUEIMAR_FB
+      if (parsed.tipo === "QUEIMAR_FB" && parsed.ref_procedure_number) {
+        const { data: refProc } = await supa
+          .from("procedures")
+          .select("id")
+          .eq("procedure_number", parsed.ref_procedure_number)
+          .order("created_date", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (refProc) updateFields.freebet_reference_id = refProc.id;
+      }
+
+      await supa.from("procedures").update(updateFields).eq("id", existing.id);
+
+      log("edit_updated", {
+        procedure_id: existing.id,
+        number: parsed.procedure_number,
+        partial: isPartial,
+        update_id: updateId,
+      });
+
+      await logToPanel(SUPABASE_URL, SERVICE_ROLE, {
+        level: "info",
+        event: "edit_updated",
+        message: `Proc #${parsed.procedure_number} atualizado via edição da mensagem Telegram`,
+        procedureNumber: parsed.procedure_number,
+        updateId,
+        messageId,
+        context: { procedure_id: existing.id, partial: isPartial },
+      });
+
+      // Resync com FreeBet PRO apenas se parse completo
+      if (!isPartial) {
+        await syncWithFreebetPro(
+          supa, SUPABASE_URL, SERVICE_ROLE,
+          existing.id, parsed.procedure_number, updateId, messageId,
+        );
+      }
+
+      return json({ ok: true, action: "edit_updated", procedure_id: existing.id });
+    }
+
+    // Proc não existe ainda → cria normalmente (ex: bot estava down na inserção original)
+    log("edit_new_proc", {
+      external_id: parsed.external_id,
+      number: parsed.procedure_number,
+      update_id: updateId,
+    });
+    // Cai no fluxo normal abaixo (parseAndInsertProcedure)
+  }
+
+  // ──────────────────────────────────────────────────────────
+  // 3. Fluxo normal — mensagem de procedimento postada no canal
   // ──────────────────────────────────────────────────────────
   const result = await parseAndInsertProcedure(supa, text);
 
