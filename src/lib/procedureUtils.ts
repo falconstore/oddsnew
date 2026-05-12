@@ -343,6 +343,7 @@ export const capitalizeMonth = (monthStr: string): string => {
 export interface DailyStats {
   totalOperacoes: number;
   totalFreebets: number;
+  totalFreebetsValor: number;
   totalSemFb: number;
   lucroBruto: number;
   operacoesEncerradas: number;
@@ -359,7 +360,9 @@ export const getDailyStats = (procedures: Procedure[], date?: Date): DailyStats 
     return d && format(d, 'yyyy-MM-dd') === today;
   });
 
-  const totalFreebets = todayProcs.filter(p => p.tipo === 'GANHAR_FB' || p.tipo === 'QUEIMAR_FB').length;
+  const fbProcs = todayProcs.filter(p => p.tipo === 'GANHAR_FB' || p.tipo === 'QUEIMAR_FB');
+  const totalFreebets = fbProcs.length;
+  const totalFreebetsValor = fbProcs.reduce((s, p) => s + (Number(p.freebet_value) || 0), 0);
   const totalSemFb = todayProcs.filter(p => p.tipo === 'SEM_FB').length;
   const lucroBruto = todayProcs.reduce((s, p) => s + (p.profit_loss || 0), 0);
   const operacoesEncerradas = todayProcs.filter(p => p.profit_loss !== 0).length;
@@ -367,6 +370,7 @@ export const getDailyStats = (procedures: Procedure[], date?: Date): DailyStats 
   return {
     totalOperacoes: todayProcs.length,
     totalFreebets,
+    totalFreebetsValor,
     totalSemFb,
     lucroBruto,
     operacoesEncerradas,

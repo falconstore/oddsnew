@@ -130,7 +130,7 @@ const Dashboard = () => {
   const dayWithMostProcedures = getDayWithMostProcedures(procedures, selectedMonth);
   const daily = getDailyStats(procedures);
 
-  const lucroPorCpf = numCpfs > 0 ? daily.lucroBruto / numCpfs : 0;
+  const lucroPorCpf = daily.lucroBruto * numCpfs;
   const todayLabel = capitalizeMonth(format(new Date(), "EEEE, dd 'de' MMMM", { locale: ptBR }));
 
   return (
@@ -217,9 +217,16 @@ const Dashboard = () => {
                   <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Freebets</span>
                 </div>
                 <p className="text-3xl font-black text-purple-300 leading-none">{daily.totalFreebets}</p>
-                <p className="text-[10px] text-muted-foreground">
-                  {daily.totalSemFb} sem freebet
-                </p>
+                <div className="flex flex-col gap-0.5">
+                  {daily.totalFreebetsValor > 0 && (
+                    <p className="text-[11px] font-semibold text-purple-400">
+                      R${daily.totalFreebetsValor.toFixed(2)} em FB
+                    </p>
+                  )}
+                  <p className="text-[10px] text-muted-foreground">
+                    {daily.totalSemFb} sem freebet
+                  </p>
+                </div>
               </div>
 
               {/* Lucro bruto */}
