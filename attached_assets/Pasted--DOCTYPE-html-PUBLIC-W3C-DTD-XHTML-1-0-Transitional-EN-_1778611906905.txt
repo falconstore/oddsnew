@@ -1,0 +1,468 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<html>
+	<head><script>(function(w,i,g){w[g]=w[g]||[];if(typeof w[g].push=='function')w[g].push(i)})
+(window,'GTM-WC2RLSQT','google_tags_first_party');</script><script>(function(w,d,s,l){w[l]=w[l]||[];(function(){w[l].push(arguments);})('set', 'developer_id.dY2E1Nz', true);
+		var f=d.getElementsByTagName(s)[0],
+		j=d.createElement(s);j.async=true;j.src='/metrics/';
+		f.parentNode.insertBefore(j,f);
+		})(window,document,'script','dataLayer');</script>
+		<meta charset="utf-8"/>
+		<title>Bet Bra | Affiliates</title>
+		<base href="https://affiliates.betbra.bet.br/">
+		<link rel="icon" type="image/x-icon" href="favicon.ico">
+		<link rel="icon" sizes="48x48" href="https://payments.betbra.bet.br/icons/android-icon-48x48.png">
+		<link rel="icon" sizes="96x96" href="https://payments.betbra.bet.br/icons/android-icon-96x96.png">
+		<link rel="icon" sizes="144x144" href="https://payments.betbra.bet.br/icons/android-icon-144x144.png">
+		<link rel="icon" sizes="192x192" href="https://payments.betbra.bet.br/icons/android-icon-192x192.png">
+		<link rel="apple-touch-icon" sizes="57x57" href="https://payments.betbra.bet.br/icons/apple-icon-57x57.png">
+		<link rel="apple-touch-icon" sizes="60x60" href="https://payments.betbra.bet.br/icons/apple-icon-60x60.png">
+		<link rel="apple-touch-icon" sizes="72x72" href="https://payments.betbra.bet.br/icons/apple-icon-72x72.png">
+		<link rel="apple-touch-icon" sizes="76x76" href="https://payments.betbra.bet.br/icons/apple-icon-76x76.png">
+		<link rel="apple-touch-icon" sizes="114x114" href="https://payments.betbra.bet.br/icons/apple-icon-114x114.png">
+		<link rel="apple-touch-icon" sizes="120x120" href="https://payments.betbra.bet.br/icons/apple-icon-120x120.png">
+		<link rel="apple-touch-icon" sizes="152x152" href="https://payments.betbra.bet.br/icons/apple-icon-152x152.png">
+		<link rel="apple-touch-icon" sizes="180x180" href="https://payments.betbra.bet.br/icons/apple-icon-180x180.png">
+		<script src="//ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js" type="text/javascript"></script>
+		<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+		<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+		<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+		<link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/smoothness/jquery-ui.css">
+		<script type="text/javascript" src="https://payments.betbra.bet.br/admin/js/jquery.cookie.js"></script>
+		<link rel="stylesheet" type="text/css" href="https://payments.betbra.bet.br/admin/js/range-date-picker/dist/duDatepicker.min.css">
+		<link rel="stylesheet" type="text/css" href="https://payments.betbra.bet.br/admin/js/time-picker/mdtimepicker.css">
+		<script src="//code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+		<script src="https://payments.betbra.bet.br/js/tinymce5/js/tinymce/tinymce.min.js"></script>
+		<script type="text/javascript" src="https://payments.betbra.bet.br/admin/js/range-date-picker/dist/duDatepicker.min.js"></script>
+		<script src="https://payments.betbra.bet.br/admin/js/time-picker/mdtimepicker.js"></script>
+		<script>var AFFILIATES_SITE_BASE = 'https://affiliates.betbra.bet.br/', ADMIN_BASE = 'https://payments.betbra.bet.br/admin/';</script>
+		<script type="text/javascript" src="https://payments.betbra.bet.br/admin/js/main.js?v=1772018814"></script>
+				<style>
+			:root {
+				--background-color: #1e1e1e;
+				--light-background-color: #343434;
+				--button-background-color: #e6d68c;
+				--button-disabled-backgroundcolor: #616364;
+				--menu-active-color: #e6d68c;
+				--menu-inactive-color: #aaaaaa;
+				--button-color: #000;
+				--color: #fff;
+				--left-menu-background-color: #eaf0ee;
+				--left-menu-active-color: rgb(210,210,210);
+			}
+		</style>
+				<link href="styles.css?v=1771602942" rel="stylesheet" type="text/css" />
+		<link href="https://payments.betbra.bet.br/admin/affiliates.css?v=1771602942" rel="stylesheet" type="text/css" />
+	</head>
+	<body>
+		<header>
+			<div>
+				<a class="logo" href="https://affiliates.betbra.bet.br/"><img src="https://payments.betbra.bet.br/images/brand/affiliates-logo.svg" alt="Bet Bra" style="margin: 9px 0 0 26px" height="30" /></a>
+				<div class="user">
+					Jonathan					<a class="logout" href="https://affiliates.betbra.bet.br/logout">
+						<i class="material-icons md-18">logout</i>
+  						<p>Logout</p>
+					</a>
+				</div>
+			</div>
+			<!-- <div class="menu">
+				<a href="https://affiliates.betbra.bet.br/"><span class="material-icons-outlined">home</span>HOME</a>
+								<a href="https://affiliates.betbra.bet.br/account/"><span class="material-icons-outlined">manage_accounts</span>ACCOUNT</a>
+				<a href="https://affiliates.betbra.bet.br/earnings/" class="active"><span class="material-icons-outlined">bar_chart</span>EARNINGS</a>
+			</div> -->
+		</header>
+<style>
+	.pagination-wrapper{
+		align-self: end;
+		margin-bottom: 14px;
+	}
+	
+	.reports-header{
+		padding: 10px 20px 0;
+	}
+	
+	table.reports{
+		width: 100%;
+	}
+	
+	table.reports thead th { 
+		position: sticky;
+		top: 0; 
+		z-index: 1;
+		background-color: #fff;
+	}
+	
+	table.reports td{
+		white-space: nowrap;
+		padding: 2px 6px;
+	}
+	
+	table.reports td:not(.earning){
+		color: rgb(95,95,95);
+	}
+	
+	table.reports td.right{
+		text-align: right;
+		padding-right: 10px;
+	}
+	
+	table.reports td a{
+		text-decoration: underline;
+	}
+	
+	table.reports th.earning{
+		background-color: #d1f7fb;
+		max-width: 100px;
+	}
+	
+	table.reports th.earning.orange{
+		background-color: #ffd699;
+	}
+	
+	table.reports th.earning.orange2{
+		background-color: #fee1c4;
+	}
+	
+	table.reports th.earning.orange3{
+		background-color: #ffebd8;
+	}
+	
+	table.reports td.earning{
+		background-color: rgba(25,245,255,0.3);
+	}
+	
+	table.reports th.earning span.title{
+		display: block;
+		position: absolute;
+		top: 0;
+		width: 100%;
+		background-color: rgb(215,225,235);
+		font-size: 12px;
+		padding: 0;
+		border-top-left-radius: 3px;
+		border-top-right-radius: 3px;
+	}
+	
+	table.reports td.total{
+		font-size: 13px;
+		text-align: right;
+		border-bottom: 0;
+		color: #000;
+	}
+</style>
+<div class="main-wrapper">
+	<div class="left">
+		<div class="container">
+		<ul class="menu">
+		<li>
+		<a href="https://affiliates.betbra.bet.br/"><span class="material-icons-outlined">home</span><p>Dashboard</p></a>
+	</li>
+		<li>
+		<a href="https://affiliates.betbra.bet.br/account/"><span class="material-icons-outlined">manage_accounts</span><p>Account</p></a>
+	</li>
+		<li>
+		<a href="https://affiliates.betbra.bet.br/commission-groups/"><span class="material-icons-outlined">payments</span><p>Commission Groups</p></a>
+	</li>
+		<li class="active">
+		<a class="toggle open" href=""><span class="material-icons-outlined">bar_chart</span><p>Reports</p></a>
+		<ul class="submenu" style="display: block">
+						<li class="active">
+				<a href="https://affiliates.betbra.bet.br/earnings/"><p>▸&nbsp;Earnings Report</p></a>
+			</li>
+								</ul>
+	</li>
+	</ul>		</div>
+	</div>	
+	<div class="right">
+    	<div class="container" style="padding-top: 0">
+    		<div id="loader"></div>
+			<style type="text/css">
+	table.reports th div{
+		padding-top: 6px;
+		width: 100%;
+		padding-left: 0;
+		padding-right: 0;
+	}
+	table.reports th p{
+		width: 100%;
+	}
+
+	.single-sort-row th > div{
+		padding-right: 6px;
+	}
+	.update-button{
+		width: fit-content;
+		height: 22px;
+	}
+	.update-button a{
+		color: blue;
+	}
+	.update-button:not(.updating):hover a{
+		text-decoration: underline;
+	}
+	.update-button.updating a{
+		color: rgb(80,80,80);
+	}
+</style>
+<div class="reports-header">
+	<h1>Earnings Report</h1>
+	<p>
+		Values last updated: 2026-05-12 18:04:35	</p> 
+	<p>Values are calculated in UTC dates</p>
+		<p>&nbsp;</p>
+	<div class="filter-group">
+		<div class="flex">
+			<div style="padding-right: 50px; text-align: left">
+				<h4>Currency</h4>
+				<div class="flex buttons-wrapper">
+					<div class="filter-button unselectable active" data-filter="currency" data-value="BRL">BRL</div><div class="filter-button unselectable" data-filter="currency" data-value="EUR">EUR</div><div class="filter-button unselectable" data-filter="currency" data-value="GBP">GBP</div><div class="filter-button unselectable" data-filter="currency" data-value="USD">USD</div>				</div>
+			</div>
+						<div class="system-filter">
+				<h4>System</h4>
+				<div class="flex buttons-wrapper">
+					<div class="filter-button unselectable active" data-filter="system" data-value="0">All</div>
+											<div class="filter-button unselectable" data-filter="system" data-value="1">Exchange</div>
+											<div class="filter-button unselectable" data-filter="system" data-value="2">SportsBook</div>
+											<div class="filter-button unselectable" data-filter="system" data-value="3">Tradeball</div>
+											<div class="filter-button unselectable" data-filter="system" data-value="4">Crypto-Bet</div>
+											<div class="filter-button unselectable" data-filter="system" data-value="5">Casino</div>
+											<div class="filter-button unselectable" data-filter="system" data-value="7">dsbook</div>
+											<div class="filter-button unselectable" data-filter="system" data-value="8">Exchange</div>
+											<div class="filter-button unselectable" data-filter="system" data-value="12">Sports</div>
+					 
+				</div>
+			</div>
+					</div>
+	</div>
+	<div class="filter-group" id="earnings-report-date-filter" style="padding-bottom: 5px">
+		<div class="flex">
+			<div style="padding-right: 50px; text-align: left">
+				<h4>Registration Date</h4>
+				<div class="flex buttons-wrapper periods">
+					<div class="filter-button unselectable" data-period="current-week">Current Week</div>
+					<div class="filter-button unselectable" data-period="last-week">Last Week</div>
+					<div class="filter-button unselectable" data-period="current-month">Current Month</div>
+					<div class="filter-button unselectable" data-period="last-month">Last Month</div>
+										<div class="filter-button unselectable" data-period="other">Other</div>
+				</div>
+				<input type="text" class="date-range" value="" data-range-from="" data-range-to="" placeholder="All time" style="text-align: left; margin-left: 6px" disabled>
+			</div>
+		
+			<div>
+				<h4>Display By</h4>
+				<div class="flex buttons-wrapper">
+					<div class="filter-button unselectable active" data-filter="group_by_period" data-value="day">Day</div>
+					<div class="filter-button unselectable" data-filter="group_by_period" data-value="month">Month</div>
+				</div>
+			</div>
+		</div>
+	</div>
+		<div class="filter-group" style="padding-bottom: 5px">
+		<div class="filter-group">
+			<h4>Affiliate Code</h4>
+			<div class="flex buttons-wrapper">
+				<div class="filter-button unselectable active" data-filter="affiliate_cookie" data-value="all">All</div>
+				<div class="filter-button unselectable" data-filter="affiliate_cookie" data-value="GqBDUV">GqBDUV</div><div class="filter-button unselectable" data-filter="affiliate_cookie" data-value="shark100">shark100</div><div class="filter-button unselectable" data-filter="affiliate_cookie" data-value="huntergreen1">huntergreen1</div>			</div>
+		</div>
+	</div>
+	</div>
+<table class="reports listagem">
+	<thead>
+		<tr class="single-sort-row">
+			<th style="width: 80px">
+				<div>
+					<p class="field-order by-date curorder asc">Date</p>
+				</div>
+			</th>
+			<th>
+				<div>
+					<p class="field-order by-registrations">Registrations</p>
+				</div>
+			</th>
+			<th style="max-width: 80px">
+				<div>
+					<p class="field-order by-new_deposit_accounts">New Depositing Accounts</p>
+				</div>
+			</th>
+			<th style="max-width: 80px">
+				<div>
+					<p class="field-order by-deposit_accounts">Depositing Accounts</p>
+				</div>
+			</th>
+						<th>
+				<div>
+					<p class="field-order by-active_accounts">System<br /></p>
+				</div>
+			</th>
+			<th>
+				<div>
+					<p class="field-order by-active_accounts">Active Accounts<br /><small>(account&nbsp;with settled&nbsp;bets)</small></p>
+				</div>
+			</th>
+			<th>
+				<div>
+					<p class="field-order by-nbetsWinLoss">Number of bets<br /><small>(won/lost)</small></p>
+				</div>
+			</th>
+			<th>
+				<div>
+					<p class="field-order by-totalMatchedVirtual">Volume&nbsp;Matched<br /><small>(sum stake of bets<br />won or lost)</small></p>
+				</div>
+			</th>
+						<th class="earning orange3">
+				<div>
+					<p class="field-order">Site&nbsp;NGR</p>
+				</div>
+			</th>
+						<th class="grouped-left">
+				<div>
+					<p class="field-order by-clientGrossTurnoverVirtual">Users&nbsp;Turnover<br /><small>(value that changed&nbsp;hands)</small></p>
+				</div>
+			</th>
+						<th class="grouped-left">
+				<div>
+					<p class="field-order by-commissionPL">Clients Commission</p>
+				</div>
+			</th>
+						<th style="max-width: 80px" class="grouped-left">
+				<div>
+					<p class="field-order by-">Accounts Triggering CPA</p>
+				</div>
+			</th>
+					</tr>
+	</thead>
+	<tbody></tbody>
+	<tfoot>
+			</tfoot>
+</table>
+<script>
+	function listEarningsBySystem(button, startDate, endDate){
+		var sub_rows_selector = startDate == endDate ? '.item-' + startDate : '.item-' + startDate.substring(0, 7);
+		if($(button).data('status') == 'opening'){
+			return;
+		}
+		if($(button).data('status') == 'closed'){
+            $(button).data('status', 'opening');
+			$(button).css('color', 'transparent');
+			var loader = addLoader($(button), 0, 12);
+            
+            $.ajax({
+                url: 'earnings/aListEarningsBySystem',
+                type: 'GET',
+                dataType: 'json',
+                data: {
+					affiliate_id: 6,
+                    startDate: startDate,
+					endDate: endDate,
+                    currency: PAGINATION.filters.currency,
+					affiliate_cookie: PAGINATION.filters.affiliate_cookie ? PAGINATION.filters.affiliate_cookie : null,
+					affiliate_earnings_types: PAGINATION.filters.affiliate_earnings_types
+                },
+                success: function(response){
+                    if(response.status == 'not-logged'){
+                        window.location.href = 'index.php';
+                        return;
+                    }
+					else if(response.status == 'error'){
+						ALERT.error(response.message);
+						return;
+					}
+					else if(response.status == 'success'){
+						$(button).data('status', 'open');
+						$(button).closest('tr').after(response.html);
+					}
+					removeLoader(loader);
+					$(button).css('color', 'inherit');
+					$(button).text('keyboard_arrow_up');
+                }
+            });
+        }
+        else if($(button).data('status') == 'closed-with-data'){
+            $(button).data('status', 'open');
+            $(button).text('keyboard_arrow_up');
+            $(button).closest('tr').siblings('tr' + sub_rows_selector).show();
+        }
+        else {
+            $(button).data('status', 'closed-with-data');
+            $(button).text('keyboard_arrow_down');
+            $(button).closest('tr').siblings('tr' + sub_rows_selector).hide();
+        }
+	}
+	
+	function reload(){
+		location.reload();
+	}
+	</script>
+
+				</div>
+	</div>
+</div>
+<script type="text/javascript" src="https://payments.betbra.bet.br/admin/js/date-filters.js"></script>
+<script>
+	PAGINATION.field = '';
+	PAGINATION.order = '';
+	PAGINATION.module = 'stats';
+	PAGINATION.container = '.reports tbody';
+	PAGINATION.url = AFFILIATES_SITE_BASE + 'earnings/aListEarnings'
+	PAGINATION.filters.affiliate_earnings_types = ["commission","turnover","cpa"];
+	
+	$(function(){
+		PAGINATION.init();
+		PAGINATION.group_by_period = 'month';
+		//PAGINATION.list();
+		var initialFilterButton = $('#earnings-report-date-filter.filter-group .buttons-wrapper.periods .filter-button[data-period="current-month"]');
+		dateFilters(initialFilterButton);
+		
+		$('.filter-group .buttons-wrapper:not(.periods) .filter-button').click(function(){
+			if($(this).hasClass('active') && $(this).data('period') != 'other'){
+				return;
+			}
+            $(this).addClass('active').siblings().removeClass('active');
+			addLoader($(PAGINATION.container), 0);
+            PAGINATION.apply_filter($(this).data('filter'), $(this).data('value'));
+        });
+        
+        $('.filter-group .buttons-wrapper.periods .filter-button').click(function(){
+			if($(this).hasClass('active') && ($(this).data('period') == 'last-week' || $(this).data('period') == 'current-week')){
+				$('div.filter-button[data-filter="group_by_period"][data-value="day"]').addClass('active').siblings().removeClass('active');
+				//PAGINATION.apply_filter('group_by_period', 'day');
+				PAGINATION.group_by_period = 'day';
+				$('div.filter-button[data-filter="group_by_period"][data-value="month"]').addClass('inactive');
+			}
+			else {
+				$('div.filter-button[data-filter="group_by_period"][data-value="month"]').removeClass('inactive');
+			}
+			addLoader($(PAGINATION.container), 0);
+			dateFilters(this);
+        });
+	});
+	
+</script>
+<script type="text/javascript" src="https://payments.betbra.bet.br/js/range-date-picker/dist/duDatepicker.min.js"></script>
+<script src="https://payments.betbra.bet.br/js/time-picker/mdtimepicker.js"></script>
+<script>
+
+$( document ).ready(function() {
+	$('body').click(function(e){
+        var element = e.target;
+        if(!$(element).hasClass('window-click-remove') && !$(element).parents().hasClass('window-click-remove')){
+            $('.window-click-remove').remove();
+        }
+	});
+    
+    $('.left ul.menu a.toggle').click(function(e){
+        e.preventDefault();
+        $(this).toggleClass('open').next('.submenu').slideToggle(160);
+    });
+
+;
+});
+
+$(window).load(function(){
+	$('#loader').remove();
+});
+  
+</script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"7e3348ce2d7146518e45e0a661716661","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body>
+</html>

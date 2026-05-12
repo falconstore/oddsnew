@@ -1,0 +1,100 @@
+
+Desativar cache
+3 requisições
+20,23 kB / 9,13 kB transferidos
+Tempo: 1,30 min
+DOMContentLoaded: 1,78 s
+load: 3,08 s
+
+	
+POST
+	https://affiliates.betbra.bet.br/earnings/aListEarnings
+Status
+200
+VersãoHTTP/2
+Transferido2,17 kB (tamanho 8,89 kB)
+Referrer Policystrict-origin-when-cross-origin
+Prioridade da requisiçãoHighest
+Resolução de DNSSistema
+
+    	
+    access-control-allow-credentials
+    	true
+    access-control-allow-headers
+    	DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type
+    access-control-allow-methods
+    	GET, POST, OPTIONS
+    access-control-allow-origin
+    	https://affiliates.betbra.bet.br
+    cache-control
+    	no-store, no-cache, must-revalidate
+    cf-cache-status
+    	DYNAMIC
+    cf-ray
+    	9fab367c5b5e4b9c-GRU
+    content-encoding
+    	br
+    content-type
+    	text/html; charset=utf-8
+    date
+    	Tue, 12 May 2026 17:41:13 GMT
+    expires
+    	Thu, 19 Nov 1981 08:52:00 GMT
+    nel
+    	{"report_to":"cf-nel","success_fraction":0.0,"max_age":604800}
+    pragma
+    	no-cache
+    report-to
+    	{"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?s=acU7TsRRpDaZNLQzwh2s4qkLiq63uEOwBarQnAqb61liPmPsu%2Bn7HL%2FDJztjm31eJqtw2qlkzmUQHXF6R5t2aM6bl4BBUcFDBkFAKrTOcXk%2F%2BXagPBeObrZrl6chOOKKMwvbdkrt5yKmHw%3D%3D"}]}
+    server
+    	cloudflare
+    strict-transport-security
+    	max-age=15552000; includeSubDomains; preload
+    vary
+    	accept-encoding
+    X-Firefox-Spdy
+    	h2
+    x-ng-instance
+    	6867
+    x-robots-tag
+    	noindex,indexifembedded
+    	
+    Accept
+    	*/*
+    Accept-Encoding
+    	gzip, deflate, br, zstd
+    Accept-Language
+    	pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7
+    Cache-Control
+    	no-cache
+    Connection
+    	keep-alive
+    Content-Length
+    	335
+    Content-Type
+    	application/x-www-form-urlencoded; charset=UTF-8
+    Cookie
+    	glc=br; _ga_8YSC4LQ18Z=GS2.1.s1778508180$o81$g0$t1778508180$j60$l0$h0$dUP84fhJ6Qe3ffKAdlA1YLHfENQMyR_MfFw; _ga=GA1.1.2032912813.1761338709; FPID=FPID2.3.y%2FJzSRpzUDWdV7LS%2FUVVnnQHgA%2BEP0%2BurxR9OpWQvuM%3D.1761338709; _fbp=fb.2.1761338709571.1965341053.AQYAAQIB; _gtmeec=eyJsbiI6ImQyNGU5MTNhNDEwN2FmODc1ZGMyYWMzZDQxOTc5OGYzNzk0ZDAwNDM0ZTUwNTlmYmI2OGFjOGQzMzYyNmVhZWUiLCJmbiI6IjFjYmQ4ZTZiNjRhZWQ1NDNiZDVhZDc1NTI1ODg0NGM1ZDg3ZjE2Yzc2ZTQ4Yjc2MzZhZTczYmZkZjU0NWJhMTQiLCJjdCI6ImVhMzNmMjAzODMxNjEwYjJiMzFkZGM5MjRjMDB…8ICa.YmOaHqxh4vYXLDr_BHLkwjyHWajaape1_.B1wn7SRpordbxl0j5RnPdP.vDMGQuohlerxEPqZeNtEpX0oSG2TQ9ukNDZETQO8GmiIfzc77_mVEyitlmwTkgFnk9kgvJE3yv_h0i806TvGi4aIrSu.xY.WC0l4UrYVP40PH3CKcIojGftZuIIXC2jMsUsXY1VgfXXNQcf5pCAkJRd1vKAzbOT0xOatpQchQAr3tsY61ao2CWY_nWRSUA; _gcl_aw=GCL.1777906718.CjwKCAjw5NvPBhAoEiwA_2egfhr3rWNouCGzmWjoqrC2pESpefuFuMrZE781Q8M8cfZmXHOJPDpqrhoCk5MQAvD_BwE; _gcl_gs=2.1.k1$i1777792497$u140492064; BIAB_LANGUAGE=PT_BR; BIAB_TZ=180; BIAB_CURRENCY=BRL; C_U_I=41714; PHPSESSID=f3en72qd598alm30mpbv9tk95o
+    Host
+    	affiliates.betbra.bet.br
+    Origin
+    	https://affiliates.betbra.bet.br
+    Pragma
+    	no-cache
+    Priority
+    	u=0
+    Referer
+    	https://affiliates.betbra.bet.br/earnings/
+    Sec-Fetch-Dest
+    	empty
+    Sec-Fetch-Mode
+    	cors
+    Sec-Fetch-Site
+    	same-origin
+    TE
+    	trailers
+    User-Agent
+    	Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:150.0) Gecko/20100101 Firefox/150.0
+    X-Requested-With
+    	XMLHttpRequest
+

@@ -1,14 +1,14 @@
 import { useState, useMemo } from 'react';
 import { usePersistedState } from '@/hooks/usePersistedState';
-import { format } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Plus, Calendar, RefreshCw, Download, TrendingUp, Zap } from 'lucide-react';
+import { Plus, Calendar, RefreshCw, Download, TrendingUp, Zap, Bot, Clock, AlertTriangle } from 'lucide-react';
 
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-import { useBetbraData, useDeleteBetbraEntry } from '@/hooks/useBetbraData';
+import { useBetbraData, useDeleteBetbraEntry, useRefreshBetbraScraper, useBetbraScraperCheck } from '@/hooks/useBetbraData';
 import { BetbraEntry } from '@/types/betbra';
 import {
   calculateBetbraStats,
@@ -32,6 +32,10 @@ export default function BetbraAffiliate() {
   const canEdit = canEditPage(PAGE_KEYS.BETBRA_AFFILIATE);
   const { data: entries = [], refetch, isRefetching } = useBetbraData();
   const deleteEntry = useDeleteBetbraEntry();
+  const refreshScraper = useRefreshBetbraScraper();
+  const { data: scraperCheck } = useBetbraScraperCheck();
+
+  const cookieConfigured = scraperCheck?.cookie_configured ?? true; // optimistic while loading
 
   const [showModal, setShowModal] = useState(false);
   const [editingEntry, setEditingEntry] = useState<BetbraEntry | null>(null);
@@ -48,12 +52,37 @@ export default function BetbraAffiliate() {
   const ngrData = useMemo(() => getDailyNgrData(entries, selectedMonth), [entries, selectedMonth]);
   const accumulatedNgrData = useMemo(() => getAccumulatedNgrData(entries, selectedMonth), [entries, selectedMonth]);
 
+  // Last update timestamp from scraped rows in the current month
+  const lastUpdatedAt = useMemo(() => {
+    const timestamps = filteredEntries
+      .map(e => e.updated_at)
+      .filter(Boolean) as string[];
+    if (!timestamps.length) return null;
+    return timestamps.sort().reverse()[0];
+  }, [filteredEntries]);
+
+  const lastUpdatedLabel = useMemo(() => {
+    if (!lastUpdatedAt) return null;
+    try {
+      return formatDistanceToNow(new Date(lastUpdatedAt), { locale: ptBR, addSuffix: true });
+    } catch {
+      return null;
+    }
+  }, [lastUpdatedAt]);
+
   const handleEdit = (entry: BetbraEntry) => { setEditingEntry(entry); setShowModal(true); };
   const handleAdd = () => { setEditingEntry(null); setShowModal(true); };
   const handleDelete = async (id: string) => {
     if (window.confirm('Tem certeza que deseja remover este registro?')) {
       await deleteEntry.mutateAsync(id);
     }
+  };
+
+  const handleScrape = () => {
+    if (!cookieConfigured) {
+      return; // guard: button is disabled, this won't be called
+    }
+    refreshScraper.mutate(selectedMonth);
   };
 
   const handleExportCSV = () => {
@@ -90,11 +119,9 @@ export default function BetbraAffiliate() {
 
         {/* Hero Header */}
         <div className="relative rounded-3xl overflow-hidden border border-white/8 glass p-6 md:p-8">
-          {/* Inner glow */}
           <div className="absolute inset-0 pointer-events-none">
             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[200px] rounded-full bg-amber-500/8 blur-[80px]" />
           </div>
-          {/* Inner grid */}
           <div
             className="absolute inset-0 pointer-events-none opacity-40"
             style={{
@@ -106,7 +133,6 @@ export default function BetbraAffiliate() {
           />
 
           <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
-            {/* Left: badge + title */}
             <div className="space-y-3">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-semibold">
                 <Zap className="w-3 h-3" />
@@ -128,8 +154,7 @@ export default function BetbraAffiliate() {
               </div>
             </div>
 
-            {/* Right: actions */}
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 items-center">
               <Button variant="glass" size="sm" onClick={handleExportCSV} data-testid="button-export">
                 <Download className="w-4 h-4 mr-1.5" />
                 Exportar
@@ -138,6 +163,29 @@ export default function BetbraAffiliate() {
                 <RefreshCw className={`w-4 h-4 mr-1.5 ${isRefetching ? 'animate-spin' : ''}`} />
                 Atualizar
               </Button>
+              {canEdit && !cookieConfigured && (
+                <div
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs"
+                  title="Configure o secret BETBRA_COOKIE no Supabase para usar o scraper"
+                  data-testid="badge-cookie-missing"
+                >
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  BETBRA_COOKIE não configurado
+                </div>
+              )}
+              {canEdit && (
+                <Button
+                  size="sm"
+                  onClick={handleScrape}
+                  disabled={refreshScraper.isPending || !cookieConfigured}
+                  title={!cookieConfigured ? 'Configure o secret BETBRA_COOKIE no Supabase para usar o scraper' : 'Buscar dados automaticamente do painel Betbra'}
+                  className="bg-gradient-to-r from-violet-600 to-violet-700 hover:from-violet-500 hover:to-violet-600 text-white font-semibold shadow-lg shadow-violet-500/20 border-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                  data-testid="button-scrape"
+                >
+                  <Bot className={`w-4 h-4 mr-1.5 ${refreshScraper.isPending ? 'animate-spin' : ''}`} />
+                  {refreshScraper.isPending ? 'Buscando...' : 'Atualizar via Scraper'}
+                </Button>
+              )}
               {canEdit && (
                 <Button size="sm" onClick={handleAdd} className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-semibold shadow-lg shadow-amber-500/20 border-0" data-testid="button-add">
                   <Plus className="w-4 h-4 mr-1.5" />
@@ -175,8 +223,16 @@ export default function BetbraAffiliate() {
               </Select>
             </div>
           </div>
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/3 border border-white/5">
-            <span className="text-xs text-muted-foreground">{filteredEntries.length} registros</span>
+          <div className="flex items-center gap-3 flex-wrap">
+            {lastUpdatedLabel && (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-violet-500/10 border border-violet-500/20" data-testid="badge-last-updated">
+                <Clock className="w-3.5 h-3.5 text-violet-400" />
+                <span className="text-xs text-violet-300">Scraper: {lastUpdatedLabel}</span>
+              </div>
+            )}
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/3 border border-white/5">
+              <span className="text-xs text-muted-foreground">{filteredEntries.length} registros</span>
+            </div>
           </div>
         </div>
 

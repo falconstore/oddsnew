@@ -9,6 +9,9 @@ export interface BetbraEntry {
   ngr: number;
   turnover: number;
   cpa: number;
+  raw_all?: Record<string, unknown> | null;
+  raw_exchange?: Record<string, unknown> | null;
+  updated_at?: string | null;
 }
 
 export interface BetbraFormData {

@@ -1,0 +1,127 @@
+<html><head></head><body>2026-05-01
+			1
+			0
+			45
+			
+                <span style="float: left; margin-right: 7px; line-height: 24px">All</span><span class="material-icons-outlined" style="font-size:17px; line-height: 24px; cursor: pointer" onclick="listEarningsBySystem(this, '2026-05-01', '2026-05-01')" data-status="closed">keyboard_arrow_down</span>
+			145
+			415
+			58 606.636 620.7360 733.47012026-05-02
+			0
+			0
+			51
+			
+                <span style="float: left; margin-right: 7px; line-height: 24px">All</span><span class="material-icons-outlined" style="font-size:17px; line-height: 24px; cursor: pointer" onclick="listEarningsBySystem(this, '2026-05-02', '2026-05-02')" data-status="closed">keyboard_arrow_down</span>
+			157
+			729
+			214 701.5755.93177 649.08012026-05-03
+			0
+			0
+			44
+			
+                <span style="float: left; margin-right: 7px; line-height: 24px">All</span><span class="material-icons-outlined" style="font-size:17px; line-height: 24px; cursor: pointer" onclick="listEarningsBySystem(this, '2026-05-03', '2026-05-03')" data-status="closed">keyboard_arrow_down</span>
+			176
+			871
+			150 571.45-3 632.10200 097.28002026-05-04
+			0
+			0
+			56
+			
+                <span style="float: left; margin-right: 7px; line-height: 24px">All</span><span class="material-icons-outlined" style="font-size:17px; line-height: 24px; cursor: pointer" onclick="listEarningsBySystem(this, '2026-05-04', '2026-05-04')" data-status="closed">keyboard_arrow_down</span>
+			104
+			404
+			97 572.65-1 017.81104 741.82012026-05-05
+			2
+			2
+			33
+			
+                <span style="float: left; margin-right: 7px; line-height: 24px">All</span><span class="material-icons-outlined" style="font-size:17px; line-height: 24px; cursor: pointer" onclick="listEarningsBySystem(this, '2026-05-05', '2026-05-05')" data-status="closed">keyboard_arrow_down</span>
+			126
+			812
+			160 974.06882.90141 271.40022026-05-06
+			1
+			1
+			63
+			
+                <span style="float: left; margin-right: 7px; line-height: 24px">All</span><span class="material-icons-outlined" style="font-size:17px; line-height: 24px; cursor: pointer" onclick="listEarningsBySystem(this, '2026-05-06', '2026-05-06')" data-status="closed">keyboard_arrow_down</span>
+			181
+			985
+			98 860.12-2 545.63167 584.04012026-05-07
+			1
+			1
+			42
+			
+                <span style="float: left; margin-right: 7px; line-height: 24px">All</span><span class="material-icons-outlined" style="font-size:17px; line-height: 24px; cursor: pointer" onclick="listEarningsBySystem(this, '2026-05-07', '2026-05-07')" data-status="closed">keyboard_arrow_down</span>
+			118
+			1 772
+			89 889.93-2 075.06129 308.36002026-05-08
+			1
+			1
+			42
+			
+                <span style="float: left; margin-right: 7px; line-height: 24px">All</span><span class="material-icons-outlined" style="font-size:17px; line-height: 24px; cursor: pointer" onclick="listEarningsBySystem(this, '2026-05-08', '2026-05-08')" data-status="closed">keyboard_arrow_down</span>
+			154
+			554
+			79 859.901 260.6070 173.45032026-05-09
+			0
+			0
+			46
+			
+                <span style="float: left; margin-right: 7px; line-height: 24px">All</span><span class="material-icons-outlined" style="font-size:17px; line-height: 24px; cursor: pointer" onclick="listEarningsBySystem(this, '2026-05-09', '2026-05-09')" data-status="closed">keyboard_arrow_down</span>
+			166
+			608
+			281 598.50-2 018.07185 516.29002026-05-10
+			0
+			0
+			40
+			
+                <span style="float: left; margin-right: 7px; line-height: 24px">All</span><span class="material-icons-outlined" style="font-size:17px; line-height: 24px; cursor: pointer" onclick="listEarningsBySystem(this, '2026-05-10', '2026-05-10')" data-status="closed">keyboard_arrow_down</span>
+			176
+			1 192
+			152 995.303 747.69153 804.12002026-05-11
+			2
+			1
+			39
+			
+                <span style="float: left; margin-right: 7px; line-height: 24px">All</span><span class="material-icons-outlined" style="font-size:17px; line-height: 24px; cursor: pointer" onclick="listEarningsBySystem(this, '2026-05-11', '2026-05-11')" data-status="closed">keyboard_arrow_down</span>
+			108
+			285
+			80 383.24-7 896.4091 159.64002026-05-12
+			2
+			0
+			19
+			
+                <span style="float: left; margin-right: 7px; line-height: 24px">All</span><span class="material-icons-outlined" style="font-size:17px; line-height: 24px; cursor: pointer" onclick="listEarningsBySystem(this, '2026-05-12', '2026-05-12')" data-status="closed">keyboard_arrow_down</span>
+			33
+			227
+			33 038.96-2 968.1624 723.7500
+	
+		<script>
+			$('table.reports tbody td').each(function(key, value){
+				if(value.innerText == '0'){
+					value.classList.add('zero-color');
+				}
+			});
+			removeLoader();
+		</script>
+		Total:
+	
+	<strong>10</strong>
+	<strong>6</strong>
+	<strong>520</strong>
+	U Rev: <strong class="red">-9 585.38</strong>
+	<strong>1 506 761</strong>
+	<strong>0</strong>
+	<strong>9</strong>
+
+<!-- New row for affiliate totals -->
+
+	
+		Totals for all time, all systems:
+		
+	<strong>573 431.28</strong>
+	&nbsp;
+	&nbsp;
+	&nbsp;
+
+</body></html>

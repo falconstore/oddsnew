@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabaseProcedures, isProceduresSupabaseConfigured } from '@/lib/supabaseProcedures';
 import { BetbraEntry } from '@/types/betbra';
 import { toast } from '@/hooks/use-toast';
+import { format } from 'date-fns';
 
 const BETBRA_KEY = ['betbra-affiliate'];
 
@@ -31,8 +32,26 @@ export function useBetbraData() {
     refetchInterval: 120000,
     refetchIntervalInBackground: false,
     enabled: isProceduresSupabaseConfigured(),
-    // Mantém a tabela estável durante refetches — evita o "pisca" do skeleton.
     placeholderData: (prev) => prev,
+  });
+}
+
+// Pre-check: calls betbra-scraper with action="check" to verify cookie is configured.
+// Returns { cookie_configured: boolean }. Runs once on mount, stale for 5 min.
+export function useBetbraScraperCheck() {
+  return useQuery({
+    queryKey: ['betbra-scraper-check'],
+    queryFn: async (): Promise<{ cookie_configured: boolean }> => {
+      if (!isProceduresSupabaseConfigured()) return { cookie_configured: false };
+      const { data, error } = await supabaseProcedures.functions.invoke('betbra-scraper', {
+        body: { action: 'check' },
+      });
+      if (error) return { cookie_configured: false };
+      return { cookie_configured: Boolean(data?.cookie_configured) };
+    },
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+    enabled: isProceduresSupabaseConfigured(),
   });
 }
 
@@ -137,6 +156,74 @@ export function useDeleteBetbraEntry() {
       toast({
         title: 'Erro',
         description: `Erro ao remover registro: ${error.message}`,
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
+// Invoke the betbra-scraper edge function for a given month
+export function useRefreshBetbraScraper() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (selectedMonth: Date) => {
+      if (!isProceduresSupabaseConfigured()) {
+        throw new Error('Procedures Supabase não configurado');
+      }
+
+      const year = selectedMonth.getFullYear();
+      const month = selectedMonth.getMonth();
+      const startDate = format(new Date(year, month, 1), 'yyyy-MM-dd');
+      const endDate = format(new Date(year, month + 1, 0), 'yyyy-MM-dd');
+
+      const { data, error } = await supabaseProcedures.functions.invoke('betbra-scraper', {
+        body: { start_date: startDate, end_date: endDate },
+      });
+
+      // If HTTP error, try to read the response body so we surface the real reason
+      let body: any = data;
+      if (error) {
+        try {
+          const ctxResp = (error as any)?.context;
+          if (ctxResp && typeof ctxResp.json === 'function') {
+            body = await ctxResp.json();
+          } else if (ctxResp && typeof ctxResp.text === 'function') {
+            body = JSON.parse(await ctxResp.text());
+          }
+        } catch {
+          /* fall through with original error */
+        }
+        if (!body || typeof body !== 'object') {
+          throw new Error(error.message);
+        }
+      }
+
+      if (!body?.ok) {
+        const msg = body?.error ?? error?.message ?? 'Erro desconhecido no scraper';
+        throw Object.assign(new Error(msg), { cookieExpired: body?.cookie_expired === true });
+      }
+
+      return body as { ok: boolean; days_updated: number; errors: string[] };
+    },
+    onSuccess: (data, variables, context) => {
+      queryClient.invalidateQueries({ queryKey: BETBRA_KEY });
+      queryClient.invalidateQueries({ queryKey: ['betbra-scraper-check'] });
+      toast({
+        title: 'Scraper concluído',
+        description: `${data.days_updated} dia${data.days_updated !== 1 ? 's' : ''} atualizado${data.days_updated !== 1 ? 's' : ''} com sucesso.`,
+      });
+    },
+    onError: (error: any) => {
+      const isCookieError =
+        error?.cookieExpired === true ||
+        error.message.toLowerCase().includes('cookie') ||
+        error.message.toLowerCase().includes('betbra_cookie');
+      toast({
+        title: isCookieError ? 'Cookie expirado' : 'Erro no scraper',
+        description: isCookieError
+          ? 'O cookie do BetBra expirou. Atualize o secret BETBRA_COOKIE no Supabase.'
+          : error.message,
         variant: 'destructive',
       });
     },

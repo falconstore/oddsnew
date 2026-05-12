@@ -3,13 +3,49 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { X } from 'lucide-react';
+import { X, ChevronDown, ChevronRight, Database, Clock } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { BetbraEntry, BetbraFormData } from '@/types/betbra';
 import { useCreateBetbraEntry, useUpdateBetbraEntry } from '@/hooks/useBetbraData';
 
 interface BetbraModalProps {
   entry: BetbraEntry | null;
   onClose: () => void;
+}
+
+function RawDataAccordion({ label, data }: { label: string; data: Record<string, unknown> }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="rounded-xl border border-white/10 overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
+      >
+        <span className="flex items-center gap-2">
+          <Database className="w-3.5 h-3.5 text-violet-400" />
+          {label}
+        </span>
+        {open ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+      </button>
+      {open && (
+        <div className="px-4 pb-4 border-t border-white/5">
+          <pre className="text-[11px] text-muted-foreground bg-black/30 rounded-lg p-3 mt-2 overflow-x-auto whitespace-pre-wrap break-all leading-relaxed">
+            {JSON.stringify(data, null, 2)}
+          </pre>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function formatUpdatedAt(ts: string): string {
+  try {
+    return format(parseISO(ts), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
+  } catch {
+    return ts;
+  }
 }
 
 export function BetbraModal({ entry, onClose }: BetbraModalProps) {
@@ -73,6 +109,9 @@ export function BetbraModal({ entry, onClose }: BetbraModalProps) {
   };
 
   const isLoading = createEntry.isPending || updateEntry.isPending;
+  const hasRawAll = entry?.raw_all && typeof entry.raw_all === 'object';
+  const hasRawExchange = entry?.raw_exchange && typeof entry.raw_exchange === 'object';
+  const hasScraperData = hasRawAll || hasRawExchange || entry?.updated_at;
 
   return (
     <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -165,6 +204,36 @@ export function BetbraModal({ entry, onClose }: BetbraModalProps) {
                 />
               </div>
             </div>
+
+            {hasScraperData && (
+              <div className="space-y-2 pt-2 border-t border-border">
+                <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider pt-2">
+                  Dados do scraper
+                </p>
+
+                {entry?.updated_at && (
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-violet-500/8 border border-violet-500/20">
+                    <Clock className="w-3.5 h-3.5 text-violet-400 flex-shrink-0" />
+                    <span className="text-xs text-violet-300">
+                      Última atualização: {formatUpdatedAt(entry.updated_at)}
+                    </span>
+                  </div>
+                )}
+
+                {hasRawAll && (
+                  <RawDataAccordion
+                    label="Raw All (site principal)"
+                    data={entry!.raw_all as Record<string, unknown>}
+                  />
+                )}
+                {hasRawExchange && (
+                  <RawDataAccordion
+                    label="Raw Exchange"
+                    data={entry!.raw_exchange as Record<string, unknown>}
+                  />
+                )}
+              </div>
+            )}
 
             <div className="flex justify-end gap-3 pt-4 border-t border-border">
               <Button

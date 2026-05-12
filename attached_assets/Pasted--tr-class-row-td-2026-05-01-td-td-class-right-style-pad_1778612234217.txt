@@ -1,0 +1,126 @@
+<tr class="row"><td>2026-05-01</td>
+			<td class="right" style="padding-right: 24px">1</td>
+			<td class="right" style="padding-right: 20px">0</td>
+			<td class="right" style="padding-right: 20px">45</td>
+			<td>
+                <span style="float: left; margin-right: 7px; line-height: 24px">All</span><span class="material-icons-outlined" style="font-size:17px; line-height: 24px; cursor: pointer" onclick="listEarningsBySystem(this, '2026-05-01', '2026-05-01')" data-status="closed">keyboard_arrow_down</span></td>
+			<td class="right" style="padding-right: 20px">145</td>
+			<td class="right" style="padding-right: 20px">415</td>
+			<td class="right">58 606.63</td><td class="right earning orange3">6 620.73</td><td class="right left-border">60 733.47</td><td class="right left-border">0</td><td class="right left-border">1</td></tr><tr class="row"><td>2026-05-02</td>
+			<td class="right" style="padding-right: 24px">0</td>
+			<td class="right" style="padding-right: 20px">0</td>
+			<td class="right" style="padding-right: 20px">51</td>
+			<td>
+                <span style="float: left; margin-right: 7px; line-height: 24px">All</span><span class="material-icons-outlined" style="font-size:17px; line-height: 24px; cursor: pointer" onclick="listEarningsBySystem(this, '2026-05-02', '2026-05-02')" data-status="closed">keyboard_arrow_down</span></td>
+			<td class="right" style="padding-right: 20px">157</td>
+			<td class="right" style="padding-right: 20px">729</td>
+			<td class="right">214 701.57</td><td class="right earning orange3">55.93</td><td class="right left-border">177 649.08</td><td class="right left-border">0</td><td class="right left-border">1</td></tr><tr class="row"><td>2026-05-03</td>
+			<td class="right" style="padding-right: 24px">0</td>
+			<td class="right" style="padding-right: 20px">0</td>
+			<td class="right" style="padding-right: 20px">44</td>
+			<td>
+                <span style="float: left; margin-right: 7px; line-height: 24px">All</span><span class="material-icons-outlined" style="font-size:17px; line-height: 24px; cursor: pointer" onclick="listEarningsBySystem(this, '2026-05-03', '2026-05-03')" data-status="closed">keyboard_arrow_down</span></td>
+			<td class="right" style="padding-right: 20px">176</td>
+			<td class="right" style="padding-right: 20px">871</td>
+			<td class="right">150 571.45</td><td class="right earning orange3 red">-3 632.10</td><td class="right left-border">200 097.28</td><td class="right left-border">0</td><td class="right left-border">0</td></tr><tr class="row"><td>2026-05-04</td>
+			<td class="right" style="padding-right: 24px">0</td>
+			<td class="right" style="padding-right: 20px">0</td>
+			<td class="right" style="padding-right: 20px">56</td>
+			<td>
+                <span style="float: left; margin-right: 7px; line-height: 24px">All</span><span class="material-icons-outlined" style="font-size:17px; line-height: 24px; cursor: pointer" onclick="listEarningsBySystem(this, '2026-05-04', '2026-05-04')" data-status="closed">keyboard_arrow_down</span></td>
+			<td class="right" style="padding-right: 20px">104</td>
+			<td class="right" style="padding-right: 20px">404</td>
+			<td class="right">97 572.65</td><td class="right earning orange3 red">-1 017.81</td><td class="right left-border">104 741.82</td><td class="right left-border">0</td><td class="right left-border">1</td></tr><tr class="row"><td>2026-05-05</td>
+			<td class="right" style="padding-right: 24px">2</td>
+			<td class="right" style="padding-right: 20px">2</td>
+			<td class="right" style="padding-right: 20px">33</td>
+			<td>
+                <span style="float: left; margin-right: 7px; line-height: 24px">All</span><span class="material-icons-outlined" style="font-size:17px; line-height: 24px; cursor: pointer" onclick="listEarningsBySystem(this, '2026-05-05', '2026-05-05')" data-status="closed">keyboard_arrow_down</span></td>
+			<td class="right" style="padding-right: 20px">126</td>
+			<td class="right" style="padding-right: 20px">812</td>
+			<td class="right">160 974.06</td><td class="right earning orange3">882.90</td><td class="right left-border">141 271.40</td><td class="right left-border">0</td><td class="right left-border">2</td></tr><tr class="row"><td>2026-05-06</td>
+			<td class="right" style="padding-right: 24px">1</td>
+			<td class="right" style="padding-right: 20px">1</td>
+			<td class="right" style="padding-right: 20px">63</td>
+			<td>
+                <span style="float: left; margin-right: 7px; line-height: 24px">All</span><span class="material-icons-outlined" style="font-size:17px; line-height: 24px; cursor: pointer" onclick="listEarningsBySystem(this, '2026-05-06', '2026-05-06')" data-status="closed">keyboard_arrow_down</span></td>
+			<td class="right" style="padding-right: 20px">181</td>
+			<td class="right" style="padding-right: 20px">985</td>
+			<td class="right">98 860.12</td><td class="right earning orange3 red">-2 545.63</td><td class="right left-border">167 584.04</td><td class="right left-border">0</td><td class="right left-border">1</td></tr><tr class="row"><td>2026-05-07</td>
+			<td class="right" style="padding-right: 24px">1</td>
+			<td class="right" style="padding-right: 20px">1</td>
+			<td class="right" style="padding-right: 20px">42</td>
+			<td>
+                <span style="float: left; margin-right: 7px; line-height: 24px">All</span><span class="material-icons-outlined" style="font-size:17px; line-height: 24px; cursor: pointer" onclick="listEarningsBySystem(this, '2026-05-07', '2026-05-07')" data-status="closed">keyboard_arrow_down</span></td>
+			<td class="right" style="padding-right: 20px">118</td>
+			<td class="right" style="padding-right: 20px">1 772</td>
+			<td class="right">89 889.93</td><td class="right earning orange3 red">-2 075.06</td><td class="right left-border">129 308.36</td><td class="right left-border">0</td><td class="right left-border">0</td></tr><tr class="row"><td>2026-05-08</td>
+			<td class="right" style="padding-right: 24px">1</td>
+			<td class="right" style="padding-right: 20px">1</td>
+			<td class="right" style="padding-right: 20px">42</td>
+			<td>
+                <span style="float: left; margin-right: 7px; line-height: 24px">All</span><span class="material-icons-outlined" style="font-size:17px; line-height: 24px; cursor: pointer" onclick="listEarningsBySystem(this, '2026-05-08', '2026-05-08')" data-status="closed">keyboard_arrow_down</span></td>
+			<td class="right" style="padding-right: 20px">154</td>
+			<td class="right" style="padding-right: 20px">554</td>
+			<td class="right">79 859.90</td><td class="right earning orange3">1 260.60</td><td class="right left-border">70 173.45</td><td class="right left-border">0</td><td class="right left-border">3</td></tr><tr class="row"><td>2026-05-09</td>
+			<td class="right" style="padding-right: 24px">0</td>
+			<td class="right" style="padding-right: 20px">0</td>
+			<td class="right" style="padding-right: 20px">46</td>
+			<td>
+                <span style="float: left; margin-right: 7px; line-height: 24px">All</span><span class="material-icons-outlined" style="font-size:17px; line-height: 24px; cursor: pointer" onclick="listEarningsBySystem(this, '2026-05-09', '2026-05-09')" data-status="closed">keyboard_arrow_down</span></td>
+			<td class="right" style="padding-right: 20px">166</td>
+			<td class="right" style="padding-right: 20px">608</td>
+			<td class="right">281 598.50</td><td class="right earning orange3 red">-2 018.07</td><td class="right left-border">185 516.29</td><td class="right left-border">0</td><td class="right left-border">0</td></tr><tr class="row"><td>2026-05-10</td>
+			<td class="right" style="padding-right: 24px">0</td>
+			<td class="right" style="padding-right: 20px">0</td>
+			<td class="right" style="padding-right: 20px">40</td>
+			<td>
+                <span style="float: left; margin-right: 7px; line-height: 24px">All</span><span class="material-icons-outlined" style="font-size:17px; line-height: 24px; cursor: pointer" onclick="listEarningsBySystem(this, '2026-05-10', '2026-05-10')" data-status="closed">keyboard_arrow_down</span></td>
+			<td class="right" style="padding-right: 20px">176</td>
+			<td class="right" style="padding-right: 20px">1 192</td>
+			<td class="right">152 995.30</td><td class="right earning orange3">3 747.69</td><td class="right left-border">153 804.12</td><td class="right left-border">0</td><td class="right left-border">0</td></tr><tr class="row"><td>2026-05-11</td>
+			<td class="right" style="padding-right: 24px">2</td>
+			<td class="right" style="padding-right: 20px">1</td>
+			<td class="right" style="padding-right: 20px">39</td>
+			<td>
+                <span style="float: left; margin-right: 7px; line-height: 24px">All</span><span class="material-icons-outlined" style="font-size:17px; line-height: 24px; cursor: pointer" onclick="listEarningsBySystem(this, '2026-05-11', '2026-05-11')" data-status="closed">keyboard_arrow_down</span></td>
+			<td class="right" style="padding-right: 20px">108</td>
+			<td class="right" style="padding-right: 20px">285</td>
+			<td class="right">80 383.24</td><td class="right earning orange3 red">-7 896.40</td><td class="right left-border">91 159.64</td><td class="right left-border">0</td><td class="right left-border">0</td></tr><tr class="row"><td>2026-05-12</td>
+			<td class="right" style="padding-right: 24px">2</td>
+			<td class="right" style="padding-right: 20px">0</td>
+			<td class="right" style="padding-right: 20px">19</td>
+			<td>
+                <span style="float: left; margin-right: 7px; line-height: 24px">All</span><span class="material-icons-outlined" style="font-size:17px; line-height: 24px; cursor: pointer" onclick="listEarningsBySystem(this, '2026-05-12', '2026-05-12')" data-status="closed">keyboard_arrow_down</span></td>
+			<td class="right" style="padding-right: 20px">33</td>
+			<td class="right" style="padding-right: 20px">227</td>
+			<td class="right">33 038.96</td><td class="right earning orange3 red">-2 968.16</td><td class="right left-border">24 723.75</td><td class="right left-border">0</td><td class="right left-border">0</td></tr><tr>
+	<td colspan="4" style="border-bottom: 0; height: 34px; font-size: 13px; color:#000">
+		<script>
+			$('table.reports tbody td').each(function(key, value){
+				if(value.innerText == '0'){
+					value.classList.add('zero-color');
+				}
+			});
+			removeLoader();
+		</script>
+		Total:
+	</td>
+	<td class="total" style="padding-right: 24px; border-bottom: 0;"><strong>10</strong></td>
+	<td class="total" style="padding-right: 20px; border-bottom: 0;"><strong>6</strong></td>
+	<td class="total" style="padding-right: 20px; border-bottom: 0;"><strong>520</strong></td>
+	<td class="total">U Rev: <strong class="red">-9 585.38</strong></td>
+	<td class="total" style="border-bottom: 0"><strong>1 506 761</strong></td>
+	<td class="total" style="border-bottom: 0"><strong>0</strong></td>
+	<td class="total" style="border-bottom: 0"><strong>9</strong></td>
+</tr>
+<!-- New row for affiliate totals -->
+<tr style="background-color: rgb(235,245,255);">
+	<td colspan="7" style="border-bottom: 0; height: 30px; font-size: 13px; color:#000">
+		Totals for all time, all systems:
+		</td>
+	<td class="total"><strong>573 431.28</strong></td>
+	<td style="border-bottom: 0">&nbsp;</td>
+	<td style="border-bottom: 0">&nbsp;</td>
+	<td style="border-bottom: 0">&nbsp;</td>
+</tr>

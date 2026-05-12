@@ -1,0 +1,126 @@
+<tr class="row"><td>2026-05-01</td>
+			<td class="right" style="padding-right: 24px">1</td>
+			<td class="right" style="padding-right: 20px">0</td>
+			<td class="right" style="padding-right: 20px">45</td>
+			<td>
+                <span style="float: left; margin-right: 7px; line-height: 24px">Exchange</span></td>
+			<td class="right" style="padding-right: 20px">141</td>
+			<td class="right" style="padding-right: 20px">376</td>
+			<td class="right">50 054.68</td><td class="right earning orange3">5 154.07</td><td class="right left-border">52 170.57</td><td class="right left-border">0</td><td class="right left-border">1</td></tr><tr class="row"><td>2026-05-02</td>
+			<td class="right" style="padding-right: 24px">0</td>
+			<td class="right" style="padding-right: 20px">0</td>
+			<td class="right" style="padding-right: 20px">51</td>
+			<td>
+                <span style="float: left; margin-right: 7px; line-height: 24px">Exchange</span></td>
+			<td class="right" style="padding-right: 20px">145</td>
+			<td class="right" style="padding-right: 20px">487</td>
+			<td class="right">193 952.64</td><td class="right earning orange3 red">-1 055.01</td><td class="right left-border">154 660.33</td><td class="right left-border">0</td><td class="right left-border">1</td></tr><tr class="row"><td>2026-05-03</td>
+			<td class="right" style="padding-right: 24px">0</td>
+			<td class="right" style="padding-right: 20px">0</td>
+			<td class="right" style="padding-right: 20px">44</td>
+			<td>
+                <span style="float: left; margin-right: 7px; line-height: 24px">Exchange</span></td>
+			<td class="right" style="padding-right: 20px">165</td>
+			<td class="right" style="padding-right: 20px">612</td>
+			<td class="right">118 904.26</td><td class="right earning orange3">1 930.66</td><td class="right left-border">142 649.46</td><td class="right left-border">0</td><td class="right left-border">0</td></tr><tr class="row"><td>2026-05-04</td>
+			<td class="right" style="padding-right: 24px">0</td>
+			<td class="right" style="padding-right: 20px">0</td>
+			<td class="right" style="padding-right: 20px">56</td>
+			<td>
+                <span style="float: left; margin-right: 7px; line-height: 24px">Exchange</span></td>
+			<td class="right" style="padding-right: 20px">98</td>
+			<td class="right" style="padding-right: 20px">229</td>
+			<td class="right">86 667.65</td><td class="right earning orange3 red">-2 541.76</td><td class="right left-border">92 768.20</td><td class="right left-border">0</td><td class="right left-border">1</td></tr><tr class="row"><td>2026-05-05</td>
+			<td class="right" style="padding-right: 24px">2</td>
+			<td class="right" style="padding-right: 20px">2</td>
+			<td class="right" style="padding-right: 20px">33</td>
+			<td>
+                <span style="float: left; margin-right: 7px; line-height: 24px">Exchange</span></td>
+			<td class="right" style="padding-right: 20px">121</td>
+			<td class="right" style="padding-right: 20px">335</td>
+			<td class="right">151 453.34</td><td class="right earning orange3">1 653.26</td><td class="right left-border">129 262.35</td><td class="right left-border">0</td><td class="right left-border">2</td></tr><tr class="row"><td>2026-05-06</td>
+			<td class="right" style="padding-right: 24px">1</td>
+			<td class="right" style="padding-right: 20px">1</td>
+			<td class="right" style="padding-right: 20px">63</td>
+			<td>
+                <span style="float: left; margin-right: 7px; line-height: 24px">Exchange</span></td>
+			<td class="right" style="padding-right: 20px">155</td>
+			<td class="right" style="padding-right: 20px">355</td>
+			<td class="right">76 645.65</td><td class="right earning orange3 red">-1 399.47</td><td class="right left-border">151 439.55</td><td class="right left-border">0</td><td class="right left-border">1</td></tr><tr class="row"><td>2026-05-07</td>
+			<td class="right" style="padding-right: 24px">1</td>
+			<td class="right" style="padding-right: 20px">1</td>
+			<td class="right" style="padding-right: 20px">42</td>
+			<td>
+                <span style="float: left; margin-right: 7px; line-height: 24px">Exchange</span></td>
+			<td class="right" style="padding-right: 20px">110</td>
+			<td class="right" style="padding-right: 20px">295</td>
+			<td class="right">62 842.66</td><td class="right earning orange3 red">-2 842.16</td><td class="right left-border">105 011.96</td><td class="right left-border">0</td><td class="right left-border">0</td></tr><tr class="row"><td>2026-05-08</td>
+			<td class="right" style="padding-right: 24px">1</td>
+			<td class="right" style="padding-right: 20px">1</td>
+			<td class="right" style="padding-right: 20px">42</td>
+			<td>
+                <span style="float: left; margin-right: 7px; line-height: 24px">Exchange</span></td>
+			<td class="right" style="padding-right: 20px">149</td>
+			<td class="right" style="padding-right: 20px">336</td>
+			<td class="right">75 585.90</td><td class="right earning orange3">442.71</td><td class="right left-border">61 458.85</td><td class="right left-border">0</td><td class="right left-border">3</td></tr><tr class="row"><td>2026-05-09</td>
+			<td class="right" style="padding-right: 24px">0</td>
+			<td class="right" style="padding-right: 20px">0</td>
+			<td class="right" style="padding-right: 20px">46</td>
+			<td>
+                <span style="float: left; margin-right: 7px; line-height: 24px">Exchange</span></td>
+			<td class="right" style="padding-right: 20px">157</td>
+			<td class="right" style="padding-right: 20px">548</td>
+			<td class="right">272 297.50</td><td class="right earning orange3 red">-1 578.84</td><td class="right left-border">172 064.14</td><td class="right left-border">0</td><td class="right left-border">0</td></tr><tr class="row"><td>2026-05-10</td>
+			<td class="right" style="padding-right: 24px">0</td>
+			<td class="right" style="padding-right: 20px">0</td>
+			<td class="right" style="padding-right: 20px">40</td>
+			<td>
+                <span style="float: left; margin-right: 7px; line-height: 24px">Exchange</span></td>
+			<td class="right" style="padding-right: 20px">168</td>
+			<td class="right" style="padding-right: 20px">584</td>
+			<td class="right">131 072.27</td><td class="right earning orange3">2 021.96</td><td class="right left-border">118 848.27</td><td class="right left-border">0</td><td class="right left-border">0</td></tr><tr class="row"><td>2026-05-11</td>
+			<td class="right" style="padding-right: 24px">2</td>
+			<td class="right" style="padding-right: 20px">1</td>
+			<td class="right" style="padding-right: 20px">39</td>
+			<td>
+                <span style="float: left; margin-right: 7px; line-height: 24px">Exchange</span></td>
+			<td class="right" style="padding-right: 20px">99</td>
+			<td class="right" style="padding-right: 20px">243</td>
+			<td class="right">71 459.24</td><td class="right earning orange3 red">-5 526.56</td><td class="right left-border">74 211.68</td><td class="right left-border">0</td><td class="right left-border">0</td></tr><tr class="row"><td>2026-05-12</td>
+			<td class="right" style="padding-right: 24px">2</td>
+			<td class="right" style="padding-right: 20px">0</td>
+			<td class="right" style="padding-right: 20px">19</td>
+			<td>
+                <span style="float: left; margin-right: 7px; line-height: 24px">Exchange</span></td>
+			<td class="right" style="padding-right: 20px">30</td>
+			<td class="right" style="padding-right: 20px">75</td>
+			<td class="right">31 876.89</td><td class="right earning orange3 red">-3 185.06</td><td class="right left-border">22 695.48</td><td class="right left-border">0</td><td class="right left-border">0</td></tr><tr>
+	<td colspan="4" style="border-bottom: 0; height: 34px; font-size: 13px; color:#000">
+		<script>
+			$('table.reports tbody td').each(function(key, value){
+				if(value.innerText == '0'){
+					value.classList.add('zero-color');
+				}
+			});
+			removeLoader();
+		</script>
+		Total:
+	</td>
+	<td class="total" style="padding-right: 24px; border-bottom: 0;"><strong>10</strong></td>
+	<td class="total" style="padding-right: 20px; border-bottom: 0;"><strong>6</strong></td>
+	<td class="total" style="padding-right: 20px; border-bottom: 0;"><strong>520</strong></td>
+	<td class="total">U Rev: <strong class="red">-6 926.20</strong></td>
+	<td class="total" style="border-bottom: 0"><strong>1 277 240</strong></td>
+	<td class="total" style="border-bottom: 0"><strong>0</strong></td>
+	<td class="total" style="border-bottom: 0"><strong>9</strong></td>
+</tr>
+<!-- New row for affiliate totals -->
+<tr style="background-color: rgb(235,245,255);">
+	<td colspan="7" style="border-bottom: 0; height: 30px; font-size: 13px; color:#000">
+		Totals for all time, all systems:
+		</td>
+	<td class="total"><strong>573 431.28</strong></td>
+	<td style="border-bottom: 0">&nbsp;</td>
+	<td style="border-bottom: 0">&nbsp;</td>
+	<td style="border-bottom: 0">&nbsp;</td>
+</tr>
