@@ -5,6 +5,7 @@ import { differenceInDays, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Procedure } from '@/types/procedures';
 import { parseDate } from '@/lib/procedureUtils';
+import { canCheckResult } from '@/lib/procedureGameTime';
 
 interface UrgentProcedure extends Procedure {
   urgency: 'high' | 'medium';
@@ -31,7 +32,23 @@ export function NotificationPanel({ procedures, onDismiss, onProcedureClick }: N
       const daysAgo = differenceInDays(today, procDate);
       const cleanStatus = (proc.status || '').trim().toLowerCase();
 
-      if ((cleanStatus === 'falta girar freebet' || cleanStatus === 'falta girar freeebet') && daysAgo > 3) {
+      // Enviado + partida encerrada + sem resultado → precisa conferir
+      if (
+        cleanStatus === 'enviado' &&
+        (proc.profit_loss === 0 || proc.profit_loss === null) &&
+        canCheckResult(proc, today) &&
+        !proc.archived
+      ) {
+        urgent.push({
+          ...proc,
+          urgency: daysAgo > 1 ? 'high' : 'medium',
+          message: daysAgo > 0
+            ? `Resultado não definido há ${daysAgo} dia${daysAgo > 1 ? 's' : ''}`
+            : 'Partida encerrada — definir resultado',
+          icon: daysAgo > 1 ? AlertCircle : Clock,
+          color: daysAgo > 1 ? 'red' : 'amber',
+        });
+      } else if ((cleanStatus === 'falta girar freebet' || cleanStatus === 'falta girar freeebet') && daysAgo > 3) {
         urgent.push({ ...proc, urgency: 'high', message: `Freebet pendente há ${daysAgo} dias`, icon: AlertCircle, color: 'red' });
       } else if ((cleanStatus === 'falta girar freebet' || cleanStatus === 'falta girar freeebet') && daysAgo > 0) {
         urgent.push({ ...proc, urgency: 'medium', message: `Freebet pendente há ${daysAgo} dia${daysAgo > 1 ? 's' : ''}`, icon: Clock, color: 'amber' });

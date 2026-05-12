@@ -26,6 +26,7 @@ import { GerarRelatorioModal } from '@/components/procedures/GerarRelatorioModal
 import { RegisterBotMessageModal } from '@/components/procedures/RegisterBotMessageModal';
 import { ColumnCustomizer } from '@/components/procedures/ColumnCustomizer';
 import { NotificationPanel } from '@/components/procedures/NotificationPanel';
+import { FilaConferencia } from '@/components/procedures/FilaConferencia';
 import { useAuth } from '@/contexts/AuthContext';
 import { PAGE_KEYS } from '@/types/auth';
 
@@ -234,6 +235,14 @@ export default function ProcedureControl() {
             procedures={monthProcedures}
             onDismiss={() => setShowNotifications(false)}
             onProcedureClick={(proc) => handleEdit(proc)}
+          />
+        )}
+
+        {/* ── Fila de Conferência ── */}
+        {canEdit && (
+          <FilaConferencia
+            procedures={procedures}
+            onCheckResult={handleCheckResult}
           />
         )}
 
