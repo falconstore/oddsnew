@@ -62,6 +62,17 @@ serve(async (req) => {
 
   const cutoff = Deno.env.get("FREEBETPRO_DATA_DE_CORTE") ?? "2026-05-03";
 
+  // Janela de retry: apenas procedures dos últimos 2 dias.
+  // Garante que o cron só retenta FALHAS RECENTES — procs antigos que nunca
+  // foram sincronizados NÃO são enviados agora, evitando que apareçam como
+  // "hoje" no painel do FreeBet PRO.
+  const windowStart = new Date();
+  windowStart.setDate(windowStart.getDate() - 2);
+  const windowStartDate = windowStart.toISOString().slice(0, 10);
+
+  // Usa o maior entre cutoff e windowStart
+  const effectiveFrom = windowStartDate > cutoff ? windowStartDate : cutoff;
+
   try {
     // Busca procedures não-sincronizados elegíveis (até 50 por tick)
     const { data: procs, error: fetchErr } = await supabase
@@ -71,7 +82,7 @@ serve(async (req) => {
       .eq("archived", false)
       .neq("platform", "")
       .not("platform", "is", null)
-      .gte("date", cutoff)
+      .gte("date", effectiveFrom)
       .order("date", { ascending: true })
       .limit(50);
 
