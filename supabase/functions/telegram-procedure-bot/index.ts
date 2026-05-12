@@ -404,6 +404,21 @@ serve(async (req) => {
     auth: { persistSession: false },
   });
 
+  // Deduplicação por update_id — impede reprocessar o mesmo webhook reenviado pelo Telegram.
+  // Qualquer log existente com este update_id indica que já foi processado (com sucesso ou erro).
+  if (updateId != null) {
+    const { data: dupLog } = await supa
+      .from("bot_logs")
+      .select("id")
+      .eq("update_id", updateId)
+      .limit(1)
+      .maybeSingle();
+    if (dupLog) {
+      log("ignored_duplicate_update", { update_id: updateId });
+      return json({ ok: true, action: "ignored_duplicate_update" });
+    }
+  }
+
   const { data: settings } = await supa
     .from("system_settings")
     .select("bot_enabled")
@@ -442,7 +457,7 @@ serve(async (req) => {
         messageId,
         context: { externalId, error: lookupErr.message },
       });
-      return json({ ok: false, error: lookupErr.message }, { status: 500 });
+      return json({ ok: true, action: "lookup_error_acked" });
     }
 
     if (existing) {
@@ -493,7 +508,7 @@ serve(async (req) => {
           rawText: replyText,
           context: { error: result.error },
         });
-        return json({ ok: false, error: result.error }, { status: 500 });
+        return json({ ok: true, action: "command_insert_error_acked" });
       }
       if (!result.isPartial) {
         await syncWithFreebetPro(supa, SUPABASE_URL, SERVICE_ROLE, result.procedureId, result.procedureNumber, updateId, messageId);
@@ -545,7 +560,7 @@ serve(async (req) => {
       rawText: text,
       context: { error: result.error },
     });
-    return json({ ok: false, error: result.error }, { status: 500 });
+    return json({ ok: true, action: "insert_error_acked" });
   }
 
   if (result.isPartial) {
