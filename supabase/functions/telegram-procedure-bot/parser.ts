@@ -383,6 +383,11 @@ export function parseMessage(text: string): ParseResult {
   // 2. Data de referência (usa hoje como fallback)
   const dateStr = extractDate(text, defaultYear) ?? now.toISOString().slice(0, 10);
 
+  // external_id único: inclui data compacta + flag EXTRA para evitar colisão com
+  // procedimentos de mesmo número em outras datas ou do tipo EXTRA.
+  const isExtra = /PROCEDIMENTO\s+\d+\s+EXTRA\b/i.test(text) || /PROCEDIMENTO\s+EXTRA\s+\d+/i.test(text);
+  const externalId = `bsk:${procedureNumber}${isExtra ? "-extra" : ""}-${dateStr.replace(/-/g, "")}`;
+
   // 3. Linha de descrição (2ª linha com "PROCEDIMENTO REFERENTE...")
   const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
   const descLine = lines.find(l => /PROCEDIMENTO\s+REFERENTE/i.test(stripEmojis(l))) ?? "";
@@ -436,7 +441,7 @@ export function parseMessage(text: string): ParseResult {
       ok: "partial",
       data: {
         procedure_number: procedureNumber,
-        external_id: `bsk:${procedureNumber}`,
+        external_id: externalId,
         titulo,
         date: dateStr,
         platform: platform ?? null,
@@ -462,7 +467,7 @@ export function parseMessage(text: string): ParseResult {
     ok: true,
     data: {
       procedure_number: procedureNumber,
-      external_id: `bsk:${procedureNumber}`,
+      external_id: externalId,
       titulo,
       date: dateStr,
       platform: platform!,

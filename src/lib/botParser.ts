@@ -297,6 +297,9 @@ export function parseMessage(text: string): ParseResult {
 
   const dateStr = extractDate(text, defaultYear) ?? now.toISOString().slice(0, 10);
 
+  const isExtra = /PROCEDIMENTO\s+\d+\s+EXTRA\b/i.test(text) || /PROCEDIMENTO\s+EXTRA\s+\d+/i.test(text);
+  const externalId = `bsk:${procedureNumber}${isExtra ? "-extra" : ""}-${dateStr.replace(/-/g, "")}`;
+
   const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
   const descLine = lines.find(l => /PROCEDIMENTO\s+REFERENTE/i.test(stripEmojis(l))) ?? "";
 
@@ -339,7 +342,7 @@ export function parseMessage(text: string): ParseResult {
       ok: "partial",
       data: {
         procedure_number: procedureNumber,
-        external_id: `bsk:${procedureNumber}`,
+        external_id: externalId,
         titulo,
         date: dateStr,
         platform: platform ?? null,
@@ -365,7 +368,7 @@ export function parseMessage(text: string): ParseResult {
     ok: true,
     data: {
       procedure_number: procedureNumber,
-      external_id: `bsk:${procedureNumber}`,
+      external_id: externalId,
       titulo,
       date: dateStr,
       platform: platform!,
