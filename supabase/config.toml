@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.telegram-procedure-bot]
 verify_jwt = false
+
+[functions.freebetpro-resync-cron]
+verify_jwt = false
