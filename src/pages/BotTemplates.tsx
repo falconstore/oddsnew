@@ -435,7 +435,7 @@ const TEMPLATES: TemplateConfig[] = [
     id: 'tentativa_dg',
     name: 'Tentativa Duplo Green',
     shortName: 'Tentativa DG',
-    description: 'Procedimento cash sem freebet com objetivo de Duplo Green. Sem emoji no header; usa CASA: separado.',
+    description: 'Procedimento cash sem freebet com objetivo de Duplo Green. Usa CASA: separado.',
     color: 'bg-violet-500/15 text-violet-400 border-violet-500/30',
     dotColor: 'bg-violet-400',
     emoji: '🟡',
@@ -449,7 +449,7 @@ const TEMPLATES: TemplateConfig[] = [
       { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Superodd' },
     ],
     generate: (f) => [
-      `PROCEDIMENTO ${f.isExtra === 'true' ? 'EXTRA ' : ''}${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
+      `🟢 PROCEDIMENTO ${f.isExtra === 'true' ? 'EXTRA ' : ''}${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
       ``,
       `PROCEDIMENTO REFERENTE : TENTATIVA DUPLO GREEN`,
       ``,
