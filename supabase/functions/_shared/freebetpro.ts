@@ -64,6 +64,7 @@ const TIPO_MAP: Record<string, string> = {
   "SEM_FB": "SEM_FB",     // FreeBet Pro mapeia internamente pra NORMAL
   "GANHAR_FB": "GANHAR_FB",
   "QUEIMAR_FB": "QUEIMAR_FB",
+  "ASR": "SEM_FB",        // Aposta Sem Risco — sincroniza como SEM_FB no FreeBet Pro
 };
 
 export function buildUpsertPayload(p: ProcRow) {

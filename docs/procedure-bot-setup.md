@@ -88,7 +88,7 @@ curl "https://api.telegram.org/bot<TOKEN>/getWebhookInfo"
 
 ## 7. Templates de Mensagem
 
-O bot reconhece 3 tipos de procedimento. Use os templates abaixo.
+O bot reconhece 4 tipos de procedimento. Use os templates abaixo.
 
 > **Campos obrigatórios:**
 > - `PROCEDIMENTO N` — número do procedimento
