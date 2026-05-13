@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Copy, Check, Bot, RefreshCw, ChevronDown, ChevronUp,
   Plus, Trash2, ShieldCheck, AlertTriangle, XCircle, Pencil, X,
   Power, PowerOff, Loader2, LifeBuoy, ClipboardCheck, CheckCircle2,
+  Search,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -524,40 +525,129 @@ function FreebetSelectField({ value, onChange }: { value: string; onChange: (v: 
     return `${d}/${m}/${y}`;
   };
 
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    if (open) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [open]);
+
   const selected = freebets.find(fb => fb.procedure_number === value);
 
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    if (!q) return freebets;
+    return freebets.filter(fb =>
+      fb.procedure_number.includes(q) ||
+      (fb.platform ?? '').toLowerCase().includes(q) ||
+      (fb.partida_descricao ?? '').toLowerCase().includes(q) ||
+      (fb.titulo ?? '').toLowerCase().includes(q)
+    );
+  }, [freebets, search]);
+
   return (
-    <div className="flex flex-col gap-1.5">
-      <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className="h-9 text-sm bg-background/50" data-testid="select-freebet-ref">
-          <SelectValue placeholder="Selecione a freebet a queimar..." />
-        </SelectTrigger>
-        <SelectContent className="max-w-sm">
-          {freebets.map(fb => {
-            const val = fmtCurrency(fb.freebet_value ?? fb.freebet_valor_previsto);
-            const dataBR = fmtDateBR(fb.date);
-            return (
-              <SelectItem key={fb.procedure_number} value={fb.procedure_number}>
-                <div className="flex flex-col gap-0.5 py-0.5">
-                  <span className="font-medium text-sm">
-                    #{fb.procedure_number} · {fb.platform ?? '—'} · {val ?? '—'}
-                  </span>
-                  {(fb.partida_descricao || dataBR) && (
-                    <span className="text-xs text-muted-foreground">
-                      {[fb.partida_descricao, dataBR].filter(Boolean).join(' · ')}
-                    </span>
-                  )}
-                </div>
-              </SelectItem>
-            );
-          })}
-        </SelectContent>
-      </Select>
+    <div className="flex flex-col gap-1.5" ref={containerRef}>
+      {/* Trigger */}
+      <button
+        type="button"
+        onClick={() => { setOpen(v => !v); setSearch(''); }}
+        data-testid="select-freebet-ref"
+        className={cn(
+          'h-9 w-full flex items-center justify-between gap-2 px-3 rounded-md border text-sm transition-colors',
+          'bg-background/50 border-border/50 hover:border-border',
+          open && 'border-primary/50 ring-1 ring-primary/20',
+        )}
+      >
+        {selected ? (
+          <span className="truncate text-foreground">
+            #{selected.procedure_number} · {selected.platform ?? '—'} · {fmtCurrency(selected.freebet_value ?? selected.freebet_valor_previsto) ?? '—'}
+          </span>
+        ) : (
+          <span className="text-muted-foreground">Selecione a freebet a queimar...</span>
+        )}
+        <ChevronDown className={cn('h-3.5 w-3.5 text-muted-foreground shrink-0 transition-transform', open && 'rotate-180')} />
+      </button>
+
+      {/* Dropdown */}
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.12 }}
+            className="relative z-50"
+          >
+            <div className="absolute top-0 left-0 right-0 bg-popover border border-border rounded-xl shadow-xl overflow-hidden">
+              {/* Search input */}
+              <div className="flex items-center gap-2 px-3 py-2 border-b border-border/60">
+                <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                <input
+                  autoFocus
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Buscar por nº, casa ou jogo..."
+                  className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/60 text-foreground"
+                  data-testid="input-freebet-search"
+                />
+                {search && (
+                  <button onClick={() => setSearch('')} className="text-muted-foreground hover:text-foreground">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* List */}
+              <div className="max-h-60 overflow-y-auto">
+                {filtered.length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-6">Nenhuma freebet encontrada</p>
+                ) : (
+                  filtered.map(fb => {
+                    const val = fmtCurrency(fb.freebet_value ?? fb.freebet_valor_previsto);
+                    const dataBR = fmtDateBR(fb.date);
+                    const isSelected = fb.procedure_number === value;
+                    return (
+                      <button
+                        key={fb.procedure_number}
+                        type="button"
+                        onClick={() => { onChange(fb.procedure_number); setOpen(false); setSearch(''); }}
+                        className={cn(
+                          'w-full text-left px-3 py-2.5 flex flex-col gap-0.5 transition-colors border-b border-border/30 last:border-0',
+                          isSelected
+                            ? 'bg-primary/10 text-primary'
+                            : 'hover:bg-muted/50 text-foreground',
+                        )}
+                      >
+                        <span className="text-sm font-medium">
+                          #{fb.procedure_number} · {fb.platform ?? '—'} · {val ?? '—'}
+                          {isSelected && <Check className="inline h-3 w-3 ml-1.5 text-primary" />}
+                        </span>
+                        {(fb.partida_descricao || dataBR) && (
+                          <span className={cn('text-xs', isSelected ? 'text-primary/70' : 'text-muted-foreground')}>
+                            {[fb.partida_descricao, dataBR].filter(Boolean).join(' · ')}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Card de detalhes da FB selecionada */}
       {selected && (
         <div className="bg-cyan-500/5 border border-cyan-500/20 rounded-lg px-3 py-2 flex flex-col gap-0.5">
-          <div className="flex items-center gap-2 text-xs">
+          <div className="flex items-center gap-2 text-xs flex-wrap">
             <span className="text-muted-foreground">Proc:</span>
             <span className="font-mono font-medium text-foreground">#{selected.procedure_number}</span>
             <span className="text-muted-foreground">·</span>
