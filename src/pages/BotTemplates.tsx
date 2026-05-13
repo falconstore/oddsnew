@@ -1551,10 +1551,20 @@ function RegistrarPorTexto() {
   const [state, setState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
 
-  const parsed = useMemo<ParseResult | null>(() => {
-    if (!rawText.trim()) return null;
-    return parseMessage(rawText);
+  // Normaliza o texto: garante emoji 🟢 no início (exigido pelo parser).
+  // O gerente pode colar o texto direto do canal mesmo sem emoji.
+  const normalizedText = useMemo(() => {
+    const t = rawText.trim();
+    if (!t) return '';
+    return /^\s*[🟢🔵]/u.test(t) ? t : `🟢 ${t}`;
   }, [rawText]);
+
+  const wasNormalized = rawText.trim().length > 0 && !/^\s*[🟢🔵]/u.test(rawText.trim());
+
+  const parsed = useMemo<ParseResult | null>(() => {
+    if (!normalizedText) return null;
+    return parseMessage(normalizedText);
+  }, [normalizedText]);
 
   const canRegister = parsed !== null && parsed.ok !== false && state !== 'loading';
 
@@ -1590,7 +1600,7 @@ function RegistrarPorTexto() {
       esporte: 'futebol',
       observacoes: data.observacoes ?? undefined,
       bot_needs_review: true,
-      bot_raw_message: rawText.trim(),
+      bot_raw_message: normalizedText,
       bot_missing_fields: parsed.ok === 'partial'
         ? (parsed.data as { missingFields: string[] }).missingFields
         : null,
@@ -1642,13 +1652,20 @@ function RegistrarPorTexto() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Textarea */}
                 <div className="flex flex-col gap-2">
-                  <Label className="text-xs font-medium text-muted-foreground">
-                    Texto da mensagem do Telegram *
-                  </Label>
+                  <div className="flex items-center justify-between gap-2">
+                    <Label className="text-xs font-medium text-muted-foreground">
+                      Texto da mensagem do Telegram *
+                    </Label>
+                    {wasNormalized && (
+                      <span className="text-[10px] text-amber-400/80 bg-amber-500/10 border border-amber-500/20 rounded px-1.5 py-0.5">
+                        🟢 adicionado automaticamente
+                      </span>
+                    )}
+                  </div>
                   <Textarea
                     value={rawText}
                     onChange={e => { setRawText(e.target.value); setState('idle'); setErrorMsg(''); }}
-                    placeholder={'Cole aqui o texto completo da mensagem do canal.\n\nEx:\n🟢 PROCEDIMENTO 190 - 13/05/2026\n🟢 PROCEDIMENTO REFERENTE A PROMOÇÃO...\nCASA: ESPORTIVABET\n\nMirassol x RB Bragantino - 13/05/2026 ÀS 20:30\n\n🟡 LUCRO: 💰 18,50 / OU\n🟡 RECOMPENSA: 🎁 100,00 EM FREEBET\n📋 CATEGORIA: Cashback'}
+                    placeholder={'Cole aqui o texto completo da mensagem do canal.\n\nNão precisa adicionar 🟢 — o sistema adiciona automaticamente se faltar.\n\nEx:\nPROCEDIMENTO 192 - 13/05/2026\nPROCEDIMENTO REFERENTE : TENTATIVA DUPLO GREEN\nCASA: SPORTY\n\nManchester City x Crystal Palace - 13/05/2026 ÀS 16:00\n\n🟡 OBJETIVO DUPLO GREEN - 🟩 134,00\n🟧 CATEGORIA: Superodd\n😍 chance de duplo green 😍'}
                     className="font-mono text-xs resize-none bg-background/50 min-h-[220px]"
                     data-testid="textarea-registrar-por-texto"
                   />
@@ -1664,7 +1681,7 @@ function RegistrarPorTexto() {
                         <p className="text-xs text-muted-foreground/50 italic">Cole o texto para ver o parse...</p>
                       </div>
                     ) : (
-                      <ValidationPanel result={parsed} text={rawText} />
+                      <ValidationPanel result={parsed} text={normalizedText} />
                     )}
                   </div>
                 </div>
