@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Copy, Check, Bot, RefreshCw, ChevronDown, ChevronUp,
   Plus, Trash2, ShieldCheck, AlertTriangle, XCircle, Pencil, X,
-  Power, PowerOff, Loader2,
+  Power, PowerOff, Loader2, LifeBuoy, ClipboardCheck, CheckCircle2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -616,6 +616,7 @@ function ValidationPanel({ result, text }: { result: ParseResult | null; text: s
     SEM_FB: 'Sem Freebet',
     GANHAR_FB: 'Ganhar Freebet',
     QUEIMAR_FB: 'Queimar Freebet',
+    ASR: 'Aposta Sem Risco',
   };
 
   return (
@@ -1505,6 +1506,9 @@ export default function BotTemplates() {
           )}
         </AnimatePresence>
 
+        {/* Contingência */}
+        <RegistrarPorTexto />
+
         {/* Quick rules */}
         <div className="bg-muted/20 border border-border/40 rounded-2xl p-4 md:p-5">
           <p className="text-sm font-semibold text-foreground mb-3">Regras que o bot verifica</p>
@@ -1533,6 +1537,194 @@ export default function BotTemplates() {
         onClose={() => setCreateModalOpen(false)}
         onSave={handleSaveCustom}
       />
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────
+// RegistrarPorTexto — contingência quando o bot não registrou
+// ─────────────────────────────────────────
+
+function RegistrarPorTexto() {
+  const [expanded, setExpanded] = useState(false);
+  const [rawText, setRawText] = useState('');
+  const [state, setState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [errorMsg, setErrorMsg] = useState('');
+
+  const parsed = useMemo<ParseResult | null>(() => {
+    if (!rawText.trim()) return null;
+    return parseMessage(rawText);
+  }, [rawText]);
+
+  const canRegister = parsed !== null && parsed.ok !== false && state !== 'loading';
+
+  async function handleRegister() {
+    if (!parsed || parsed.ok === false) return;
+    setState('loading');
+    const data = parsed.data;
+    const payload: Record<string, unknown> = {
+      procedure_number: data.procedure_number,
+      external_id: data.external_id,
+      promotion_name: data.titulo || undefined,
+      date: data.date,
+      created_date: data.date,
+      platform: data.platform ?? '—',
+      category: data.category,
+      status: data.tipo === 'ASR' ? 'Aposta Sem Risco' : 'Enviado',
+      tipo: data.tipo,
+      partida_descricao: data.partida_descricao,
+      kickoff_at: data.kickoff_at,
+      data_partida: data.data_partida,
+      horario_partida: data.horario_partida,
+      lucro_prejuizo_previsto: data.lucro_prejuizo_previsto,
+      freebet_valor_previsto: data.freebet_valor_previsto,
+      freebet_value: data.freebet_valor_previsto,
+      profit_loss: 0,
+      dp: data.dp,
+      tags: data.tags ?? [],
+      is_favorite: false,
+      archived: false,
+      tachado: false,
+      reenviado_count: 0,
+      duplo_green_confirmado: data.is_duplo_green,
+      esporte: 'futebol',
+      observacoes: data.observacoes ?? undefined,
+      bot_needs_review: true,
+      bot_raw_message: rawText.trim(),
+      bot_missing_fields: parsed.ok === 'partial'
+        ? (parsed.data as { missingFields: string[] }).missingFields
+        : null,
+    };
+    const { error } = await supabase.from('procedures').insert(payload);
+    if (error) {
+      setState('error');
+      setErrorMsg(error.message);
+    } else {
+      setState('success');
+      setRawText('');
+    }
+  }
+
+  return (
+    <div className="bg-amber-500/5 border border-amber-500/20 rounded-2xl overflow-hidden">
+      <button
+        onClick={() => setExpanded(v => !v)}
+        className="w-full flex items-center gap-3 p-4 md:p-5 hover:bg-amber-500/5 transition-colors text-left"
+        data-testid="btn-toggle-contingencia"
+      >
+        <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center shrink-0">
+          <LifeBuoy className="h-4 w-4 text-amber-400" />
+        </div>
+        <div className="flex-1">
+          <p className="text-sm font-semibold text-amber-400">Contingência — Bot não registrou?</p>
+          <p className="text-xs text-muted-foreground">Cole o texto da mensagem para registrar manualmente</p>
+        </div>
+        {expanded
+          ? <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" />
+          : <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />}
+      </button>
+
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="border-t border-amber-500/15 p-4 md:p-5 flex flex-col gap-4">
+              <p className="text-xs text-muted-foreground">
+                Use quando o bot perdeu uma mensagem (editada rapidamente, bot offline, webhook atrasado, etc).
+                Cole o texto exato do canal e clique em <strong className="text-foreground">Registrar</strong>.
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Textarea */}
+                <div className="flex flex-col gap-2">
+                  <Label className="text-xs font-medium text-muted-foreground">
+                    Texto da mensagem do Telegram *
+                  </Label>
+                  <Textarea
+                    value={rawText}
+                    onChange={e => { setRawText(e.target.value); setState('idle'); setErrorMsg(''); }}
+                    placeholder={'Cole aqui o texto completo da mensagem do canal.\n\nEx:\n🟢 PROCEDIMENTO 190 - 13/05/2026\n🟢 PROCEDIMENTO REFERENTE A PROMOÇÃO...\nCASA: ESPORTIVABET\n\nMirassol x RB Bragantino - 13/05/2026 ÀS 20:30\n\n🟡 LUCRO: 💰 18,50 / OU\n🟡 RECOMPENSA: 🎁 100,00 EM FREEBET\n📋 CATEGORIA: Cashback'}
+                    className="font-mono text-xs resize-none bg-background/50 min-h-[220px]"
+                    data-testid="textarea-registrar-por-texto"
+                  />
+                </div>
+
+                {/* Parse preview */}
+                <div className="flex flex-col gap-2">
+                  <p className="text-xs font-medium text-muted-foreground">Campos detectados</p>
+                  <div className="flex-1 bg-muted/20 border border-border/40 rounded-xl p-4 min-h-[220px]">
+                    {!rawText.trim() ? (
+                      <div className="flex flex-col items-center justify-center gap-2 py-8 text-center h-full">
+                        <Bot className="h-8 w-8 text-muted-foreground/20" />
+                        <p className="text-xs text-muted-foreground/50 italic">Cole o texto para ver o parse...</p>
+                      </div>
+                    ) : (
+                      <ValidationPanel result={parsed} text={rawText} />
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Feedback states */}
+              <AnimatePresence mode="wait">
+                {state === 'success' && (
+                  <motion.div
+                    key="success"
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-4 py-3"
+                  >
+                    <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+                    <p className="text-sm text-emerald-400 font-medium">Procedimento registrado com sucesso!</p>
+                  </motion.div>
+                )}
+                {state === 'error' && (
+                  <motion.div
+                    key="error"
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    className="flex items-center gap-2 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3"
+                  >
+                    <XCircle className="h-4 w-4 text-red-400 shrink-0" />
+                    <p className="text-sm text-red-400">{errorMsg || 'Erro ao registrar o procedimento.'}</p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <div className="flex items-center justify-end gap-3">
+                <Button
+                  size="sm"
+                  onClick={handleRegister}
+                  disabled={!canRegister}
+                  className={cn(
+                    'gap-1.5',
+                    canRegister
+                      ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30'
+                      : 'opacity-40 cursor-not-allowed bg-muted/20 text-muted-foreground border border-border/40',
+                  )}
+                  data-testid="btn-registrar-por-texto"
+                >
+                  {state === 'loading' ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : state === 'success' ? (
+                    <Check className="h-3.5 w-3.5" />
+                  ) : (
+                    <ClipboardCheck className="h-3.5 w-3.5" />
+                  )}
+                  {state === 'loading' ? 'Registrando...' : state === 'success' ? 'Registrado!' : 'Registrar Procedimento'}
+                </Button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
