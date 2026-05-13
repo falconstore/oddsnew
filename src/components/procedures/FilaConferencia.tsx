@@ -56,7 +56,21 @@ function buildFila(procedures: Procedure[]): FilaItem[] {
       continue;
     }
 
-    // Caso 2: Partida em aberto (status antigo)
+    // Caso 2: Aguardando Resultado (jogo encerrado — transição automática pós-kickoff+150min)
+    if (cleanStatus === 'aguardando resultado') {
+      items.push({
+        proc,
+        urgency: daysAgo > 1 ? 'high' : 'medium',
+        motivo: daysAgo > 0
+          ? `Aguardando resultado há ${daysAgo} dia${daysAgo > 1 ? 's' : ''}`
+          : 'Jogo encerrado — definir resultado',
+        daysAgo,
+        tipo: 'conferir',
+      });
+      continue;
+    }
+
+    // Caso 3: Partida em aberto (status intermediário ou legado)
     if (cleanStatus === 'enviada partida em aberto') {
       items.push({
         proc,
@@ -70,7 +84,7 @@ function buildFila(procedures: Procedure[]): FilaItem[] {
       continue;
     }
 
-    // Caso 3: Falta Girar Freebet
+    // Caso 4: Falta Girar Freebet
     if (cleanStatus === 'falta girar freebet' || cleanStatus === 'falta girar freeebet') {
       items.push({
         proc,

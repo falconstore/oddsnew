@@ -9,6 +9,7 @@ export type ProcedureCategory =
 export type ProcedureStatus = 
   | 'Enviado'
   | 'Enviada partida em Aberto'
+  | 'Aguardando Resultado'
   | 'Concluído'
   | 'Lucro Direto'
   | 'Freebet Pendente'
@@ -143,6 +144,7 @@ export const PROCEDURE_CATEGORIES: ProcedureCategory[] = [
 export const PROCEDURE_STATUSES: ProcedureStatus[] = [
   'Enviado',
   'Enviada partida em Aberto',
+  'Aguardando Resultado',
   'Concluído',
   'Lucro Direto',
   'Freebet Pendente',

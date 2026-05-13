@@ -52,6 +52,16 @@ export function NotificationPanel({ procedures, onDismiss, onProcedureClick }: N
         urgent.push({ ...proc, urgency: 'high', message: `Freebet pendente há ${daysAgo} dias`, icon: AlertCircle, color: 'red' });
       } else if ((cleanStatus === 'falta girar freebet' || cleanStatus === 'falta girar freeebet') && daysAgo > 0) {
         urgent.push({ ...proc, urgency: 'medium', message: `Freebet pendente há ${daysAgo} dia${daysAgo > 1 ? 's' : ''}`, icon: Clock, color: 'amber' });
+      } else if (cleanStatus === 'aguardando resultado') {
+        urgent.push({
+          ...proc,
+          urgency: daysAgo > 1 ? 'high' : 'medium',
+          message: daysAgo > 0
+            ? `Aguardando resultado há ${daysAgo} dia${daysAgo > 1 ? 's' : ''}`
+            : 'Jogo encerrado — definir resultado',
+          icon: daysAgo > 1 ? AlertCircle : Clock,
+          color: daysAgo > 1 ? 'orange' : 'amber',
+        });
       } else if (cleanStatus === 'enviada partida em aberto' && daysAgo > 2) {
         urgent.push({ ...proc, urgency: 'high', message: `Partida em aberto há ${daysAgo} dias`, icon: AlertCircle, color: 'orange' });
       } else if (cleanStatus === 'freebet pendente' && daysAgo > 5) {

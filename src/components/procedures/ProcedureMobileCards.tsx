@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Star, Pencil, Trash2, ExternalLink, Tag, Calendar, Building2, Archive, ArchiveRestore, Trophy, Clock, CheckCircle2, AlertCircle, ShieldCheck, AlertTriangle, ShieldAlert } from 'lucide-react';
+import { Star, Pencil, Trash2, ExternalLink, Tag, Calendar, Building2, Archive, ArchiveRestore, Trophy, Clock, CheckCircle2, AlertCircle, ShieldCheck, AlertTriangle, ShieldAlert, Timer } from 'lucide-react';
 import { Procedure } from '@/types/procedures';
 import { formatProcedureDate, translateCategory } from '@/lib/procedureUtils';
 import { canCheckResult } from '@/lib/procedureGameTime';
@@ -23,8 +23,12 @@ export function ProcedureMobileCards({ procedures, onEdit, onDelete, onToggleFav
     if (status === 'Concluído' || status === 'Lucro Direto') {
       return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
     }
+    if (status === 'Aguardando Resultado') {
+      return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
+    }
     if (
       status === 'Enviada partida em Aberto' ||
+      status === 'Enviada Partida em Aberto' ||
       status === 'Freebet Pendente' ||
       status === 'Falta Girar Freebet' ||
       status === 'Falta Girar Freeebet'
@@ -154,7 +158,8 @@ export function ProcedureMobileCards({ procedures, onEdit, onDelete, onToggleFav
             <div className="bg-white/[0.03] rounded-xl p-2.5 border border-white/5">
               <p className="text-muted-foreground mb-1">Status</p>
               <div className="flex items-center gap-1.5 flex-wrap">
-                <Badge className={`text-[10px] px-1.5 py-0 border font-medium ${getStatusBadge(proc.status)}`}>
+                <Badge className={`text-[10px] px-1.5 py-0 border font-medium inline-flex items-center gap-1 ${getStatusBadge(proc.status)}`}>
+                  {proc.status === 'Aguardando Resultado' && <Timer className="w-2.5 h-2.5 flex-shrink-0" />}
                   {proc.status}
                 </Badge>
                 <StatusActionToggles procedure={proc} />

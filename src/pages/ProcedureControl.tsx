@@ -129,6 +129,7 @@ export default function ProcedureControl() {
           const isUrgent = (
             ((cleanStatus === 'falta girar freebet' || cleanStatus === 'falta girar freeebet') && daysAgo > 3) ||
             (cleanStatus === 'enviada partida em aberto' && daysAgo > 2) ||
+            (cleanStatus === 'aguardando resultado' && daysAgo > 1) ||
             (cleanStatus === 'referência faltando' && daysAgo > 1)
           );
           if (!isUrgent) return false;
@@ -138,6 +139,7 @@ export default function ProcedureControl() {
             cleanStatus === 'falta girar freebet' ||
             cleanStatus === 'falta girar freeebet' ||
             cleanStatus === 'enviada partida em aberto' ||
+            cleanStatus === 'aguardando resultado' ||
             cleanStatus === 'freebet pendente' ||
             cleanStatus === 'referência faltando'
           );

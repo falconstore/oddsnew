@@ -2,7 +2,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Star, Pencil, Trash2, ExternalLink, Tag, Archive, ArchiveRestore, Trophy, CheckCircle2, AlertCircle, ShieldCheck, AlertTriangle, ShieldAlert } from 'lucide-react';
+import { Star, Pencil, Trash2, ExternalLink, Tag, Archive, ArchiveRestore, Trophy, CheckCircle2, AlertCircle, ShieldCheck, AlertTriangle, ShieldAlert, Timer } from 'lucide-react';
 import { Procedure } from '@/types/procedures';
 import { formatProcedureDate, translateCategory } from '@/lib/procedureUtils';
 import { canCheckResult } from '@/lib/procedureGameTime';
@@ -25,8 +25,12 @@ export function ProcedureTable({ procedures, visibleColumns, onEdit, onDelete, o
     if (status === 'Concluído' || status === 'Lucro Direto') {
       return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
     }
+    if (status === 'Aguardando Resultado') {
+      return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
+    }
     if (
       status === 'Enviada partida em Aberto' ||
+      status === 'Enviada Partida em Aberto' ||
       status === 'Freebet Pendente' ||
       status === 'Falta Girar Freebet' ||
       status === 'Falta Girar Freeebet'
@@ -187,7 +191,8 @@ export function ProcedureTable({ procedures, visibleColumns, onEdit, onDelete, o
               {visibleColumns.includes('status') && (
                 <TableCell className="py-2 px-2">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <Badge className={`text-[10px] px-1.5 py-0 border font-medium ${getStatusBadge(proc.status)}`}>
+                    <Badge className={`text-[10px] px-1.5 py-0 border font-medium inline-flex items-center gap-1 ${getStatusBadge(proc.status)}`}>
+                      {proc.status === 'Aguardando Resultado' && <Timer className="w-2.5 h-2.5 flex-shrink-0" />}
                       {proc.status}
                     </Badge>
                     <StatusActionToggles procedure={proc} />
