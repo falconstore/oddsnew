@@ -2,7 +2,7 @@
 // Suporta os 5 templates reais utilizados pelos gerentes.
 // deno-lint-ignore-file
 
-export type ProcedureTipo = "SEM_FB" | "GANHAR_FB" | "QUEIMAR_FB";
+export type ProcedureTipo = "SEM_FB" | "GANHAR_FB" | "QUEIMAR_FB" | "ASR";
 export type Prioridade = "ALTA" | "MEDIA";
 
 export interface ParsedProcedure {
@@ -319,6 +319,12 @@ function extractLucro(text: string): { value: number; isDuploGreen: boolean } | 
 }
 
 function extractFreebetValor(text: string): number | null {
+  // Padrão ASR: "RECOMPENSA: 🎁 X,XX EM FREEBET" — prioridade sobre o padrão clássico
+  // para evitar capturar o valor errado quando há ambas as linhas LUCRO e RECOMPENSA.
+  const recompensaRe = new RegExp(`RECOMPENSA:[^\\n]*?${BR_NUM.source}\\s*EM\\s*FREEBET`, "i");
+  const rm = text.match(recompensaRe);
+  if (rm) return parseBrNumber(rm[1]);
+
   // Padrão clássico: "X,XX EM FREEBET"
   const re = new RegExp(`${BR_NUM.source}\\s*EM\\s*FREEBET`, "i");
   const m = text.match(re);
@@ -343,6 +349,13 @@ function extractFreebetValor(text: string): number | null {
 function detectTipo(text: string): ProcedureTipo {
   // Detecta QUEIMAR_FB pelo formato longo ou pelo abreviado (REF N°)
   if (/REFERENTE\s+[AÀ][OS]?\s+FREEBETS?\s+(?:DO\s+PROCEDIMENTO|[—\-]?\s*REF\s+N)/i.test(text)) return "QUEIMAR_FB";
+  // ASR (Aposta Sem Risco): tem RECOMPENSA: ... EM FREEBET + linha LUCRO:
+  // Sinal distintivo: "LUCRO: X / OU" + "RECOMPENSA: X EM FREEBET" na mesma mensagem.
+  // Deve vir ANTES do check de GANHAR_FB para evitar classificação errada.
+  if (
+    /RECOMPENSA:[^\n]*\bEM\s+FREEBET\b/i.test(text) &&
+    /LUCRO:[^\n]*/i.test(text)
+  ) return "ASR";
   if (/\bEM\s+FREEBET\b/i.test(text)) return "GANHAR_FB";
   return "SEM_FB";
 }
@@ -417,6 +430,13 @@ export function parseMessage(text: string): ParseResult {
   }
   if ((tipo === "SEM_FB" || tipo === "QUEIMAR_FB") && lucroResult == null) {
     missing.push("lucro previsto (LUCRO: 💵 X,XX ou OBJETIVO DUPLO GREEN - 💵 X,XX)");
+  }
+  // ASR exige ambos: lucro direto E recompensa em freebet
+  if (tipo === "ASR" && lucroResult == null) {
+    missing.push("lucro previsto (LUCRO: 💰 X,XX / OU)");
+  }
+  if (tipo === "ASR" && freebetValor == null) {
+    missing.push("recompensa em freebet (RECOMPENSA: 🎁 X,XX EM FREEBET)");
   }
 
   // 9. Referência QUEIMAR_FB

@@ -18,7 +18,7 @@ export type ProcedureStatus =
   | 'Falta Girar Freebet';
 
 // Tipo de freebet (paridade com FreeBet Pro §8.1)
-export type ProcedureType = 'SEM_FB' | 'GANHAR_FB' | 'QUEIMAR_FB';
+export type ProcedureType = 'SEM_FB' | 'GANHAR_FB' | 'QUEIMAR_FB' | 'ASR';
 
 // Crédito de freebet pós-jogo (paridade com FreeBet Pro §8.4)
 export type FreebetCreditada = 'SIM' | 'NAO';

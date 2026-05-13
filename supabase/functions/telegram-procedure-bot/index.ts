@@ -167,7 +167,7 @@ function buildInsertRow(
     created_date: parsed.date,
     platform: parsed.platform ?? "—",
     category: parsed.category,
-    status: "Enviado",
+    status: parsed.tipo === "ASR" ? "Aposta Sem Risco" : "Enviado",
     tipo: parsed.tipo,
     partida_descricao: parsed.partida_descricao,
     kickoff_at: parsed.kickoff_at,
@@ -328,6 +328,7 @@ function buildConfirmMsg(parsed: ParsedProcedure): string {
     SEM_FB: "Lucro Direto",
     GANHAR_FB: "Ganhar Freebet",
     QUEIMAR_FB: "Queimar Freebet",
+    ASR: "Aposta Sem Risco",
   };
   const eventoStr = parsed.partida_descricao
     ? ` · ${escHtml(parsed.partida_descricao)}`

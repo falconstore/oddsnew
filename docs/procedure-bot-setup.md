@@ -187,6 +187,31 @@ O bot reconhece 3 tipos de procedimento. Use os templates abaixo.
 
 ---
 
+### Tipo 4 — Aposta Sem Risco (ASR)
+
+Usada quando a promoção garante **lucro direto OU freebet** como recompensa alternativa.
+O sinal distintivo é ter `LUCRO:` **e** `RECOMPENSA: X EM FREEBET` na mesma mensagem.
+
+```
+🟢 PROCEDIMENTO 189 - 13/05/2026
+🟢 PROCEDIMENTO REFERENTE A PROMOÇÃO DA ESPORTIVABET - ESPORTIVA DAY 🔥
+CASA: ESPORTIVABET
+
+UTILIZAREMOS A PARTIDA ENTRE:
+Mirassol x RB Bragantino - 13/05/2026 ÀS 20:30
+
+🟡 LUCRO: 💰 18,50 / OU
+🟡 RECOMPENSA: 🎁 100,00 EM FREEBET
+📋 CATEGORIA: Cashback
+😍 chance de duplo green 😍
+```
+
+> O bot registra com `tipo = ASR`, `status = Aposta Sem Risco`, e captura ambos os valores:
+> `lucro_prejuizo_previsto = 18,50` e `freebet_valor_previsto = 100,00`.
+> O "/ OU" após o valor do lucro é opcional e tolerado.
+
+---
+
 ### Múltiplos Eventos (o bot escolhe o mais próximo do horário atual)
 
 ```
