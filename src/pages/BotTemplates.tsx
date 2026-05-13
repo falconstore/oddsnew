@@ -476,6 +476,9 @@ interface FreebetOption {
   platform: string | null;
   freebet_value: number | null;
   freebet_valor_previsto: number | null;
+  partida_descricao: string | null;
+  date: string | null;
+  titulo: string | null;
 }
 
 function FreebetSelectField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
@@ -484,7 +487,7 @@ function FreebetSelectField({ value, onChange }: { value: string; onChange: (v: 
     queryFn: async (): Promise<FreebetOption[]> => {
       const { data, error } = await supabase
         .from('procedures')
-        .select('procedure_number, platform, freebet_value, freebet_valor_previsto')
+        .select('procedure_number, platform, freebet_value, freebet_valor_previsto, partida_descricao, date, titulo')
         .eq('tipo', 'GANHAR_FB')
         .eq('archived', false)
         .in('freebet_creditada', ['SIM', 'AGUARDANDO'])
@@ -515,27 +518,71 @@ function FreebetSelectField({ value, onChange }: { value: string; onChange: (v: 
     );
   }
 
+  const fmtDateBR = (iso: string | null) => {
+    if (!iso) return null;
+    const [y, m, d] = iso.split('-');
+    return `${d}/${m}/${y}`;
+  };
+
+  const selected = freebets.find(fb => fb.procedure_number === value);
+
   return (
-    <Select value={value} onValueChange={onChange}>
-      <SelectTrigger className="h-9 text-sm bg-background/50" data-testid="select-freebet-ref">
-        <SelectValue placeholder="Selecione a freebet a queimar..." />
-      </SelectTrigger>
-      <SelectContent>
-        {freebets.map(fb => {
-          const val = fmtCurrency(fb.freebet_value ?? fb.freebet_valor_previsto);
-          const label = [
-            `#${fb.procedure_number}`,
-            fb.platform ?? '—',
-            val,
-          ].filter(Boolean).join(' · ');
-          return (
-            <SelectItem key={fb.procedure_number} value={fb.procedure_number}>
-              {label}
-            </SelectItem>
-          );
-        })}
-      </SelectContent>
-    </Select>
+    <div className="flex flex-col gap-1.5">
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger className="h-9 text-sm bg-background/50" data-testid="select-freebet-ref">
+          <SelectValue placeholder="Selecione a freebet a queimar..." />
+        </SelectTrigger>
+        <SelectContent className="max-w-sm">
+          {freebets.map(fb => {
+            const val = fmtCurrency(fb.freebet_value ?? fb.freebet_valor_previsto);
+            const dataBR = fmtDateBR(fb.date);
+            return (
+              <SelectItem key={fb.procedure_number} value={fb.procedure_number}>
+                <div className="flex flex-col gap-0.5 py-0.5">
+                  <span className="font-medium text-sm">
+                    #{fb.procedure_number} · {fb.platform ?? '—'} · {val ?? '—'}
+                  </span>
+                  {(fb.partida_descricao || dataBR) && (
+                    <span className="text-xs text-muted-foreground">
+                      {[fb.partida_descricao, dataBR].filter(Boolean).join(' · ')}
+                    </span>
+                  )}
+                </div>
+              </SelectItem>
+            );
+          })}
+        </SelectContent>
+      </Select>
+
+      {/* Card de detalhes da FB selecionada */}
+      {selected && (
+        <div className="bg-cyan-500/5 border border-cyan-500/20 rounded-lg px-3 py-2 flex flex-col gap-0.5">
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-muted-foreground">Proc:</span>
+            <span className="font-mono font-medium text-foreground">#{selected.procedure_number}</span>
+            <span className="text-muted-foreground">·</span>
+            <span className="text-cyan-400 font-medium">{fmtCurrency(selected.freebet_value ?? selected.freebet_valor_previsto) ?? '—'}</span>
+            {selected.platform && <>
+              <span className="text-muted-foreground">·</span>
+              <span className="text-foreground">{selected.platform}</span>
+            </>}
+          </div>
+          {selected.partida_descricao && (
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-muted-foreground">Jogo:</span>
+              <span className="text-foreground">{selected.partida_descricao}</span>
+              {selected.date && <span className="text-muted-foreground">{fmtDateBR(selected.date)}</span>}
+            </div>
+          )}
+          {selected.titulo && (
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-muted-foreground">Título:</span>
+              <span className="text-muted-foreground/80 truncate">{selected.titulo}</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
