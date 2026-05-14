@@ -125,6 +125,20 @@ serve(async (req) => {
           path: `/procedimentos/${encodeURIComponent(proc.id)}`,
           body: patchBody,
         });
+
+        // Fallback: se a FreeBet PRO devolveu 404, o procedimento sumiu do
+        // lado deles (provavelmente apagado por op interna). Recriamos via
+        // POST pra manter os dois lados em paridade — preserva o mesmo
+        // external_id (= proc.id), mantendo histórico/relacionamentos.
+        if (res.status === 404) {
+          log("patch_404_fallback_to_post", { procId, requestId: res.requestId });
+          res = await callFreebetPro({
+            method: "POST",
+            path: "/procedimentos",
+            body: payload,
+            idempotencyKey: `${proc.id}:recreate:${proc.created_date ?? ""}`,
+          });
+        }
       } else {
         res = await callFreebetPro({
           method: "POST",

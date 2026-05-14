@@ -81,10 +81,19 @@ export function buildUpsertPayload(p: ProcRow) {
 
   // Doc: time da FreeBet PRO pediu (06/05/2026) que o `numero` do procedimento
   // viaje no body pra refletir no painel deles. `procedure_number` é text livre
-  // no nosso schema (pode ser "Bônus 29"); só envia quando parsa pra int puro.
-  const numeroParsed =
-    p.procedure_number && /^\d+$/.test(p.procedure_number.trim())
-      ? Number.parseInt(p.procedure_number.trim(), 10)
+  // no nosso schema — extraímos o PREFIXO numérico:
+  //   "174"        → 174
+  //   "174 EXTRA"  → 174   (reentrada / variação do mesmo procedimento)
+  //   "202 EXTRA"  → 202
+  //   "Bônus 29"   → 29   (raro, prefixo não-numérico)
+  // O validator do FreeBet PRO exige `numero: number` (rejeita null com 422
+  // validation_error), então nunca enviamos null se houver QUALQUER dígito.
+  const numMatchPrefix = p.procedure_number?.trim().match(/^(\d+)/);
+  const numMatchAny = p.procedure_number?.match(/(\d+)/);
+  const numeroParsed = numMatchPrefix
+    ? Number.parseInt(numMatchPrefix[1], 10)
+    : numMatchAny
+      ? Number.parseInt(numMatchAny[1], 10)
       : null;
 
   return {

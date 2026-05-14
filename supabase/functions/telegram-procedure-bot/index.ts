@@ -267,10 +267,28 @@ async function syncWithFreebetPro(
   updateId: number | null,
   messageId: number | undefined,
 ): Promise<void> {
-  try {
-    const { data: syncData, error } = await supa.functions.invoke("freebetpro-sync", {
+  // Retry com backoff curto pra absorver falhas transientes da FreeBet PRO
+  // (timeouts da rede, cold starts, rate-limit momentâneo). 3 tentativas:
+  // imediata → +800ms → +2s. Só loga erro se TODAS falharem; sucesso em
+  // qualquer tentativa loga ok normalmente.
+  const MAX_ATTEMPTS = 3;
+  const DELAYS_MS = [0, 800, 2000];
+  let syncData: any = null;
+  let error: any = null;
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    if (DELAYS_MS[attempt] > 0) await new Promise((r) => setTimeout(r, DELAYS_MS[attempt]));
+    const result = await supa.functions.invoke("freebetpro-sync", {
       body: { procedure_id: procedureId, action: "upsert" },
     });
+    syncData = result.data;
+    error = result.error;
+    // Sucesso da edge function E sync remoto OK → para o loop
+    if (!error && syncData?.ok !== false) break;
+    if (attempt < MAX_ATTEMPTS - 1) {
+      log("freebetpro_sync_retry", { procedureId, procedureNumber, attempt: attempt + 1, err: error?.message });
+    }
+  }
+  try {
     if (error) {
       log("freebetpro_sync_failed", { procedureId, procedureNumber, err: error.message });
       await logToPanel(supabaseUrl, serviceRoleKey, {
