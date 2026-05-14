@@ -907,9 +907,15 @@ function ValidationPanel({ result, text }: { result: ParseResult | null; text: s
           <span className="text-muted-foreground">Freebet:</span>
           <span className="text-cyan-400 font-medium">R$ {data.freebet_valor_previsto.toFixed(2).replace('.', ',')}</span>
         </>}
-        {data.dp && <>
-          <span className="text-muted-foreground">Duplo Green:</span>
-          <span className="text-primary font-medium">✓ DP detectado</span>
+        {data.tags && data.tags.length > 0 && <>
+          <span className="text-muted-foreground">Tags:</span>
+          <span className="flex flex-wrap gap-1">
+            {data.tags.map(t => (
+              <span key={t} className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-primary/10 text-primary text-[10px] font-medium border border-primary/20">
+                {t}
+              </span>
+            ))}
+          </span>
         </>}
       </div>
 
@@ -1846,7 +1852,7 @@ function RegistrarPorTexto() {
       archived: false,
       tachado: false,
       reenviado_count: 0,
-      duplo_green_confirmado: data.is_duplo_green,
+      duplo_green_confirmado: false,
       esporte: 'futebol',
       observacoes: data.observacoes ?? undefined,
       bot_needs_review: true,

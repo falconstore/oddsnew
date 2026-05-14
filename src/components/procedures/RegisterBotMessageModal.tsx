@@ -38,7 +38,7 @@ function buildInsertRow(parsed: any, rawMessage: string, missingFields?: string[
     freebet_reference: parsed.tipo === 'QUEIMAR_FB' && parsed.ref_procedure_number
       ? parsed.ref_procedure_number
       : undefined,
-    tags: [],
+    tags: parsed.tags ?? [],
     is_favorite: false,
     archived: false,
     tachado: false,

@@ -453,14 +453,17 @@ export function parseMessage(text: string): ParseResult {
   }
 
   // 11. Duplo green / prioridade
-  // isDuploGreen = true apenas quando "OBJETIVO DUPLO GREEN - 💵 X,XX" (com valor confirmado)
-  const isDuploGreen = lucroResult?.isDuploGreen ?? false;
-  // chanceDuploGreen = true quando "chance de duplo green" mas SEM valor confirmado
-  // → gera tag "Chance DG", NÃO ativa dp nem duplo_green_confirmado
-  const chanceDuploGreen = /chance\s+de\s+duplo\s+green/i.test(text) && !isDuploGreen;
-  const prioridade: Prioridade = (isDuploGreen || chanceDuploGreen) ? "ALTA" : "MEDIA";
-  // tags automáticas
-  const autoTags: string[] = chanceDuploGreen ? ["Chance DG"] : [];
+  // DG detection: "OBJETIVO DUPLO GREEN - 💵 X,XX" (valor é só meta, não lucro real)
+  // OU "chance de duplo green" (frase solta).
+  // Em AMBOS os casos: lucro_previsto = 0, dp/is_duplo_green = false (tag apenas).
+  // Confirmar duplo green é ação manual no modal "Definir Resultados".
+  const isDuploGreenObjetivo = lucroResult?.isDuploGreen ?? false;
+  const chanceDuploGreen = /chance\s+de\s+duplo\s+green/i.test(text);
+  const isDG = isDuploGreenObjetivo || chanceDuploGreen;
+  // Quando o "lucro" detectado veio do OBJETIVO DG, zera (era só meta, não lucro previsto real)
+  const lucroPrevistoFinal = isDuploGreenObjetivo ? 0 : (lucroResult?.value ?? null);
+  const prioridade: Prioridade = isDG ? "ALTA" : "MEDIA";
+  const autoTags: string[] = isDG ? ["Chance DG"] : [];
 
   // Resultado parcial: tem número mas falta(m) campo(s)
   if (missing.length > 0) {
@@ -479,11 +482,11 @@ export function parseMessage(text: string): ParseResult {
         kickoff_at: chosenEvent?.kickoffUtc ?? null,
         data_partida: chosenEvent?.isoDate ?? null,
         horario_partida: chosenEvent?.time ?? null,
-        lucro_prejuizo_previsto: lucroResult?.value ?? null,
+        lucro_prejuizo_previsto: lucroPrevistoFinal,
         freebet_valor_previsto: freebetValor,
         ref_procedure_number: refProcNumber,
-        is_duplo_green: isDuploGreen,
-        dp: isDuploGreen,
+        is_duplo_green: false,
+        dp: false,
         tags: autoTags,
         observacoes,
         missingFields: missing,
@@ -506,11 +509,11 @@ export function parseMessage(text: string): ParseResult {
       kickoff_at: chosenEvent?.kickoffUtc ?? null,
       data_partida: chosenEvent?.isoDate ?? null,
       horario_partida: chosenEvent?.time ?? null,
-      lucro_prejuizo_previsto: lucroResult?.value ?? null,
+      lucro_prejuizo_previsto: lucroPrevistoFinal,
       freebet_valor_previsto: freebetValor,
       ref_procedure_number: refProcNumber,
-      is_duplo_green: isDuploGreen,
-      dp: isDuploGreen,
+      is_duplo_green: false,
+      dp: false,
       tags: autoTags,
       observacoes,
     },
