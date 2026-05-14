@@ -23,7 +23,7 @@ function buildInsertRow(parsed: any, rawMessage: string, missingFields?: string[
     created_date: parsed.date,
     platform: parsed.platform ?? '—',
     category: parsed.category,
-    status: 'Enviado',
+    status: 'Enviada Partida em Aberto',
     tipo: parsed.tipo,
     prioridade: parsed.prioridade,
     partida_descricao: parsed.partida_descricao,

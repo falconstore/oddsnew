@@ -1836,7 +1836,7 @@ function RegistrarPorTexto() {
       created_date: data.date,
       platform: data.platform ?? '—',
       category: data.category,
-      status: data.tipo === 'ASR' ? 'Aposta Sem Risco' : 'Enviado',
+      status: data.tipo === 'ASR' ? 'Aposta Sem Risco' : 'Enviada Partida em Aberto',
       tipo: data.tipo,
       partida_descricao: data.partida_descricao,
       kickoff_at: data.kickoff_at,
