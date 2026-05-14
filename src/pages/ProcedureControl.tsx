@@ -25,7 +25,6 @@ import { ImportModal } from '@/components/procedures/ImportModal';
 import { GerarRelatorioModal } from '@/components/procedures/GerarRelatorioModal';
 import { RegisterBotMessageModal } from '@/components/procedures/RegisterBotMessageModal';
 import { ColumnCustomizer } from '@/components/procedures/ColumnCustomizer';
-import { NotificationPanel } from '@/components/procedures/NotificationPanel';
 import { FilaConferencia } from '@/components/procedures/FilaConferencia';
 import { useAuth } from '@/contexts/AuthContext';
 import { PAGE_KEYS } from '@/types/auth';
@@ -44,7 +43,6 @@ export default function ProcedureControl() {
   const [resultProcedure, setResultProcedure] = useState<Procedure | null>(null);
   // selectedMonth shared via localStorage with Dashboard (same key)
   const [selectedMonth] = usePersistedState('proc_month', new Date());
-  const [showNotifications, setShowNotifications] = useState(true);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showRelatorioModal, setShowRelatorioModal] = useState(false);
   const [showColumnCustomizer, setShowColumnCustomizer] = useState(false);
@@ -235,15 +233,6 @@ export default function ProcedureControl() {
             </div>
           )}
         </div>
-
-        {/* ── Alertas ── */}
-        {showNotifications && (
-          <NotificationPanel
-            procedures={monthProcedures}
-            onDismiss={() => setShowNotifications(false)}
-            onProcedureClick={(proc) => handleEdit(proc)}
-          />
-        )}
 
         {/* ── Fila de Conferência ── */}
         {canEdit && (
