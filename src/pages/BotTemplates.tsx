@@ -1864,7 +1864,16 @@ function RegistrarPorTexto() {
     const { error } = await supabase.from('procedures').insert(payload);
     if (error) {
       setState('error');
-      setErrorMsg(error.message);
+      const isDup = error.code === '23505' || /duplicate key|procedures_external_id_key/i.test(error.message);
+      if (isDup) {
+        setErrorMsg(
+          `Já existe um procedimento Nº ${data.procedure_number} cadastrado em ${data.date.split('-').reverse().join('/')}. ` +
+          `Verifique no painel "Procedimentos" (talvez esteja com status "Concluído" ou em outra aba) — ` +
+          `não é possível criar duas vezes o mesmo número na mesma data.`
+        );
+      } else {
+        setErrorMsg(error.message);
+      }
     } else {
       setState('success');
       setRawText('');
