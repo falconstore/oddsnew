@@ -2,6 +2,38 @@ import { startOfMonth, endOfMonth, endOfDay, differenceInDays, format } from 'da
 import { ptBR } from 'date-fns/locale';
 import { Procedure } from '@/types/procedures';
 
+// Stop words PT-BR mantidas em minúscula em meio a nomes multi-palavra
+// (ex.: "Bet da Sorte", "Jogo de Ouro", "Rei do Pitaco").
+const PLATFORM_STOP_WORDS = new Set(['de', 'da', 'do', 'das', 'dos', 'e']);
+
+/**
+ * Normaliza nome de plataforma/casa para Title Case PT-BR:
+ * - Trim e colapsa espaços múltiplos
+ * - Cada palavra: primeira letra maiúscula, resto minúsculo
+ * - Stop words ('de', 'da', 'do', 'das', 'dos', 'e') ficam minúsculas
+ *   exceto se forem a primeira palavra
+ *
+ * Exemplos:
+ *   "BET365"        -> "Bet365"
+ *   "BETANO"        -> "Betano"
+ *   "MC GAMES"      -> "Mc Games"
+ *   "JOGO DE OURO"  -> "Jogo de Ouro"
+ *   "bet da sorte"  -> "Bet da Sorte"
+ */
+export function normalizePlatformName(input: string | null | undefined): string {
+  if (!input) return '';
+  const trimmed = input.trim().replace(/\s+/g, ' ');
+  if (!trimmed) return '';
+  return trimmed
+    .split(' ')
+    .map((word, i) => {
+      const lower = word.toLowerCase();
+      if (i > 0 && PLATFORM_STOP_WORDS.has(lower)) return lower;
+      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    })
+    .join(' ');
+}
+
 export const parseDate = (dateString: string | null | undefined): Date | null => {
   if (!dateString) return null;
 

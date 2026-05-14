@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { X, Upload, CheckCircle, AlertCircle } from 'lucide-react';
 import { useBulkCreateProcedures } from '@/hooks/useProcedures';
+import { normalizePlatformName } from '@/lib/procedureUtils';
 
 interface ImportModalProps {
   onClose: () => void;
@@ -111,7 +112,7 @@ export function ImportModal({ onClose, onSuccess }: ImportModalProps) {
       }
 
       cleanRecord.procedure_number = record.procedure_number;
-      cleanRecord.platform = record.platform;
+      cleanRecord.platform = normalizePlatformName(record.platform);
       
       if (record.category) cleanRecord.category = record.category;
       if (record.status) cleanRecord.status = record.status;

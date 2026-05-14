@@ -8,6 +8,7 @@ import { parseMessage, ParseResult } from '@/lib/botParser';
 import { supabaseProcedures } from '@/lib/supabaseProcedures';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from '@/hooks/use-toast';
+import { normalizePlatformName } from '@/lib/procedureUtils';
 
 interface Props {
   open: boolean;
@@ -21,7 +22,7 @@ function buildInsertRow(parsed: any, rawMessage: string, missingFields?: string[
     promotion_name: parsed.titulo || undefined,
     date: parsed.date,
     created_date: parsed.date,
-    platform: parsed.platform ?? '—',
+    platform: parsed.platform ? normalizePlatformName(parsed.platform) : '—',
     category: parsed.category,
     status: 'Enviada Partida em Aberto',
     tipo: parsed.tipo,

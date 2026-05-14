@@ -18,7 +18,7 @@ import {
   PROCEDURE_SPORTS,
 } from '@/types/procedures';
 import { useCreateProcedure, useUpdateProcedure, useProcedures } from '@/hooks/useProcedures';
-import { getAllTags, getAllPlatforms } from '@/lib/procedureUtils';
+import { getAllTags, getAllPlatforms, normalizePlatformName } from '@/lib/procedureUtils';
 import { useBookmakers } from '@/hooks/useOddsData';
 
 interface ProcedureModalProps {
@@ -187,7 +187,7 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
     const dataToSubmit = {
       date: formData.date,
       procedure_number: formData.procedure_number,
-      platform: formData.platform,
+      platform: normalizePlatformName(formData.platform),
       promotion_name: formData.promotion_name || null,
       category: formData.category,
       status: formData.status,

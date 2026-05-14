@@ -12,6 +12,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { json } from "../_shared/cors.ts";
 import { parseMessage, ParsedProcedure, PartialParsedProcedure } from "./parser.ts";
+import { normalizePlatformName } from "../_shared/platform.ts";
 
 const log = (event: string, data: Record<string, unknown>) => {
   console.log(JSON.stringify({ tag: "telegram-procedure-bot", event, ...data }));
@@ -165,7 +166,7 @@ function buildInsertRow(
     promotion_name: parsed.titulo || undefined,
     date: parsed.date,
     created_date: parsed.date,
-    platform: parsed.platform ?? "—",
+    platform: parsed.platform ? normalizePlatformName(parsed.platform) : "—",
     category: parsed.category,
     status: parsed.tipo === "ASR" ? "Aposta Sem Risco" : "Enviada Partida em Aberto",
     tipo: parsed.tipo,
@@ -605,7 +606,7 @@ serve(async (req) => {
         : undefined;
       const updateFields: Record<string, unknown> = {
         promotion_name: parsed.titulo || undefined,
-        platform: parsed.platform ?? undefined,
+        platform: parsed.platform ? normalizePlatformName(parsed.platform) : undefined,
         category: parsed.category,
         tipo: parsed.tipo,
         partida_descricao: parsed.partida_descricao,
