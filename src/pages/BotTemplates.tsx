@@ -479,7 +479,7 @@ interface FreebetOption {
   freebet_valor_previsto: number | null;
   partida_descricao: string | null;
   date: string | null;
-  titulo: string | null;
+  promotion_name: string | null;
   freebet_creditada: string | null;
   status: string | null;
 }
@@ -496,7 +496,7 @@ function FreebetSelectField({ value, onChange }: { value: string; onChange: (v: 
     queryFn: async (): Promise<FreebetOption[]> => {
       const { data, error } = await supabase
         .from('procedures')
-        .select('procedure_number, platform, freebet_value, freebet_valor_previsto, partida_descricao, date, titulo, freebet_creditada, status')
+        .select('procedure_number, platform, freebet_value, freebet_valor_previsto, partida_descricao, date, promotion_name, freebet_creditada, status')
         .eq('tipo', 'GANHAR_FB')
         .eq('archived', false)
         .order('created_date', { ascending: false })
@@ -556,7 +556,7 @@ function FreebetSelectField({ value, onChange }: { value: string; onChange: (v: 
       fb.procedure_number.includes(q) ||
       (fb.platform ?? '').toLowerCase().includes(q) ||
       (fb.partida_descricao ?? '').toLowerCase().includes(q) ||
-      (fb.titulo ?? '').toLowerCase().includes(q)
+      (fb.promotion_name ?? '').toLowerCase().includes(q)
     );
   }, [visible, search]);
 
