@@ -8,6 +8,7 @@ import { formatProcedureDate, translateCategory, getDisplayProfitLoss } from '@/
 import { canCheckResult } from '@/lib/procedureGameTime';
 import { KickoffBadge } from './KickoffBadge';
 import { StatusActionToggles } from './StatusActionToggles';
+import { LucroMaximoTooltip } from './LucroMaximoTooltip';
 
 interface ProcedureTableProps {
   procedures: Procedure[];
@@ -215,25 +216,25 @@ export function ProcedureTable({ procedures, proceduresById, visibleColumns, onE
               )}
               {visibleColumns.includes('profit_loss') && (() => {
                 const dpl = getDisplayProfitLoss(proc, proceduresById);
-                const tooltip = dpl.isGross
-                  ? `Lucro máximo (líquido + R$ ${dpl.deficitSum.toFixed(2)} de déficit das FBs origem)`
-                  : undefined;
+                const showEffective = dpl.effective !== 0;
+                const showPrevisto = !showEffective && dpl.previsto !== 0;
                 return (
                   <TableCell className="py-2 px-2">
-                    {dpl.effective !== 0 ? (
-                      <span
-                        className={`text-xs font-bold ${dpl.effective >= 0 ? 'text-emerald-400' : 'text-red-400'} ${dpl.isGross ? 'underline decoration-dotted decoration-emerald-400/40 underline-offset-2' : ''}`}
-                        title={tooltip}
-                      >
-                        {dpl.effective >= 0 ? '+' : ''}R$ {dpl.effective.toFixed(2)}
-                      </span>
-                    ) : dpl.previsto !== 0 ? (
-                      <span
-                        className={`text-xs text-muted-foreground/50 font-medium ${dpl.isGross ? 'underline decoration-dotted underline-offset-2' : ''}`}
-                        title={tooltip ?? 'Lucro previsto (resultado ainda não definido)'}
-                      >
-                        ~R$ {dpl.previsto.toFixed(2)}
-                      </span>
+                    {showEffective ? (
+                      <LucroMaximoTooltip dpl={dpl} liquid={dpl.liquidEffective} total={dpl.effective}>
+                        <span className={`text-xs font-bold ${dpl.effective >= 0 ? 'text-emerald-400' : 'text-red-400'} ${dpl.isGross ? 'underline decoration-dotted decoration-emerald-400/40 underline-offset-2' : ''}`}>
+                          {dpl.effective >= 0 ? '+' : ''}R$ {dpl.effective.toFixed(2)}
+                        </span>
+                      </LucroMaximoTooltip>
+                    ) : showPrevisto ? (
+                      <LucroMaximoTooltip dpl={dpl} liquid={dpl.liquidPrevisto} total={dpl.previsto} isPrevisto>
+                        <span
+                          className={`text-xs text-muted-foreground/50 font-medium ${dpl.isGross ? 'underline decoration-dotted underline-offset-2' : ''}`}
+                          title={dpl.isGross ? undefined : 'Lucro previsto (resultado ainda não definido)'}
+                        >
+                          ~R$ {dpl.previsto.toFixed(2)}
+                        </span>
+                      </LucroMaximoTooltip>
                     ) : (
                       <span className="text-xs font-bold text-emerald-400">+R$ 0.00</span>
                     )}

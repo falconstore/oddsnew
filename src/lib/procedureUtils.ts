@@ -308,11 +308,25 @@ export const getDailyProfitData = (procedures: Procedure[], selectedMonth: Date)
  *   - deficitSum: soma absoluta dos déficits das origens (0 se não-QUEIMAR_FB ou sem origens)
  *   - isGross:   true se aplicamos a soma (QUEIMAR_FB com pelo menos uma origem encontrada)
  */
+export interface DisplayProfitLossOriginItem {
+  id: string;
+  procedure_number: string | null;
+  promotion_name: string | null;
+  platform: string | null;
+  partida_descricao: string | null;
+  deficit: number;        // valor negativo original (ex: -37.92)
+  deficitAbs: number;     // valor positivo somado (ex: 37.92)
+  source: 'resultado_lucro' | 'profit_loss' | 'lucro_prejuizo_previsto' | 'none';
+}
+
 export interface DisplayProfitLoss {
   effective: number;
   previsto: number;
+  liquidEffective: number;   // valor líquido armazenado em profit_loss
+  liquidPrevisto: number;    // valor líquido armazenado em lucro_prejuizo_previsto
   deficitSum: number;
   isGross: boolean;
+  origins: DisplayProfitLossOriginItem[]; // origens encontradas (com déficit ou não)
 }
 
 export const getDisplayProfitLoss = (
@@ -321,10 +335,17 @@ export const getDisplayProfitLoss = (
 ): DisplayProfitLoss => {
   const storedEffective = Number(proc.profit_loss ?? 0);
   const storedPrevisto = Number(proc.lucro_prejuizo_previsto ?? 0);
+  const empty: DisplayProfitLoss = {
+    effective: storedEffective,
+    previsto: storedPrevisto,
+    liquidEffective: storedEffective,
+    liquidPrevisto: storedPrevisto,
+    deficitSum: 0,
+    isGross: false,
+    origins: [],
+  };
 
-  if (proc.tipo !== 'QUEIMAR_FB' || !byId) {
-    return { effective: storedEffective, previsto: storedPrevisto, deficitSum: 0, isGross: false };
-  }
+  if (proc.tipo !== 'QUEIMAR_FB' || !byId) return empty;
 
   const ids = new Set<string>();
   if (Array.isArray(proc.freebet_reference_ids)) {
@@ -332,31 +353,51 @@ export const getDisplayProfitLoss = (
   }
   if (proc.freebet_reference_id) ids.add(proc.freebet_reference_id);
 
-  if (ids.size === 0) {
-    return { effective: storedEffective, previsto: storedPrevisto, deficitSum: 0, isGross: false };
-  }
+  if (ids.size === 0) return empty;
 
   let deficitSum = 0;
-  let foundAny = false;
+  const origins: DisplayProfitLossOriginItem[] = [];
   for (const id of ids) {
     const origin = byId.get(id);
     if (!origin) continue;
-    foundAny = true;
-    const originDeficit = Number(
-      origin.resultado_lucro ?? origin.profit_loss ?? origin.lucro_prejuizo_previsto ?? 0
-    );
-    if (originDeficit < 0) deficitSum += Math.abs(originDeficit);
+    let deficit = 0;
+    let source: DisplayProfitLossOriginItem['source'] = 'none';
+    if (origin.resultado_lucro != null) {
+      deficit = Number(origin.resultado_lucro);
+      source = 'resultado_lucro';
+    } else if (origin.profit_loss != null && Number(origin.profit_loss) !== 0) {
+      deficit = Number(origin.profit_loss);
+      source = 'profit_loss';
+    } else if (origin.lucro_prejuizo_previsto != null) {
+      deficit = Number(origin.lucro_prejuizo_previsto);
+      source = 'lucro_prejuizo_previsto';
+    }
+    const deficitAbs = deficit < 0 ? Math.abs(deficit) : 0;
+    origins.push({
+      id: origin.id,
+      procedure_number: origin.procedure_number,
+      promotion_name: origin.promotion_name,
+      platform: origin.platform,
+      partida_descricao: origin.partida_descricao,
+      deficit,
+      deficitAbs,
+      source,
+    });
+    deficitSum += deficitAbs;
   }
 
-  if (!foundAny || deficitSum === 0) {
-    return { effective: storedEffective, previsto: storedPrevisto, deficitSum: 0, isGross: false };
+  if (origins.length === 0 || deficitSum === 0) {
+    return { ...empty, origins };
   }
 
   return {
     effective: storedEffective + deficitSum,
     previsto: storedPrevisto + deficitSum,
+    liquidEffective: storedEffective,
+    liquidPrevisto: storedPrevisto,
     deficitSum,
     isGross: true,
+    origins,
   };
 };
 

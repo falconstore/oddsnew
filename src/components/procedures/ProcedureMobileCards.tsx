@@ -7,6 +7,7 @@ import { formatProcedureDate, translateCategory, getDisplayProfitLoss } from '@/
 import { canCheckResult } from '@/lib/procedureGameTime';
 import { KickoffBadge } from './KickoffBadge';
 import { StatusActionToggles } from './StatusActionToggles';
+import { LucroMaximoTooltip } from './LucroMaximoTooltip';
 
 interface ProcedureMobileCardsProps {
   procedures: Procedure[];
@@ -169,23 +170,26 @@ export function ProcedureMobileCards({ procedures, proceduresById, onEdit, onDel
             </div>
             {(() => {
               const dpl = getDisplayProfitLoss(proc, proceduresById);
-              const tooltip = dpl.isGross
-                ? `Lucro máximo (líquido + R$ ${dpl.deficitSum.toFixed(2)} de déficit das FBs origem)`
-                : undefined;
+              const showEffective = dpl.effective !== 0;
+              const showPrevisto = !showEffective && dpl.previsto !== 0;
               return (
                 <div className="bg-white/[0.03] rounded-xl p-2.5 border border-white/5">
                   <p className="text-muted-foreground mb-1">
                     Lucro/Prejuízo
-                    {dpl.isGross && <span className="ml-1 text-[9px] text-emerald-400/70" title={tooltip}>(máx)</span>}
+                    {dpl.isGross && <span className="ml-1 text-[9px] text-emerald-400/70">(máx)</span>}
                   </p>
-                  {dpl.effective !== 0 ? (
-                    <span className={`font-bold text-sm ${dpl.effective >= 0 ? 'text-emerald-400' : 'text-red-400'}`} title={tooltip}>
-                      {dpl.effective >= 0 ? '+' : ''}R$ {dpl.effective.toFixed(2)}
-                    </span>
-                  ) : dpl.previsto !== 0 ? (
-                    <span className="text-sm text-muted-foreground/50 font-medium" title={tooltip ?? 'Lucro previsto (resultado ainda não definido)'}>
-                      ~R$ {dpl.previsto.toFixed(2)}
-                    </span>
+                  {showEffective ? (
+                    <LucroMaximoTooltip dpl={dpl} liquid={dpl.liquidEffective} total={dpl.effective}>
+                      <span className={`font-bold text-sm ${dpl.effective >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                        {dpl.effective >= 0 ? '+' : ''}R$ {dpl.effective.toFixed(2)}
+                      </span>
+                    </LucroMaximoTooltip>
+                  ) : showPrevisto ? (
+                    <LucroMaximoTooltip dpl={dpl} liquid={dpl.liquidPrevisto} total={dpl.previsto} isPrevisto>
+                      <span className="text-sm text-muted-foreground/50 font-medium">
+                        ~R$ {dpl.previsto.toFixed(2)}
+                      </span>
+                    </LucroMaximoTooltip>
                   ) : (
                     <span className="font-bold text-sm text-emerald-400">+R$ 0.00</span>
                   )}
