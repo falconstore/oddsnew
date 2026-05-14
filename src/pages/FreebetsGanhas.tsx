@@ -51,8 +51,13 @@ function buildCiclos(procedures: Procedure[], periodo: Periodo): FreebetCiclo[] 
   const ativos = procedures.filter((p) => !p.archived);
   const queimadoresPorOrigem = new Map<string, Procedure>();
   for (const p of ativos) {
-    if (p.tipo === 'QUEIMAR_FB' && p.freebet_reference_id) {
-      queimadoresPorOrigem.set(p.freebet_reference_id, p);
+    if (p.tipo !== 'QUEIMAR_FB') continue;
+    // Multi-origem: indexa pelo array (fallback singular pra linhas legadas).
+    const ids = p.freebet_reference_ids && p.freebet_reference_ids.length > 0
+      ? p.freebet_reference_ids
+      : (p.freebet_reference_id ? [p.freebet_reference_id] : []);
+    for (const id of ids) {
+      queimadoresPorOrigem.set(id, p);
     }
   }
   const ciclos: FreebetCiclo[] = [];

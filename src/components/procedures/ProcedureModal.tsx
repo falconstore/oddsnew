@@ -50,6 +50,7 @@ const emptyForm: ProcedureFormData = {
   esporte: 'futebol',
   cenario_b_cash: '',
   freebet_reference_id: null,
+  freebet_reference_ids: [],
 };
 
 function FieldLabel({ icon: Icon, label, required }: { icon: typeof FileText; label: string; required?: boolean }) {
@@ -140,6 +141,10 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
         esporte: procedure.esporte || 'futebol',
         cenario_b_cash: procedure.cenario_b_cash != null ? String(procedure.cenario_b_cash) : '',
         freebet_reference_id: procedure.freebet_reference_id || null,
+        // Backfill UX: linhas antigas só têm singular; espelha pro array pra UI funcionar.
+        freebet_reference_ids: (procedure.freebet_reference_ids && procedure.freebet_reference_ids.length > 0)
+          ? procedure.freebet_reference_ids
+          : (procedure.freebet_reference_id ? [procedure.freebet_reference_id] : []),
       });
     } else {
       setFormData({ ...emptyForm, procedure_number: suggestedNextNumber, date: new Date().toISOString().slice(0, 10) });
@@ -207,8 +212,14 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
       fixture_id: formData.fixture_id ?? null,
       esporte: formData.esporte || 'futebol',
       cenario_b_cash: cenarioBCash,
-      // QUEIMAR_FB: preserva o vínculo UUID com a origem
-      freebet_reference_id: formData.tipo === 'QUEIMAR_FB' ? formData.freebet_reference_id : null,
+      // QUEIMAR_FB: preserva os vínculos UUID com a(s) origem(ns).
+      // Multi-origem: array com TODAS, singular = primeira (back-compat sync FreeBet PRO).
+      freebet_reference_id: formData.tipo === 'QUEIMAR_FB'
+        ? (formData.freebet_reference_ids[0] ?? formData.freebet_reference_id ?? null)
+        : null,
+      freebet_reference_ids: formData.tipo === 'QUEIMAR_FB'
+        ? (formData.freebet_reference_ids ?? [])
+        : [],
     };
 
     try {
@@ -479,16 +490,17 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
                         procedures={allProcedures}
                         currentId={procedure?.id ?? null}
                         refValue={formData.freebet_reference}
-                        refId={formData.freebet_reference_id}
+                        selectedIds={formData.freebet_reference_ids}
                         onChange={(next) => setFormData({
                           ...formData,
-                          freebet_reference: next.freebet_reference,
-                          freebet_reference_id: next.freebet_reference_id,
-                          // Auto-preencher Plataforma com a casa da FB origem (doc §3, checklist 9).
-                          // Só popula quando vem do autocomplete (next.platform !== undefined),
-                          // permitindo o usuário editar livremente depois.
-                          platform: next.platform !== undefined && next.platform
-                            ? next.platform
+                          freebet_reference: next.primaryRefText,
+                          freebet_reference_id: next.selectedIds[0] ?? null,
+                          freebet_reference_ids: next.selectedIds,
+                          // Auto-preencher Plataforma com a casa da FB origem PRIMÁRIA
+                          // (doc §3, checklist 9). Só popula quando vem do autocomplete
+                          // (next.primaryPlatform !== undefined), permitindo edição livre depois.
+                          platform: next.primaryPlatform !== undefined && next.primaryPlatform
+                            ? next.primaryPlatform
                             : formData.platform,
                         })}
                         inputClassName="bg-purple-500/5 border-purple-500/20 focus:border-purple-500/50 h-9 text-sm pr-8"
