@@ -6,6 +6,21 @@ import { Procedure } from '@/types/procedures';
 // (ex.: "Bet da Sorte", "Jogo de Ouro", "Rei do Pitaco").
 const PLATFORM_STOP_WORDS = new Set(['de', 'da', 'do', 'das', 'dos', 'e']);
 
+// Aliases canônicos: nome original (lowercase, sem espaços) → nome canônico.
+// Aplicado ANTES da normalização Title Case pra unificar variações de
+// espaçamento (ex.: "Mcgames" → "Mc Games", "Goldebet" → "Gol de Bet").
+const PLATFORM_ALIASES: Record<string, string> = {
+  mcgames: 'Mc Games',
+  f12bet: 'F12 Bet',
+  goldebet: 'Gol de Bet',
+  jogodeouro: 'Jogo de Ouro',
+  reidopitaco: 'Rei do Pitaco',
+  betdasorte: 'Bet da Sorte',
+  lancedasorte: 'Lance da Sorte',
+  brasildasorte: 'Brasil da Sorte',
+  pixdasorte: 'Pix da Sorte',
+};
+
 /**
  * Normaliza nome de plataforma/casa para Title Case PT-BR:
  * - Trim e colapsa espaços múltiplos
@@ -24,6 +39,9 @@ export function normalizePlatformName(input: string | null | undefined): string 
   if (!input) return '';
   const trimmed = input.trim().replace(/\s+/g, ' ');
   if (!trimmed) return '';
+  // Alias check: chave = string sem espaços, lowercase
+  const aliasKey = trimmed.toLowerCase().replace(/\s+/g, '');
+  if (PLATFORM_ALIASES[aliasKey]) return PLATFORM_ALIASES[aliasKey];
   return trimmed
     .split(' ')
     .map((word, i) => {
