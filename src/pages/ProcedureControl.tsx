@@ -154,6 +154,11 @@ export default function ProcedureControl() {
 
       return true;
     }).sort((a, b) => {
+      // 1º critério: data DESC (mais recente primeiro) — mantém agrupamento por data correto
+      const dateA = a.date || '';
+      const dateB = b.date || '';
+      if (dateA !== dateB) return dateB.localeCompare(dateA);
+      // 2º critério: nº do procedimento DESC dentro do mesmo dia
       const numA = parseInt(a.procedure_number, 10) || 0;
       const numB = parseInt(b.procedure_number, 10) || 0;
       return numB - numA;
