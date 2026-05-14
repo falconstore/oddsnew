@@ -92,7 +92,7 @@ export function ProcedureTable({ procedures, proceduresById, visibleColumns, onE
             <TableRow
               key={proc.id}
               data-testid={`row-procedure-${proc.id}`}
-              className={`border-white/5 hover:bg-white/[0.03] transition-colors group ${proc.archived ? 'opacity-50' : ''} ${proc.tachado ? 'opacity-50 grayscale' : ''} ${hasIncomplete ? 'border-l-2 border-l-orange-500/40' : needsReviewOnly ? 'border-l-2 border-l-yellow-500/30' : ''}`}
+              className={`border-white/5 ${idx % 2 === 0 ? 'bg-white/[0.025]' : 'bg-transparent'} hover:bg-white/[0.06] transition-colors group ${proc.archived ? 'opacity-50' : ''} ${proc.tachado ? 'opacity-50 grayscale' : ''} ${hasIncomplete ? 'border-l-2 border-l-orange-500/40' : needsReviewOnly ? 'border-l-2 border-l-yellow-500/30' : ''}`}
             >
               <TableCell className="w-8 py-2 px-2">
                 <Button

@@ -22,6 +22,8 @@ import { cn } from '@/lib/utils';
 import { Sidebar } from '@/components/Sidebar';
 import { parseMessage, type ParseResult } from '@/lib/botParser';
 import { EventoAutocomplete } from '@/components/procedures/EventoAutocomplete';
+import { useProcedures } from '@/hooks/useProcedures';
+import { getAllPlatforms } from '@/lib/procedureUtils';
 import { PROCEDURE_CATEGORIES } from '@/types/procedures';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
@@ -2024,6 +2026,17 @@ function FieldInput({
   value: string;
   onChange: (v: string) => void;
 }) {
+  // Autocomplete pra campo "Casa de Apostas": sugere casas já usadas
+  // no sistema (procedimentos existentes), evitando erro de digitação.
+  // react-query dedupa a query entre instâncias, sem custo extra.
+  const isCasaField = field.id === 'casa';
+  const { data: procedures = [] } = useProcedures();
+  const platformSuggestions = useMemo(
+    () => (isCasaField ? getAllPlatforms(procedures) : []),
+    [isCasaField, procedures],
+  );
+  const datalistId = isCasaField ? `casas-datalist-${field.id}` : undefined;
+
   const handleChange = (v: string) => {
     onChange(field.uppercase ? v.toUpperCase() : v);
   };
@@ -2055,12 +2068,20 @@ function FieldInput({
         value={value}
         placeholder={field.placeholder}
         onChange={e => handleChange(e.target.value)}
+        list={datalistId}
         className={cn(
           'h-9 text-sm bg-background/50',
           field.uppercase && 'uppercase placeholder:normal-case',
         )}
         data-testid={`input-field-${field.id}`}
       />
+      {isCasaField && datalistId && (
+        <datalist id={datalistId}>
+          {platformSuggestions.map(p => (
+            <option key={p} value={p} />
+          ))}
+        </datalist>
+      )}
       {field.hint && (
         <p className="text-[11px] text-muted-foreground/70">{field.hint}</p>
       )}
