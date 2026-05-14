@@ -3,13 +3,15 @@ import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Star, Pencil, Trash2, ExternalLink, Tag, Calendar, Building2, Archive, ArchiveRestore, Trophy, Clock, CheckCircle2, AlertCircle, ShieldCheck, AlertTriangle, ShieldAlert, Timer } from 'lucide-react';
 import { Procedure } from '@/types/procedures';
-import { formatProcedureDate, translateCategory } from '@/lib/procedureUtils';
+import { formatProcedureDate, translateCategory, getDisplayProfitLoss } from '@/lib/procedureUtils';
 import { canCheckResult } from '@/lib/procedureGameTime';
 import { KickoffBadge } from './KickoffBadge';
 import { StatusActionToggles } from './StatusActionToggles';
 
 interface ProcedureMobileCardsProps {
   procedures: Procedure[];
+  /** Map id→Procedure (lista FULL) usado pra calcular L/P máximo da QUEIMAR_FB com déficit das origens. */
+  proceduresById?: Map<string, Procedure>;
   onEdit?: (proc: Procedure) => void;
   onDelete?: (id: string) => void;
   onToggleFavorite: (proc: Procedure) => void;
@@ -18,7 +20,7 @@ interface ProcedureMobileCardsProps {
   onConfirmBot?: (id: string) => void;
 }
 
-export function ProcedureMobileCards({ procedures, onEdit, onDelete, onToggleFavorite, onArchive, onCheckResult, onConfirmBot }: ProcedureMobileCardsProps) {
+export function ProcedureMobileCards({ procedures, proceduresById, onEdit, onDelete, onToggleFavorite, onArchive, onCheckResult, onConfirmBot }: ProcedureMobileCardsProps) {
   const getStatusBadge = (status: string) => {
     if (status === 'Concluído' || status === 'Lucro Direto') {
       return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
@@ -165,20 +167,31 @@ export function ProcedureMobileCards({ procedures, onEdit, onDelete, onToggleFav
                 <StatusActionToggles procedure={proc} />
               </div>
             </div>
-            <div className="bg-white/[0.03] rounded-xl p-2.5 border border-white/5">
-              <p className="text-muted-foreground mb-1">Lucro/Prejuízo</p>
-              {proc.profit_loss !== 0 ? (
-                <span className={`font-bold text-sm ${proc.profit_loss >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {proc.profit_loss >= 0 ? '+' : ''}R$ {proc.profit_loss?.toFixed(2)}
-                </span>
-              ) : proc.lucro_prejuizo_previsto != null && proc.lucro_prejuizo_previsto !== 0 ? (
-                <span className="text-sm text-muted-foreground/50 font-medium" title="Lucro previsto (resultado ainda não definido)">
-                  ~R$ {Number(proc.lucro_prejuizo_previsto).toFixed(2)}
-                </span>
-              ) : (
-                <span className="font-bold text-sm text-emerald-400">+R$ 0.00</span>
-              )}
-            </div>
+            {(() => {
+              const dpl = getDisplayProfitLoss(proc, proceduresById);
+              const tooltip = dpl.isGross
+                ? `Lucro máximo (líquido + R$ ${dpl.deficitSum.toFixed(2)} de déficit das FBs origem)`
+                : undefined;
+              return (
+                <div className="bg-white/[0.03] rounded-xl p-2.5 border border-white/5">
+                  <p className="text-muted-foreground mb-1">
+                    Lucro/Prejuízo
+                    {dpl.isGross && <span className="ml-1 text-[9px] text-emerald-400/70" title={tooltip}>(máx)</span>}
+                  </p>
+                  {dpl.effective !== 0 ? (
+                    <span className={`font-bold text-sm ${dpl.effective >= 0 ? 'text-emerald-400' : 'text-red-400'}`} title={tooltip}>
+                      {dpl.effective >= 0 ? '+' : ''}R$ {dpl.effective.toFixed(2)}
+                    </span>
+                  ) : dpl.previsto !== 0 ? (
+                    <span className="text-sm text-muted-foreground/50 font-medium" title={tooltip ?? 'Lucro previsto (resultado ainda não definido)'}>
+                      ~R$ {dpl.previsto.toFixed(2)}
+                    </span>
+                  ) : (
+                    <span className="font-bold text-sm text-emerald-400">+R$ 0.00</span>
+                  )}
+                </div>
+              );
+            })()}
             {proc.freebet_value && (
               <div className="bg-white/[0.03] rounded-xl p-2.5 border border-white/5">
                 <p className="text-muted-foreground mb-1">Freebet</p>

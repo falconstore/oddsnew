@@ -293,6 +293,73 @@ export const getDailyProfitData = (procedures: Procedure[], selectedMonth: Date)
     });
 };
 
+/**
+ * Para QUEIMAR_FB: o "lucro máximo" exibido na coluna L/P é o valor armazenado
+ * (líquido) + soma dos déficits absolutos das FBs origem vinculadas.
+ *
+ * Origens vêm de `freebet_reference_ids` (multi) com fallback no `freebet_reference_id` singular.
+ * O déficit de cada origem é lido em ordem: resultado_lucro → profit_loss → lucro_prejuizo_previsto.
+ *
+ * Para outros tipos, retorna o valor armazenado tal qual (sem soma).
+ *
+ * @returns { effective, previsto, deficitSum, isGross }
+ *   - effective: valor a exibir quando profit_loss está preenchido (gross para QUEIMAR_FB)
+ *   - previsto:  valor a exibir como "previsto" (~) quando profit_loss=0 (gross para QUEIMAR_FB)
+ *   - deficitSum: soma absoluta dos déficits das origens (0 se não-QUEIMAR_FB ou sem origens)
+ *   - isGross:   true se aplicamos a soma (QUEIMAR_FB com pelo menos uma origem encontrada)
+ */
+export interface DisplayProfitLoss {
+  effective: number;
+  previsto: number;
+  deficitSum: number;
+  isGross: boolean;
+}
+
+export const getDisplayProfitLoss = (
+  proc: Procedure,
+  byId?: Map<string, Procedure>
+): DisplayProfitLoss => {
+  const storedEffective = Number(proc.profit_loss ?? 0);
+  const storedPrevisto = Number(proc.lucro_prejuizo_previsto ?? 0);
+
+  if (proc.tipo !== 'QUEIMAR_FB' || !byId) {
+    return { effective: storedEffective, previsto: storedPrevisto, deficitSum: 0, isGross: false };
+  }
+
+  const ids = new Set<string>();
+  if (Array.isArray(proc.freebet_reference_ids)) {
+    for (const id of proc.freebet_reference_ids) if (id) ids.add(id);
+  }
+  if (proc.freebet_reference_id) ids.add(proc.freebet_reference_id);
+
+  if (ids.size === 0) {
+    return { effective: storedEffective, previsto: storedPrevisto, deficitSum: 0, isGross: false };
+  }
+
+  let deficitSum = 0;
+  let foundAny = false;
+  for (const id of ids) {
+    const origin = byId.get(id);
+    if (!origin) continue;
+    foundAny = true;
+    const originDeficit = Number(
+      origin.resultado_lucro ?? origin.profit_loss ?? origin.lucro_prejuizo_previsto ?? 0
+    );
+    if (originDeficit < 0) deficitSum += Math.abs(originDeficit);
+  }
+
+  if (!foundAny || deficitSum === 0) {
+    return { effective: storedEffective, previsto: storedPrevisto, deficitSum: 0, isGross: false };
+  }
+
+  return {
+    effective: storedEffective + deficitSum,
+    previsto: storedPrevisto + deficitSum,
+    deficitSum,
+    isGross: true,
+  };
+};
+
 export const translateCategory = (category: string): string => {
   const translations: Record<string, string> = {
     'Promotion': 'Promoção',

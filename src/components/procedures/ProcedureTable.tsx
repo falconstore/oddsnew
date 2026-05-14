@@ -4,13 +4,15 @@ import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Star, Pencil, Trash2, ExternalLink, Tag, Archive, ArchiveRestore, Trophy, CheckCircle2, AlertCircle, ShieldCheck, AlertTriangle, ShieldAlert, Timer } from 'lucide-react';
 import { Procedure } from '@/types/procedures';
-import { formatProcedureDate, translateCategory } from '@/lib/procedureUtils';
+import { formatProcedureDate, translateCategory, getDisplayProfitLoss } from '@/lib/procedureUtils';
 import { canCheckResult } from '@/lib/procedureGameTime';
 import { KickoffBadge } from './KickoffBadge';
 import { StatusActionToggles } from './StatusActionToggles';
 
 interface ProcedureTableProps {
   procedures: Procedure[];
+  /** Map id→Procedure (lista FULL) usado pra calcular L/P máximo da QUEIMAR_FB com déficit das origens. */
+  proceduresById?: Map<string, Procedure>;
   visibleColumns: string[];
   onEdit?: (proc: Procedure) => void;
   onDelete?: (id: string) => void;
@@ -20,7 +22,7 @@ interface ProcedureTableProps {
   onConfirmBot?: (id: string) => void;
 }
 
-export function ProcedureTable({ procedures, visibleColumns, onEdit, onDelete, onToggleFavorite, onArchive, onCheckResult, onConfirmBot }: ProcedureTableProps) {
+export function ProcedureTable({ procedures, proceduresById, visibleColumns, onEdit, onDelete, onToggleFavorite, onArchive, onCheckResult, onConfirmBot }: ProcedureTableProps) {
   const getStatusBadge = (status: string) => {
     if (status === 'Concluído' || status === 'Lucro Direto') {
       return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
@@ -211,21 +213,33 @@ export function ProcedureTable({ procedures, visibleColumns, onEdit, onDelete, o
                   )}
                 </TableCell>
               )}
-              {visibleColumns.includes('profit_loss') && (
-                <TableCell className="py-2 px-2">
-                  {proc.profit_loss !== 0 ? (
-                    <span className={`text-xs font-bold ${proc.profit_loss >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                      {proc.profit_loss >= 0 ? '+' : ''}R$ {proc.profit_loss?.toFixed(2)}
-                    </span>
-                  ) : proc.lucro_prejuizo_previsto != null && proc.lucro_prejuizo_previsto !== 0 ? (
-                    <span className="text-xs text-muted-foreground/50 font-medium" title="Lucro previsto (resultado ainda não definido)">
-                      ~R$ {Number(proc.lucro_prejuizo_previsto).toFixed(2)}
-                    </span>
-                  ) : (
-                    <span className="text-xs font-bold text-emerald-400">+R$ 0.00</span>
-                  )}
-                </TableCell>
-              )}
+              {visibleColumns.includes('profit_loss') && (() => {
+                const dpl = getDisplayProfitLoss(proc, proceduresById);
+                const tooltip = dpl.isGross
+                  ? `Lucro máximo (líquido + R$ ${dpl.deficitSum.toFixed(2)} de déficit das FBs origem)`
+                  : undefined;
+                return (
+                  <TableCell className="py-2 px-2">
+                    {dpl.effective !== 0 ? (
+                      <span
+                        className={`text-xs font-bold ${dpl.effective >= 0 ? 'text-emerald-400' : 'text-red-400'} ${dpl.isGross ? 'underline decoration-dotted decoration-emerald-400/40 underline-offset-2' : ''}`}
+                        title={tooltip}
+                      >
+                        {dpl.effective >= 0 ? '+' : ''}R$ {dpl.effective.toFixed(2)}
+                      </span>
+                    ) : dpl.previsto !== 0 ? (
+                      <span
+                        className={`text-xs text-muted-foreground/50 font-medium ${dpl.isGross ? 'underline decoration-dotted underline-offset-2' : ''}`}
+                        title={tooltip ?? 'Lucro previsto (resultado ainda não definido)'}
+                      >
+                        ~R$ {dpl.previsto.toFixed(2)}
+                      </span>
+                    ) : (
+                      <span className="text-xs font-bold text-emerald-400">+R$ 0.00</span>
+                    )}
+                  </TableCell>
+                );
+              })()}
               {visibleColumns.includes('tags') && (
                 <TableCell className="py-2 px-2">
                   <div className="flex flex-wrap gap-0.5">

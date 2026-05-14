@@ -33,6 +33,11 @@ export default function ProcedureControl() {
   const { canEditPage } = useAuth();
   const canEdit = canEditPage(PAGE_KEYS.PROCEDURE_CONTROL);
   const { data: procedures = [], refetch } = useProcedures();
+  const proceduresById = useMemo(() => {
+    const m = new Map<string, Procedure>();
+    for (const p of procedures) m.set(p.id, p);
+    return m;
+  }, [procedures]);
   const deleteProcedure = useDeleteProcedure();
   const toggleFavorite = useToggleFavorite();
   const archiveProcedure = useArchiveProcedure();
@@ -278,6 +283,7 @@ export default function ProcedureControl() {
           <div className="p-0">
             <ProcedureTable
               procedures={filteredProcedures}
+              proceduresById={proceduresById}
               visibleColumns={visibleColumns}
               onEdit={canEdit ? handleEdit : undefined}
               onDelete={canEdit ? handleDelete : undefined}
@@ -290,6 +296,7 @@ export default function ProcedureControl() {
           <div className="p-3">
             <ProcedureMobileCards
               procedures={filteredProcedures}
+              proceduresById={proceduresById}
               onEdit={canEdit ? handleEdit : undefined}
               onDelete={canEdit ? handleDelete : undefined}
               onArchive={canEdit ? handleArchive : undefined}
