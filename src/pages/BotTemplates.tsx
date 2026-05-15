@@ -144,17 +144,22 @@ const TEMPLATES: TemplateConfig[] = [
       { id: 'evento1', label: 'Partida', placeholder: 'Ex: Flamengo x Palmeiras', type: 'evento' },
       { id: 'lucro', label: 'Lucro Previsto (ex: 17,00)', placeholder: '17,00', type: 'text' },
       { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Freebet' },
+      { id: 'evento2', label: 'Partida 2', placeholder: 'Ex: Real Madrid x Barcelona', type: 'evento', optional: true },
     ],
     generate: (f) => {
       const refStr = f.numRef || '[NNN]';
       const linha2 = `🟢 PROCEDIMENTO REFERENTE ÀS FREEBETS — REF N° ${refStr} 🔥`;
+      const partidas = [`${f.evento1 || 'TIME A X TIME B'} - ${f.evento1_data || 'DD/MM/AAAA'} ÀS ${f.evento1_hora || 'HH:MM'}`];
+      if (f.evento2) {
+        partidas.push(`${f.evento2} - ${f.evento2_data || 'DD/MM/AAAA'} ÀS ${f.evento2_hora || 'HH:MM'}`);
+      }
       return [
         `🟢 PROCEDIMENTO ${f.isExtra === 'true' ? 'EXTRA ' : ''}${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
         linha2,
         `CASA: 🏠 ${(f.casa || 'CASA').toUpperCase()}`,
         ``,
         `UTILIZAREMOS O JOGO ENTRE:`,
-        `${f.evento1 || 'TIME A X TIME B'} - ${f.evento1_data || 'DD/MM/AAAA'} ÀS ${f.evento1_hora || 'HH:MM'}`,
+        ...partidas,
         ``,
         `🟥 Atenção: sempre confere data e horário da partida nos bilhetes também.`,
         `🟥 Atenção: Sempre confira se os links dos bilhetes são os mesmos da imagem.`,
