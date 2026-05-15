@@ -263,7 +263,7 @@ export default function TrialAdmin() {
                 Conversão do aviso de 24h
               </h2>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Avisos enviados, visitas em /trial-upgrade e cliques nos CTAs · {RANGE_LABELS[statsRange]}
+                Avisos disparados via Telegram e quantos viraram pagamento · {RANGE_LABELS[statsRange]}
               </p>
             </div>
             <Select value={statsRange} onValueChange={v => setStatsRange(v as TrialStatsRange)}>
@@ -289,76 +289,44 @@ export default function TrialAdmin() {
               ))}
             </div>
           ) : (
-            <>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <MetricCard
-                  icon={<BellRing className="w-5 h-5" />}
-                  label="Avisos enviados"
-                  value={upgradeStats.remindersSent}
-                  hint="Trials que receberam o aviso de 24h"
-                  accent="from-amber-500/20 to-amber-500/5 border-amber-500/25 text-amber-300"
-                  testId="metric-reminders-sent"
-                />
-                <MetricCard
-                  icon={<Eye className="w-5 h-5" />}
-                  label="Visitas /trial-upgrade"
-                  value={upgradeStats.views}
-                  hint="Quantas vezes a página foi aberta"
-                  accent="from-sky-500/20 to-sky-500/5 border-sky-500/25 text-sky-300"
-                  testId="metric-views"
-                />
-                <MetricCard
-                  icon={<MousePointerClick className="w-5 h-5" />}
-                  label="Leads únicos com clique"
-                  value={upgradeStats.uniqueLeadsClicked}
-                  hint={`${upgradeStats.totalClicks} cliques no total`}
-                  accent="from-fuchsia-500/20 to-fuchsia-500/5 border-fuchsia-500/25 text-fuchsia-300"
-                  testId="metric-unique-clicks"
-                />
-                <MetricCard
-                  icon={<TrendingUp className="w-5 h-5" />}
-                  label="Taxa de conversão"
-                  value={`${upgradeStats.conversionRate.toFixed(1)}%`}
-                  hint={
-                    upgradeStats.remindersSent > 0
-                      ? `${upgradeStats.uniqueLeadsClicked} de ${upgradeStats.remindersSent} avisos`
-                      : 'Sem avisos no período'
-                  }
-                  accent="from-emerald-500/20 to-emerald-500/5 border-emerald-500/25 text-emerald-300"
-                  testId="metric-conversion-rate"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <CtaBreakdownCard
-                  icon={<MessageCircle className="w-4 h-4" />}
-                  label="WhatsApp"
-                  value={upgradeStats.clicksWhatsapp}
-                  total={upgradeStats.totalClicks}
-                  accent="text-emerald-300 bg-emerald-500/10 border-emerald-500/25"
-                  bar="bg-emerald-400/70"
-                  testId="metric-cta-whatsapp"
-                />
-                <CtaBreakdownCard
-                  icon={<Send className="w-4 h-4" />}
-                  label="Telegram"
-                  value={upgradeStats.clicksTelegram}
-                  total={upgradeStats.totalClicks}
-                  accent="text-sky-300 bg-sky-500/10 border-sky-500/25"
-                  bar="bg-sky-400/70"
-                  testId="metric-cta-telegram"
-                />
-                <CtaBreakdownCard
-                  icon={<ShoppingCart className="w-4 h-4" />}
-                  label="Checkout"
-                  value={upgradeStats.clicksCheckout}
-                  total={upgradeStats.totalClicks}
-                  accent="text-pink-300 bg-pink-500/10 border-pink-500/25"
-                  bar="bg-pink-400/70"
-                  testId="metric-cta-checkout"
-                />
-              </div>
-            </>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <MetricCard
+                icon={<BellRing className="w-5 h-5" />}
+                label="Avisos 24h enviados"
+                value={upgradeStats.remindersSent}
+                hint="Trials que receberam o aviso de 24h"
+                accent="from-amber-500/20 to-amber-500/5 border-amber-500/25 text-amber-300"
+                testId="metric-reminders-sent"
+              />
+              <MetricCard
+                icon={<BellRing className="w-5 h-5" />}
+                label="Avisos 1h enviados"
+                value={upgradeStats.reminders1hSent}
+                hint="Último lembrete antes da expiração"
+                accent="from-orange-500/20 to-orange-500/5 border-orange-500/25 text-orange-300"
+                testId="metric-reminders-1h-sent"
+              />
+              <MetricCard
+                icon={<ShoppingCart className="w-5 h-5" />}
+                label="Pagamentos pós-aviso"
+                value={upgradeStats.paidAfterReminder}
+                hint="Leads avisados que viraram assinatura"
+                accent="from-fuchsia-500/20 to-fuchsia-500/5 border-fuchsia-500/25 text-fuchsia-300"
+                testId="metric-paid-after-reminder"
+              />
+              <MetricCard
+                icon={<TrendingUp className="w-5 h-5" />}
+                label="Taxa de conversão"
+                value={`${upgradeStats.conversionRate.toFixed(1)}%`}
+                hint={
+                  upgradeStats.remindersSent > 0
+                    ? `${upgradeStats.paidAfterReminder} de ${upgradeStats.remindersSent} avisos`
+                    : 'Sem avisos no período'
+                }
+                accent="from-emerald-500/20 to-emerald-500/5 border-emerald-500/25 text-emerald-300"
+                testId="metric-conversion-rate"
+              />
+            </div>
           )}
         </div>
 

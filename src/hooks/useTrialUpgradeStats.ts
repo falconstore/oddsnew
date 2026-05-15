@@ -28,6 +28,16 @@ export interface TrialUpgradeStats {
   totalClicks: number;
   uniqueLeadsClicked: number;
   remindersSent: number;
+  /** Avisos de 1h disparados no período (segundo lembrete). */
+  reminders1hSent: number;
+  /**
+   * Leads que receberam aviso 24h E pagaram em qualquer momento.
+   * Métrica real de conversão do funil de aviso (o link do aviso vai
+   * direto pro checkout do Lastlink com cupom, então não passa pela
+   * página /trial-upgrade — views/clicks dela ficam zerados).
+   */
+  paidAfterReminder: number;
+  /** paidAfterReminder / remindersSent — conversão real do aviso. */
   conversionRate: number;
 }
 
@@ -57,9 +67,28 @@ export const useTrialUpgradeStats = (
         .not('reminder_sent_at', 'is', null);
       if (sinceIso) remindersQ = remindersQ.gte('reminder_sent_at', sinceIso);
 
-      const [eventsRes, remindersRes] = await Promise.all([eventsQ, remindersQ]);
+      let reminders1hQ = supabase
+        .from('trial_leads')
+        .select('id', { count: 'exact', head: true })
+        .not('reminder_1h_sent_at', 'is', null);
+      if (sinceIso) reminders1hQ = reminders1hQ.gte('reminder_1h_sent_at', sinceIso);
+
+      // Conversão real: leads que receberam aviso 24h E pagaram.
+      // Janela = quando o aviso foi enviado (paid_at pode ser depois).
+      let paidQ = supabase
+        .from('trial_leads')
+        .select('id', { count: 'exact', head: true })
+        .not('reminder_sent_at', 'is', null)
+        .not('paid_at', 'is', null);
+      if (sinceIso) paidQ = paidQ.gte('reminder_sent_at', sinceIso);
+
+      const [eventsRes, remindersRes, reminders1hRes, paidRes] = await Promise.all([
+        eventsQ, remindersQ, reminders1hQ, paidQ,
+      ]);
       if (eventsRes.error) throw eventsRes.error;
       if (remindersRes.error) throw remindersRes.error;
+      if (reminders1hRes.error) throw reminders1hRes.error;
+      if (paidRes.error) throw paidRes.error;
 
       const events = (eventsRes.data ?? []) as Pick<TrialUpgradeEvent, 'id' | 'lead_id' | 'event_type' | 'created_at'>[];
 
@@ -84,8 +113,10 @@ export const useTrialUpgradeStats = (
         counts.cta_free_group +
         counts.cta_open_form;
       const remindersSent = remindersRes.count ?? 0;
+      const reminders1hSent = reminders1hRes.count ?? 0;
+      const paidAfterReminder = paidRes.count ?? 0;
       const conversionRate = remindersSent > 0
-        ? (uniqueLeads.size / remindersSent) * 100
+        ? (paidAfterReminder / remindersSent) * 100
         : 0;
 
       return {
@@ -99,6 +130,8 @@ export const useTrialUpgradeStats = (
         totalClicks,
         uniqueLeadsClicked: uniqueLeads.size,
         remindersSent,
+        reminders1hSent,
+        paidAfterReminder,
         conversionRate,
       };
     },
