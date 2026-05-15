@@ -1,16 +1,20 @@
 // Badge AO VIVO/ENCERRADO baseado em kickoff (paridade FULL FreeBet PRO doc 02 §badges).
-// Janela LIVE = [kickoff, kickoff+4h]. Não mostra nada se status == Concluído/Lucro Direto.
+// Janela LIVE = [kickoff, kickoff+150min] — mesma janela usada por
+// `getGameTimeBucket` (filtros, canCheckResult, FilaConferencia) e pelo
+// cron `auto_update_procedure_statuses` no banco. Manter aqui igual evita
+// que um procedimento apareça AO VIVO no badge mas ENCERRADO em todo o
+// resto do sistema (ex.: pós-jogo entre 150-240min). 150min cobre os ~115min
+// de uma partida de futebol + acréscimos com folga.
+// Não mostra nada se status == Concluído/Lucro Direto.
 import { Radio, CheckCircle2 } from 'lucide-react';
 import { Procedure } from '@/types/procedures';
-import { parseKickoff } from '@/lib/procedureGameTime';
+import { parseKickoff, LIVE_WINDOW_MIN } from '@/lib/procedureGameTime';
 
 interface Props {
   procedure: Pick<Procedure, 'data_partida' | 'horario_partida' | 'status'> & { kickoff_at?: string | null };
   now?: Date;
   variant?: 'inline' | 'pill';
 }
-
-const LIVE_WINDOW_MIN = 240; // 4h
 
 export function KickoffBadge({ procedure, now = new Date(), variant = 'pill' }: Props) {
   const concluido = procedure.status === 'Concluído' || procedure.status === 'Lucro Direto';

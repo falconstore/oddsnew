@@ -20,6 +20,11 @@ export function parseKickoff(
 
 export type GameTimeBucket = 'live' | 'upcoming' | 'ended' | 'none';
 
+// Janela "ao vivo" — usada pelo filtro de bucket, pelo KickoffBadge e
+// pelo cron `auto_update_procedure_statuses` no banco. 150min cobre os
+// ~115min de uma partida de futebol + acréscimos com folga.
+export const LIVE_WINDOW_MIN = 150;
+
 export function getGameTimeBucket(
   proc: Pick<Procedure, 'data_partida' | 'horario_partida'> & { kickoff_at?: string | null },
   now: Date = new Date(),
@@ -28,7 +33,7 @@ export function getGameTimeBucket(
   if (!kickoff) return 'none';
   const diffMin = (now.getTime() - kickoff.getTime()) / 60000;
   if (diffMin < 0) return 'upcoming';
-  if (diffMin <= 150) return 'live';   // janela de 0..150min = "ao vivo"
+  if (diffMin <= LIVE_WINDOW_MIN) return 'live';   // janela de 0..150min = "ao vivo"
   return 'ended';
 }
 
