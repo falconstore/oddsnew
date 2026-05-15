@@ -5,7 +5,8 @@
 //
 // Cache: 12h em memória do worker (suficiente — API-Football só atualiza uma vez por dia
 // por fixture, e fixture_id/kickoff são imutáveis depois de criados).
-// Horizonte: hoje + 3 dias futuros (4 chamadas no warmup, depois cache).
+// Horizonte: hoje + 7 dias futuros (8 chamadas no warmup, depois cache 12h). Cobre uma
+// semana inteira pra programar procedimentos com folga.
 // Janela "ao vivo": ainda relevante até kickoff + 4h (jogos em andamento aparecem na busca).
 //
 // Auth: usa o JWT padrão do Supabase (frontend já manda o anon + sessão).
@@ -31,7 +32,7 @@ interface Fixture {
 }
 
 const TTL_MS = 12 * 60 * 60 * 1000;          // 12h
-const HORIZON_DAYS = 4;                      // hoje + 3
+const HORIZON_DAYS = 8;                      // hoje + 7 (semana inteira)
 const JANELA_AO_VIVO_MS = 4 * 60 * 60 * 1000; // 4h pós-kickoff
 
 let cache: { data: Fixture[]; fetchedAt: number } | null = null;
