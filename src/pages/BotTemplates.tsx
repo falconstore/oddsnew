@@ -1639,8 +1639,10 @@ export default function BotTemplates() {
                     {showOptional && (
                       <motion.div
                         initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        className="flex flex-col gap-3 mt-3 overflow-hidden"
+                        animate={{ opacity: 1, height: 'auto', overflow: 'visible' }}
+                        transition={{ duration: 0.25 }}
+                        style={{ overflow: 'hidden' }}
+                        className="flex flex-col gap-3 mt-3"
                       >
                         {optionalFields.map(f =>
                           f.type === 'evento' ? (
