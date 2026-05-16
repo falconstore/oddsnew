@@ -48,6 +48,8 @@ type ProcRow = Record<string, unknown> & {
   reenviado_count: number | null;
   duplo_green_confirmado: boolean | null;
   duplo_green_lucro: number | null;
+  // Flag estruturada: procedimento extra/reenvio (substitui "EXTRA" no texto)
+  is_extra: boolean | null;
 };
 
 const CATEGORIA_MAP: Record<string, string> = {
@@ -128,6 +130,9 @@ export function buildUpsertPayload(p: ProcRow) {
     // doc 06 — bloco DG do modal Definir Resultados
     duplo_green_confirmado: !!p.duplo_green_confirmado,
     duplo_green_lucro: dec(p.duplo_green_lucro),
+    // Flag estruturada: procedimento extra/reenvio. FreeBet PRO usa pra
+    // renderizar etiqueta "EXTRA / REENVIO" no card deles.
+    is_extra: !!p.is_extra,
   };
 }
 

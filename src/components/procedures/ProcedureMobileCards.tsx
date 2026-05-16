@@ -70,6 +70,14 @@ export function ProcedureMobileCards({ procedures, proceduresById, onEdit, onDel
                   <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary text-[10px] px-1.5 py-0">
                     {translateCategory(proc.category)}
                   </Badge>
+                  {proc.is_extra && (
+                    <Badge
+                      data-testid={`badge-extra-mobile-${proc.id}`}
+                      className="bg-amber-500/15 text-amber-400 border border-amber-500/30 text-[10px] px-1.5 py-0 font-bold uppercase tracking-wide"
+                    >
+                      EXTRA
+                    </Badge>
+                  )}
                   {proc.archived && (
                     <Badge variant="outline" className="border-muted-foreground/30 text-muted-foreground text-[10px] px-1.5 py-0">
                       <Archive className="w-2.5 h-2.5 mr-1" /> Arquivado

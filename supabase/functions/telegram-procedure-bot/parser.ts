@@ -22,6 +22,7 @@ export interface ParsedProcedure {
   freebet_valor_previsto: number | null;
   ref_procedure_number: string | null; // número do proc de referência (QUEIMAR_FB)
   is_duplo_green: boolean;
+  is_extra: boolean;            // procedimento extra/reenvio (PROCEDIMENTO EXTRA N ou N EXTRA)
   dp: boolean;
   tags: string[];               // tags automáticas, ex: ["Chance DG"]
   observacoes: string | null;   // linha "📝 OBS: ..." (ex: Opção 2 da Aposta Protegida)
@@ -45,6 +46,7 @@ export interface PartialParsedProcedure {
   freebet_valor_previsto: number | null;
   ref_procedure_number: string | null;
   is_duplo_green: boolean;
+  is_extra: boolean;
   dp: boolean;
   tags: string[];
   observacoes: string | null;
@@ -486,6 +488,7 @@ export function parseMessage(text: string): ParseResult {
         freebet_valor_previsto: freebetValor,
         ref_procedure_number: refProcNumber,
         is_duplo_green: false,
+        is_extra: isExtra,
         dp: false,
         tags: autoTags,
         observacoes,
@@ -513,6 +516,7 @@ export function parseMessage(text: string): ParseResult {
       freebet_valor_previsto: freebetValor,
       ref_procedure_number: refProcNumber,
       is_duplo_green: false,
+      is_extra: isExtra,
       dp: false,
       tags: autoTags,
       observacoes,

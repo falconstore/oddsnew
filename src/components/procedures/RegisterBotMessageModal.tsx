@@ -44,6 +44,7 @@ function buildInsertRow(parsed: any, rawMessage: string, missingFields?: string[
     archived: false,
     tachado: false,
     reenviado_count: 0,
+    is_extra: parsed.is_extra,
     duplo_green_confirmado: parsed.is_duplo_green,
     esporte: 'futebol',
     bot_needs_review: true,

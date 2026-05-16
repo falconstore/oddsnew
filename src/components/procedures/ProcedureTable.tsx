@@ -186,9 +186,16 @@ export function ProcedureTable({ procedures, proceduresById, visibleColumns, onE
               )}
               {visibleColumns.includes('category') && (
                 <TableCell className="py-2 px-2">
-                  <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary text-[10px] px-1.5 py-0 font-medium">
-                    {translateCategory(proc.category)}
-                  </Badge>
+                  <div className="flex items-center gap-1 flex-wrap">
+                    <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary text-[10px] px-1.5 py-0 font-medium">
+                      {translateCategory(proc.category)}
+                    </Badge>
+                    {proc.is_extra && (
+                      <span data-testid={`badge-extra-${proc.id}`} className="inline-flex items-center px-1.5 py-0 rounded text-[9px] font-bold uppercase tracking-wide bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                        EXTRA
+                      </span>
+                    )}
+                  </div>
                 </TableCell>
               )}
               {visibleColumns.includes('status') && (

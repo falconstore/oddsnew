@@ -51,6 +51,7 @@ const emptyForm: ProcedureFormData = {
   cenario_b_cash: '',
   freebet_reference_id: null,
   freebet_reference_ids: [],
+  is_extra: false,
 };
 
 function FieldLabel({ icon: Icon, label, required }: { icon: typeof FileText; label: string; required?: boolean }) {
@@ -145,6 +146,7 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
         freebet_reference_ids: (procedure.freebet_reference_ids && procedure.freebet_reference_ids.length > 0)
           ? procedure.freebet_reference_ids
           : (procedure.freebet_reference_id ? [procedure.freebet_reference_id] : []),
+        is_extra: !!procedure.is_extra,
       });
     } else {
       setFormData({ ...emptyForm, procedure_number: suggestedNextNumber, date: new Date().toISOString().slice(0, 10) });
@@ -220,6 +222,7 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
       freebet_reference_ids: formData.tipo === 'QUEIMAR_FB'
         ? (formData.freebet_reference_ids ?? [])
         : [],
+      is_extra: formData.is_extra,
     };
 
     try {
@@ -315,6 +318,17 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
                     placeholder={`Próximo livre: ${suggestedNextNumber}`}
                     className="bg-white/5 border-white/10 focus:border-cyan-500/50 h-9 text-sm"
                   />
+                  <div className="mt-2 flex items-center gap-2 h-8 px-2.5 rounded-lg bg-amber-500/8 border border-amber-500/20">
+                    <Switch
+                      id="is-extra"
+                      checked={formData.is_extra}
+                      onCheckedChange={(checked) => setFormData({ ...formData, is_extra: checked })}
+                      data-testid="switch-is-extra"
+                    />
+                    <Label htmlFor="is-extra" className="text-[11px] cursor-pointer text-amber-300/90 font-medium uppercase tracking-wide">
+                      Extra / Reenvio
+                    </Label>
+                  </div>
                 </div>
                 <div>
                   <FieldLabel icon={Building2} label="Plataforma" required />

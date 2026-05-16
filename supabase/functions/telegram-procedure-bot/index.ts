@@ -187,6 +187,7 @@ function buildInsertRow(
     archived: false,
     tachado: false,
     reenviado_count: 0,
+    is_extra: parsed.is_extra,
     duplo_green_confirmado: parsed.is_duplo_green,
     esporte: "futebol",
     observacoes: parsed.observacoes ?? undefined,

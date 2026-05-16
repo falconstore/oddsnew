@@ -62,6 +62,8 @@ export interface Procedure {
   freebet_reference_id: string | null;
   /** Multi-origem: TODAS as FBs origens vinculadas a esta QUEIMAR_FB. Inclui o primário (= freebet_reference_id). Vazio quando tipo != QUEIMAR_FB. */
   freebet_reference_ids: string[];
+  /** Procedimento extra/reenvio (reentrada do mesmo número). Renderizado como badge "EXTRA" e enviado como campo estruturado pro FreeBet PRO. */
+  is_extra: boolean;
   editado_por: string | null;
   // Paridade FULL FreeBet Pro (doc 02 — autocomplete API-Football, doc 01 — esporte + cenário B)
   kickoff_at: string | null;
@@ -126,6 +128,7 @@ export interface ProcedureFormData {
   cenario_b_cash: string;          // numeric; '' = sem cenário B
   freebet_reference_id: string | null; // UUID origem PRIMÁRIA (= freebet_reference_ids[0]). Mantido pra back-compat sync FreeBet PRO.
   freebet_reference_ids: string[];     // TODAS origens vinculadas (multi-select)
+  is_extra: boolean;                   // Procedimento extra/reenvio
 }
 
 export interface ProcedureResultFormData {

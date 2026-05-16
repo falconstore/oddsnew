@@ -21,6 +21,7 @@ export interface ParsedProcedure {
   freebet_valor_previsto: number | null;
   ref_procedure_number: string | null;
   is_duplo_green: boolean;
+  is_extra: boolean;
   dp: boolean;
   tags: string[];
   observacoes: string | null;
@@ -43,6 +44,7 @@ export interface PartialParsedProcedure {
   freebet_valor_previsto: number | null;
   ref_procedure_number: string | null;
   is_duplo_green: boolean;
+  is_extra: boolean;
   dp: boolean;
   tags: string[];
   observacoes: string | null;
@@ -395,6 +397,7 @@ export function parseMessage(text: string): ParseResult {
         freebet_valor_previsto: freebetValor,
         ref_procedure_number: refProcNumber,
         is_duplo_green: false,
+        is_extra: isExtra,
         dp: false,
         tags: autoTags,
         observacoes,
@@ -422,6 +425,7 @@ export function parseMessage(text: string): ParseResult {
       freebet_valor_previsto: freebetValor,
       ref_procedure_number: refProcNumber,
       is_duplo_green: false,
+      is_extra: isExtra,
       dp: false,
       tags: autoTags,
       observacoes,
