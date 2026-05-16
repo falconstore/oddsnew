@@ -1190,7 +1190,7 @@ export default function BotTemplates() {
     setActiveCustomId(id);
   }
 
-  const preview = activeCustomId ? customEditText : template.generate(enrichedFields);
+  const preview = activeCustomId ? customEditText : template.generate(enrichedFields).toUpperCase();
 
   const handleCopy = async () => {
     try {
