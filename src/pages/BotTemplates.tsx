@@ -1873,6 +1873,7 @@ function RegistrarPorTexto() {
       duplo_green_confirmado: false,
       esporte: 'futebol',
       observacoes: data.observacoes ?? undefined,
+      is_extra: data.is_extra,
       bot_needs_review: true,
       bot_raw_message: normalizedText,
       bot_missing_fields: parsed.ok === 'partial'
