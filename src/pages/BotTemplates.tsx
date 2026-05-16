@@ -137,6 +137,7 @@ const TEMPLATES: TemplateConfig[] = [
     emoji: '🟢',
     fields: [
       { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
+      { id: 'incluirDG', label: 'Chance de Duplo Green', placeholder: '', type: 'toggle', default: () => 'true' },
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 130', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'numRef', label: 'Freebet a Queimar', placeholder: '', type: 'freebet_select', hint: 'Selecione o procedimento GANHAR_FB cuja freebet será queimada aqui.' },
@@ -167,7 +168,7 @@ const TEMPLATES: TemplateConfig[] = [
         ``,
         `🟡 LUCRO: 💵 ${fmtVal(f.lucro)} 💵`,
         `📋 CATEGORIA: ${f.categoria || 'Freebet'}`,
-        `😍 chance de duplo green 😍`,
+        ...(f.incluirDG !== 'false' ? [`😍 chance de duplo green 😍`] : []),
       ].join('\n');
     },
   },
@@ -181,6 +182,7 @@ const TEMPLATES: TemplateConfig[] = [
     emoji: '🟢',
     fields: [
       { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
+      { id: 'incluirDG', label: 'Chance de Duplo Green', placeholder: '', type: 'toggle', default: () => 'true' },
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 129', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'casa', label: 'Casa de Apostas', placeholder: 'Ex: Sportingbet', type: 'text', uppercase: true },
@@ -210,7 +212,7 @@ const TEMPLATES: TemplateConfig[] = [
         ``,
         recompensa,
         `📋 CATEGORIA: ${f.categoria || 'Freebet'}`,
-        `😍 chance de duplo green 😍`,
+        ...(f.incluirDG !== 'false' ? [`😍 chance de duplo green 😍`] : []),
       ].join('\n');
     },
   },
@@ -224,6 +226,7 @@ const TEMPLATES: TemplateConfig[] = [
     emoji: '🟢',
     fields: [
       { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
+      { id: 'incluirDG', label: 'Chance de Duplo Green', placeholder: '', type: 'toggle', default: () => 'true' },
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 115', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'missao', label: 'Nome da Missão', placeholder: 'Ex: LIGA DOS CAMPEÕES', type: 'text', uppercase: true },
@@ -253,7 +256,7 @@ const TEMPLATES: TemplateConfig[] = [
         ``,
         recompensa,
         `📋 CATEGORIA: ${f.categoria || 'Extra'}`,
-        `😍 chance de duplo green para um lado 😍`,
+        ...(f.incluirDG !== 'false' ? [`😍 chance de duplo green para um lado 😍`] : []),
       ].join('\n');
     },
   },
@@ -267,6 +270,7 @@ const TEMPLATES: TemplateConfig[] = [
     emoji: '🔵',
     fields: [
       { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
+      { id: 'incluirDG', label: 'Chance de Duplo Green', placeholder: '', type: 'toggle', default: () => 'true' },
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 116', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'casa', label: 'Casa de Apostas', placeholder: 'Ex: Betesporte', type: 'text', uppercase: true, hint: 'A casa aparece na linha 2 ("DA BETESPORTE") — não precisa de linha CASA: separada neste tipo.' },
@@ -285,7 +289,7 @@ const TEMPLATES: TemplateConfig[] = [
       ``,
       `🟡 OBJETIVO DUPLO GREEN - 💵 ${fmtVal(f.valorDG)}`,
       `📋 CATEGORIA: ${f.categoria || 'Superodd'}`,
-      `😍 chance de duplo green 😍`,
+      ...(f.incluirDG !== 'false' ? [`😍 chance de duplo green 😍`] : []),
     ].join('\n'),
   },
   {
@@ -298,6 +302,7 @@ const TEMPLATES: TemplateConfig[] = [
     emoji: '🟢',
     fields: [
       { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
+      { id: 'incluirDG', label: 'Chance de Duplo Green', placeholder: '', type: 'toggle', default: () => 'true' },
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 141', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'casa', label: 'Casa de Apostas', placeholder: 'Ex: BET365', type: 'text', uppercase: true },
@@ -325,7 +330,7 @@ const TEMPLATES: TemplateConfig[] = [
       ``,
       `🟡LUCRO: 💵 ${fmtVal(f.lucroMin)} A ${fmtVal(f.lucroMax)}💵`,
       ``,
-      `😍 chance de duplo green😍`,
+      ...(f.incluirDG !== 'false' ? [`😍 chance de duplo green😍`] : []),
     ].join('\n'),
   },
   {
@@ -338,6 +343,7 @@ const TEMPLATES: TemplateConfig[] = [
     emoji: '🟢',
     fields: [
       { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
+      { id: 'incluirDG', label: 'Chance de Duplo Green', placeholder: '', type: 'toggle', default: () => 'true' },
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 117', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'campanha', label: 'Nome da Promoção/Campanha', placeholder: 'Ex: SUPER ODDS WEEK', type: 'text', uppercase: true },
@@ -359,7 +365,7 @@ const TEMPLATES: TemplateConfig[] = [
       ``,
       `🟡 LUCRO: 💵 ${fmtVal(f.lucroMin)} À ${fmtVal(f.lucroMax)} 💵`,
       `📋 CATEGORIA: ${f.categoria || 'Promoção'}`,
-      `😍 chance de duplo green 😍`,
+      ...(f.incluirDG !== 'false' ? [`😍 chance de duplo green 😍`] : []),
     ].join('\n'),
   },
   {
@@ -372,6 +378,7 @@ const TEMPLATES: TemplateConfig[] = [
     emoji: '🟢',
     fields: [
       { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
+      { id: 'incluirDG', label: 'Chance de Duplo Green', placeholder: '', type: 'toggle', default: () => 'true' },
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 138', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'casa', label: 'Casa de Apostas', placeholder: 'Ex: Sportingbet', type: 'text', uppercase: true },
@@ -401,7 +408,7 @@ const TEMPLATES: TemplateConfig[] = [
         lines.push(`📝 OBS: OPÇÃO 2 — ${f.obs.trim().toUpperCase()}`);
       }
       lines.push(`📋 CATEGORIA: ${f.categoria || 'Promoção'}`);
-      lines.push(`😍 chance de duplo green 😍`);
+      if (f.incluirDG !== 'false') lines.push(`😍 chance de duplo green 😍`);
       return lines.join('\n');
     },
   },
@@ -415,6 +422,7 @@ const TEMPLATES: TemplateConfig[] = [
     emoji: '🟢',
     fields: [
       { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
+      { id: 'incluirDG', label: 'Chance de Duplo Green', placeholder: '', type: 'toggle', default: () => 'true' },
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 140', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'valorTotal', label: 'Valor total a utilizar (ex: 100,00)', placeholder: '100,00', type: 'text' },
@@ -436,7 +444,7 @@ const TEMPLATES: TemplateConfig[] = [
       ``,
       `🟡 LUCRO : 💵 ${fmtVal(f.lucroMin)} À ${fmtVal(f.lucroMax)} OU ANULA 💵`,
       `📋 CATEGORIA: ${f.categoria || 'Superodd'}`,
-      `😍 chance de duplo green 😍`,
+      ...(f.incluirDG !== 'false' ? [`😍 chance de duplo green 😍`] : []),
     ].join('\n'),
   },
   {
@@ -449,6 +457,7 @@ const TEMPLATES: TemplateConfig[] = [
     emoji: '🟡',
     fields: [
       { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
+      { id: 'incluirDG', label: 'Chance de Duplo Green', placeholder: '', type: 'toggle', default: () => 'true' },
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 139', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'casa', label: 'Casa de Apostas', placeholder: 'Ex: Betano', type: 'text', uppercase: true },
@@ -470,7 +479,7 @@ const TEMPLATES: TemplateConfig[] = [
       ``,
       `🟡 OBJETIVO DUPLO GREEN - 🟩 ${fmtVal(f.valorDG)}`,
       `📋 CATEGORIA: ${f.categoria || 'Superodd'}`,
-      `😍 chance de duplo green 😍`,
+      ...(f.incluirDG !== 'false' ? [`😍 chance de duplo green 😍`] : []),
     ].join('\n'),
   },
 ];
