@@ -196,12 +196,28 @@ async function recallLead(
     };
   }
 
+  // Reserva ok — se algo falhar daqui pra frente, restauramos last_recall_at
+  // e recall_count pros valores anteriores (rollback). Assim falhas no
+  // Telegram não marcam o lead como "recall enviado" e não suprimem retries.
+  const rollback = async (reason: string, stage: string, extra: Record<string, unknown> = {}) => {
+    await admin
+      .from("trial_leads")
+      .update({
+        last_recall_at: lead.last_recall_at,
+        recall_count: lead.recall_count,
+      })
+      .eq("id", lead.id);
+    await logBot(admin, "trial_recall_failed", `${stage}: ${reason}`, {
+      lead_id: lead.id,
+      stage,
+      rolled_back: true,
+      ...extra,
+    }, "error");
+  };
+
   const linkRes = await tgCreateInviteLink(botToken, chatId, lead.id);
   if (!linkRes.ok) {
-    await logBot(admin, "trial_recall_failed", `createChatInviteLink: ${linkRes.error}`, {
-      lead_id: lead.id,
-      stage: "create_invite_link",
-    }, "error");
+    await rollback(linkRes.error, "create_invite_link");
     return { lead_id: lead.id, ok: false, reason: linkRes.error };
   }
 
@@ -209,11 +225,7 @@ async function recallLead(
   const text = buildRecallMessage(firstName);
   const sendRes = await tgSendRecallDM(botToken, lead.telegram_user_id, text, linkRes.link);
   if (!sendRes.ok) {
-    await logBot(admin, "trial_recall_failed", `sendMessage: ${sendRes.error}`, {
-      lead_id: lead.id,
-      stage: "send_dm",
-      telegram_status: sendRes.status,
-    }, "error");
+    await rollback(sendRes.error, "send_dm", { telegram_status: sendRes.status });
     return { lead_id: lead.id, ok: false, reason: sendRes.error };
   }
 

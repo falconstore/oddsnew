@@ -79,6 +79,14 @@ export default function TrialAdmin() {
   const [recallDraft, setRecallDraft] = useState<{ after?: string; repeat?: string; cap?: string }>({});
   const [confirmBulkRecall, setConfirmBulkRecall] = useState(false);
   const [recallFilter, setRecallFilter] = useState<'all' | 'never' | 'sent'>('all');
+  const [selectedRecallIds, setSelectedRecallIds] = useState<Set<string>>(new Set());
+  const toggleRecallSelection = (id: string) => {
+    setSelectedRecallIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
   const [testOpen, setTestOpen] = useState(false);
   const [testForm, setTestForm] = useState({ variant: '24h' as '24h' | '1h', userId: '', username: '', name: '' });
 
@@ -719,19 +727,34 @@ export default function TrialAdmin() {
           )}
           {(() => {
             const eligible = filtered.filter(l => l.status === 'pending' && !!l.telegram_user_id);
+            const validSelected = Array.from(selectedRecallIds).filter(id => eligible.some(l => l.id === id));
             if (eligible.length === 0) return null;
+            const selectAll = () => setSelectedRecallIds(new Set(eligible.map(l => l.id)));
+            const clearAll = () => setSelectedRecallIds(new Set());
             return (
-              <Button
-                size="sm"
-                onClick={() => setConfirmBulkRecall(true)}
-                disabled={recall.isPending}
-                className="h-9 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-200 border border-cyan-500/30"
-                data-testid="button-bulk-recall"
-                title="Reenvia DM com convite VIP pra todos os pendentes filtrados"
-              >
-                {recall.isPending ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1.5" />}
-                Recall ({eligible.length})
-              </Button>
+              <>
+                <Button
+                  size="sm" variant="ghost"
+                  onClick={validSelected.length === eligible.length ? clearAll : selectAll}
+                  className="h-9 text-xs text-muted-foreground hover:text-foreground"
+                  data-testid="button-recall-select-all"
+                >
+                  {validSelected.length === eligible.length ? 'Limpar seleção' : `Selecionar todos pendentes (${eligible.length})`}
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => setConfirmBulkRecall(true)}
+                  disabled={recall.isPending || validSelected.length === 0}
+                  className="h-9 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-200 border border-cyan-500/30 disabled:opacity-40"
+                  data-testid="button-bulk-recall"
+                  title={validSelected.length === 0
+                    ? 'Marque ao menos um lead pendente pra fazer o recall em lote'
+                    : `Reenvia DM com convite VIP pros ${validSelected.length} lead(s) selecionado(s)`}
+                >
+                  {recall.isPending ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1.5" />}
+                  Recall ({validSelected.length})
+                </Button>
+              </>
             );
           })()}
         </div>
@@ -781,6 +804,16 @@ export default function TrialAdmin() {
                   className="glass rounded-2xl border border-white/8 p-4 hover:border-pink-500/25 transition-all duration-200 card-hover"
                   data-testid={`card-trial-lead-${lead.id}`}>
                   <div className="flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-4">
+                    {lead.status === 'pending' && !!lead.telegram_user_id && (
+                      <input
+                        type="checkbox"
+                        checked={selectedRecallIds.has(lead.id)}
+                        onChange={() => toggleRecallSelection(lead.id)}
+                        className="h-4 w-4 accent-cyan-400 cursor-pointer flex-shrink-0"
+                        title="Selecionar pra recall em lote"
+                        data-testid={`checkbox-recall-${lead.id}`}
+                      />
+                    )}
                     {/* Identity */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1.5 flex-wrap">
@@ -1062,8 +1095,8 @@ export default function TrialAdmin() {
               Recall em massa
             </DialogTitle>
             <DialogDescription>
-              Vai reenviar a DM com convite VIP pra <b>{filtered.filter(l => l.status === 'pending' && !!l.telegram_user_id).length}</b> lead(s) pendente(s) que possuem Telegram ID. Continua?
-              <br /><span className="text-[11px] text-muted-foreground">Limite por execução: 200 leads.</span>
+              Vai reenviar a DM com convite VIP pros <b>{Array.from(selectedRecallIds).filter(id => filtered.some(l => l.id === id && l.status === 'pending' && !!l.telegram_user_id)).length}</b> lead(s) selecionado(s). Continua?
+              <br /><span className="text-[11px] text-muted-foreground">Cooldown de 60min por lead — se já recebeu recall agora há pouco, vai ser ignorado.</span>
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2">
@@ -1074,9 +1107,11 @@ export default function TrialAdmin() {
               className="bg-cyan-500/30 hover:bg-cyan-500/40 text-cyan-100 border border-cyan-500/40"
               disabled={recall.isPending}
               onClick={async () => {
-                const ids = filtered.filter(l => l.status === 'pending' && !!l.telegram_user_id).map(l => l.id).slice(0, 200);
+                const ids = Array.from(selectedRecallIds).filter(id =>
+                  filtered.some(l => l.id === id && l.status === 'pending' && !!l.telegram_user_id),
+                ).slice(0, 200);
                 if (!ids.length) { setConfirmBulkRecall(false); return; }
-                await recall.mutateAsync({ leadIds: ids }).catch(() => {});
+                await recall.mutateAsync({ leadIds: ids }).then(() => setSelectedRecallIds(new Set())).catch(() => {});
                 setConfirmBulkRecall(false);
               }}
               data-testid="button-confirm-bulk-recall"

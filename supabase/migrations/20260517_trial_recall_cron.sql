@@ -1,6 +1,6 @@
 -- =====================================================
 -- Trial Recall — pg_cron schedule
--- Roda 1x ao dia (12:00 UTC = 09:00 Brasília) e chama
+-- Roda 1x ao dia (10:00 UTC = 07:00 Brasília) e chama
 -- POST /functions/v1/trial-recall com body { "cron": true }.
 --
 -- Reusa o segredo 'trial_cron_secret' já existente no Vault
@@ -20,7 +20,7 @@ $$;
 
 SELECT cron.schedule(
   'trial-recall-daily',
-  '0 12 * * *',
+  '0 10 * * *',
   $cmd$
   SELECT net.http_post(
     url := 'https://wspsuempnswljkphatur.functions.supabase.co/trial-recall',
