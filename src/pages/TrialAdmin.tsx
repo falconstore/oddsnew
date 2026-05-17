@@ -131,16 +131,18 @@ export default function TrialAdmin() {
 
   const filtered = useMemo(() => {
     let list = leads;
-    if (monthFilter !== 'all') {
+    const q = search.trim().toLowerCase();
+    const qDigits = q.replace(/\D/g, '');
+
+    // Quando há busca de texto, ignora filtro de mês pra não esconder leads de outros meses
+    if (!q && monthFilter !== 'all') {
       list = list.filter(l => l.created_at.startsWith(monthFilter));
     }
     if (statusFilter !== 'all') list = list.filter(l => l.status === statusFilter);
     if (cohortFilter !== 'all') list = list.filter(l => l.cohort === cohortFilter);
     if (recallFilter === 'never') list = list.filter(l => !l.last_recall_at);
     else if (recallFilter === 'sent') list = list.filter(l => !!l.last_recall_at);
-    if (search) {
-      const q = search.toLowerCase().trim();
-      const qDigits = q.replace(/\D/g, '');
+    if (q) {
       list = list.filter(l =>
         (l.name ?? '').toLowerCase().includes(q) ||
         (l.email ?? '').toLowerCase().includes(q) ||
