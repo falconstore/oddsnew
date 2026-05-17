@@ -7,7 +7,7 @@ import {
   Mail, Phone, Send, ExternalLink, Trash2, Eye, MousePointerClick, BellRing,
   MessageCircle, ShoppingCart, TrendingUp, Users2, FileSignature,
   Stethoscope, AlertTriangle, Loader2, XCircle, Link2, RotateCw,
-  ShieldAlert, Unlock, Radio, ServerCog, Receipt, Eraser,
+  ShieldAlert, Unlock, Radio, ServerCog, Receipt, Eraser, RefreshCw,
 } from 'lucide-react';
 import { Layout } from '@/components/Layout';
 import { DailyLeadsChart } from '@/components/trial/DailyLeadsChart';
@@ -22,6 +22,7 @@ import {
   useTrialLeads, useKickTrialLead, usePurgeTrialLead, useDiagnoseTelegram,
   useLinkManual, useResetWebhook, useForceActivate, useLinkGc, type TelegramDiagnose,
   useTrialSettings, useUpdateTrialSettings, useSendReminderTest,
+  useRecallLeads,
 } from '@/hooks/useTrialLeads';
 import { useTrialUpgradeStats, type TrialStatsRange } from '@/hooks/useTrialUpgradeStats';
 import { useTrialCapiStats } from '@/hooks/useTrialCapiStats';
@@ -73,7 +74,11 @@ export default function TrialAdmin() {
   const settings = useTrialSettings();
   const updateSettings = useUpdateTrialSettings();
   const sendTest = useSendReminderTest();
+  const recall = useRecallLeads();
   const [couponDraft, setCouponDraft] = useState<string>('');
+  const [recallDraft, setRecallDraft] = useState<{ after?: string; repeat?: string; cap?: string }>({});
+  const [confirmBulkRecall, setConfirmBulkRecall] = useState(false);
+  const [recallFilter, setRecallFilter] = useState<'all' | 'never' | 'sent'>('all');
   const [testOpen, setTestOpen] = useState(false);
   const [testForm, setTestForm] = useState({ variant: '24h' as '24h' | '1h', userId: '', username: '', name: '' });
 
@@ -123,6 +128,8 @@ export default function TrialAdmin() {
     }
     if (statusFilter !== 'all') list = list.filter(l => l.status === statusFilter);
     if (cohortFilter !== 'all') list = list.filter(l => l.cohort === cohortFilter);
+    if (recallFilter === 'never') list = list.filter(l => !l.last_recall_at);
+    else if (recallFilter === 'sent') list = list.filter(l => !!l.last_recall_at);
     if (search) {
       const q = search.toLowerCase();
       list = list.filter(l =>
@@ -135,7 +142,7 @@ export default function TrialAdmin() {
       );
     }
     return list;
-  }, [leads, monthFilter, statusFilter, cohortFilter, search]);
+  }, [leads, monthFilter, statusFilter, cohortFilter, search, recallFilter]);
 
   return (
     <Layout>
@@ -249,6 +256,73 @@ export default function TrialAdmin() {
               >
                 {updateSettings.isPending ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-1.5" />}
                 Salvar cupom
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Recall — reenvio do convite VIP via DM (manual + cron diário) */}
+        <div className="glass rounded-3xl border border-white/8 p-5 md:p-6">
+          <div className="flex flex-col md:flex-row md:items-end gap-4">
+            <div className="flex-1 min-w-0">
+              <h2 className="text-lg md:text-xl font-bold flex items-center gap-2">
+                <RefreshCw className="w-5 h-5 text-cyan-400" />
+                Recall de leads travados
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Reenvia DM amigável + botão "Entrar no VIP agora" pra leads em "Aguardando entrada". Cron roda diariamente às 12h (UTC) respeitando os parâmetros abaixo.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-end gap-2">
+              <div className="flex flex-col gap-1">
+                <label className="text-[11px] uppercase tracking-wider text-muted-foreground">Após (h)</label>
+                <Input
+                  type="number" min={1}
+                  value={recallDraft.after ?? (settings.data?.recall_after_hours ?? 12).toString()}
+                  onChange={(e) => setRecallDraft(d => ({ ...d, after: e.target.value }))}
+                  disabled={settings.isLoading}
+                  className="bg-white/5 border-white/10 h-9 text-sm font-mono w-[90px]"
+                  data-testid="input-recall-after-hours"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[11px] uppercase tracking-wider text-muted-foreground">Repetir (dias)</label>
+                <Input
+                  type="number" min={1}
+                  value={recallDraft.repeat ?? (settings.data?.recall_repeat_after_days ?? 7).toString()}
+                  onChange={(e) => setRecallDraft(d => ({ ...d, repeat: e.target.value }))}
+                  disabled={settings.isLoading}
+                  className="bg-white/5 border-white/10 h-9 text-sm font-mono w-[100px]"
+                  data-testid="input-recall-repeat-days"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[11px] uppercase tracking-wider text-muted-foreground">Cap diário</label>
+                <Input
+                  type="number" min={1}
+                  value={recallDraft.cap ?? (settings.data?.recall_daily_cap ?? 100).toString()}
+                  onChange={(e) => setRecallDraft(d => ({ ...d, cap: e.target.value }))}
+                  disabled={settings.isLoading}
+                  className="bg-white/5 border-white/10 h-9 text-sm font-mono w-[100px]"
+                  data-testid="input-recall-daily-cap"
+                />
+              </div>
+              <Button
+                size="sm"
+                onClick={() => {
+                  const patch: Parameters<typeof updateSettings.mutate>[0] = {};
+                  if (recallDraft.after !== undefined) patch.recallAfterHours = Number(recallDraft.after);
+                  if (recallDraft.repeat !== undefined) patch.recallRepeatAfterDays = Number(recallDraft.repeat);
+                  if (recallDraft.cap !== undefined) patch.recallDailyCap = Number(recallDraft.cap);
+                  if (Object.keys(patch).length === 0) return;
+                  updateSettings.mutate(patch, { onSuccess: () => setRecallDraft({}) });
+                }}
+                disabled={updateSettings.isPending || Object.keys(recallDraft).length === 0}
+                className="bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-200 border border-cyan-500/30 h-9"
+                data-testid="button-save-recall-settings"
+              >
+                {updateSettings.isPending ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-1.5" />}
+                Salvar
               </Button>
             </div>
           </div>
@@ -626,13 +700,40 @@ export default function TrialAdmin() {
               <SelectItem value="v1">v1 — grupo antigo ({stats.v1})</SelectItem>
             </SelectContent>
           </Select>
-          {(search || statusFilter !== 'all' || cohortFilter !== 'all' || monthFilter !== 'all') && (
+          <Select value={recallFilter} onValueChange={v => setRecallFilter(v as 'all' | 'never' | 'sent')}>
+            <SelectTrigger className="bg-white/5 border-white/10 h-9 text-sm w-[180px]" data-testid="select-trial-recall-filter">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Recall: todos</SelectItem>
+              <SelectItem value="never">Recall: nunca enviado</SelectItem>
+              <SelectItem value="sent">Recall: já enviado</SelectItem>
+            </SelectContent>
+          </Select>
+          {(search || statusFilter !== 'all' || cohortFilter !== 'all' || monthFilter !== 'all' || recallFilter !== 'all') && (
             <Button variant="ghost" size="sm" className="h-9 text-xs text-muted-foreground hover:text-foreground"
-              onClick={() => { setSearch(''); setStatusFilter('all'); setCohortFilter('all'); setMonthFilter('all'); }}
+              onClick={() => { setSearch(''); setStatusFilter('all'); setCohortFilter('all'); setMonthFilter('all'); setRecallFilter('all'); }}
               data-testid="button-trial-clear-filters">
               Limpar filtros
             </Button>
           )}
+          {(() => {
+            const eligible = filtered.filter(l => l.status === 'pending' && !!l.telegram_user_id);
+            if (eligible.length === 0) return null;
+            return (
+              <Button
+                size="sm"
+                onClick={() => setConfirmBulkRecall(true)}
+                disabled={recall.isPending}
+                className="h-9 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-200 border border-cyan-500/30"
+                data-testid="button-bulk-recall"
+                title="Reenvia DM com convite VIP pra todos os pendentes filtrados"
+              >
+                {recall.isPending ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1.5" />}
+                Recall ({eligible.length})
+              </Button>
+            );
+          })()}
         </div>
 
         {/* Gráfico diário de leads */}
@@ -714,6 +815,16 @@ export default function TrialAdmin() {
                           >
                             Ver trial anterior
                           </button>
+                        )}
+                        {lead.last_recall_at && (
+                          <Badge
+                            className="text-[10px] bg-cyan-500/10 text-cyan-300 border-cyan-500/30"
+                            data-testid={`badge-recall-${lead.id}`}
+                            title={`Recall enviado ${lead.recall_count ?? 1}x · último em ${fmtDate(lead.last_recall_at)}`}
+                          >
+                            <RefreshCw className="w-2.5 h-2.5 mr-1" />
+                            Recall · {fmtDate(lead.last_recall_at)}{lead.recall_count && lead.recall_count > 1 ? ` (${lead.recall_count}x)` : ''}
+                          </Badge>
                         )}
                         {(lead.status === 'converted' || lead.paid_at) && (
                           <RouterLink
@@ -836,6 +947,27 @@ export default function TrialAdmin() {
                           Liberar e ativar
                         </Button>
                       )}
+                      {lead.status === 'pending' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 text-xs border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/10 disabled:opacity-40"
+                          disabled={!lead.telegram_user_id || recall.isPending}
+                          onClick={() => recall.mutate({ leadIds: [lead.id] })}
+                          data-testid={`button-lead-recall-${lead.id}`}
+                          title={!lead.telegram_user_id
+                            ? 'Lead ainda sem Telegram ID — vincule primeiro'
+                            : lead.last_recall_at
+                              ? `Último recall: ${fmtDate(lead.last_recall_at)} · ${lead.recall_count ?? 0}x`
+                              : 'Reenviar convite VIP via DM'}
+                        >
+                          {recall.isPending && recall.variables?.leadIds?.[0] === lead.id
+                            ? <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                            : <RefreshCw className="w-3 h-3 mr-1" />}
+                          Recall
+                          {lead.recall_count ? <span className="ml-1 text-[10px] opacity-70">{lead.recall_count}x</span> : null}
+                        </Button>
+                      )}
                       <Button
                         size="sm"
                         variant="outline"
@@ -916,6 +1048,41 @@ export default function TrialAdmin() {
               data-testid="button-confirm-kick"
             >
               {kick.isPending ? 'Removendo…' : 'Remover do grupo'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk recall confirmation */}
+      <Dialog open={confirmBulkRecall} onOpenChange={(o) => !o && setConfirmBulkRecall(false)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <RefreshCw className="w-5 h-5 text-cyan-400" />
+              Recall em massa
+            </DialogTitle>
+            <DialogDescription>
+              Vai reenviar a DM com convite VIP pra <b>{filtered.filter(l => l.status === 'pending' && !!l.telegram_user_id).length}</b> lead(s) pendente(s) que possuem Telegram ID. Continua?
+              <br /><span className="text-[11px] text-muted-foreground">Limite por execução: 200 leads.</span>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setConfirmBulkRecall(false)} disabled={recall.isPending}>
+              Cancelar
+            </Button>
+            <Button
+              className="bg-cyan-500/30 hover:bg-cyan-500/40 text-cyan-100 border border-cyan-500/40"
+              disabled={recall.isPending}
+              onClick={async () => {
+                const ids = filtered.filter(l => l.status === 'pending' && !!l.telegram_user_id).map(l => l.id).slice(0, 200);
+                if (!ids.length) { setConfirmBulkRecall(false); return; }
+                await recall.mutateAsync({ leadIds: ids }).catch(() => {});
+                setConfirmBulkRecall(false);
+              }}
+              data-testid="button-confirm-bulk-recall"
+            >
+              {recall.isPending ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1.5" />}
+              Reenviar pra todos
             </Button>
           </DialogFooter>
         </DialogContent>

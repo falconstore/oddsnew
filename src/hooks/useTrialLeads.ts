@@ -228,6 +228,9 @@ export const useForceActivate = () => {
 
 export type TrialSettings = {
   reminder_coupon: string;
+  recall_after_hours: number;
+  recall_repeat_after_days: number;
+  recall_daily_cap: number;
   updated_at: string;
   updated_by: string | null;
 };
@@ -238,27 +241,62 @@ export const useTrialSettings = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('trial_settings')
-        .select('reminder_coupon, updated_at, updated_by')
+        .select('reminder_coupon, recall_after_hours, recall_repeat_after_days, recall_daily_cap, updated_at, updated_by')
         .eq('id', true)
         .maybeSingle();
       if (error) throw error;
-      return (data ?? { reminder_coupon: 'PODPROMO', updated_at: '', updated_by: null }) as TrialSettings;
+      return (data ?? {
+        reminder_coupon: 'PODPROMO',
+        recall_after_hours: 12,
+        recall_repeat_after_days: 7,
+        recall_daily_cap: 100,
+        updated_at: '',
+        updated_by: null,
+      }) as TrialSettings;
     },
     staleTime: 30_000,
   });
 };
 
+export type UpdateTrialSettingsInput = {
+  coupon?: string;
+  recallAfterHours?: number;
+  recallRepeatAfterDays?: number;
+  recallDailyCap?: number;
+};
+
 export const useUpdateTrialSettings = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ coupon }: { coupon: string }) => {
-      const trimmed = coupon.trim();
-      if (!trimmed) throw new Error('Cupom não pode ficar em branco');
+    mutationFn: async (input: UpdateTrialSettingsInput) => {
+      const patch: Record<string, unknown> = {
+        updated_at: new Date().toISOString(),
+      };
+      if (input.coupon !== undefined) {
+        const trimmed = input.coupon.trim();
+        if (!trimmed) throw new Error('Cupom não pode ficar em branco');
+        patch.reminder_coupon = trimmed;
+      }
+      if (input.recallAfterHours !== undefined) {
+        const v = Math.floor(input.recallAfterHours);
+        if (!Number.isFinite(v) || v < 1) throw new Error('Horas devem ser ≥ 1');
+        patch.recall_after_hours = v;
+      }
+      if (input.recallRepeatAfterDays !== undefined) {
+        const v = Math.floor(input.recallRepeatAfterDays);
+        if (!Number.isFinite(v) || v < 1) throw new Error('Dias devem ser ≥ 1');
+        patch.recall_repeat_after_days = v;
+      }
+      if (input.recallDailyCap !== undefined) {
+        const v = Math.floor(input.recallDailyCap);
+        if (!Number.isFinite(v) || v < 1) throw new Error('Cap diário deve ser ≥ 1');
+        patch.recall_daily_cap = v;
+      }
       const { data: sessionData } = await supabase.auth.getSession();
-      const email = sessionData.session?.user?.email ?? null;
+      patch.updated_by = sessionData.session?.user?.email ?? null;
       const { data, error } = await supabase
         .from('trial_settings')
-        .update({ reminder_coupon: trimmed, updated_at: new Date().toISOString(), updated_by: email })
+        .update(patch)
         .eq('id', true)
         .select()
         .single();
@@ -267,10 +305,60 @@ export const useUpdateTrialSettings = () => {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['trial_settings'] });
-      toast({ title: 'Cupom atualizado', description: 'O próximo aviso já vai usar o novo valor.' });
+      toast({ title: 'Configuração salva' });
     },
     onError: (err: Error) => {
-      toast({ title: 'Erro ao atualizar cupom', description: err.message, variant: 'destructive' });
+      toast({ title: 'Erro ao salvar', description: err.message, variant: 'destructive' });
+    },
+  });
+};
+
+export type RecallResult = {
+  ok: boolean;
+  mode: 'manual' | 'cron';
+  requested?: number;
+  sent: number;
+  failed: number;
+  message?: string;
+  results: Array<{ lead_id: string; ok: boolean; reason?: string }>;
+};
+
+export const useRecallLeads = () => {
+  const qc = useQueryClient();
+  return useMutation<RecallResult, Error, { leadIds: string[] }>({
+    mutationFn: async ({ leadIds }) => {
+      if (!leadIds.length) throw new Error('Nenhum lead selecionado');
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      const url = `${import.meta.env.VITE_MAIN_SUPABASE_URL}/functions/v1/trial-recall`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(
+          leadIds.length === 1 ? { lead_id: leadIds[0] } : { lead_ids: leadIds },
+        ),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.message || json?.error || 'Falha ao enviar recall');
+      return json as RecallResult;
+    },
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['trial_leads'] });
+      const desc = data.message
+        ?? (data.failed === 0
+          ? `${data.sent} enviado(s) com sucesso.`
+          : `${data.sent} enviado(s), ${data.failed} falharam.`);
+      toast({
+        title: data.failed === 0 ? 'Recall enviado' : 'Recall com falhas',
+        description: desc,
+        variant: data.failed > 0 && data.sent === 0 ? 'destructive' : undefined,
+      });
+    },
+    onError: (err: Error) => {
+      toast({ title: 'Erro no recall', description: err.message, variant: 'destructive' });
     },
   });
 };

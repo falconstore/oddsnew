@@ -41,6 +41,8 @@ export interface TrialLead {
   expires_at: string | null;
   removed_at: string | null;
   reminder_sent_at: string | null;
+  last_recall_at: string | null;
+  recall_count: number | null;
   previous_lead_id: string | null;
   cohort: 'v1' | 'v2' | 'direct';
   bonus_invite_link: string | null;
