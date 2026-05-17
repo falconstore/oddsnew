@@ -76,12 +76,15 @@ export function DailyLeadsChart({ leads, monthFilter, isLoading = false }: Daily
 
     const arr: ChartPoint[] = [];
     let totalCount = 0;
+    let daysWithData = 0;
     for (const [key, count] of dayMap) {
       arr.push({ label: format(parseISO(key), 'dd/MM', { locale: ptBR }), count });
       totalCount += count;
+      if (count > 0) daysWithData++;
     }
 
-    const avgVal = arr.length > 0 ? totalCount / arr.length : 0;
+    // Divide só pelos dias que tiveram ao menos 1 lead — ignora zeros e dias futuros
+    const avgVal = daysWithData > 0 ? totalCount / daysWithData : 0;
     return { data: arr, avg: avgVal, isEmpty: totalCount === 0, monthLabel: mLabel };
   }, [leads, monthFilter]);
 
