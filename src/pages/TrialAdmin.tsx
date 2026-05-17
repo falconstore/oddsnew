@@ -849,16 +849,27 @@ export default function TrialAdmin() {
                             Ver trial anterior
                           </button>
                         )}
-                        {lead.last_recall_at && (
-                          <Badge
-                            className="text-[10px] bg-cyan-500/10 text-cyan-300 border-cyan-500/30"
-                            data-testid={`badge-recall-${lead.id}`}
-                            title={`Recall enviado ${lead.recall_count ?? 1}x · último em ${fmtDate(lead.last_recall_at)}`}
-                          >
-                            <RefreshCw className="w-2.5 h-2.5 mr-1" />
-                            Recall · {fmtDate(lead.last_recall_at)}{lead.recall_count && lead.recall_count > 1 ? ` (${lead.recall_count}x)` : ''}
-                          </Badge>
-                        )}
+                        {lead.last_recall_at && (() => {
+                          const diffMs = Date.now() - new Date(lead.last_recall_at).getTime();
+                          const mins = Math.max(0, Math.floor(diffMs / 60000));
+                          const hours = Math.floor(mins / 60);
+                          const days = Math.floor(hours / 24);
+                          const rel = days >= 1
+                            ? `há ${days}d`
+                            : hours >= 1
+                              ? `há ${hours}h`
+                              : `há ${mins}min`;
+                          return (
+                            <Badge
+                              className="text-[10px] bg-cyan-500/10 text-cyan-300 border-cyan-500/30"
+                              data-testid={`badge-recall-${lead.id}`}
+                              title={`Recall enviado ${lead.recall_count ?? 1}x · último em ${fmtDate(lead.last_recall_at)}`}
+                            >
+                              <RefreshCw className="w-2.5 h-2.5 mr-1" />
+                              Recall enviado {rel}{lead.recall_count && lead.recall_count > 1 ? ` · ${lead.recall_count}x` : ''}
+                            </Badge>
+                          );
+                        })()}
                         {(lead.status === 'converted' || lead.paid_at) && (
                           <RouterLink
                             to={`/lastlink-admin?lead=${lead.id}`}
@@ -989,7 +1000,7 @@ export default function TrialAdmin() {
                           onClick={() => recall.mutate({ leadIds: [lead.id] })}
                           data-testid={`button-lead-recall-${lead.id}`}
                           title={!lead.telegram_user_id
-                            ? 'Lead ainda sem Telegram ID — vincule primeiro'
+                            ? 'Lead ainda não clicou /start no bot — sem Telegram ID, não dá pra mandar DM. Vincule primeiro.'
                             : lead.last_recall_at
                               ? `Último recall: ${fmtDate(lead.last_recall_at)} · ${lead.recall_count ?? 0}x`
                               : 'Reenviar convite VIP via DM'}
