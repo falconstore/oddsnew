@@ -139,12 +139,13 @@ export default function TrialAdmin() {
     if (recallFilter === 'never') list = list.filter(l => !l.last_recall_at);
     else if (recallFilter === 'sent') list = list.filter(l => !!l.last_recall_at);
     if (search) {
-      const q = search.toLowerCase();
+      const q = search.toLowerCase().trim();
+      const qDigits = q.replace(/\D/g, '');
       list = list.filter(l =>
-        l.name.toLowerCase().includes(q) ||
-        l.email.toLowerCase().includes(q) ||
-        l.whatsapp.includes(q.replace(/\D/g, '')) ||
-        l.telegram_username.toLowerCase().includes(q) ||
+        (l.name ?? '').toLowerCase().includes(q) ||
+        (l.email ?? '').toLowerCase().includes(q) ||
+        (qDigits && (l.whatsapp ?? '').includes(qDigits)) ||
+        (l.telegram_username ?? '').toLowerCase().includes(q) ||
         l.id.toLowerCase().includes(q) ||
         (l.previous_lead_id?.toLowerCase().includes(q) ?? false)
       );
