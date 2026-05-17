@@ -164,12 +164,36 @@ async function recallLead(
   botToken: string,
   chatId: string,
   lead: LeadRow,
+  minSeconds: number,
 ): Promise<SendResult> {
   if (lead.status !== "pending") {
     return { lead_id: lead.id, ok: false, reason: `status=${lead.status} (esperado pending)` };
   }
   if (!lead.telegram_user_id) {
     return { lead_id: lead.id, ok: false, reason: "sem telegram_user_id" };
+  }
+
+  // Throttle atômico + increment numa só query. Retorna NULL se o lead
+  // foi reenviado há menos de `minSeconds` (ou virou inelegível). Isso
+  // protege contra clique repetido / corrida cron×manual sem race.
+  const { data: newCount, error: gateErr } = await admin.rpc("try_record_trial_recall", {
+    p_lead_id: lead.id,
+    p_min_seconds: Math.max(1, Math.floor(minSeconds)),
+  });
+  if (gateErr) {
+    await logBot(admin, "trial_recall_failed", `gate rpc: ${gateErr.message}`, {
+      lead_id: lead.id,
+      stage: "throttle_gate",
+    }, "error");
+    return { lead_id: lead.id, ok: false, reason: `gate_error: ${gateErr.message}` };
+  }
+  if (newCount === null || newCount === undefined) {
+    const lastIso = lead.last_recall_at ?? "(nunca)";
+    return {
+      lead_id: lead.id,
+      ok: false,
+      reason: `throttled (último envio: ${lastIso}, cooldown: ${minSeconds}s)`,
+    };
   }
 
   const linkRes = await tgCreateInviteLink(botToken, chatId, lead.id);
@@ -198,24 +222,8 @@ async function recallLead(
   // é efêmero (24h) e o trial-webhook pode achar o lead via telegram_user_id
   // mesmo sem ele estar no banco. Se o admin precisar acompanhar, o link
   // fica no bot_logs (context.invite_link).
-  const { error: updErr } = await admin
-    .from("trial_leads")
-    .update({
-      last_recall_at: new Date().toISOString(),
-      recall_count: (lead.recall_count ?? 0) + 1,
-    })
-    .eq("id", lead.id);
-
-  if (updErr) {
-    await logBot(admin, "trial_recall_failed", `DM enviada mas falhou ao gravar last_recall_at`, {
-      lead_id: lead.id,
-      telegram_user_id: lead.telegram_user_id,
-      invite_link: linkRes.link,
-      db_error: updErr.message,
-      stage: "update_db",
-    }, "error");
-    return { lead_id: lead.id, ok: false, reason: `db_update_failed: ${updErr.message}` };
-  }
+  // Já validamos elegibilidade antes do envio via try_record_trial_recall
+  // (atômico: throttle + increment numa só query). Aqui só fazemos logging.
 
   await logBot(admin, "trial_recall_sent", `Recall enviado para ${lead.telegram_user_id}`, {
     lead_id: lead.id,
@@ -290,9 +298,10 @@ serve(async (req) => {
         return json({ error: "query failed" }, { status: 500 });
       }
 
+      const cronMinSeconds = repeatDays * 24 * 60 * 60;
       const results: SendResult[] = [];
       for (const lead of leads ?? []) {
-        results.push(await recallLead(admin, botToken, chatId, lead as LeadRow));
+        results.push(await recallLead(admin, botToken, chatId, lead as LeadRow, cronMinSeconds));
       }
       const sent = results.filter(r => r.ok).length;
       const failed = results.length - sent;
@@ -351,6 +360,10 @@ serve(async (req) => {
       return json({ error: "Falha ao consultar leads" }, { status: 500 });
     }
 
+    // Cooldown manual: 60min entre cliques no mesmo lead. Protege contra
+    // spam (clique repetido, double-submit do bulk) sem bloquear o admin
+    // de reenviar legitimamente em outro dia.
+    const MANUAL_MIN_SECONDS = 60 * 60;
     const byId = new Map<string, LeadRow>((leads ?? []).map(l => [l.id, l as LeadRow]));
     const results: SendResult[] = [];
     for (const id of dedup) {
@@ -359,7 +372,7 @@ serve(async (req) => {
         results.push({ lead_id: id, ok: false, reason: "lead não encontrado" });
         continue;
       }
-      results.push(await recallLead(admin, botToken, chatId, lead));
+      results.push(await recallLead(admin, botToken, chatId, lead, MANUAL_MIN_SECONDS));
     }
 
     const sent = results.filter(r => r.ok).length;
