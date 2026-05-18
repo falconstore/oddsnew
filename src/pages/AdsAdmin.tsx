@@ -66,9 +66,16 @@ const colorFor = (() => {
 export default function AdsAdmin() {
   const { data: allLeads = [], isLoading, refetch, isFetching } = useTrialLeads();
 
-  // Filtra apenas cohort='ads'
+  // Leads de tráfego pago: cohort='ads' OU qualquer UTM/fbclid presente
+  // (captura leads da landing /trial que vieram de campanhas)
   const adsLeads = useMemo(
-    () => allLeads.filter(l => l.cohort === 'ads'),
+    () => allLeads.filter(l =>
+      l.cohort === 'ads' ||
+      !!l.utm_source   ||
+      !!l.utm_campaign ||
+      !!l.utm_content  ||
+      !!l.fbclid,
+    ),
     [allLeads],
   );
 

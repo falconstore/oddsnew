@@ -68,6 +68,29 @@ function readCookie(name: string): string | null {
   return m ? decodeURIComponent(m[1]) : null;
 }
 
+interface UtmParams {
+  utm_source: string | null;
+  utm_medium: string | null;
+  utm_campaign: string | null;
+  utm_content: string | null;
+  utm_term: string | null;
+  fbclid: string | null;
+}
+
+function readUtmParams(): UtmParams {
+  const p = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
+  return {
+    utm_source:   p.get('utm_source'),
+    utm_medium:   p.get('utm_medium'),
+    utm_campaign: p.get('utm_campaign'),
+    utm_content:  p.get('utm_content'),
+    utm_term:     p.get('utm_term'),
+    fbclid:       p.get('fbclid'),
+  };
+}
+
+const TRIAL_UTM_KEY = 'trial_utm_params';
+
 type PixelEventName = 'PageView' | 'Lead' | 'InitiateCheckout' | 'ViewContent';
 
 function trackPixel(
@@ -892,6 +915,21 @@ function InlineSignupForm({
   const [serverError, setServerError] = useState<string | null>(null);
   const [focusTracked, setFocusTracked] = useState(false);
   const firstInputRef = useRef<HTMLInputElement | null>(null);
+  const utmParamsRef = useRef<UtmParams>({ utm_source: null, utm_medium: null, utm_campaign: null, utm_content: null, utm_term: null, fbclid: null });
+
+  useEffect(() => {
+    const params = readUtmParams();
+    utmParamsRef.current = params;
+    // persiste em sessionStorage para sobreviver a reloads da mesma sessão
+    try { sessionStorage.setItem(TRIAL_UTM_KEY, JSON.stringify(params)); } catch { /* ignore */ }
+    // tenta recuperar UTMs persistidos (caso venha de redirect)
+    if (!params.utm_source && !params.fbclid) {
+      try {
+        const saved = sessionStorage.getItem(TRIAL_UTM_KEY);
+        if (saved) utmParamsRef.current = JSON.parse(saved);
+      } catch { /* ignore */ }
+    }
+  }, []);
 
   const update = (k: keyof FormState, v: string) => {
     setForm(prev => ({ ...prev, [k]: v }));
@@ -938,6 +976,7 @@ function InlineSignupForm({
           event_source_url: typeof window !== 'undefined' ? window.location.href : null,
           fbp: readCookie('_fbp'),
           fbc: readCookie('_fbc'),
+          ...utmParamsRef.current,
         }),
       });
       const json = await res.json().catch(() => ({}));

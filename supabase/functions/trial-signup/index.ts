@@ -27,6 +27,12 @@ serve(async (req) => {
       ? body.event_source_url.slice(0, 512) : null;
     const fbp = typeof body.fbp === "string" ? body.fbp.slice(0, 256) : null;
     const fbc = typeof body.fbc === "string" ? body.fbc.slice(0, 256) : null;
+    const utm_source   = typeof body.utm_source   === "string" ? body.utm_source.slice(0, 255)   : null;
+    const utm_medium   = typeof body.utm_medium   === "string" ? body.utm_medium.slice(0, 255)   : null;
+    const utm_campaign = typeof body.utm_campaign === "string" ? body.utm_campaign.slice(0, 255) : null;
+    const utm_content  = typeof body.utm_content  === "string" ? body.utm_content.slice(0, 255)  : null;
+    const utm_term     = typeof body.utm_term     === "string" ? body.utm_term.slice(0, 255)     : null;
+    const fbclid       = typeof body.fbclid       === "string" ? body.fbclid.slice(0, 512)       : null;
 
     if (!name || !email || !whatsapp || !telegram_username) {
       return json({ error: "Todos os campos são obrigatórios." }, { status: 400 });
@@ -145,6 +151,12 @@ serve(async (req) => {
         invite_link: inviteLink,
         bonus_invite_link: bonusInviteLink,
         status: "pending",
+        ...(utm_source   ? { utm_source }   : {}),
+        ...(utm_medium   ? { utm_medium }   : {}),
+        ...(utm_campaign ? { utm_campaign } : {}),
+        ...(utm_content  ? { utm_content }  : {}),
+        ...(utm_term     ? { utm_term }     : {}),
+        ...(fbclid       ? { fbclid }       : {}),
       })
       .select("id")
       .single();
