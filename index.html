@@ -91,14 +91,15 @@
     </script>
     <!-- Fim Adscala Rastreamento de Conversão -->
 
-    <!-- TAREFA 4: Adscala Tracking Pixel -->
+    <!-- TAREFA 4: Adscala Tracking Pixel — só ativo na landing /trial -->
     <script>
     (function(){
+      if(location.pathname !== '/trial' && !location.pathname.startsWith('/trial?')) return;
       var mid="CT-USER-001-ADMIN";
       var api="https://adscala.com.br/api/tracking";
       function send(e,d){
         fetch(api,{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({event:e,nodeId:mid,url:location.href,...d})});
+        body:JSON.stringify({event:e,nodeId:mid,url:location.href,...d})}).catch(function(){});
       }
       send("pageview",{});
       document.addEventListener("click",function(e){
