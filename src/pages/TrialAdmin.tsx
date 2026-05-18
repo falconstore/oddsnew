@@ -837,7 +837,7 @@ export default function TrialAdmin() {
                         )}
                         {lead.cohort === 'ads' && (
                           <Badge
-                            className="text-[10px] bg-blue-500/15 text-blue-300 border-blue-500/35"
+                            className="text-[10px] bg-cyan-500/15 text-cyan-300 border-cyan-500/35"
                             data-testid={`badge-cohort-ads-${lead.id}`}
                             title={lead.utm_campaign ? `Campanha: ${lead.utm_campaign}` : 'Lead captado via tráfego pago'}
                           >
