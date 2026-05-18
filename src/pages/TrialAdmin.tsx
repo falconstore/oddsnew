@@ -106,6 +106,7 @@ export default function TrialAdmin() {
     return opts;
   }, []);
   const [confirmKick, setConfirmKick] = useState<TrialLead | null>(null);
+  const [confirmActivate, setConfirmActivate] = useState<TrialLead | null>(null);
   const [linkLead, setLinkLead] = useState<TrialLead | null>(null);
   const [manualUserId, setManualUserId] = useState('');
   const [linkResult, setLinkResult] = useState<{ message?: string; needManual?: boolean } | null>(null);
@@ -1043,9 +1044,9 @@ export default function TrialAdmin() {
                           variant="outline"
                           className="h-8 text-xs border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-40"
                           disabled={manualActivate.isPending}
-                          onClick={() => manualActivate.mutate(lead.id)}
+                          onClick={() => setConfirmActivate(lead)}
                           data-testid={`button-lead-manual-activate-${lead.id}`}
-                          title="Ativar manualmente — use quando o lead já está no grupo mas o webhook não atualizou o status. Inicia trial de 7 dias a partir de agora."
+                          title="Ativar manualmente — use SOMENTE se a pessoa já está no grupo mas o status não atualizou. Inicia trial de 7 dias a partir de agora."
                         >
                           {manualActivate.isPending && manualActivate.variables === lead.id
                             ? <Loader2 className="w-3 h-3 mr-1 animate-spin" />
@@ -1133,6 +1134,44 @@ export default function TrialAdmin() {
               data-testid="button-confirm-kick"
             >
               {kick.isPending ? 'Removendo…' : 'Remover do grupo'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Ativar manualmente — confirmação */}
+      <Dialog open={!!confirmActivate} onOpenChange={() => setConfirmActivate(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+              Ativar manualmente
+            </DialogTitle>
+            <DialogDescription className="space-y-2 pt-1">
+              <span className="block">
+                Confirme que <b>{confirmActivate?.name}</b> (@{confirmActivate?.telegram_username}) já está no grupo VIP antes de continuar.
+              </span>
+              <span className="block text-amber-300/90 text-xs border border-amber-500/25 rounded-lg px-3 py-2 bg-amber-500/8">
+                ⚠️ Use este botão <b>somente</b> quando a pessoa já entrou no grupo mas o status não atualizou automaticamente. Se ela ainda não entrou, o trial vai contar os 7 dias sem que ela esteja presente.
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setConfirmActivate(null)} disabled={manualActivate.isPending}>
+              Cancelar
+            </Button>
+            <Button
+              className="bg-emerald-600 hover:bg-emerald-500 text-white"
+              disabled={manualActivate.isPending}
+              onClick={async () => {
+                if (!confirmActivate) return;
+                await manualActivate.mutateAsync(confirmActivate.id).catch(() => {});
+                setConfirmActivate(null);
+              }}
+              data-testid="button-confirm-manual-activate"
+            >
+              {manualActivate.isPending ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-1.5" />}
+              {manualActivate.isPending ? 'Ativando…' : 'Sim, já está no grupo — Ativar'}
             </Button>
           </DialogFooter>
         </DialogContent>
