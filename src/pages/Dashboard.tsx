@@ -32,6 +32,8 @@ import {
   generateMonthOptions,
   capitalizeMonth,
   getDailyStats,
+  getDuploGreenCount,
+  getDuploGreenProfit,
 } from '@/lib/procedureUtils';
 
 const quickLinks = [
@@ -129,6 +131,8 @@ const Dashboard = () => {
   const dayWithMostProfit = getDayWithMostProfit(procedures, selectedMonth);
   const dayWithMostProcedures = getDayWithMostProcedures(procedures, selectedMonth);
   const daily = getDailyStats(procedures);
+  const dgCount = getDuploGreenCount(procedures, selectedMonth);
+  const dgProfit = getDuploGreenProfit(procedures, selectedMonth);
 
   const lucroPorCpf = daily.lucroBruto * numCpfs;
   const todayLabel = capitalizeMonth(format(new Date(), "EEEE, dd 'de' MMMM", { locale: ptBR }));
@@ -371,6 +375,36 @@ const Dashboard = () => {
             icon={FileText}
             color="pink"
           />
+        </div>
+
+        {/* ── Duplo Green ── */}
+        <div className="relative rounded-2xl overflow-hidden border border-emerald-500/20 bg-gradient-to-br from-emerald-950/40 via-[#060d08] to-[#060d08]">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,hsl(145_80%_48%/0.10)_0%,transparent_60%)]" />
+          <div className="relative z-10 px-5 py-4">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-6 h-6 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+                <Zap className="w-3.5 h-3.5 text-emerald-400" />
+              </div>
+              <span className="text-xs font-bold uppercase tracking-widest text-emerald-400/80">Duplo Green</span>
+              <span className="text-[10px] text-muted-foreground ml-1">— {capitalizeMonth(format(selectedMonth, 'MMMM/yyyy', { locale: ptBR }))}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-xl bg-white/5 border border-emerald-500/15 p-4 flex flex-col gap-1.5">
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Confirmados</span>
+                <p className="text-3xl font-black text-emerald-300 leading-none">{dgCount}</p>
+                <p className="text-[10px] text-muted-foreground">no mês selecionado</p>
+              </div>
+              <div className="rounded-xl bg-white/5 border border-emerald-500/15 p-4 flex flex-col gap-1.5">
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Lucro com DG</span>
+                <p className={`text-3xl font-black leading-none ${dgProfit >= 0 ? 'text-emerald-300' : 'text-red-400'}`}>
+                  {dgProfit >= 0 ? '+' : ''}R$ {dgProfit.toFixed(2)}
+                </p>
+                <p className="text-[10px] text-muted-foreground">
+                  {dgCount > 0 ? `≈ R$ ${(dgProfit / dgCount).toFixed(2)} por DG` : 'nenhum confirmado'}
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* ── Gráficos ── */}

@@ -498,6 +498,31 @@ export const capitalizeMonth = (monthStr: string): string => {
   return monthStr.charAt(0).toUpperCase() + monthStr.slice(1);
 };
 
+export const getDuploGreenCount = (procedures: Procedure[], selectedMonth: Date): number => {
+  const monthStart = startOfMonth(selectedMonth);
+  const monthEnd = endOfDay(endOfMonth(selectedMonth));
+  return getCountableProcedures(procedures).filter(proc => {
+    if (!proc.duplo_green_confirmado) return false;
+    const procDate = proc.date ? parseDate(proc.date) : null;
+    return procDate && !isNaN(procDate.getTime()) && procDate >= monthStart && procDate <= monthEnd;
+  }).length;
+};
+
+export const getDuploGreenProfit = (procedures: Procedure[], selectedMonth: Date): number => {
+  const monthStart = startOfMonth(selectedMonth);
+  const monthEnd = endOfDay(endOfMonth(selectedMonth));
+  return getCountableProcedures(procedures)
+    .filter(proc => {
+      if (!proc.duplo_green_confirmado) return false;
+      const procDate = proc.date ? parseDate(proc.date) : null;
+      return procDate && !isNaN(procDate.getTime()) && procDate >= monthStart && procDate <= monthEnd;
+    })
+    .reduce((sum, proc) => {
+      const lucro = proc.duplo_green_lucro != null ? Number(proc.duplo_green_lucro) : (proc.profit_loss || 0);
+      return sum + lucro;
+    }, 0);
+};
+
 export interface DailyStats {
   totalOperacoes: number;
   totalFreebets: number;
