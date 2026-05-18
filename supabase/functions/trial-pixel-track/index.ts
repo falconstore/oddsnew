@@ -13,7 +13,7 @@ import {
   type CapiEventName,
 } from "../_shared/meta-capi.ts";
 
-const ALLOWED_EVENTS = new Set<CapiEventName>(["PageView", "ViewContent"]);
+const ALLOWED_EVENTS = new Set<CapiEventName>(["PageView", "ViewContent", "Lead"]);
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
