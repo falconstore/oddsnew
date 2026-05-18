@@ -117,7 +117,12 @@ export default function AdsObrigado() {
 
     initPixel();
 
-    const eventId = makeEventId();
+    // Reutiliza o mesmo leadEventId gerado no submit (AdsLanding) para que a
+    // Meta possa deduplificar: o ads-signup já disparou CAPI Lead com esse ID,
+    // e o pixel do browser também. Usar o mesmo ID aqui garante que não haja
+    // dupla contagem — a Meta ignora events com o mesmo event_id numa janela
+    // de deduplicação de ~48h.
+    const eventId = adsData?.leadEventId ?? makeEventId();
     const run = () => trackPixelLead(eventId);
     if (typeof requestIdleCallback !== 'undefined') {
       requestIdleCallback(run, { timeout: 1500 });
