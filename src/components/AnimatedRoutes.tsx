@@ -28,6 +28,7 @@ import TrialUpgrade from '@/pages/TrialUpgrade';
 import TrialAdmin from '@/pages/TrialAdmin';
 import AdsLanding from '@/pages/AdsLanding';
 import AdsObrigado from '@/pages/AdsObrigado';
+import AdsAdmin from '@/pages/AdsAdmin';
 import LastlinkAdmin from '@/pages/LastlinkAdmin';
 import WatermarkStudio from '@/pages/WatermarkStudio';
 import BotTemplates from '@/pages/BotTemplates';
@@ -255,6 +256,13 @@ export function AnimatedRoutes() {
           <RequireAuth pageKey={PAGE_KEYS.TRIAL}>
             <PageTransition>
               <TrialAdmin />
+            </PageTransition>
+          </RequireAuth>
+        } />
+        <Route path="/ads-admin" element={
+          <RequireAuth pageKey={PAGE_KEYS.TRIAL}>
+            <PageTransition>
+              <AdsAdmin />
             </PageTransition>
           </RequireAuth>
         } />
