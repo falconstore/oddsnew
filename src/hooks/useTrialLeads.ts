@@ -51,6 +51,33 @@ export const usePurgeTrialLead = () => {
   });
 };
 
+export const useManualActivateLead = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (leadId: string) => {
+      const now = new Date();
+      const expires = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      const { error } = await supabase
+        .from('trial_leads')
+        .update({
+          status: 'active',
+          entered_at: now.toISOString(),
+          expires_at: expires.toISOString(),
+        })
+        .eq('id', leadId)
+        .eq('status', 'pending');
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['trial_leads'] });
+      toast({ title: 'Lead ativado manualmente', description: 'Status atualizado para Ativo · trial de 7 dias a partir de agora.' });
+    },
+    onError: (err: Error) => {
+      toast({ title: 'Erro ao ativar', description: err.message, variant: 'destructive' });
+    },
+  });
+};
+
 export const useKickTrialLead = () => {
   const qc = useQueryClient();
   return useMutation({

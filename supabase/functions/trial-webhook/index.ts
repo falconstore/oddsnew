@@ -511,8 +511,17 @@ serve(async (req) => {
         foundVia = "user_id";
       }
 
-      // 1b) fallback: lookup pelo invite_link rastreado
-      if (!lead && inviteLink) {
+      // 1b) lookup pelo invite_link rastreado.
+      // Executa quando: (a) não achou lead por user_id, OU (b) achou por
+      // user_id mas o lead encontrado NÃO está pending/active — isso acontece
+      // quando o mesmo Telegram já teve um trial anterior (expired/removed/
+      // blocked/converted) e o usuário se re-cadastrou com novo WhatsApp/email.
+      // Nesse caso o lead novo (pending) precisa ser ativado pelo invite_link,
+      // e o lead antigo deve ser ignorado para esse evento de join.
+      const needInviteLinkLookup =
+        !!inviteLink &&
+        (!lead || (lead.status !== "pending" && lead.status !== "active"));
+      if (needInviteLinkLookup) {
         const { data: byLink, error: byLinkErr } = await supabase
           .from("trial_leads")
           .select("id, status, invite_link, bonus_invite_link")
@@ -525,6 +534,7 @@ serve(async (req) => {
           lead_id: byLink?.id ?? null,
           lead_status: byLink?.status ?? null,
           error: byLinkErr?.message ?? null,
+          reason: lead ? "user_id_lead_not_actionable" : "no_user_id_match",
         });
         if (byLinkErr) console.error("lookup by invite_link failed", byLinkErr);
         if (byLink) {

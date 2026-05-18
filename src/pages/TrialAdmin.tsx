@@ -19,7 +19,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import {
-  useTrialLeads, useKickTrialLead, usePurgeTrialLead, useDiagnoseTelegram,
+  useTrialLeads, useKickTrialLead, usePurgeTrialLead, useDiagnoseTelegram, useManualActivateLead,
   useLinkManual, useResetWebhook, useForceActivate, useLinkGc, type TelegramDiagnose,
   useTrialSettings, useUpdateTrialSettings, useSendReminderTest,
   useRecallLeads,
@@ -75,6 +75,7 @@ export default function TrialAdmin() {
   const updateSettings = useUpdateTrialSettings();
   const sendTest = useSendReminderTest();
   const recall = useRecallLeads();
+  const manualActivate = useManualActivateLead();
   const [couponDraft, setCouponDraft] = useState<string>('');
   const [recallDraft, setRecallDraft] = useState<{ after?: string; repeat?: string; cap?: string }>({});
   const [confirmBulkRecall, setConfirmBulkRecall] = useState(false);
@@ -1034,6 +1035,22 @@ export default function TrialAdmin() {
                             : <RefreshCw className="w-3 h-3 mr-1" />}
                           Recall
                           {lead.recall_count ? <span className="ml-1 text-[10px] opacity-70">{lead.recall_count}x</span> : null}
+                        </Button>
+                      )}
+                      {lead.status === 'pending' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 text-xs border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-40"
+                          disabled={manualActivate.isPending}
+                          onClick={() => manualActivate.mutate(lead.id)}
+                          data-testid={`button-lead-manual-activate-${lead.id}`}
+                          title="Ativar manualmente — use quando o lead já está no grupo mas o webhook não atualizou o status. Inicia trial de 7 dias a partir de agora."
+                        >
+                          {manualActivate.isPending && manualActivate.variables === lead.id
+                            ? <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                            : <CheckCircle2 className="w-3 h-3 mr-1" />}
+                          Ativar
                         </Button>
                       )}
                       <Button
