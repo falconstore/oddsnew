@@ -26,6 +26,8 @@ import TrialLanding from '@/pages/TrialLanding';
 import TrialObrigado from '@/pages/TrialObrigado';
 import TrialUpgrade from '@/pages/TrialUpgrade';
 import TrialAdmin from '@/pages/TrialAdmin';
+import AdsLanding from '@/pages/AdsLanding';
+import AdsObrigado from '@/pages/AdsObrigado';
 import LastlinkAdmin from '@/pages/LastlinkAdmin';
 import WatermarkStudio from '@/pages/WatermarkStudio';
 import BotTemplates from '@/pages/BotTemplates';
@@ -113,6 +115,16 @@ export function AnimatedRoutes() {
               <TrialUpgrade />
             </PageTransition>
           } />
+          <Route path="/ads" element={
+            <PageTransition>
+              <AdsLanding />
+            </PageTransition>
+          } />
+          <Route path="/ads/obrigado" element={
+            <PageTransition>
+              <AdsObrigado />
+            </PageTransition>
+          } />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AnimatePresence>
@@ -138,6 +150,17 @@ export function AnimatedRoutes() {
         <Route path="/links" element={
           <PageTransition>
             <BioLinks />
+          </PageTransition>
+        } />
+        {/* Ads landing — rota pública, sem auth */}
+        <Route path="/ads" element={
+          <PageTransition>
+            <AdsLanding />
+          </PageTransition>
+        } />
+        <Route path="/ads/obrigado" element={
+          <PageTransition>
+            <AdsObrigado />
           </PageTransition>
         } />
         

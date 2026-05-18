@@ -92,7 +92,7 @@ export default function TrialAdmin() {
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | TrialStatus>('all');
-  const [cohortFilter, setCohortFilter] = useState<'all' | 'v1' | 'v2'>('all');
+  const [cohortFilter, setCohortFilter] = useState<'all' | 'v1' | 'v2' | 'ads'>('all');
   const [monthFilter, setMonthFilter] = useState<string>(() => format(new Date(), 'yyyy-MM'));
 
   const monthOptions = useMemo(() => {
@@ -114,7 +114,7 @@ export default function TrialAdmin() {
   const { data: capiStats, isLoading: capiLoading } = useTrialCapiStats();
 
   const stats = useMemo(() => {
-    const s = { total: leads.length, active: 0, expired: 0, blocked: 0, pending: 0, removed: 0, blockedRepeat: 0, converted: 0, v1: 0, v2: 0 };
+    const s = { total: leads.length, active: 0, expired: 0, blocked: 0, pending: 0, removed: 0, blockedRepeat: 0, converted: 0, v1: 0, v2: 0, ads: 0 };
     for (const l of leads) {
       if (l.status === 'active') s.active++;
       else if (l.status === 'expired') s.expired++;
@@ -125,6 +125,7 @@ export default function TrialAdmin() {
       else if (l.status === 'converted') s.converted++;
       if (l.cohort === 'v1') s.v1++;
       else if (l.cohort === 'v2') s.v2++;
+      else if (l.cohort === 'ads') s.ads++;
     }
     return s;
   }, [leads]);
@@ -701,7 +702,7 @@ export default function TrialAdmin() {
               <SelectItem value="converted">Convertidos (pagos)</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={cohortFilter} onValueChange={v => setCohortFilter(v as 'all' | 'v1' | 'v2')}>
+          <Select value={cohortFilter} onValueChange={v => setCohortFilter(v as 'all' | 'v1' | 'v2' | 'ads')}>
             <SelectTrigger className="bg-white/5 border-white/10 h-9 text-sm w-[180px]" data-testid="select-trial-cohort-filter">
               <SelectValue />
             </SelectTrigger>
@@ -709,6 +710,7 @@ export default function TrialAdmin() {
               <SelectItem value="all">Todas as turmas</SelectItem>
               <SelectItem value="v2">v2 — grupo atual ({stats.v2})</SelectItem>
               <SelectItem value="v1">v1 — grupo antigo ({stats.v1})</SelectItem>
+              <SelectItem value="ads">Ads — tráfego pago ({stats.ads})</SelectItem>
             </SelectContent>
           </Select>
           <Select value={recallFilter} onValueChange={v => setRecallFilter(v as 'all' | 'never' | 'sent')}>
@@ -833,6 +835,15 @@ export default function TrialAdmin() {
                             v1 (grupo antigo)
                           </Badge>
                         )}
+                        {lead.cohort === 'ads' && (
+                          <Badge
+                            className="text-[10px] bg-blue-500/15 text-blue-300 border-blue-500/35"
+                            data-testid={`badge-cohort-ads-${lead.id}`}
+                            title={lead.utm_campaign ? `Campanha: ${lead.utm_campaign}` : 'Lead captado via tráfego pago'}
+                          >
+                            ADS{lead.utm_campaign ? ` · ${lead.utm_campaign}` : ''}
+                          </Badge>
+                        )}
                         {lead.previous_lead_id && (
                           <Badge
                             className="text-[10px] bg-orange-500/10 text-orange-300 border-orange-500/30"
@@ -890,6 +901,16 @@ export default function TrialAdmin() {
                         <span className="inline-flex items-center gap-1"><Phone className="w-3 h-3" />{fmtWhatsapp(lead.whatsapp)}</span>
                         <span className="inline-flex items-center gap-1"><Send className="w-3 h-3" />@{lead.telegram_username}</span>
                       </div>
+                      {lead.cohort === 'ads' && (lead.utm_source || lead.utm_medium || lead.utm_campaign || lead.utm_content || lead.utm_term || lead.fbclid) && (
+                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-blue-300/70 mt-0.5" data-testid={`utm-row-${lead.id}`}>
+                          {lead.utm_source   && <span>src: <span className="font-mono">{lead.utm_source}</span></span>}
+                          {lead.utm_medium   && <span>med: <span className="font-mono">{lead.utm_medium}</span></span>}
+                          {lead.utm_campaign && <span>camp: <span className="font-mono">{lead.utm_campaign}</span></span>}
+                          {lead.utm_content  && <span>con: <span className="font-mono">{lead.utm_content}</span></span>}
+                          {lead.utm_term     && <span>term: <span className="font-mono">{lead.utm_term}</span></span>}
+                          {lead.fbclid       && <span title={lead.fbclid}>fbclid: <span className="font-mono">{lead.fbclid.slice(0, 16)}…</span></span>}
+                        </div>
+                      )}
                       {/* Badges de presença em cada grupo (VIP + Área do Aluno bônus) */}
                       <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                         {lead.entered_at ? (
