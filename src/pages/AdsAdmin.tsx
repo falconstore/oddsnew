@@ -74,7 +74,8 @@ export default function AdsAdmin() {
       !!l.utm_source   ||
       !!l.utm_campaign ||
       !!l.utm_content  ||
-      !!l.fbclid,
+      !!l.fbclid        ||
+      !!l.ct,
     ),
     [allLeads],
   );
@@ -151,7 +152,8 @@ export default function AdsAdmin() {
         (l.utm_campaign ?? '').toLowerCase().includes(q) ||
         (l.utm_content  ?? '').toLowerCase().includes(q) ||
         (l.utm_source   ?? '').toLowerCase().includes(q) ||
-        (l.fbclid       ?? '').toLowerCase().includes(q),
+        (l.fbclid       ?? '').toLowerCase().includes(q) ||
+        (l.ct           ?? '').toLowerCase().includes(q),
       );
     }
     return list;
@@ -380,7 +382,7 @@ function LeadCard({ lead, expanded, onToggle }: {
   onToggle: () => void;
 }) {
   const meta = STATUS_META[lead.status];
-  const hasUtm = lead.utm_source || lead.utm_medium || lead.utm_campaign || lead.utm_content || lead.utm_term;
+  const hasUtm = lead.utm_source || lead.utm_medium || lead.utm_campaign || lead.utm_content || lead.utm_term || lead.ct;
 
   return (
     <div
@@ -395,6 +397,12 @@ function LeadCard({ lead, expanded, onToggle }: {
             <span className={`inline-flex items-center justify-center px-2.5 py-1 rounded-lg border text-[11px] font-bold uppercase tracking-wide ${colorFor(lead.utm_source)}`}
               data-testid={`badge-utm-source-${lead.id}`}>
               {lead.utm_source}
+            </span>
+          )}
+          {lead.ct && (
+            <span className="inline-flex items-center justify-center px-2 py-0.5 rounded border border-violet-500/30 bg-violet-500/10 text-violet-300 text-[10px] font-semibold font-mono"
+              data-testid={`badge-ct-${lead.id}`} title="AdsScala CT">
+              {lead.ct}
             </span>
           )}
           {lead.fbclid && (
@@ -474,6 +482,7 @@ function LeadCard({ lead, expanded, onToggle }: {
               ['utm_campaign', lead.utm_campaign],
               ['utm_content',  lead.utm_content],
               ['utm_term',     lead.utm_term],
+              ['ct (AdsScala)', lead.ct],
               ['fbclid',       lead.fbclid ? `${lead.fbclid.slice(0, 20)}…` : null],
               ['ID do lead',   lead.id.slice(0, 18) + '…'],
               ['Expira em',    lead.expires_at ? fmtDate(lead.expires_at) : null],

@@ -75,6 +75,7 @@ interface UtmParams {
   utm_content: string | null;
   utm_term: string | null;
   fbclid: string | null;
+  ct: string | null;
 }
 
 function readUtmParams(): UtmParams {
@@ -86,6 +87,7 @@ function readUtmParams(): UtmParams {
     utm_content:  p.get('utm_content'),
     utm_term:     p.get('utm_term'),
     fbclid:       p.get('fbclid'),
+    ct:           p.get('ct'),
   };
 }
 
@@ -915,7 +917,7 @@ function InlineSignupForm({
   const [serverError, setServerError] = useState<string | null>(null);
   const [focusTracked, setFocusTracked] = useState(false);
   const firstInputRef = useRef<HTMLInputElement | null>(null);
-  const utmParamsRef = useRef<UtmParams>({ utm_source: null, utm_medium: null, utm_campaign: null, utm_content: null, utm_term: null, fbclid: null });
+  const utmParamsRef = useRef<UtmParams>({ utm_source: null, utm_medium: null, utm_campaign: null, utm_content: null, utm_term: null, fbclid: null, ct: null });
 
   useEffect(() => {
     const params = readUtmParams();
