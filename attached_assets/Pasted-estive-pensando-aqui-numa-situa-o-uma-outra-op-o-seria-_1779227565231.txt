@@ -1,0 +1,31 @@
+estive pensando aqui numa situação, uma outra opção seria termos além do grupo vip no telegram pro usuário acessar após o tráfego, considerando que alguns usuários não tem telegram de imediato, seria um PWA que o usuário teria de funcionalidades: 
+
+1- página com os procedimentos que são enviados já no telegram também e ao mesmo tempo ser enviado neste PWA que são procedimentos da página /procedures
+
+2- O usuário iria conseguir verificar todas informações daquele procedimento enviado pra ele realizar suas operações independente do telegrama, o telegram iria continuar, mas o app ajudaria
+
+3- esse PWA teria já o login e senha automaticamente criado com os dados de primeiro cadastro solicitado no formulário da pagina trial.sharkgreen.com.br que seriam:
+- nome completo
+- email
+- whatsapp
+Com essas informações já é possível ele ter um login e senha nesse PWA e quando ele fizesse o primeiro acesso ele receberia informação pra trocar a sua senha
+
+4- O procedimento hoje que é enviado é feito pela página /procedures no botão Novo procedimento e nada disso iria mudar, a diferença é que esse sinal também chegaria no PWA
+
+5- Esse PWA já seria instalado diretamente no celular do usuário, logo poderia ter já sua tela de Login facilitado, mas o ideal mesmo é não ficar deslogando e já permanecer logado por um longo período
+
+6- Nesse PWA era interessante ter um botão na dashboard principal dele convidativo pra acompanhar tbm os sinais no grupo vip do telegram atual, caso o usuário possua o status de assinante
+
+7- Esse PWA tbm teria a integração com o mesmo banco de dados atual, pra conexão de controle de quem é assinante e quem não está de assinante, quem está de trial e quem não está 
+
+8- Nesse PWA seria interessante na dashboard principal o usuário ter as informações que possui na página principal do sistema que mostra o total de operações do dia, freebets, lucro bruto, lucro por CPF, se teve duplo green, e principalmente o calendário igual já tem hoje na página principal na versão web, porém pra mobile, colocar também o gráfico de evolução que é extremamente necessário
+
+9- no PWA ter uma página única com a lista em formato de tabela com botão pra expandir em tela única os procedimentos atuais e o status de cada procedimento e informações do procedimento, quanto ta pagando, casas de apostas, valor a ser apostado, quanto tempo falta pro procedimento e etc... 
+
+10- Nesse PWA o usuário poderia também selecionar as operações que ele realizou no dia pra termos internamente um acompanhamento pra saber se ele está operando ou não 
+
+11- Nesse PWA ter o sistema de notificação na tela inicial do celular dele quando por exemplo:
+- Novo Procedimento: Lucro de R$ xx,xx ou Freebet de XX
+- Assinatura pendente de pagamento
+- Fechamento de lucro do dia de todas operações realizadas, com quantidade de procedimentos e freebets ganhas por CPF, convidando o usuário que não é assinante se ele estivesse usando quanto ele ganharia por dia.
+
