@@ -160,9 +160,9 @@ function CalendarHeatmap({ data }: { data: DayPoint[] }) {
           return (
             <button key={s.date}
               onClick={() => setSelected(isSel ? null : s)}
-              className="rounded-md flex-shrink-0 flex flex-col items-center justify-center transition-transform active:scale-90"
+              className="rounded-lg flex-shrink-0 flex flex-col items-center justify-center transition-transform active:scale-90"
               style={{
-                width: 34, height: 38,
+                width: 46, height: 52,
                 background: bg,
                 border: isSel
                   ? `2px solid ${pos ? 'hsl(145 80% 55%)' : '#f87171'}`
@@ -171,14 +171,14 @@ function CalendarHeatmap({ data }: { data: DayPoint[] }) {
               {label ? (
                 <span className="font-bold leading-none"
                   style={{
-                    fontSize: label.length > 4 ? 7 : 8,
-                    color: isEmpty ? 'rgba(255,255,255,0.2)' : pos ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.9)',
+                    fontSize: label.length > 4 ? 9 : 11,
+                    color: 'rgba(255,255,255,0.92)',
                     fontVariantNumeric: 'tabular-nums',
                   }}>
                   {label}
                 </span>
               ) : (
-                <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.15)' }}>·</span>
+                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.15)' }}>·</span>
               )}
             </button>
           )
