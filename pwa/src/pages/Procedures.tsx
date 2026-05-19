@@ -114,9 +114,9 @@ export function Procedures() {
   return (
     <div className="page-content no-scrollbar px-4">
       <div className="pt-2 mb-4">
-        <h1 className="text-xl font-bold text-white mb-1">Sinais</h1>
+        <h1 className="text-xl font-bold text-white mb-1">Procedimentos</h1>
         <p className="text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>
-          Procedimentos em tempo real
+          Todos os procedimentos em tempo real
         </p>
       </div>
 
@@ -169,7 +169,7 @@ export function Procedures() {
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: idx * 0.03, duration: 0.2 }}>
-                <ProcedureCard p={p} onClick={() => navigate(`/sinais/${p.id}`)} />
+                <ProcedureCard p={p} onClick={() => navigate(`/procedimentos/${p.id}`)} />
               </motion.div>
             ))}
           </div>

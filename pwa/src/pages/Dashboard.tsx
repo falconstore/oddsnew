@@ -1,13 +1,10 @@
 import { useState, useRef } from 'react'
-import { format, parseISO, differenceInMinutes, isFuture, formatDistanceToNow } from 'date-fns'
+import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { motion, AnimatePresence } from 'framer-motion'
-import { TrendingUp, Zap, BarChart2, Clock, ChevronRight, Users, Minus, Plus } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { TrendingUp, Zap, BarChart2, Users, Minus, Plus } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
-import { useProceduresToday } from '@/hooks/useProcedures'
 import { usePeriodStats, useLast90DaysStats, PERIODS, PeriodKey, DayPoint } from '@/hooks/useStats'
-import { Procedure } from '@/lib/supabase'
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid, ReferenceLine, TooltipProps,
@@ -28,16 +25,6 @@ function useCpfCount() {
 }
 
 // ─── helpers ────────────────────────────────────────────────────────────────
-function statusColor(status: string | null) {
-  switch (status) {
-    case 'Concluído': case 'Lucro Direto':           return 'hsl(145 80% 48%)'
-    case 'Enviado': case 'Enviada Partida em Aberto':
-    case 'Aguardando Resultado':                      return '#facc15'
-    case 'Falta Girar Freebet': case 'Freebet Pendente': return '#fb923c'
-    default:                                          return 'rgba(255,255,255,0.4)'
-  }
-}
-
 function fmtR(v: number) {
   return `${v >= 0 ? '+' : ''}R$${Math.abs(v).toFixed(2)}`
 }
@@ -58,42 +45,6 @@ function PeriodSelector({ active, onChange }: { active: PeriodKey; onChange: (p:
         </button>
       ))}
     </div>
-  )
-}
-
-// ─── Active procedure card ───────────────────────────────────────────────────
-function ActiveCard({ p, onClick }: { p: Procedure; onClick: () => void }) {
-  const kickoff = p.kickoff_at ? parseISO(p.kickoff_at) : null
-  const isLive   = kickoff && !isFuture(kickoff) && differenceInMinutes(new Date(), kickoff) < 240
-  const upcoming = kickoff && isFuture(kickoff)
-  return (
-    <button onClick={onClick}
-      className="glass p-3.5 text-left w-full flex items-start justify-between gap-3 active:scale-[0.98] transition-transform">
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1 flex-wrap">
-          <span className="pill text-[10px]"
-            style={{ background: `${statusColor(p.status)}1a`, color: statusColor(p.status), border: `1px solid ${statusColor(p.status)}33` }}>
-            {p.status}
-          </span>
-          {isLive && (
-            <span className="pill text-[10px]" style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)' }}>
-              <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse inline-block mr-1" />AO VIVO
-            </span>
-          )}
-        </div>
-        <p className="text-sm font-semibold text-white truncate">
-          {p.promotion_name || p.platform || `#${p.procedure_number}`}
-        </p>
-        {p.platform && <p className="text-[11px] mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>{p.platform}</p>}
-        {kickoff && (
-          <p className="text-[10px] mt-1 flex items-center gap-1" style={{ color: 'rgba(255,255,255,0.35)' }}>
-            <Clock size={9} />
-            {upcoming ? `Kickoff em ${formatDistanceToNow(kickoff, { locale: ptBR })}` : isLive ? 'Em andamento' : 'Encerrado'}
-          </p>
-        )}
-      </div>
-      <ChevronRight size={15} style={{ color: 'rgba(255,255,255,0.3)', flexShrink: 0, marginTop: 2 }} />
-    </button>
   )
 }
 
@@ -381,17 +332,10 @@ function CpfCalculator({ lucroBruto, period }: { lucroBruto: number; period: Per
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export function Dashboard() {
   const { lead }    = useAuth()
-  const navigate    = useNavigate()
   const [period, setPeriod] = useState<PeriodKey>('today')
 
   const { data: stats }        = usePeriodStats(period)
   const { data: allStats = [] } = useLast90DaysStats()
-  const { data: procedures = [] } = useProceduresToday()
-
-  const activeProcs = procedures.filter(p =>
-    !p.tachado && ['Enviado','Enviada Partida em Aberto','Aguardando Resultado','Falta Girar Freebet','Freebet Pendente'].includes(p.status ?? '')
-  )
-
   const h = new Date().getHours()
   const greeting = h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite'
   const firstName  = lead?.name?.split(' ')[0] ?? 'Trader'
@@ -473,29 +417,6 @@ export function Dashboard() {
 
       {/* Calculator */}
       <CpfCalculator lucroBruto={lucroBruto} period={period} />
-
-      {/* Active procedures (only shown when period = today) */}
-      {period === 'today' && activeProcs.length > 0 && (
-        <section className="mb-4">
-          <h2 className="text-[10px] font-semibold uppercase tracking-widest mb-2.5" style={{ color: 'rgba(255,255,255,0.38)' }}>
-            Ativos agora · {activeProcs.length}
-          </h2>
-          <div className="flex flex-col gap-2">
-            {activeProcs.slice(0, 5).map(p => (
-              <motion.div key={p.id} initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }}>
-                <ActiveCard p={p} onClick={() => navigate(`/sinais/${p.id}`)} />
-              </motion.div>
-            ))}
-          </div>
-          {activeProcs.length > 5 && (
-            <button onClick={() => navigate('/sinais')}
-              className="w-full mt-2 py-2.5 text-xs font-medium rounded-xl text-center transition-all active:scale-95"
-              style={{ background: 'rgba(30,222,107,0.07)', color: 'hsl(145 80% 48%)', border: '1px solid rgba(30,222,107,0.18)' }}>
-              Ver todos os {activeProcs.length} ativos
-            </button>
-          )}
-        </section>
-      )}
 
       {/* Chart */}
       {allStats.length > 0 && (
