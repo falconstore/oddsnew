@@ -521,11 +521,12 @@ serve(async (req) => {
         status: string;
         invite_link: string | null;
         bonus_invite_link: string | null;
+        expires_at: string | null;
       };
       let foundVia: string | null = null;
       const { data: byUser, error: byUserErr } = await supabase
         .from("trial_leads")
-        .select("id, status, invite_link, bonus_invite_link")
+        .select("id, status, invite_link, bonus_invite_link, expires_at")
         .eq("telegram_user_id", userId)
         .order("created_at", { ascending: false })
         .limit(1)
@@ -544,20 +545,34 @@ serve(async (req) => {
         foundVia = "user_id";
       }
 
+      // Helper: detecta lead "active" cujo prazo já expirou no banco mas o
+      // cron ainda não processou (ou o evento de saída não chegou). Nesses casos
+      // o lead ativo é um ciclo encerrado e NÃO deve ser tratado como referência
+      // para o anti-repetidor — o lead correto é o novo pending do invite_link.
+      const isLeadStaleActive = (l: typeof lead): boolean =>
+        !!l &&
+        l.status === "active" &&
+        !!l.expires_at &&
+        new Date(l.expires_at) < new Date();
+
       // 1b) lookup pelo invite_link rastreado.
       // Executa quando: (a) não achou lead por user_id, OU (b) achou por
       // user_id mas o lead encontrado NÃO está pending/active — isso acontece
       // quando o mesmo Telegram já teve um trial anterior (expired/removed/
       // blocked/converted) e o usuário se re-cadastrou com novo WhatsApp/email.
-      // Nesse caso o lead novo (pending) precisa ser ativado pelo invite_link,
-      // e o lead antigo deve ser ignorado para esse evento de join.
+      // TAMBÉM executa quando o lead encontrado está em BLOCKED_LEAD_STATUSES
+      // ou está "active" mas com expires_at já no passado (stale-active): nesses
+      // casos o lead correto para ativar é o novo pending encontrado pelo link.
       const needInviteLinkLookup =
         !!inviteLink &&
-        (!lead || (lead.status !== "pending" && lead.status !== "active"));
+        (!lead ||
+          (lead.status !== "pending" && lead.status !== "active") ||
+          BLOCKED_LEAD_STATUSES.has(lead.status) ||
+          isLeadStaleActive(lead));
       if (needInviteLinkLookup) {
         const { data: byLink, error: byLinkErr } = await supabase
           .from("trial_leads")
-          .select("id, status, invite_link, bonus_invite_link")
+          .select("id, status, invite_link, bonus_invite_link, expires_at")
           .eq("invite_link", inviteLink)
           .maybeSingle();
         log("lookup_invite_link", {
@@ -619,12 +634,42 @@ serve(async (req) => {
       // é uma 2ª inscrição do mesmo Telegram via novo email/WhatsApp/@.
       // Marcamos o lead NOVO como blocked_repeat (com previous_lead_id) e
       // re-kickamos antes de qualquer outra coisa.
+      //
+      // GUARD: só entra no bloco anti-repetidor se o lead A (encontrado por
+      // user_id) NÃO estiver em estado terminal (BLOCKED_LEAD_STATUSES) E NÃO
+      // for um lead "active" com expires_at já no passado (stale-active). Se
+      // lead A é terminal/expirado, o usuário está fazendo uma re-inscrição
+      // legítima — não é tentativa de segundo trial — e deve ser ativado
+      // normalmente. Essa condição é um belt-and-suspenders: o fix em
+      // needInviteLinkLookup já deve ter redirecionado foundVia para
+      // "invite_link" nesses casos, mas o guard garante que mesmo que isso
+      // falhe (ex.: invite_link lookup retornou null), o anti-repetidor
+      // não dispara indevidamente.
       if (
         lead &&
         foundVia === "user_id" &&
         inviteLink &&
         lead.invite_link !== inviteLink
       ) {
+        const leadAIsTerminalOrExpiredActive =
+          BLOCKED_LEAD_STATUSES.has(lead.status) || isLeadStaleActive(lead);
+
+        if (leadAIsTerminalOrExpiredActive) {
+          // Lead A é um ciclo encerrado: não é evidência de abuso.
+          // Emitir log estruturado para auditoria e deixar o fluxo normal
+          // de ativação tratar o lead correto.
+          log("corrected-rejoin", {
+            update_id: updateId,
+            event: "corrected-rejoin",
+            old_lead_id: lead.id,
+            old_lead_status: lead.status,
+            old_lead_expires_at: lead.expires_at ?? null,
+            invite_link_received: inviteLink,
+            user_id: userId,
+            note: "lead A is terminal/stale-active; anti-repeater skipped for legitimate rejoin",
+          });
+          // fall through to normal activation flow
+        } else {
         const { data: byLinkRepeat, error: byLinkRepeatErr } = await supabase
           .from("trial_leads")
           .select("id, status, invite_link")
@@ -697,6 +742,7 @@ serve(async (req) => {
           });
           return json({ ok: true, action: "blocked-repeat", lead_id: byLinkRepeat.id });
         }
+        } // end else (lead A is NOT terminal/stale-active)
       }
 
       // 1c.0) CONVERSÃO PAGA: se o lead estava bloqueado/expirado mas o
