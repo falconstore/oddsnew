@@ -8,6 +8,17 @@ BetShark Pro is a real-time odds monitoring application for sports betting. It p
 - Dark theme preferred (default)
 - UI style: "Instagrammable" — neon accents, glassmorphism, gradient text, animated elements
 
+## Projects
+
+| App | Pasta | Porta | Descrição |
+|-----|-------|-------|-----------|
+| **Admin** (BetShark Pro) | `src/` | 5000 | Painel admin — odds, procedimentos, leads, afiliados |
+| **PWA** (Shark Green App) | `pwa/` | 5173 | App mobile para membros (trial + assinantes) |
+
+- O admin e o PWA são **completamente independentes** — cada um tem seu próprio `package.json`, Vite, workflow e arquivos. Nunca misture.
+- Admin workflow: `Start application` → `npm run dev` na raiz
+- PWA workflow: `Start PWA` → `cd pwa && npm run dev`
+
 ## System Architecture
 - **Frontend**: Built with React 18, TypeScript, and Vite, styled using Tailwind CSS and shadcn/ui. State management is handled by `@tanstack/react-query` for server state and React Context for authentication. Routing uses `react-router-dom v6` with `framer-motion` for animated transitions.
 - **Backend**: Leverages Supabase for authentication, database, and real-time functionalities. Supabase Edge Functions manage business logic and integrations.
