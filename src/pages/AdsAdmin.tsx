@@ -5,7 +5,7 @@ import { ptBR } from 'date-fns/locale';
 import {
   Megaphone, Search, Users, Phone, Clock, ExternalLink,
   TrendingUp, CheckCircle2, XCircle, RefreshCw, Loader2,
-  Filter, ChevronDown, ChevronUp,
+  Filter, ChevronDown, ChevronUp, Copy, Check, Send, Bot,
 } from 'lucide-react';
 import { Layout } from '@/components/Layout';
 import { Input } from '@/components/ui/input';
@@ -374,6 +374,21 @@ export default function AdsAdmin() {
   );
 }
 
+// ── Bot link helper ─────────────────────────────────────────────────────────
+
+const BOT_USERNAME = 'sharkinhogreen_bot';
+
+function botStartUrl(leadId: string) {
+  return `https://t.me/${BOT_USERNAME}?start=lead_${leadId}`;
+}
+
+function waBotMsg(lead: TrialLead) {
+  const link = botStartUrl(lead.id);
+  const name = lead.name?.split(' ')[0] || 'olá';
+  const msg = `Oi ${name}! 👋\n\nSeu cadastro no *Shark Green* foi feito com sucesso, mas o acesso ainda não foi ativado.\n\nClique no link abaixo, abra o bot e aperte *START* para receber o link do grupo de trial:\n\n${link}\n\nQualquer dúvida é só falar! 🦈`;
+  return `https://wa.me/55${lead.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(msg)}`;
+}
+
 // ── LeadCard ───────────────────────────────────────────────────────────────
 
 function LeadCard({ lead, expanded, onToggle }: {
@@ -381,12 +396,20 @@ function LeadCard({ lead, expanded, onToggle }: {
   expanded: boolean;
   onToggle: () => void;
 }) {
+  const [copied, setCopied] = useState(false);
   const meta = STATUS_META[lead.status];
   const hasUtm = lead.utm_source || lead.utm_medium || lead.utm_campaign || lead.utm_content || lead.utm_term || lead.ct;
+  const isPending = lead.status === 'pending';
+
+  function copyBotLink() {
+    navigator.clipboard.writeText(botStartUrl(lead.id));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
 
   return (
     <div
-      className="glass rounded-2xl border border-white/8 p-4 hover:border-cyan-500/25 transition-all duration-200"
+      className={`glass rounded-2xl border p-4 transition-all duration-200 ${isPending ? 'border-amber-500/30 hover:border-amber-500/50' : 'border-white/8 hover:border-cyan-500/25'}`}
       data-testid={`card-ads-lead-${lead.id}`}
     >
       <div className="flex flex-col sm:flex-row sm:items-start gap-3">
@@ -420,6 +443,12 @@ function LeadCard({ lead, expanded, onToggle }: {
             <Badge className={`text-[10px] ${meta.cls}`} data-testid={`badge-ads-status-${lead.id}`}>
               {meta.label}
             </Badge>
+            {isPending && (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-amber-500/40 bg-amber-500/10 text-amber-300 text-[10px] font-medium"
+                title="Usuário não iniciou o bot do Telegram — clique em expandir para recuperar">
+                <Bot className="w-3 h-3" /> Não iniciou bot
+              </span>
+            )}
             {lead.status === 'converted' && (
               <RouterLink
                 to={`/trial-admin`}
@@ -475,6 +504,53 @@ function LeadCard({ lead, expanded, onToggle }: {
       {/* Detalhes expandidos */}
       {expanded && (
         <div className="mt-3 pt-3 border-t border-white/8 space-y-2">
+
+          {/* Bloco de recuperação — só para leads Aguardando */}
+          {isPending && (
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/8 p-3 space-y-2"
+              data-testid={`block-bot-recovery-${lead.id}`}>
+              <p className="text-[11px] font-semibold text-amber-300 flex items-center gap-1.5">
+                <Bot className="w-3.5 h-3.5" />
+                Usuário não iniciou o bot — envie o link abaixo para ativar o trial
+              </p>
+              <div className="flex items-center gap-2 bg-black/30 rounded-lg px-3 py-1.5 border border-white/8">
+                <code className="text-[10px] text-cyan-300 font-mono flex-1 break-all select-all"
+                  data-testid={`text-bot-link-${lead.id}`}>
+                  {botStartUrl(lead.id)}
+                </code>
+                <button
+                  type="button"
+                  onClick={copyBotLink}
+                  className="flex-shrink-0 p-1 rounded hover:bg-white/10 text-muted-foreground hover:text-amber-300 transition-colors"
+                  title="Copiar link do bot"
+                  data-testid={`button-copy-bot-link-${lead.id}`}
+                >
+                  {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={copyBotLink}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 text-[11px] font-medium transition-colors"
+                  data-testid={`button-copy-bot-link-action-${lead.id}`}
+                >
+                  {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                  {copied ? 'Copiado!' : 'Copiar link'}
+                </button>
+                <a
+                  href={waBotMsg(lead)}
+                  target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 text-[11px] font-medium transition-colors"
+                  data-testid={`link-wa-bot-msg-${lead.id}`}
+                >
+                  <Send className="w-3 h-3" />
+                  Enviar via WhatsApp
+                </a>
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-1 text-[11px]">
             {[
               ['utm_source',   lead.utm_source],
