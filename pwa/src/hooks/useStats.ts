@@ -4,7 +4,6 @@ import { format, subDays } from 'date-fns'
 
 export type DailyStats = {
   date: string
-  // Idêntico ao admin getDailyStats
   totalOperacoes: number
   operacoesEncerradas: number
   operacoesAbertas: number
@@ -12,6 +11,8 @@ export type DailyStats = {
   totalFreebetsValor: number
   totalSemFb: number
   lucroBruto: number
+  // Potencial: soma de freebet_value das operações ainda em aberto
+  potencialFreebet: number
 }
 
 export type DayPoint = {
@@ -27,20 +28,26 @@ export function useTodayStats() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('procedures')
-        .select('profit_loss, tipo, freebet_value, tachado, archived')
+        .select('profit_loss, tipo, freebet_value, status, tachado, archived')
         .eq('date', today)
         .eq('archived', false)
         .eq('tachado', false)
       if (error) throw error
 
-      const procs = (data ?? []) as Pick<Procedure, 'profit_loss' | 'tipo' | 'freebet_value' | 'tachado' | 'archived'>[]
+      const OPEN_STATUSES = ['Enviado', 'Enviada Partida em Aberto', 'Aguardando Resultado', 'Falta Girar Freebet', 'Freebet Pendente']
+      const procs = (data ?? []) as any[]
 
       const fbProcs = procs.filter(p => p.tipo === 'GANHAR_FB' || p.tipo === 'QUEIMAR_FB')
       const totalFreebets = fbProcs.length
-      const totalFreebetsValor = fbProcs.reduce((s, p) => s + (Number(p.freebet_value) || 0), 0)
+      const totalFreebetsValor = fbProcs.reduce((s: number, p: any) => s + (Number(p.freebet_value) || 0), 0)
       const totalSemFb = procs.filter(p => p.tipo === 'SEM_FB').length
-      const lucroBruto = procs.reduce((s, p) => s + (Number(p.profit_loss) || 0), 0)
+      const lucroBruto = procs.reduce((s: number, p: any) => s + (Number(p.profit_loss) || 0), 0)
       const operacoesEncerradas = procs.filter(p => p.profit_loss !== null && Number(p.profit_loss) !== 0).length
+
+      // Potencial = soma de freebet_value das freebets ainda em aberto
+      const potencialFreebet = procs
+        .filter(p => OPEN_STATUSES.includes(p.status) && (p.tipo === 'GANHAR_FB' || p.tipo === 'QUEIMAR_FB') && Number(p.freebet_value) > 0)
+        .reduce((s: number, p: any) => s + Number(p.freebet_value), 0)
 
       return {
         date: today,
@@ -51,6 +58,7 @@ export function useTodayStats() {
         totalFreebetsValor,
         totalSemFb,
         lucroBruto,
+        potencialFreebet,
       }
     },
     staleTime: 30_000,

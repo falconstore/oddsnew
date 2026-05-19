@@ -136,8 +136,8 @@ function CpfCalculator({ lucroBruto }: { lucroBruto: number }) {
           style={{ color: positivo ? 'hsl(145 80% 55%)' : '#f87171', fontVariantNumeric: 'tabular-nums' }}>
           {positivo ? '+' : ''}R${resultado.toFixed(2)}
         </motion.p>
-        <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.35)' }}>
-          retorno estimado hoje com {numCpfs} CPF{numCpfs !== 1 ? 's' : ''}
+        <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>
+          Esse seria o resultado de hoje com <span className="font-semibold text-white">{numCpfs} CPF{numCpfs !== 1 ? 's' : ''}</span> escolhidos
         </p>
       </div>
 
@@ -264,51 +264,61 @@ export function Dashboard() {
         <img src="/logo.png" alt="Shark" className="w-10 h-10 rounded-xl" />
       </div>
 
-      {/* KPI 3-card grid */}
-      <div className="grid grid-cols-2 gap-3 mb-3">
+      {/* KPI grid — compacto */}
+      <div className="grid grid-cols-2 gap-2 mb-3">
 
         {/* Operações */}
-        <div className="glass p-4 flex flex-col gap-1.5">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(103,232,249,0.12)' }}>
-            <BarChart2 size={15} style={{ color: '#67e8f9' }} />
+        <div className="glass px-3 py-3 flex flex-col gap-1">
+          <div className="flex items-center gap-1.5 mb-0.5">
+            <BarChart2 size={13} style={{ color: '#67e8f9' }} />
+            <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.4)' }}>Operações</span>
           </div>
-          <p className="text-xl font-bold text-white leading-none mt-0.5">{stats?.totalOperacoes ?? 0}</p>
-          <p className="text-xs font-medium" style={{ color: 'rgba(255,255,255,0.45)' }}>Operações hoje</p>
-          <div className="flex items-center gap-2 flex-wrap mt-0.5">
-            <span className="text-[10px]" style={{ color: 'rgba(30,222,107,0.8)' }}>✓ {stats?.operacoesEncerradas ?? 0} enc.</span>
+          <p className="text-2xl font-black text-white leading-none">{stats?.totalOperacoes ?? 0}</p>
+          <div className="flex items-center gap-2 mt-0.5">
+            <span className="text-[10px]" style={{ color: 'rgba(30,222,107,0.85)' }}>✓ {stats?.operacoesEncerradas ?? 0} enc.</span>
             <span className="text-[10px]" style={{ color: '#facc15' }}>◷ {stats?.operacoesAbertas ?? 0} ab.</span>
           </div>
+          {(stats?.potencialFreebet ?? 0) > 0 && (
+            <div className="mt-1 flex items-center gap-1">
+              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md"
+                style={{ background: 'rgba(250,204,21,0.12)', color: '#facc15' }}>
+                ⚡ R${(stats!.potencialFreebet).toFixed(0)} potencial FB
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Freebets */}
-        <div className="glass p-4 flex flex-col gap-1.5">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(167,139,250,0.12)' }}>
-            <Zap size={15} style={{ color: '#a78bfa' }} />
+        <div className="glass px-3 py-3 flex flex-col gap-1">
+          <div className="flex items-center gap-1.5 mb-0.5">
+            <Zap size={13} style={{ color: '#a78bfa' }} />
+            <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.4)' }}>Freebets</span>
           </div>
-          <p className="text-xl font-bold text-white leading-none mt-0.5">{stats?.totalFreebets ?? 0}</p>
-          <p className="text-xs font-medium" style={{ color: 'rgba(255,255,255,0.45)' }}>Freebets</p>
-          {(stats?.totalFreebetsValor ?? 0) > 0 && (
-            <span className="text-[10px] font-semibold" style={{ color: '#c4b5fd' }}>
+          <p className="text-2xl font-black text-white leading-none">{stats?.totalFreebets ?? 0}</p>
+          {(stats?.totalFreebetsValor ?? 0) > 0 ? (
+            <span className="text-[10px] font-semibold mt-0.5" style={{ color: '#c4b5fd' }}>
               R${(stats?.totalFreebetsValor ?? 0).toFixed(2)} em FB
             </span>
+          ) : (
+            <span className="text-[10px] mt-0.5" style={{ color: 'rgba(255,255,255,0.3)' }}>—</span>
           )}
-          <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.35)' }}>
+          <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.3)' }}>
             {stats?.totalSemFb ?? 0} sem freebet
           </span>
         </div>
 
-        {/* Lucro Bruto — full width */}
-        <div className="col-span-2 glass p-4 flex items-center gap-4">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+        {/* Lucro Bruto — full width compacto */}
+        <div className="col-span-2 glass px-3 py-3 flex items-center gap-3">
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
             style={{ background: lucroBruto >= 0 ? 'rgba(30,222,107,0.12)' : 'rgba(248,113,113,0.12)' }}>
-            <TrendingUp size={18} style={{ color: lucroBruto >= 0 ? 'hsl(145 80% 48%)' : '#f87171' }} />
+            <TrendingUp size={15} style={{ color: lucroBruto >= 0 ? 'hsl(145 80% 48%)' : '#f87171' }} />
           </div>
-          <div className="flex-1">
-            <p className="text-2xl font-black leading-none"
+          <div>
+            <p className="text-xl font-black leading-none"
               style={{ color: lucroBruto >= 0 ? 'hsl(145 80% 48%)' : '#f87171', fontVariantNumeric: 'tabular-nums' }}>
               {lucroBruto >= 0 ? '+' : ''}R${lucroBruto.toFixed(2)}
             </p>
-            <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>Lucro bruto hoje · resultado real</p>
+            <p className="text-[10px] mt-0.5" style={{ color: 'rgba(255,255,255,0.35)' }}>Lucro bruto hoje · resultado real</p>
           </div>
         </div>
       </div>
