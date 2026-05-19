@@ -6,6 +6,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders, json } from "../_shared/cors.ts";
 import { getClientIp, sendMetaCapiEvent } from "../_shared/meta-capi.ts";
+import { sendZApiText, buildWelcomeMessage } from "../_shared/zapi.ts";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -181,6 +182,24 @@ serve(async (req) => {
       Deno.env.get("TELEGRAM_TRIAL_BOT_USERNAME") ?? "sharkinhogreen_bot"
     ).replace(/^@+/, "");
     const botStartUrl = `https://t.me/${botUsername}?start=lead_${inserted.id}`;
+
+    // WhatsApp de boas-vindas via Z-API — fire-and-forget.
+    // Orienta o lead a instalar o Telegram e clicar no bot pra ativar o trial.
+    // Silencioso em caso de erro (secrets ausentes ou instância desconectada)
+    // para não bloquear o cadastro nem expor detalhes ao usuário.
+    {
+      const firstName = name.split(" ")[0];
+      const welcomeMsg = buildWelcomeMessage(firstName, botStartUrl);
+      const zapiPromise = sendZApiText({ phone: whatsapp, message: welcomeMsg })
+        .then((r) => {
+          if (!r.ok) console.warn("trial-signup: Z-API falhou:", r.error);
+          else console.log("trial-signup: WhatsApp boas-vindas enviado para", whatsapp.slice(0, 4) + "****");
+        })
+        .catch((e) => console.warn("trial-signup: Z-API exception:", e));
+      // @ts-ignore — EdgeRuntime existe em Supabase Edge / Deno Deploy
+      const er = (globalThis as { EdgeRuntime?: { waitUntil: (p: Promise<unknown>) => void } }).EdgeRuntime;
+      if (er && typeof er.waitUntil === "function") er.waitUntil(zapiPromise);
+    }
 
     // Conversions API: dispara Lead server-side em paralelo ao pixel do
     // browser, deduplicando pelo mesmo event_id. Fire-and-forget pra não
