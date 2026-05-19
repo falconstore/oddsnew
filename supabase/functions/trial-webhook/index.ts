@@ -319,6 +319,34 @@ serve(async (req) => {
           .maybeSingle();
         if (byUserB) { bLead = byUserB; bFoundVia = "user_id"; }
 
+        // Se o lead encontrado por user_id está em status terminal (expirado/removido/bloqueado)
+        // ou convertido, tenta também o lookup por bonus_invite_link para encontrar um novo
+        // cadastro pending — re-entrada legítima após trial anterior encerrado.
+        // Espelha o comportamento do grupo principal (linhas 521–543).
+        if (
+          bLead &&
+          inviteLink &&
+          (BLOCKED_LEAD_STATUSES.has(bLead.status) || bLead.status === "converted")
+        ) {
+          const { data: byLinkFallbackB } = await supabase
+            .from("trial_leads")
+            .select("id, status, telegram_user_id, bonus_invite_link")
+            .eq("bonus_invite_link", inviteLink)
+            .neq("id", bLead.id)
+            .maybeSingle();
+          if (byLinkFallbackB) {
+            log("bonus-lookup-fallback-to-invite-link", {
+              update_id: updateId,
+              old_lead_id: bLead.id,
+              old_status: bLead.status,
+              new_lead_id: byLinkFallbackB.id,
+              new_status: byLinkFallbackB.status,
+            });
+            bLead = byLinkFallbackB;
+            bFoundVia = "bonus_invite_link";
+          }
+        }
+
         if (!bLead && inviteLink) {
           const { data: byLinkB } = await supabase
             .from("trial_leads")
@@ -374,12 +402,17 @@ serve(async (req) => {
         // Anti-repeat B (simétrico ao VIP, linha 517): achamos o lead pelo
         // user_id (registro mais recente daquele Telegram) MAS o invite_link
         // recebido não bate com o `bonus_invite_link` salvo nele — significa
-        // que o user já tem cadastro e está entrando pelo link bônus de OUTRO
-        // lead novo. Marca esse lead novo como blocked_repeat e kicka.
+        // que o user já tem cadastro ATIVO/PENDENTE e está entrando pelo link
+        // bônus de OUTRO lead novo. Marca esse lead novo como blocked_repeat e kicka.
+        // IMPORTANTE: só dispara se o lead anterior está ativo/pendente — não para
+        // leads terminais (expired/removed/blocked/blocked_repeat) nem converted,
+        // pois nesses casos é re-cadastro legítimo após trial anterior encerrado.
         if (
           bFoundVia === "user_id" &&
           inviteLink &&
-          bLead.bonus_invite_link !== inviteLink
+          bLead.bonus_invite_link !== inviteLink &&
+          !BLOCKED_LEAD_STATUSES.has(bLead.status) &&
+          bLead.status !== "converted"
         ) {
           const { data: byLinkRepeatB } = await supabase
             .from("trial_leads")
