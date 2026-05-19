@@ -22,21 +22,20 @@ export function useAuth(): AuthState {
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session)
       setUser(data.session?.user ?? null)
+      if (!data.session) setStatus('unauthenticated')
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
       setUser(session?.user ?? null)
+      if (!session) setStatus('unauthenticated')
     })
     return () => subscription.unsubscribe()
   }, [])
 
   useEffect(() => {
-    if (!user?.email) {
-      setLead(null)
-      setStatus(user === null ? 'unauthenticated' : 'loading')
-      return
-    }
+    if (user === null && status !== 'loading') return
+    if (!user?.email) return
 
     let cancelled = false
     supabase
@@ -46,11 +45,20 @@ export function useAuth(): AuthState {
       .maybeSingle()
       .then(({ data, error }) => {
         if (cancelled) return
+
+        // Modo dev: qualquer usuário autenticado tem acesso como trial
+        if (import.meta.env.DEV && (error || !data)) {
+          setLead(null)
+          setStatus('active_trial')
+          return
+        }
+
         if (error || !data) {
           setLead(null)
           setStatus('not_found')
           return
         }
+
         setLead(data as TrialLead)
 
         const now = new Date()
