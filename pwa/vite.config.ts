@@ -10,7 +10,7 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'logo.png'],
       manifest: {
-        name: 'Shark Green — Sinais',
+        name: 'Shark Green',
         short_name: 'Shark Green',
         description: 'Procedimentos e sinais de apostas em tempo real',
         theme_color: '#0b1120',
@@ -33,10 +33,14 @@ export default defineConfig({
           },
         ],
       },
+      devOptions: {
+        enabled: true,
+        type: 'module',
+      },
     }),
   ],
   resolve: {
-    alias: { '@': path.resolve(__dirname, 'src') },
+    alias: { '@': path.resolve(__dirname, 'src'), '@assets': path.resolve(__dirname, '../attached_assets') },
   },
   server: {
     port: 5173,
