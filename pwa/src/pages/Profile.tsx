@@ -26,8 +26,8 @@ export function Profile() {
   const navigate = useNavigate()
 
   async function handleLogout() {
+    // signOut já faz window.location.replace('/login') internamente
     await signOut()
-    navigate('/login', { replace: true })
   }
 
   const isSubscriber = status === 'active_subscriber'
