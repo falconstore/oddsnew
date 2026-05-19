@@ -136,6 +136,15 @@ function CalendarHeatmap({ data }: { data: DayPoint[] }) {
   const last30 = data.slice(-30)
   const max = Math.max(...last30.map(s => Math.abs(s.lucro)), 1)
 
+  function cellLabel(lucro: number) {
+    if (lucro === 0) return ''
+    const abs = Math.abs(lucro)
+    const sign = lucro > 0 ? '+' : '-'
+    if (abs >= 1000) return `${sign}${(abs / 1000).toFixed(1)}k`
+    if (abs >= 100)  return `${sign}${Math.round(abs)}`
+    return `${sign}${abs.toFixed(0)}`
+  }
+
   return (
     <div className="glass p-4 mb-5" style={{ border: '1px solid rgba(255,255,255,0.06)' }}>
       <div className="flex flex-wrap gap-1 mb-3">
@@ -147,17 +156,31 @@ function CalendarHeatmap({ data }: { data: DayPoint[] }) {
           const bg      = isEmpty
             ? 'rgba(255,255,255,0.05)'
             : pos ? `rgba(30,222,107,${0.12 + ratio * 0.7})` : `rgba(248,113,113,${0.12 + ratio * 0.7})`
+          const label = cellLabel(s.lucro)
           return (
             <button key={s.date}
               onClick={() => setSelected(isSel ? null : s)}
-              className="w-7 h-7 rounded-md flex-shrink-0 transition-transform active:scale-90"
+              className="rounded-md flex-shrink-0 flex flex-col items-center justify-center transition-transform active:scale-90"
               style={{
+                width: 34, height: 38,
                 background: bg,
                 border: isSel
                   ? `2px solid ${pos ? 'hsl(145 80% 55%)' : '#f87171'}`
                   : '1px solid rgba(255,255,255,0.06)',
-              }}
-            />
+              }}>
+              {label ? (
+                <span className="font-bold leading-none"
+                  style={{
+                    fontSize: label.length > 4 ? 7 : 8,
+                    color: isEmpty ? 'rgba(255,255,255,0.2)' : pos ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.9)',
+                    fontVariantNumeric: 'tabular-nums',
+                  }}>
+                  {label}
+                </span>
+              ) : (
+                <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.15)' }}>·</span>
+              )}
+            </button>
           )
         })}
       </div>
@@ -341,6 +364,11 @@ export function Dashboard() {
   const firstName  = lead?.name?.split(' ')[0] ?? 'Trader'
   const lucroBruto = stats?.lucroBruto ?? 0
 
+  // Slice chart data to match selected period
+  const chartDays = period === '90d' ? 90 : period === '30d' ? 30 : 7
+  const chartData = allStats.slice(-chartDays)
+  const chartLabel = period === '90d' ? '90 dias' : period === '30d' ? '30 dias' : period === '7d' ? '7 dias' : period === 'yesterday' ? 'últimos 7 dias' : 'últimos 7 dias'
+
   return (
     <div className="page-content no-scrollbar px-4">
 
@@ -422,9 +450,9 @@ export function Dashboard() {
       {allStats.length > 0 && (
         <section className="mb-1">
           <h2 className="text-[10px] font-semibold uppercase tracking-widest mb-2.5" style={{ color: 'rgba(255,255,255,0.38)' }}>
-            Evolução — 90 dias
+            Evolução — {chartLabel}
           </h2>
-          <EvolutionChart data={allStats} />
+          <EvolutionChart data={chartData} />
         </section>
       )}
 
