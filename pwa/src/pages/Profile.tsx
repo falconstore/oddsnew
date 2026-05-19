@@ -33,7 +33,7 @@ export function Profile() {
   const isSubscriber = status === 'active_subscriber'
   const isTrial = status === 'active_trial'
 
-  const trialExpires = lead?.trial_expires_at ? parseISO(lead.trial_expires_at) : null
+  const trialExpires = lead?.expires_at ? parseISO(lead.expires_at) : null
   const daysLeft = trialExpires ? differenceInDays(trialExpires, new Date()) : null
 
   const telegramUsername = lead?.telegram_username
@@ -101,8 +101,8 @@ export function Profile() {
           {trialExpires && (
             <InfoRow
               label={isSubscriber ? "Assinante desde" : "Trial expira em"}
-              value={isSubscriber
-                ? format(parseISO(lead?.subscribed_at ?? ''), "dd/MM/yyyy", { locale: ptBR })
+              value={isSubscriber && lead?.paid_at
+                ? format(parseISO(lead.paid_at), "dd/MM/yyyy", { locale: ptBR })
                 : format(trialExpires, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
               icon={Clock}
             />

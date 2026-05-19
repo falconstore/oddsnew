@@ -54,8 +54,8 @@ export function useAuth(): AuthState {
         setLead(data as TrialLead)
 
         const now = new Date()
-        const trialExpires = data.trial_expires_at ? new Date(data.trial_expires_at) : null
-        const isSubscriber = Boolean(data.subscribed_at)
+        const trialExpires = data.expires_at ? new Date(data.expires_at) : null
+        const isSubscriber = Boolean(data.paid_at) || data.subscription_status === 'active'
 
         if (isSubscriber) {
           setStatus('active_subscriber')

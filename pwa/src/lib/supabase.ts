@@ -1,7 +1,13 @@
 import { createClient } from '@supabase/supabase-js'
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string
+// PWA usa wspsuempnswljkphatur — variáveis com prefixo MAIN_ para não conflitar
+// com as VITE_SUPABASE_* do painel admin (hyccrhpvedvfnzhetxkz) no userenv.shared
+const SUPABASE_URL =
+  import.meta.env.VITE_MAIN_SUPABASE_URL as string ||
+  'https://wspsuempnswljkphatur.supabase.co'
+const SUPABASE_ANON_KEY =
+  import.meta.env.VITE_MAIN_SUPABASE_ANON_KEY as string ||
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndzcHN1ZW1wbnN3bGprcGhhdHVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAzNTc1NTEsImV4cCI6MjA3NTkzMzU1MX0.zgEcoHFulNHrSxyHOZTbCCtDKfqjppHLRh1junsmsoA'
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
@@ -18,11 +24,12 @@ export type TrialLead = {
   email: string | null
   whatsapp: string | null
   telegram_username: string | null
-  telegram_chat_id: string | null
+  telegram_user_id: number | null
   status: string | null
   cohort: string | null
-  trial_expires_at: string | null
-  subscribed_at: string | null
+  expires_at: string | null
+  paid_at: string | null
+  subscription_status: string | null
   created_at: string
 }
 
