@@ -389,6 +389,34 @@ function waBotMsg(lead: TrialLead) {
   return `https://wa.me/55${lead.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(msg)}`;
 }
 
+function waNoTelegramMsg(lead: TrialLead) {
+  const link = botStartUrl(lead.id);
+  const name = lead.name?.split(' ')[0] || 'olá';
+  const msg = [
+    `Oi ${name}! 👋`,
+    ``,
+    `Seu cadastro no *Shark Green* foi feito com sucesso! 🦈`,
+    ``,
+    `Para acessar o grupo de sinais, você vai precisar do *Telegram* — é gratuito, seguro e em menos de 2 minutos você já está dentro! 😊`,
+    ``,
+    `*📲 Passo a passo:*`,
+    ``,
+    `1️⃣ Baixe o Telegram (grátis):`,
+    `   🤖 Android → https://play.google.com/store/apps/details?id=org.telegram.messenger`,
+    `   🍎 iPhone → https://apps.apple.com/br/app/telegram-messenger/id686449807`,
+    ``,
+    `2️⃣ Instale e crie sua conta (só precisa de número de celular)`,
+    ``,
+    `3️⃣ Clique no link abaixo e aperte *START*:`,
+    `${link}`,
+    ``,
+    `Pronto! Você vai receber o acesso ao grupo em segundos. 🚀`,
+    ``,
+    `Qualquer dúvida é só chamar aqui!`,
+  ].join('\n');
+  return `https://wa.me/55${lead.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(msg)}`;
+}
+
 // ── LeadCard ───────────────────────────────────────────────────────────────
 
 function LeadCard({ lead, expanded, onToggle }: {
@@ -543,9 +571,20 @@ function LeadCard({ lead, expanded, onToggle }: {
                   target="_blank" rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 text-[11px] font-medium transition-colors"
                   data-testid={`link-wa-bot-msg-${lead.id}`}
+                  title="Mensagem para quem já tem Telegram instalado"
                 >
                   <Send className="w-3 h-3" />
-                  Enviar via WhatsApp
+                  Tem Telegram
+                </a>
+                <a
+                  href={waNoTelegramMsg(lead)}
+                  target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20 text-[11px] font-medium transition-colors"
+                  data-testid={`link-wa-no-telegram-msg-${lead.id}`}
+                  title="Mensagem com passo a passo para baixar o Telegram"
+                >
+                  <Send className="w-3 h-3" />
+                  Não tem Telegram
                 </a>
               </div>
             </div>
