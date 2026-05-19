@@ -763,8 +763,10 @@ serve(async (req) => {
       // 1e) Lead pending → ativa pelo prazo de 7 dias
       if (lead.status === "pending") {
         // 1e.1) Anti-repetidor: o telegram_user_id é imutável no Telegram,
-        // então se ele já aparece em outro lead (qualquer status que não
-        // 'pending'), bloqueamos esse 2º trial e re-kickamos na hora.
+        // então se ele já aparece em outro lead ATIVO ou PENDENTE,
+        // bloqueamos esse 2º trial e re-kickamos na hora.
+        // Leads em status terminal (expired, removed, blocked, blocked_repeat,
+        // converted) representam ciclos encerrados — não são prova de abuso.
         // Apenas pulamos a checagem se foundVia === "user_id" (significa
         // que o lead encontrado JÁ é desse user_id — não há repetição).
         if (foundVia !== "user_id") {
@@ -773,6 +775,7 @@ serve(async (req) => {
             .select("id, status, created_at")
             .eq("telegram_user_id", userId)
             .neq("id", lead.id)
+            .not("status", "in", "(expired,removed,blocked,blocked_repeat,converted)")
             .order("created_at", { ascending: false })
             .limit(1)
             .maybeSingle();
