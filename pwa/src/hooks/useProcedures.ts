@@ -1,11 +1,16 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { supabase, Procedure } from '@/lib/supabase'
 import { format } from 'date-fns'
+
+function uid() {
+  return Math.random().toString(36).slice(2, 8)
+}
 
 export function useProceduresToday() {
   const qc = useQueryClient()
   const today = format(new Date(), 'yyyy-MM-dd')
+  const channelName = useRef(`procedures-today-${uid()}`)
 
   const query = useQuery<Procedure[]>({
     queryKey: ['procedures', 'today', today],
@@ -23,7 +28,7 @@ export function useProceduresToday() {
 
   useEffect(() => {
     const channel = supabase
-      .channel('procedures-today-realtime')
+      .channel(channelName.current)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
@@ -41,6 +46,7 @@ export function useProceduresToday() {
 
 export function useProceduresList(filter: 'all' | 'active' | 'done' = 'all') {
   const qc = useQueryClient()
+  const channelName = useRef(`procedures-list-${uid()}`)
 
   const query = useQuery<Procedure[]>({
     queryKey: ['procedures', 'list', filter],
@@ -67,7 +73,7 @@ export function useProceduresList(filter: 'all' | 'active' | 'done' = 'all') {
 
   useEffect(() => {
     const channel = supabase
-      .channel('procedures-list-realtime')
+      .channel(channelName.current)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'procedures' }, () => {
         qc.invalidateQueries({ queryKey: ['procedures', 'list'] })
       })
