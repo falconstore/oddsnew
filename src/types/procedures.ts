@@ -18,7 +18,7 @@ export type ProcedureStatus =
   | 'Falta Girar Freebet';
 
 // Tipo de freebet (paridade com FreeBet Pro §8.1)
-export type ProcedureType = 'SEM_FB' | 'GANHAR_FB' | 'QUEIMAR_FB' | 'ASR';
+export type ProcedureType = 'SEM_FB' | 'GANHAR_FB' | 'QUEIMAR_FB' | 'ASR' | 'TENTATIVA_DG';
 
 // Crédito de freebet pós-jogo (paridade com FreeBet Pro §8.4)
 export type FreebetCreditada = 'SIM' | 'NAO';
@@ -172,9 +172,10 @@ export const PROCEDURE_SPORTS: { value: string; label: string }[] = [
 ];
 
 export const PROCEDURE_TYPES: { value: ProcedureType; label: string; description: string }[] = [
-  { value: 'SEM_FB',     label: 'Sem Freebet',     description: 'Operação sem freebet envolvida' },
-  { value: 'GANHAR_FB',  label: 'Ganhar Freebet',  description: 'Operação que pode gerar uma freebet' },
-  { value: 'QUEIMAR_FB', label: 'Queimar Freebet', description: 'Operação para girar uma freebet existente' },
+  { value: 'SEM_FB',       label: 'Sem Freebet',          description: 'Operação sem freebet envolvida' },
+  { value: 'GANHAR_FB',    label: 'Ganhar Freebet',       description: 'Operação que pode gerar uma freebet' },
+  { value: 'QUEIMAR_FB',   label: 'Queimar Freebet',      description: 'Operação para girar uma freebet existente' },
+  { value: 'TENTATIVA_DG', label: 'Tentativa de Duplo Green', description: 'Operação com objetivo de Duplo Green' },
 ];
 
 export const AVAILABLE_COLUMNS = [

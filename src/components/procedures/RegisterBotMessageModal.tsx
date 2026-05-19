@@ -57,12 +57,14 @@ const TIPO_LABELS: Record<string, string> = {
   SEM_FB: 'Lucro Direto',
   GANHAR_FB: 'Ganhar Freebet',
   QUEIMAR_FB: 'Queimar Freebet',
+  TENTATIVA_DG: 'Tentativa de Duplo Green',
 };
 
 const TIPO_COLORS: Record<string, string> = {
   SEM_FB: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
   GANHAR_FB: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
   QUEIMAR_FB: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
+  TENTATIVA_DG: 'bg-teal-500/20 text-teal-400 border-teal-500/30',
 };
 
 export function RegisterBotMessageModal({ open, onClose }: Props) {

@@ -153,7 +153,7 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
     }
   }, [procedure, suggestedNextNumber]);
 
-  const showFreebetFields = formData.tipo !== 'SEM_FB';
+  const showFreebetFields = formData.tipo !== 'SEM_FB' && formData.tipo !== 'TENTATIVA_DG';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

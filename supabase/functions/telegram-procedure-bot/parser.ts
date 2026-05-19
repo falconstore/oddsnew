@@ -2,7 +2,7 @@
 // Suporta os 5 templates reais utilizados pelos gerentes.
 // deno-lint-ignore-file
 
-export type ProcedureTipo = "SEM_FB" | "GANHAR_FB" | "QUEIMAR_FB" | "ASR";
+export type ProcedureTipo = "SEM_FB" | "GANHAR_FB" | "QUEIMAR_FB" | "ASR" | "TENTATIVA_DG";
 export type Prioridade = "ALTA" | "MEDIA";
 
 export interface ParsedProcedure {
