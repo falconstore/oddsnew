@@ -15,6 +15,9 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
+    // Sessão de longa duração — refresh token roda automaticamente
+    // enquanto o usuário usar o app pelo menos 1x por semana
+    storageKey: 'sg-pwa-session',
   },
 })
 
