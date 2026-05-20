@@ -14,6 +14,16 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <script>
+      // Detecta troca de Service Worker e recarrega automaticamente.
+      // Este script roda como script classico (nao-module) — funciona mesmo
+      // quando os modulos JS falham a carregar (cache corrompido do SW antigo).
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.addEventListener('controllerchange', function() {
+          window.location.reload();
+        });
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
