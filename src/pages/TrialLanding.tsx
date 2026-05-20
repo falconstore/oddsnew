@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { computeDeviceFingerprint } from '@/lib/deviceFingerprint';
 import { z } from 'zod';
 import {
   CheckCircle2, AlertCircle, Clock,
@@ -918,6 +919,7 @@ function InlineSignupForm({
   const [focusTracked, setFocusTracked] = useState(false);
   const firstInputRef = useRef<HTMLInputElement | null>(null);
   const utmParamsRef = useRef<UtmParams>({ utm_source: null, utm_medium: null, utm_campaign: null, utm_content: null, utm_term: null, fbclid: null, ct: null });
+  const fingerprintRef = useRef<string | null>(null);
 
   useEffect(() => {
     const params = readUtmParams();
@@ -931,6 +933,12 @@ function InlineSignupForm({
         if (saved) utmParamsRef.current = JSON.parse(saved);
       } catch { /* ignore */ }
     }
+  }, []);
+
+  useEffect(() => {
+    computeDeviceFingerprint()
+      .then(fp => { fingerprintRef.current = fp; })
+      .catch(() => { /* noop — fingerprint é melhor-esforço */ });
   }, []);
 
   const update = (k: keyof FormState, v: string) => {
@@ -978,12 +986,17 @@ function InlineSignupForm({
           event_source_url: typeof window !== 'undefined' ? window.location.href : null,
           fbp: readCookie('_fbp'),
           fbc: readCookie('_fbc'),
+          signup_fingerprint: fingerprintRef.current,
           ...utmParamsRef.current,
         }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setServerError(json?.error || 'Não foi possível processar sua solicitação. Tente novamente.');
+        if (json?.error === 'already_used_trial') {
+          setServerError('Este dispositivo já utilizou o período de teste. Acesse o link de assinatura para continuar.');
+        } else {
+          setServerError(json?.error || 'Não foi possível processar sua solicitação. Tente novamente.');
+        }
         return;
       }
       onSuccessTrack(leadEventId);

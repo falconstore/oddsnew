@@ -35,6 +35,8 @@ serve(async (req) => {
     const utm_term     = typeof body.utm_term     === "string" ? body.utm_term.slice(0, 255)     : null;
     const fbclid       = typeof body.fbclid       === "string" ? body.fbclid.slice(0, 512)       : null;
     const ct           = typeof body.ct           === "string" ? body.ct.slice(0, 255)           : null;
+    const signup_fingerprint = typeof body.signup_fingerprint === "string"
+      ? body.signup_fingerprint.slice(0, 128) : null;
 
     if (!name || !email || !whatsapp || !telegram_username) {
       return json({ error: "Todos os campos são obrigatórios." }, { status: 400 });
@@ -48,6 +50,12 @@ serve(async (req) => {
     if (!/^[a-z0-9_]{3,32}$/.test(telegram_username)) {
       return json({ error: "@ do Telegram inválido. Use letras, números e _." }, { status: 400 });
     }
+
+    // Extrair IP do request
+    const signup_ip =
+      req.headers.get("cf-connecting-ip") ||
+      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      null;
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -81,6 +89,44 @@ serve(async (req) => {
       return json({
         error: "Você já utilizou seu trial gratuito. Para continuar, fale com o suporte para uma assinatura.",
       }, { status: 409 });
+    }
+
+    // Anti-abuso: verifica se IP ou fingerprint já consta em lead expirado/bloqueado
+    if (signup_ip || signup_fingerprint) {
+      const orClauses: string[] = [];
+      if (signup_ip) orClauses.push(`signup_ip.eq.${signup_ip}`);
+      if (signup_fingerprint) orClauses.push(`signup_fingerprint.eq.${signup_fingerprint}`);
+
+      const { data: abuseMatch, error: abuseErr } = await supabase
+        .from("trial_leads")
+        .select("id")
+        .in("status", ["expired", "blocked", "blocked_repeat"])
+        .or(orClauses.join(","))
+        .limit(1);
+
+      if (abuseErr) {
+        console.warn("trial-signup: abuse check error", abuseErr);
+      } else if (abuseMatch && abuseMatch.length > 0) {
+        // Salva o lead como blocked_repeat para rastreio, mas não processa
+        await supabase.from("trial_leads").insert({
+          name,
+          email,
+          whatsapp,
+          telegram_username,
+          status: "blocked_repeat",
+          ...(signup_ip ? { signup_ip } : {}),
+          ...(signup_fingerprint ? { signup_fingerprint } : {}),
+          ...(utm_source   ? { utm_source }   : {}),
+          ...(utm_medium   ? { utm_medium }   : {}),
+          ...(utm_campaign ? { utm_campaign } : {}),
+          ...(utm_content  ? { utm_content }  : {}),
+          ...(utm_term     ? { utm_term }     : {}),
+          ...(fbclid       ? { fbclid }       : {}),
+          ...(ct           ? { ct }           : {}),
+        }).catch((e: unknown) => console.warn("trial-signup: blocked_repeat insert error", e));
+
+        return json({ error: "already_used_trial" }, { status: 409 });
+      }
     }
 
     // Cria invite link no Telegram (24h, 1 uso)
@@ -153,6 +199,8 @@ serve(async (req) => {
         invite_link: inviteLink,
         bonus_invite_link: bonusInviteLink,
         status: "pending",
+        ...(signup_ip          ? { signup_ip }          : {}),
+        ...(signup_fingerprint ? { signup_fingerprint } : {}),
         ...(utm_source   ? { utm_source }   : {}),
         ...(utm_medium   ? { utm_medium }   : {}),
         ...(utm_campaign ? { utm_campaign } : {}),

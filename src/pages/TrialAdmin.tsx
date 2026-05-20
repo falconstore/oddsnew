@@ -8,7 +8,7 @@ import {
   MessageCircle, ShoppingCart, TrendingUp, Users2, FileSignature,
   Stethoscope, AlertTriangle, Loader2, XCircle, Link2, RotateCw,
   ShieldAlert, Unlock, Radio, ServerCog, Receipt, Eraser, RefreshCw,
-  Smartphone, Bell, Crown,
+  Smartphone, Bell, Crown, Shield,
 } from 'lucide-react';
 import { Layout } from '@/components/Layout';
 import { DailyLeadsChart } from '@/components/trial/DailyLeadsChart';
@@ -1019,6 +1019,37 @@ export default function TrialAdmin() {
                         <p className="font-mono">{fmtDate(lead.expires_at)}</p>
                       </div>
                     </div>
+
+                    {/* Dados de Segurança — visível apenas quando preenchidos */}
+                    {(lead.signup_ip || lead.signup_fingerprint) && (
+                      <div
+                        className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-muted-foreground/70 pt-1 border-t border-white/5"
+                        data-testid={`security-row-${lead.id}`}
+                      >
+                        <span className="inline-flex items-center gap-1 text-muted-foreground/50 uppercase tracking-wider">
+                          <Shield className="w-2.5 h-2.5" />
+                          Segurança
+                        </span>
+                        {lead.signup_ip && (
+                          <span
+                            className="inline-flex items-center gap-1"
+                            title="IP de cadastro"
+                            data-testid={`text-signup-ip-${lead.id}`}
+                          >
+                            IP: <span className="font-mono text-white/50">{lead.signup_ip}</span>
+                          </span>
+                        )}
+                        {lead.signup_fingerprint && (
+                          <span
+                            className="inline-flex items-center gap-1"
+                            title={`Fingerprint completo: ${lead.signup_fingerprint}`}
+                            data-testid={`text-signup-fingerprint-${lead.id}`}
+                          >
+                            Fingerprint: <span className="font-mono text-white/50">{lead.signup_fingerprint.slice(0, 12)}…</span>
+                          </span>
+                        )}
+                      </div>
+                    )}
 
                     {/* Actions */}
                     <div className="flex gap-2 lg:ml-auto">

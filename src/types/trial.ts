@@ -59,6 +59,10 @@ export interface TrialLead {
   bonus_removed_at: string | null;
   created_at: string;
 
+  // Anti-abuso
+  signup_ip: string | null;
+  signup_fingerprint: string | null;
+
   // Lastlink — pagamento
   lastlink_order_id: string | null;
   lastlink_subscription_id: string | null;
