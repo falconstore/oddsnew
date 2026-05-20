@@ -18,12 +18,20 @@ registerRoute(
 
 // ─── Push notification received ──────────────────────────────────────────────
 self.addEventListener('push', (event: PushEvent) => {
-  if (!event.data) return
-  let payload: { title?: string; body?: string; tag?: string; data?: Record<string, string> }
-  try { payload = event.data.json() } catch { payload = { title: 'Shark Green', body: event.data.text() } }
+  // Always show something — even if data is null/undecryptable (diagnostic)
+  let payload: { title?: string; body?: string; tag?: string; data?: Record<string, string> } = {}
+  try {
+    if (event.data) {
+      try { payload = event.data.json() }
+      catch { payload = { title: '🦈 Shark Green', body: event.data.text() } }
+    } else {
+      // No payload — push arrived but without data (delivery works, encryption may not)
+      payload = { title: '🦈 Shark Green', body: 'Nova atualização disponível!' }
+    }
+  } catch { payload = { title: '🦈 Shark Green', body: 'Nova atualização disponível!' } }
 
   event.waitUntil(
-    self.registration.showNotification(payload.title ?? 'Shark Green', {
+    self.registration.showNotification(payload.title ?? '🦈 Shark Green', {
       body: payload.body ?? '',
       icon: '/logo.png',
       badge: '/logo.png',

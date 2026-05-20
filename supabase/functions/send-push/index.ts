@@ -159,21 +159,36 @@ async function sendOne(
   const body = await encryptPayload(payloadJson, sub.p256dh, sub.auth)
   const jwt = await buildVapidJwt(sub.endpoint, vapidPublic, vapidPrivate)
 
+  const authHeader = `vapid t=${jwt},k=${vapidPublic}`
+  console.log('[send-push] endpoint:', sub.endpoint.slice(0, 60))
+  console.log('[send-push] auth header length:', authHeader.length)
+  console.log('[send-push] body bytes:', body.length)
+
   const res = await fetch(sub.endpoint, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/octet-stream',
       'Content-Encoding': 'aes128gcm',
       'TTL': '86400',
-      'Authorization': `vapid t=${jwt},k=${vapidPublic}`,
+      'Authorization': authHeader,
     },
     body,
   })
 
-  if (!res.ok && res.status !== 201) {
-    const text = await res.text().catch(() => '')
+  const responseText = await res.text().catch(() => '')
+  console.log('[send-push] FCM status:', res.status, '| body:', responseText.slice(0, 200))
+
+  // FCM legacy endpoint returns 200 with failure in body
+  if (responseText.includes('"failure":1') || responseText.includes('"error"')) {
     throw Object.assign(
-      new Error(`Push failed ${res.status}: ${text}`),
+      new Error(`FCM delivery failure: ${responseText.slice(0, 200)}`),
+      { statusCode: res.status }
+    )
+  }
+
+  if (!res.ok && res.status !== 201) {
+    throw Object.assign(
+      new Error(`Push failed ${res.status}: ${responseText}`),
       { statusCode: res.status }
     )
   }
@@ -290,9 +305,28 @@ Deno.serve(async (req: Request) => {
     const expired: string[] = []
     const errors: string[] = []
 
+    const noPayload = (body as any).no_payload === true
+
     await Promise.all(subs.map(async (sub: any) => {
       try {
-        await sendOne(sub, notifPayload, vapidPublic, vapidPrivate)
+        if (noPayload) {
+          // Diagnostic: send without encrypted payload — tests delivery + VAPID only
+          const jwt = await buildVapidJwt(sub.endpoint, vapidPublic, vapidPrivate)
+          const res = await fetch(sub.endpoint, {
+            method: 'POST',
+            headers: {
+              'TTL': '86400',
+              'Authorization': `vapid t=${jwt},k=${vapidPublic}`,
+            },
+          })
+          const responseText = await res.text().catch(() => '')
+          console.log('[send-push no_payload] status:', res.status, 'body:', responseText.slice(0, 200))
+          if (!res.ok && res.status !== 201) {
+            throw Object.assign(new Error(`Push failed ${res.status}: ${responseText}`), { statusCode: res.status })
+          }
+        } else {
+          await sendOne(sub, notifPayload, vapidPublic, vapidPrivate)
+        }
         sent++
       } catch (e: any) {
         errors.push(`${sub.endpoint.slice(-20)}: ${e.message}`)
