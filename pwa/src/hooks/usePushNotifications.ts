@@ -14,7 +14,7 @@ function urlBase64ToUint8Array(base64: string) {
 export type PushState = 'unsupported' | 'denied' | 'subscribed' | 'unsubscribed' | 'loading'
 
 export function usePushNotifications() {
-  const { user } = useAuth()
+  const { user, lead } = useAuth()
   const [state, setState] = useState<PushState>('loading')
 
   const isSupported = typeof window !== 'undefined'
@@ -50,6 +50,7 @@ export function usePushNotifications() {
       const json = sub.toJSON()
       await supabase.from('push_subscriptions').upsert({
         user_id: user.id,
+        lead_id: lead?.id ?? null,
         endpoint: json.endpoint!,
         p256dh: (json.keys as any).p256dh,
         auth: (json.keys as any).auth,

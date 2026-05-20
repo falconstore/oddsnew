@@ -71,6 +71,7 @@ export const PAGE_KEYS = {
   TELEGRAM_BOT: 'telegram_bot',
   WATERMARK: 'watermark',
   PUSH_NOTIFICATIONS: 'push_notifications',
+  APP_STATS: 'app_stats',
   // Manter keys legadas para não quebrar referências existentes
   LEAGUES: 'sharkodds',
   TEAMS: 'sharkodds',
@@ -98,6 +99,7 @@ export const PAGE_KEY_TO_COLUMN: Record<string, keyof UserPermissionRow> = {
   telegram_bot: 'can_view_admin',
   watermark: 'can_view_watermark',
   push_notifications: 'can_view_admin',
+  app_stats: 'can_view_admin',
 };
 
 // Colunas de permissão editáveis (para o admin UI)

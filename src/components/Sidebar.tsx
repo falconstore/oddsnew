@@ -24,6 +24,7 @@ import {
   ScrollText,
   Megaphone,
   Bell,
+  BarChart3,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -50,6 +51,7 @@ const navigation: NavigationItem[] = [
   { name: 'Trial Telegram', href: '/trial-admin', icon: Gift, pageKey: PAGE_KEYS.TRIAL, color: 'text-pink-400' },
   { name: 'Anúncios', href: '/ads-admin', icon: Megaphone, pageKey: PAGE_KEYS.TRIAL, color: 'text-cyan-400' },
   { name: 'Pagamentos Lastlink', href: '/lastlink-admin', icon: Receipt, pageKey: PAGE_KEYS.LASTLINK, color: 'text-emerald-400' },
+  { name: 'Estatísticas App', href: '/app-stats', icon: BarChart3, pageKey: PAGE_KEYS.APP_STATS, color: 'text-green-400' },
   { name: 'Push Notifications', href: '/push-notifications', icon: Bell, pageKey: PAGE_KEYS.PUSH_NOTIFICATIONS, color: 'text-violet-400' },
   { name: "Marca d'Água", href: '/watermark', icon: Stamp, pageKey: PAGE_KEYS.WATERMARK, color: 'text-green-400' },
   { name: 'Configurações', href: '/settings', icon: Settings, pageKey: PAGE_KEYS.SETTINGS, color: 'text-slate-400' },

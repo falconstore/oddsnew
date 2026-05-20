@@ -8,6 +8,7 @@ import {
   MessageCircle, ShoppingCart, TrendingUp, Users2, FileSignature,
   Stethoscope, AlertTriangle, Loader2, XCircle, Link2, RotateCw,
   ShieldAlert, Unlock, Radio, ServerCog, Receipt, Eraser, RefreshCw,
+  Smartphone, Bell, Crown,
 } from 'lucide-react';
 import { Layout } from '@/components/Layout';
 import { DailyLeadsChart } from '@/components/trial/DailyLeadsChart';
@@ -24,6 +25,7 @@ import {
   useTrialSettings, useUpdateTrialSettings, useSendReminderTest,
   useRecallLeads,
 } from '@/hooks/useTrialLeads';
+import { useTrialPwaStats } from '@/hooks/useTrialPwaStats';
 import { useTrialUpgradeStats, type TrialStatsRange } from '@/hooks/useTrialUpgradeStats';
 import { useTrialCapiStats } from '@/hooks/useTrialCapiStats';
 import type { TrialLead, TrialStatus } from '@/types/trial';
@@ -75,6 +77,7 @@ export default function TrialAdmin() {
   const updateSettings = useUpdateTrialSettings();
   const sendTest = useSendReminderTest();
   const recall = useRecallLeads();
+  const { data: pwaStats } = useTrialPwaStats();
   const manualActivate = useManualActivateLead();
   const [couponDraft, setCouponDraft] = useState<string>('');
   const [recallDraft, setRecallDraft] = useState<{ after?: string; repeat?: string; cap?: string }>({});
@@ -961,6 +964,47 @@ export default function TrialAdmin() {
                             Área do Aluno indisponível
                           </Badge>
                         )}
+                        {/* Subscription status */}
+                        {lead.subscription_status && (
+                          <Badge
+                            className={`text-[10px] ${
+                              lead.subscription_status === 'active'
+                                ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                                : lead.subscription_status === 'canceled' || lead.subscription_status === 'refunded'
+                                ? 'bg-red-500/15 text-red-300 border-red-500/30'
+                                : lead.subscription_status === 'expired'
+                                ? 'bg-zinc-500/15 text-zinc-400 border-zinc-500/30'
+                                : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                            }`}
+                            data-testid={`badge-sub-status-${lead.id}`}
+                            title={`Lastlink: assinatura ${lead.subscription_status}`}
+                          >
+                            <Crown className="w-2.5 h-2.5 mr-1" />
+                            {lead.subscription_status === 'active' ? 'Assinante' : `Assin. ${lead.subscription_status}`}
+                          </Badge>
+                        )}
+                        {/* PWA presence */}
+                        {pwaStats?.appLeadIds.has(lead.id) ? (
+                          <Badge
+                            className="text-[10px] bg-blue-500/15 text-blue-300 border-blue-500/30"
+                            data-testid={`badge-app-active-${lead.id}`}
+                            title="Usuário já acessou o Shark Green App"
+                          >
+                            <Smartphone className="w-2.5 h-2.5 mr-1" />
+                            No app
+                          </Badge>
+                        ) : null}
+                        {/* Push notification */}
+                        {pwaStats?.pushLeadIds.has(lead.id) ? (
+                          <Badge
+                            className="text-[10px] bg-violet-500/15 text-violet-300 border-violet-500/30"
+                            data-testid={`badge-push-${lead.id}`}
+                            title="Usuário tem notificações push ativas"
+                          >
+                            <Bell className="w-2.5 h-2.5 mr-1" />
+                            Push ativo
+                          </Badge>
+                        ) : null}
                       </div>
                     </div>
 

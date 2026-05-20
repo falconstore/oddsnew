@@ -32,6 +32,7 @@ import AdsAdmin from '@/pages/AdsAdmin';
 import LastlinkAdmin from '@/pages/LastlinkAdmin';
 import WatermarkStudio from '@/pages/WatermarkStudio';
 import { PushNotifications } from '@/pages/PushNotifications';
+import { AppStats } from '@/pages/AppStats';
 import BotTemplates from '@/pages/BotTemplates';
 import BioLinks from '@/pages/BioLinks';
 import NotFound from '@/pages/NotFound';
@@ -271,6 +272,13 @@ export function AnimatedRoutes() {
           <RequireAuth pageKey={PAGE_KEYS.LASTLINK}>
             <PageTransition>
               <LastlinkAdmin />
+            </PageTransition>
+          </RequireAuth>
+        } />
+        <Route path="/app-stats" element={
+          <RequireAuth pageKey={PAGE_KEYS.APP_STATS}>
+            <PageTransition>
+              <AppStats />
             </PageTransition>
           </RequireAuth>
         } />

@@ -14,11 +14,18 @@ import { DuploGreen } from '@/pages/DuploGreen'
 import { Profile } from '@/pages/Profile'
 import { Subscription } from '@/pages/Subscription'
 import { Paywall } from '@/pages/Paywall'
+import { useAppTracking } from '@/hooks/useAppTracking'
+
+function AppTracker() {
+  useAppTracking()
+  return null
+}
 
 export default function App() {
   return (
     <MobileOnly>
       <BrowserRouter>
+        <AppTracker />
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
