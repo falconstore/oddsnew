@@ -66,15 +66,22 @@ function LiveCard({ p, onClick }: { p: Procedure; onClick: () => void }) {
             {p.status}
           </span>
         </div>
-        <p className="text-sm font-semibold text-white truncate">
+        <p className="text-sm font-semibold text-white leading-snug"
+           style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
           {p.promotion_name || p.platform || `#${p.procedure_number}`}
         </p>
-        <div className="flex items-center gap-1.5 mt-0.5">
+        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
           <span style={{ color: sc }}>{tipoIcon(p.tipo)}</span>
           {p.platform && <span className="text-[11px]" style={{ color: 'rgba(255,255,255,0.38)' }}>{p.platform}</span>}
           {p.kickoff_at && (
             <span className="text-[11px]" style={{ color: 'rgba(255,255,255,0.28)' }}>
               · {format(parseISO(p.kickoff_at), 'HH:mm')}
+            </span>
+          )}
+          {Number(p.profit_loss ?? 0) !== 0 && (
+            <span className="text-[11px] font-semibold font-mono"
+                  style={{ color: 'rgba(255,255,255,0.38)' }}>
+              · pot. R${Math.abs(Number(p.profit_loss)).toFixed(0)}
             </span>
           )}
         </div>

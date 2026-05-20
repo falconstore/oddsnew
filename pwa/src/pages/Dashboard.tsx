@@ -360,12 +360,10 @@ export function Dashboard() {
 
   const { data: stats }        = usePeriodStats(period)
   const { data: allStats = [] } = useLast90DaysStats()
-  const h = new Date().getHours()
-  const greeting = h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite'
   const lucroBruto = stats?.lucroBruto ?? 0
 
-  // Hype titles — rotate by day of week so it changes every dia sem precisar do nome real
-  const HYPE_TITLES = ['Jogador', 'Trader', 'Craque', 'Guerreiro', 'Vencedor', 'Monstro', 'Caro']
+  // Hype greeting — ignora nome real, sempre usa título rotativo por hora
+  const HYPE_TITLES = ['Jogador', 'Craque', 'Monstro']
   const HYPE_MOTTOS = [
     'Hoje é dia de green! 🟢',
     'Partiu procedimento! 🎯',
@@ -375,8 +373,8 @@ export function Dashboard() {
     'Final de semana de green! 🏆',
     'Domingo de lucro! 🟢',
   ]
-  const dow = new Date().getDay() // 0 = domingo
-  const firstName = lead?.name?.split(' ')[0] ?? HYPE_TITLES[dow % HYPE_TITLES.length]
+  const dow = new Date().getDay()
+  const hypeTitle = HYPE_TITLES[Math.floor(Date.now() / (1000 * 60 * 60 * 4)) % HYPE_TITLES.length]
   const motto = HYPE_MOTTOS[dow]
 
   // Slice chart data to match selected period
@@ -393,7 +391,7 @@ export function Dashboard() {
           <p className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>
             {format(new Date(), "EEEE, d 'de' MMMM", { locale: ptBR })}
           </p>
-          <h1 className="text-xl font-bold text-white mt-0.5">{greeting}, {firstName}! 👋</h1>
+          <h1 className="text-xl font-bold text-white mt-0.5">Falaaaa, {hypeTitle}! 👋</h1>
           <p className="text-xs font-semibold mt-0.5" style={{ color: 'hsl(145 80% 52%)' }}>{motto}</p>
         </div>
         <NavLink to="/perfil"
