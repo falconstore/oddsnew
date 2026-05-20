@@ -5,14 +5,15 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// ─── Web Crypto helpers ──────────────────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function base64url(data: Uint8Array): string {
-  let b64 = btoa(String.fromCharCode(...data))
+  const bytes = Array.from(data)
+  const b64 = btoa(bytes.map(b => String.fromCharCode(b)).join(''))
   return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
 }
 
-function base64urlDecode(str: string): Uint8Array {
+function fromBase64url(str: string): Uint8Array {
   const b64 = str.replace(/-/g, '+').replace(/_/g, '/')
   const padded = b64.padEnd(b64.length + (4 - b64.length % 4) % 4, '=')
   return Uint8Array.from(atob(padded), c => c.charCodeAt(0))
@@ -21,111 +22,142 @@ function base64urlDecode(str: string): Uint8Array {
 function concat(...arrays: Uint8Array[]): Uint8Array {
   const total = arrays.reduce((s, a) => s + a.length, 0)
   const out = new Uint8Array(total)
-  let offset = 0
-  for (const a of arrays) { out.set(a, offset); offset += a.length }
+  let off = 0
+  for (const a of arrays) { out.set(a, off); off += a.length }
   return out
 }
 
-function numToUint8(n: number, byteLen: number): Uint8Array {
-  const arr = new Uint8Array(byteLen)
-  for (let i = byteLen - 1; i >= 0; i--) { arr[i] = n & 0xff; n >>= 8 }
-  return arr
-}
+// ─── VAPID JWT ────────────────────────────────────────────────────────────────
 
-// HKDF extract (RFC 5869)
-async function hkdfExtract(salt: Uint8Array, ikm: Uint8Array): Promise<CryptoKey> {
-  const saltKey = await crypto.subtle.importKey('raw', salt.length > 0 ? salt : new Uint8Array(32), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
-  const prk = await crypto.subtle.sign('HMAC', saltKey, ikm)
-  return crypto.subtle.importKey('raw', prk, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
-}
-
-// HKDF expand (RFC 5869)
-async function hkdfExpand(prk: CryptoKey, info: Uint8Array, length: number): Promise<Uint8Array> {
-  const blocks: Uint8Array[] = []
-  let t = new Uint8Array(0)
-  for (let i = 1; blocks.reduce((s, b) => s + b.length, 0) < length; i++) {
-    const input = concat(t, info, new Uint8Array([i]))
-    t = new Uint8Array(await crypto.subtle.sign('HMAC', prk, input))
-    blocks.push(t)
-  }
-  return concat(...blocks).slice(0, length)
-}
-
-// ─── VAPID JWT signing ───────────────────────────────────────────────────────
-
-async function buildVapidHeader(endpoint: string, vapidPublicB64: string, vapidPrivateB64: string): Promise<string> {
+async function buildVapidJwt(endpoint: string, vapidPublicB64: string, vapidPrivateB64: string): Promise<string> {
   const url = new URL(endpoint)
   const audience = `${url.protocol}//${url.host}`
-  const exp = Math.floor(Date.now() / 1000) + 43200 // 12h
+  const exp = Math.floor(Date.now() / 1000) + 43200
 
   const enc = new TextEncoder()
-  const headerB64 = base64url(enc.encode(JSON.stringify({ typ: 'JWT', alg: 'ES256' })))
-  const payloadB64 = base64url(enc.encode(JSON.stringify({ aud: audience, exp, sub: 'mailto:admin@sharkgreen.com.br' })))
-  const sigInput = `${headerB64}.${payloadB64}`
+  const header = base64url(enc.encode(JSON.stringify({ typ: 'JWT', alg: 'ES256' })))
+  const payload = base64url(enc.encode(JSON.stringify({ aud: audience, exp, sub: 'mailto:admin@sharkgreen.com.br' })))
+  const signingInput = `${header}.${payload}`
 
-  const pubBytes = base64urlDecode(vapidPublicB64)
+  // Import private key as JWK (d = private scalar, x/y = public point coords)
+  const pubBytes = fromBase64url(vapidPublicB64)  // 65 bytes: 0x04 + x(32) + y(32)
   const privKey = await crypto.subtle.importKey(
     'jwk',
-    { kty: 'EC', crv: 'P-256', d: vapidPrivateB64, x: base64url(pubBytes.slice(1, 33)), y: base64url(pubBytes.slice(33, 65)) },
+    {
+      kty: 'EC', crv: 'P-256',
+      d: vapidPrivateB64,
+      x: base64url(pubBytes.slice(1, 33)),
+      y: base64url(pubBytes.slice(33, 65)),
+    },
     { name: 'ECDSA', namedCurve: 'P-256' },
     false, ['sign']
   )
-  const sig = new Uint8Array(await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, privKey, enc.encode(sigInput)))
-  const jwt = `${sigInput}.${base64url(sig)}`
-  return `vapid t=${jwt},k=${vapidPublicB64}`
+
+  const sig = new Uint8Array(
+    await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, privKey, enc.encode(signingInput))
+  )
+  return `${signingInput}.${base64url(sig)}`
 }
 
-// ─── RFC 8291: Encrypted Content-Encoding for HTTP ──────────────────────────
+// ─── RFC 8291 payload encryption using native Web Crypto HKDF ────────────────
 
-async function encryptPayload(plaintext: string, p256dhB64: string, authB64: string): Promise<{ body: Uint8Array; salt: Uint8Array; senderPublic: Uint8Array }> {
+async function encryptPayload(
+  plaintext: string,
+  p256dhB64: string,
+  authB64: string
+): Promise<Uint8Array> {
   const enc = new TextEncoder()
-  const plaintextBytes = enc.encode(plaintext)
 
-  const receiverPublicBytes = base64urlDecode(p256dhB64)
-  const authSecret = base64urlDecode(authB64)
-  const salt = crypto.getRandomValues(new Uint8Array(16))
+  const receiverPublicBytes = fromBase64url(p256dhB64)    // browser P-256 public key (65 bytes)
+  const authSecret = fromBase64url(authB64)                // auth secret (16 bytes)
+  const salt = crypto.getRandomValues(new Uint8Array(16))  // random 16-byte salt
 
-  // Ephemeral sender key pair
-  const ephemeral = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits'])
-  const senderPublic = new Uint8Array(await crypto.subtle.exportKey('raw', ephemeral.publicKey))
+  // Ephemeral sender ECDH key pair
+  const senderKeyPair = await crypto.subtle.generateKey(
+    { name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']
+  )
+  const senderPublicBytes = new Uint8Array(
+    await crypto.subtle.exportKey('raw', senderKeyPair.publicKey)
+  )  // 65 bytes uncompressed
 
-  // Import receiver's public key
-  const receiverKey = await crypto.subtle.importKey('raw', receiverPublicBytes, { name: 'ECDH', namedCurve: 'P-256' }, false, [])
-
-  // ECDH shared secret
-  const sharedBits = await crypto.subtle.deriveBits({ name: 'ECDH', public: receiverKey }, ephemeral.privateKey, 256)
+  // ECDH shared secret with receiver's public key
+  const receiverKey = await crypto.subtle.importKey(
+    'raw', receiverPublicBytes, { name: 'ECDH', namedCurve: 'P-256' }, false, []
+  )
+  const sharedBits = await crypto.subtle.deriveBits(
+    { name: 'ECDH', public: receiverKey }, senderKeyPair.privateKey, 256
+  )
   const sharedSecret = new Uint8Array(sharedBits)
 
-  // Key info (RFC 8291 §3.4)
-  const keyInfo = concat(enc.encode('WebPush: info\x00'), receiverPublicBytes, senderPublic)
+  // RFC 8291 §3.3: IKM via HKDF-Extract(auth_secret, ECDH) + HKDF-Expand with keyInfo
+  // key_info = "WebPush: info\x00" || ua_public || as_public
+  const keyInfo = concat(
+    enc.encode('WebPush: info\x00'),
+    receiverPublicBytes,
+    senderPublicBytes
+  )
 
-  // PRK via HKDF
-  const prk = await hkdfExtract(authSecret, sharedSecret)
-  const ikm = await hkdfExpand(prk, keyInfo, 32)
+  // Use native HKDF to derive IKM (salt=authSecret, ikm=sharedSecret, info=keyInfo, len=32)
+  const sharedKey = await crypto.subtle.importKey(
+    'raw', sharedSecret, 'HKDF', false, ['deriveBits']
+  )
+  const ikmBits = await crypto.subtle.deriveBits(
+    { name: 'HKDF', hash: 'SHA-256', salt: authSecret, info: keyInfo },
+    sharedKey, 256
+  )
+  const ikm = new Uint8Array(ikmBits)
 
-  // CEK + nonce via HKDF with salt
-  const prkCek = await hkdfExtract(salt, ikm)
-  const cek = await hkdfExpand(prkCek, enc.encode('Content-Encoding: aes128gcm\x00'), 16)
-  const nonce = await hkdfExpand(prkCek, enc.encode('Content-Encoding: nonce\x00'), 12)
+  // RFC 8291 §3.4: CEK and nonce via HKDF(salt=random_salt, ikm=IKM)
+  const ikmKey = await crypto.subtle.importKey('raw', ikm, 'HKDF', false, ['deriveBits'])
 
-  // AES-128-GCM encrypt (pad with 0x02 delimiter, no padding)
-  const padded = concat(plaintextBytes, new Uint8Array([0x02]))
+  const cekBits = await crypto.subtle.deriveBits(
+    {
+      name: 'HKDF', hash: 'SHA-256',
+      salt,
+      info: enc.encode('Content-Encoding: aes128gcm\x00'),
+    },
+    ikmKey, 128  // 16 bytes
+  )
+
+  // Derive nonce separately from same IKM (HKDF is stateless, reimport)
+  const ikmKey2 = await crypto.subtle.importKey('raw', ikm, 'HKDF', false, ['deriveBits'])
+  const nonceBits = await crypto.subtle.deriveBits(
+    {
+      name: 'HKDF', hash: 'SHA-256',
+      salt,
+      info: enc.encode('Content-Encoding: nonce\x00'),
+    },
+    ikmKey2, 96  // 12 bytes
+  )
+
+  const cek = new Uint8Array(cekBits)
+  const nonce = new Uint8Array(nonceBits)
+
+  // AES-128-GCM encrypt: plaintext + 0x02 delimiter (RFC 8291 §4)
+  const padded = concat(enc.encode(plaintext), new Uint8Array([0x02]))
   const aesKey = await crypto.subtle.importKey('raw', cek, { name: 'AES-GCM' }, false, ['encrypt'])
-  const encrypted = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, aesKey, padded))
+  const ciphertext = new Uint8Array(
+    await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, aesKey, padded)
+  )
 
-  // Build aes128gcm body: salt(16) + rs(4) + keylen(1) + senderPublic(65) + ciphertext
-  const rs = numToUint8(4096, 4)
-  const keyLen = new Uint8Array([senderPublic.length])
-  const body = concat(salt, rs, keyLen, senderPublic, encrypted)
+  // aes128gcm record: salt(16) + rs(4 BE) + idlen(1) + keyid(senderPublic) + ciphertext
+  const rs = new Uint8Array(4)
+  new DataView(rs.buffer).setUint32(0, 4096, false)  // record size big-endian
+  const idlen = new Uint8Array([senderPublicBytes.length])  // 65
 
-  return { body, salt, senderPublic }
+  return concat(salt, rs, idlen, senderPublicBytes, ciphertext)
 }
 
-// ─── Send a single push notification ────────────────────────────────────────
+// ─── Send one push notification ───────────────────────────────────────────────
 
-async function sendOne(sub: { endpoint: string; p256dh: string; auth: string }, payloadJson: string, vapidPublic: string, vapidPrivate: string): Promise<void> {
-  const { body } = await encryptPayload(payloadJson, sub.p256dh, sub.auth)
-  const vapidHeader = await buildVapidHeader(sub.endpoint, vapidPublic, vapidPrivate)
+async function sendOne(
+  sub: { endpoint: string; p256dh: string; auth: string },
+  payloadJson: string,
+  vapidPublic: string,
+  vapidPrivate: string
+): Promise<void> {
+  const body = await encryptPayload(payloadJson, sub.p256dh, sub.auth)
+  const jwt = await buildVapidJwt(sub.endpoint, vapidPublic, vapidPrivate)
 
   const res = await fetch(sub.endpoint, {
     method: 'POST',
@@ -133,18 +165,83 @@ async function sendOne(sub: { endpoint: string; p256dh: string; auth: string }, 
       'Content-Type': 'application/octet-stream',
       'Content-Encoding': 'aes128gcm',
       'TTL': '86400',
-      'Authorization': vapidHeader,
+      'Authorization': `vapid t=${jwt},k=${vapidPublic}`,
     },
     body,
   })
 
   if (!res.ok && res.status !== 201) {
     const text = await res.text().catch(() => '')
-    throw Object.assign(new Error(`Push failed: ${res.status} ${text}`), { statusCode: res.status })
+    throw Object.assign(
+      new Error(`Push failed ${res.status}: ${text}`),
+      { statusCode: res.status }
+    )
   }
 }
 
-// ─── Main handler ────────────────────────────────────────────────────────────
+// ─── Notification templates ───────────────────────────────────────────────────
+
+type PushBody = {
+  type: 'new_procedure' | 'daily_summary' | 'subscription_pending' | 'subscription_canceled' | 'subscription_expired' | 'custom'
+  user_id?: string
+  lead_id?: string
+  triggered_by?: string
+  title?: string
+  body_text?: string
+  tag?: string
+  url?: string
+  procedure_number?: number
+  profit_loss?: number | null
+  tipo?: string
+  platform?: string
+  freebet_value?: number | null
+  duplo_green_confirmado?: boolean
+  total_profit?: number
+  count?: number
+  freebets_count?: number
+}
+
+function buildPayload(body: PushBody): { title: string; body: string; tag: string; data: Record<string, string> } {
+  const fmt = (n: number) => `R$ ${n >= 0 ? '+' : ''}${n.toFixed(2).replace('.', ',')}`
+
+  switch (body.type) {
+    case 'new_procedure': {
+      const n = body.procedure_number ? ` #${body.procedure_number}` : ''
+      const platform = body.platform ? ` • ${body.platform}` : ''
+      return {
+        title: `🦈 Novo procedimento${n}`,
+        body: `${body.tipo ?? 'Procedimento'} adicionado${platform}`,
+        tag: 'new_procedure',
+        data: { url: '/procedures' },
+      }
+    }
+    case 'daily_summary': {
+      const profit = body.total_profit != null ? ` • ${fmt(body.total_profit)}` : ''
+      return {
+        title: '📊 Resumo do dia',
+        body: `${body.count ?? 0} procedimentos hoje${profit}`,
+        tag: 'daily_summary',
+        data: { url: '/' },
+      }
+    }
+    case 'subscription_pending':
+      return { title: '⚠️ Pagamento pendente', body: 'Confirme o pagamento para manter seu acesso ativo.', tag: 'sub_pending', data: { url: '/assinatura' } }
+    case 'subscription_canceled':
+      return { title: '❌ Assinatura cancelada', body: 'Seu acesso foi encerrado. Renove para continuar.', tag: 'sub_canceled', data: { url: '/assinatura' } }
+    case 'subscription_expired':
+      return { title: '⏰ Acesso expirado', body: 'Seu trial/assinatura expirou. Renove agora.', tag: 'sub_expired', data: { url: '/assinatura' } }
+    case 'custom':
+    default:
+      return {
+        title: body.title ?? '🦈 Shark Green',
+        body: body.body_text ?? '',
+        tag: body.tag ?? 'custom',
+        data: { url: body.url ?? '/' },
+      }
+  }
+}
+
+// ─── Main handler ─────────────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -156,98 +253,59 @@ Deno.serve(async (req: Request) => {
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
     const supabase = createClient(supabaseUrl, serviceRoleKey)
+    const body = await req.json() as PushBody
 
-    const body = await req.json() as {
-      type: 'new_procedure' | 'daily_summary' | 'subscription_pending' | 'subscription_canceled' | 'subscription_expired' | 'custom'
-      user_id?: string
-      lead_id?: string
-      triggered_by?: string
-      title?: string
-      body_text?: string
-      tag?: string
-      url?: string
-      procedure_number?: number
-      profit_loss?: number | null
-      tipo?: string
-      platform?: string
-      freebet_value?: number | null
-      duplo_green_confirmado?: boolean
-      total_profit?: number
-      count?: number
-      freebets_count?: number
+    // ── Build notification payload ──
+    let title: string
+    let bodyText: string
+    let tag: string
+    let url: string
+
+    if (body.type === 'custom') {
+      title = body.title ?? '🦈 Shark Green'
+      bodyText = body.body_text ?? ''
+      tag = body.tag ?? 'custom'
+      url = body.url ?? '/'
+    } else {
+      const t = buildPayload(body)
+      title = t.title; bodyText = t.body; tag = t.tag; url = t.data.url
     }
 
-    let title = body.title ?? 'Shark Green 🦈'
-    let bodyText = body.body_text ?? ''
-    let tag = body.tag ?? 'sg'
-    let url = body.url ?? '/'
+    const notifPayload = JSON.stringify({ title, body: bodyText, tag, data: { url } })
 
-    if (body.type === 'new_procedure') {
-      const isDG = body.duplo_green_confirmado
-      const isFB = body.tipo === 'GANHAR_FB' || body.tipo === 'QUEIMAR_FB'
-      const profit = body.profit_loss ? Math.abs(body.profit_loss) : null
-      if (isDG) {
-        title = '⚡ Duplo Green confirmado!'; bodyText = body.platform ? `${body.platform} — 2× Green garantido` : 'Confira o resultado'; url = '/duplo-green'; tag = 'dg'
-      } else if (isFB && body.freebet_value) {
-        title = `🎯 Freebet de R$${body.freebet_value.toFixed(0)} disponível`; bodyText = body.platform ? `Queime em ${body.platform}` : 'Acesse o procedimento'; url = '/procedimentos'; tag = 'fb'
-      } else if (profit) {
-        title = `💰 Lucro: +R$${profit.toFixed(0)}`; bodyText = body.platform ? `via ${body.platform}` : 'Resultado confirmado'; url = '/procedimentos'; tag = `proc-${body.procedure_number}`
-      } else {
-        title = `📋 Procedimento #${body.procedure_number ?? ''}`; bodyText = body.platform ? `${body.platform} — ${body.tipo ?? ''}` : 'Novo procedimento'; url = '/procedimentos'; tag = 'proc'
-      }
-    } else if (body.type === 'daily_summary') {
-      let totalProfit = body.total_profit
-      let count = body.count
-      let freebetsCount = body.freebets_count
-      if (totalProfit === undefined || count === undefined) {
-        const todayBRT = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString().slice(0, 10)
-        const { data: procs } = await supabase.from('procedures').select('profit_loss,resultado_lucro,duplo_green_lucro,freebet_creditada').eq('date', todayBRT).eq('archived', false).eq('tachado', false)
-        if (procs) {
-          count = procs.length
-          totalProfit = procs.reduce((s: number, p: any) => s + (p.duplo_green_lucro != null ? Number(p.duplo_green_lucro) : p.resultado_lucro != null ? Number(p.resultado_lucro) : Number(p.profit_loss ?? 0)), 0)
-          freebetsCount = procs.filter((p: any) => p.freebet_creditada === 'SIM').length
-        }
-      }
-      totalProfit = totalProfit ?? 0; count = count ?? 0; freebetsCount = freebetsCount ?? 0
-      if (count === 0) return new Response(JSON.stringify({ sent: 0, reason: 'no procedures today' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
-      const sign = totalProfit >= 0 ? '+' : ''
-      title = `📊 Fechamento: ${sign}R$${Math.abs(totalProfit).toFixed(0)} hoje`
-      bodyText = `${count} procedimento${count !== 1 ? 's' : ''} · ${freebetsCount} freebet${freebetsCount !== 1 ? 's' : ''} ganha${freebetsCount !== 1 ? 's' : ''}`
-      url = '/'; tag = 'daily-summary'
-    } else if (body.type === 'subscription_pending') {
-      title = '⚠️ Pagamento pendente'; bodyText = 'Confirme o pagamento para manter seu acesso ativo.'; url = '/assinatura'; tag = 'sub-pending'
-    } else if (body.type === 'subscription_canceled') {
-      title = '😢 Assinatura cancelada'; bodyText = 'Seu acesso foi encerrado. Renove para continuar.'; url = '/assinatura'; tag = 'sub-canceled'
-    } else if (body.type === 'subscription_expired') {
-      title = '⌛ Pedido expirado'; bodyText = 'Complete o pagamento para ativar seu acesso.'; url = '/assinatura'; tag = 'sub-expired'
-    }
-
-    // Resolve subscriptions
+    // ── Fetch subscriptions ──
     let query = supabase.from('push_subscriptions').select('*')
     if (body.user_id) query = query.eq('user_id', body.user_id)
     else if (body.lead_id) query = query.eq('lead_id', body.lead_id)
-    const { data: subs, error } = await query
 
-    if (error) throw error
+    const { data: subs } = await query
     if (!subs || subs.length === 0) {
-      return new Response(JSON.stringify({ sent: 0, reason: 'no subscriptions' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      return new Response(JSON.stringify({ sent: 0, reason: 'no subscriptions' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
 
-    const payloadJson = JSON.stringify({ title, body: bodyText, tag, data: { url } })
+    // ── Send to each subscription ──
     let sent = 0
     const expired: string[] = []
+    const errors: string[] = []
 
-    await Promise.allSettled(subs.map(async (sub: any) => {
+    await Promise.all(subs.map(async (sub: any) => {
       try {
-        await sendOne({ endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth }, payloadJson, vapidPublic, vapidPrivate)
+        await sendOne(sub, notifPayload, vapidPublic, vapidPrivate)
         sent++
       } catch (e: any) {
+        errors.push(`${sub.endpoint.slice(-20)}: ${e.message}`)
         if (e.statusCode === 410 || e.statusCode === 404) expired.push(sub.endpoint)
       }
     }))
 
-    if (expired.length > 0) await supabase.from('push_subscriptions').delete().in('endpoint', expired)
+    // ── Cleanup expired subscriptions ──
+    if (expired.length > 0) {
+      await supabase.from('push_subscriptions').delete().in('endpoint', expired)
+    }
 
+    // ── Log result ──
     try {
       await supabase.from('push_notification_logs').insert({
         type: body.type,
@@ -256,12 +314,20 @@ Deno.serve(async (req: Request) => {
         url,
         target: body.user_id ? `user:${body.user_id}` : body.lead_id ? `lead:${body.lead_id}` : 'all',
         sent_count: sent,
+        error: errors.length > 0 ? errors.join(' | ') : null,
         triggered_by: body.triggered_by ?? 'api',
       })
     } catch (_) { /* log failure is non-fatal */ }
 
-    return new Response(JSON.stringify({ sent, expired: expired.length }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    return new Response(
+      JSON.stringify({ sent, expired: expired.length, errors }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
   } catch (err: any) {
-    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    console.error('send-push error:', err)
+    return new Response(
+      JSON.stringify({ error: err.message }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
   }
 })
