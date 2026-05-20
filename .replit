@@ -62,7 +62,7 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd pwa && npm run preview"
+args = "cd pwa && node server.cjs"
 waitForPort = 5173
 
 [[ports]]
@@ -76,10 +76,6 @@ externalPort = 3002
 [[ports]]
 localPort = 5173
 externalPort = 5173
-
-[[ports]]
-localPort = 23637
-externalPort = 3000
 
 [[ports]]
 localPort = 23638
