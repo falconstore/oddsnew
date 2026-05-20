@@ -55,92 +55,109 @@ function statusColor(status: string | null) {
   }
 }
 
+function FreebetSubcard({ tipo, value }: { tipo: string; value: number }) {
+  const isGanhar = tipo === 'GANHAR_FB'
+  return (
+    <div className="flex flex-col items-center justify-center flex-shrink-0 px-2 py-1.5 rounded-xl"
+         style={{
+           minWidth: 52,
+           background: isGanhar ? 'rgba(30,222,107,0.18)' : 'rgba(245,158,11,0.18)',
+           border: `1px solid ${isGanhar ? 'rgba(30,222,107,0.35)' : 'rgba(245,158,11,0.35)'}`,
+         }}>
+      <span className="text-[9px] font-bold uppercase tracking-wide"
+            style={{ color: isGanhar ? 'hsl(145 80% 60%)' : '#f59e0b' }}>
+        Freebet
+      </span>
+      <span className="text-[13px] font-black font-mono text-white leading-tight">
+        {value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+      </span>
+    </div>
+  )
+}
+
 function LiveCard({ p, onClick }: { p: Procedure; onClick: () => void }) {
   const mins = minutesLive(p.kickoff_at!)
   const elapsed = mins < 90 ? `${mins}'` : `+${mins - 90}'`
   const sc = statusColor(p.status)
+  const hasFb = (p.tipo === 'GANHAR_FB' || p.tipo === 'QUEIMAR_FB') && Number(p.freebet_value ?? 0) > 0
 
   return (
     <motion.button onClick={onClick}
       initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
-      className="w-full text-left p-4 rounded-2xl flex items-center gap-3 active:scale-[0.98] transition-transform"
+      className="w-full text-left px-4 pt-3 pb-4 rounded-2xl active:scale-[0.98] transition-transform"
       style={{
         background: 'rgba(239,68,68,0.06)',
         border: '1px solid rgba(239,68,68,0.2)',
       }}>
 
-      {/* Live time badge */}
-      <div className="flex flex-col items-center justify-center flex-shrink-0"
-        style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)' }}>
-        <span className="text-[10px] font-black" style={{ color: '#ef4444' }}>{elapsed}</span>
-        <span className="text-[8px] font-semibold" style={{ color: 'rgba(239,68,68,0.7)' }}>AO VIVO</span>
+      {/* Header row: #ID + status pills */}
+      <div className="flex items-center gap-2 mb-2.5">
+        <span className="text-[11px] font-black font-mono px-2 py-0.5 rounded-lg"
+              style={{ background: 'rgba(255,255,255,0.09)', color: 'rgba(255,255,255,0.55)' }}>
+          #{p.procedure_number}
+        </span>
+        <span className="flex items-center gap-1 text-[10px] font-bold"
+              style={{ color: '#ef4444' }}>
+          <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />AO VIVO
+        </span>
+        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+              style={{ background: `${sc}1a`, color: sc }}>
+          {p.status}
+        </span>
       </div>
 
-      <div className="flex-1 min-w-0">
-        {/* Status row */}
-        <div className="flex items-center gap-2 mb-1">
-          <span className="flex items-center gap-1.5 text-[10px] font-bold"
-            style={{ color: '#ef4444' }}>
-            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse flex-shrink-0" />
-            AO VIVO
-          </span>
-          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
-            style={{ background: `${sc}1a`, color: sc }}>
-            {p.status}
-          </span>
+      {/* Main row: timer + content + freebet subcard */}
+      <div className="flex items-center gap-3">
+        {/* Live time badge */}
+        <div className="flex flex-col items-center justify-center flex-shrink-0"
+          style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)' }}>
+          <span className="text-[10px] font-black" style={{ color: '#ef4444' }}>{elapsed}</span>
+          <span className="text-[8px] font-semibold" style={{ color: 'rgba(239,68,68,0.7)' }}>AO VIVO</span>
         </div>
 
-        {/* Title */}
-        <p className="text-sm font-semibold text-white leading-snug"
-           style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-          {p.promotion_name || p.platform || `#${p.procedure_number}`}
-        </p>
+        {/* Content */}
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-white leading-snug"
+             style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+            {p.promotion_name || p.platform || `Operação #${p.procedure_number}`}
+          </p>
 
-        {/* Tag row: ID · tipo · freebet · DG */}
-        <div className="flex items-center gap-1 mt-1.5 flex-wrap">
-          {/* ID */}
-          <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded-md"
-                style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.4)' }}>
-            #{p.procedure_number}
-          </span>
-          {/* Tipo */}
-          {p.tipo && (() => { const tc = tipoColor(p.tipo); return (
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"
-                  style={{ background: tc.bg, color: tc.color }}>
-              {tipoLabel(p.tipo)}
-            </span>
-          )})()}
-          {/* Freebet value */}
-          {(p.tipo === 'GANHAR_FB' || p.tipo === 'QUEIMAR_FB') && Number(p.freebet_value ?? 0) > 0 && (
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-0.5"
-                  style={{ background: 'rgba(251,146,60,0.15)', color: '#fb923c' }}>
-              <Zap size={9} />FB R${Number(p.freebet_value).toFixed(0)}
-            </span>
-          )}
-          {/* Duplo Green */}
-          {p.duplo_green_confirmado && (
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-0.5"
-                  style={{ background: 'rgba(167,139,250,0.15)', color: '#a78bfa' }}>
-              <Star size={9} />2x GREEN
-            </span>
-          )}
-          {/* Pot. profit */}
-          {Number(p.profit_loss ?? 0) !== 0 && (
-            <span className="text-[10px] font-semibold font-mono px-1.5 py-0.5 rounded-md"
-                  style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.38)' }}>
-              pot. R${Math.abs(Number(p.profit_loss)).toFixed(0)}
-            </span>
-          )}
+          {/* Tag row: tipo · DG · pot. profit */}
+          <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+            {p.tipo && (() => { const tc = tipoColor(p.tipo); return (
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"
+                    style={{ background: tc.bg, color: tc.color }}>
+                {tipoLabel(p.tipo)}
+              </span>
+            )})()}
+            {p.duplo_green_confirmado && (
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-0.5"
+                    style={{ background: 'rgba(167,139,250,0.15)', color: '#a78bfa' }}>
+                <Star size={9} />2x GREEN
+              </span>
+            )}
+            {!hasFb && Number(p.profit_loss ?? 0) !== 0 && (
+              <span className="text-[10px] font-semibold font-mono px-1.5 py-0.5 rounded-md"
+                    style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.38)' }}>
+                pot. R${Math.abs(Number(p.profit_loss)).toFixed(0)}
+              </span>
+            )}
+          </div>
+
+          {/* Platform / kickoff */}
+          <p className="text-[11px] mt-1" style={{ color: 'rgba(255,255,255,0.28)' }}>
+            {p.platform && <span>{p.platform}</span>}
+            {p.kickoff_at && <span> · {format(parseISO(p.kickoff_at), 'HH:mm')}</span>}
+          </p>
         </div>
 
-        {/* Platform / kickoff */}
-        <p className="text-[11px] mt-1" style={{ color: 'rgba(255,255,255,0.28)' }}>
-          {p.platform && <span>{p.platform}</span>}
-          {p.kickoff_at && <span> · {format(parseISO(p.kickoff_at), 'HH:mm')}</span>}
-        </p>
+        {/* Right: freebet subcard or chevron */}
+        {hasFb ? (
+          <FreebetSubcard tipo={p.tipo!} value={Number(p.freebet_value)} />
+        ) : (
+          <ChevronRight size={15} style={{ color: 'rgba(255,255,255,0.25)', flexShrink: 0 }} />
+        )}
       </div>
-
-      <ChevronRight size={15} style={{ color: 'rgba(255,255,255,0.25)', flexShrink: 0 }} />
     </motion.button>
   )
 }

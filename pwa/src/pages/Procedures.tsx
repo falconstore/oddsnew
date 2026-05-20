@@ -61,94 +61,113 @@ function lucroEfetivo(p: Procedure) {
   return Number(p.duplo_green_lucro ?? p.resultado_lucro ?? p.profit_loss ?? 0)
 }
 
+function FreebetSubcard({ tipo, value }: { tipo: string; value: number }) {
+  const isGanhar = tipo === 'GANHAR_FB'
+  return (
+    <div className="flex flex-col items-center justify-center flex-shrink-0 px-2 py-1.5 rounded-xl"
+         style={{
+           minWidth: 52,
+           background: isGanhar ? 'rgba(30,222,107,0.18)' : 'rgba(245,158,11,0.18)',
+           border: `1px solid ${isGanhar ? 'rgba(30,222,107,0.35)' : 'rgba(245,158,11,0.35)'}`,
+         }}>
+      <span className="text-[9px] font-bold uppercase tracking-wide"
+            style={{ color: isGanhar ? 'hsl(145 80% 60%)' : '#f59e0b' }}>
+        Freebet
+      </span>
+      <span className="text-[13px] font-black font-mono text-white leading-tight">
+        {value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+      </span>
+    </div>
+  )
+}
+
 function ProcedureCard({ p, onClick }: { p: Procedure; onClick: () => void }) {
   const sm = statusMeta(p.status)
   const lucro = lucroEfetivo(p)
   const kickoff = p.kickoff_at ? parseISO(p.kickoff_at) : null
   const isLive = kickoff && !isFuture(kickoff) && differenceInMinutes(new Date(), kickoff) < 240
   const hasLucro = p.status === 'Concluído' || p.status === 'Lucro Direto'
+  const hasFb = (p.tipo === 'GANHAR_FB' || p.tipo === 'QUEIMAR_FB') && Number(p.freebet_value ?? 0) > 0
 
   return (
     <button onClick={onClick}
-      className="glass p-4 text-left w-full flex items-center gap-3 active:scale-[0.98] transition-transform"
+      className="glass px-4 pt-3 pb-4 text-left w-full active:scale-[0.98] transition-transform"
       style={{ opacity: p.tachado ? 0.4 : 1 }}>
 
-      <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-           style={{ background: sm.bg }}>
-        <span style={{ color: sm.color }}>{tipoIcon(p.tipo)}</span>
+      {/* Header row: #ID + status + live */}
+      <div className="flex items-center gap-2 mb-2.5">
+        <span className="text-[11px] font-black font-mono px-2 py-0.5 rounded-lg"
+              style={{ background: 'rgba(255,255,255,0.09)', color: 'rgba(255,255,255,0.55)' }}>
+          #{p.procedure_number}
+        </span>
+        <span className="text-xs font-semibold" style={{ color: sm.color }}>
+          {p.status}
+        </span>
+        {isLive && (
+          <span className="flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444' }}>
+            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />AO VIVO
+          </span>
+        )}
       </div>
 
-      <div className="flex-1 min-w-0">
-        {/* Status row */}
-        <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
-          <span className="text-xs font-semibold" style={{ color: sm.color }}>
-            {p.status}
-          </span>
-          {isLive && (
-            <span className="flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full"
-                  style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444' }}>
-              <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />AO VIVO
-            </span>
-          )}
+      {/* Main row: icon + content + right */}
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+             style={{ background: sm.bg }}>
+          <span style={{ color: sm.color }}>{tipoIcon(p.tipo)}</span>
         </div>
 
-        {/* Title */}
-        <p className="text-sm font-medium text-white leading-snug"
-           style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-          {p.promotion_name || p.platform || `Operação #${p.procedure_number}`}
-        </p>
+        <div className="flex-1 min-w-0">
+          {/* Title */}
+          <p className="text-sm font-medium text-white leading-snug"
+             style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+            {p.promotion_name || p.platform || `Operação #${p.procedure_number}`}
+          </p>
 
-        {/* Tag row: ID · tipo · freebet · DG */}
-        <div className="flex items-center gap-1 mt-1.5 flex-wrap">
-          {/* ID */}
-          <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded-md"
-                style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.4)' }}>
-            #{p.procedure_number}
-          </span>
-          {/* Tipo */}
-          {p.tipo && (() => { const tc = tipoColor(p.tipo); return (
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"
-                  style={{ background: tc.bg, color: tc.color }}>
-              {tipoLabel(p.tipo)}
-            </span>
-          )})()}
-          {/* Freebet value */}
-          {(p.tipo === 'GANHAR_FB' || p.tipo === 'QUEIMAR_FB') && Number(p.freebet_value ?? 0) > 0 && (
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-0.5"
-                  style={{ background: 'rgba(251,146,60,0.15)', color: '#fb923c' }}>
-              <Zap size={9} />FB R${Number(p.freebet_value).toFixed(0)}
-            </span>
-          )}
-          {/* Duplo Green */}
-          {p.duplo_green_confirmado && (
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-0.5"
-                  style={{ background: 'rgba(167,139,250,0.15)', color: '#a78bfa' }}>
-              <Star size={9} />2x GREEN
-            </span>
-          )}
+          {/* Tag row: tipo · DG */}
+          <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+            {p.tipo && (() => { const tc = tipoColor(p.tipo); return (
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"
+                    style={{ background: tc.bg, color: tc.color }}>
+                {tipoLabel(p.tipo)}
+              </span>
+            )})()}
+            {p.duplo_green_confirmado && (
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-0.5"
+                    style={{ background: 'rgba(167,139,250,0.15)', color: '#a78bfa' }}>
+                <Star size={9} />2x GREEN
+              </span>
+            )}
+          </div>
+
+          {/* Platform / date / kickoff */}
+          <p className="text-[11px] mt-1 truncate" style={{ color: 'rgba(255,255,255,0.28)' }}>
+            {p.platform && <span>{p.platform} · </span>}
+            {format(parseISO(p.date), 'dd/MM', { locale: ptBR })}
+            {kickoff && <span> · {format(kickoff, 'HH:mm')}</span>}
+          </p>
         </div>
 
-        {/* Platform / date / kickoff */}
-        <p className="text-[11px] mt-1 truncate" style={{ color: 'rgba(255,255,255,0.28)' }}>
-          {p.platform && <span>{p.platform} · </span>}
-          {format(parseISO(p.date), 'dd/MM', { locale: ptBR })}
-          {kickoff && <span> · {format(kickoff, 'HH:mm')}</span>}
-        </p>
-      </div>
-
-      <div className="flex flex-col items-end gap-1 flex-shrink-0">
-        {hasLucro ? (
-          <span className="text-sm font-bold font-mono"
-                style={{ color: lucro >= 0 ? 'hsl(145 80% 48%)' : '#f87171' }}>
-            {lucro >= 0 ? '+' : ''}R${lucro.toFixed(0)}
-          </span>
-        ) : Number(p.profit_loss ?? 0) !== 0 ? (
-          <span className="text-xs font-semibold font-mono"
-                style={{ color: 'rgba(255,255,255,0.35)' }}>
-            pot. R${Math.abs(Number(p.profit_loss)).toFixed(0)}
-          </span>
-        ) : null}
-        <ChevronRight size={14} style={{ color: 'rgba(255,255,255,0.25)' }} />
+        {/* Right: freebet subcard OR lucro/pot/chevron */}
+        {hasFb ? (
+          <FreebetSubcard tipo={p.tipo!} value={Number(p.freebet_value)} />
+        ) : (
+          <div className="flex flex-col items-end gap-1 flex-shrink-0">
+            {hasLucro ? (
+              <span className="text-sm font-bold font-mono"
+                    style={{ color: lucro >= 0 ? 'hsl(145 80% 48%)' : '#f87171' }}>
+                {lucro >= 0 ? '+' : ''}R${lucro.toFixed(0)}
+              </span>
+            ) : Number(p.profit_loss ?? 0) !== 0 ? (
+              <span className="text-xs font-semibold font-mono"
+                    style={{ color: 'rgba(255,255,255,0.35)' }}>
+                pot. R${Math.abs(Number(p.profit_loss)).toFixed(0)}
+              </span>
+            ) : null}
+            <ChevronRight size={14} style={{ color: 'rgba(255,255,255,0.25)' }} />
+          </div>
+        )}
       </div>
     </button>
   )
