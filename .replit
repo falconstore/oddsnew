@@ -57,13 +57,13 @@ outputType = "webview"
 name = "Start PWA"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd pwa && npm run dev"
-waitForPort = 5173
-
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd pwa && npm run preview"
+waitForPort = 5173
 
 [[ports]]
 localPort = 5000
@@ -76,10 +76,6 @@ externalPort = 3002
 [[ports]]
 localPort = 5173
 externalPort = 5173
-
-[[ports]]
-localPort = 23636
-externalPort = 3001
 
 [[ports]]
 localPort = 23637
