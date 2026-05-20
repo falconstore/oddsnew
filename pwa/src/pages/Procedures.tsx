@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { useNavigate, NavLink } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, Clock, TrendingUp, Zap, Star, ChevronRight, User } from 'lucide-react'
+import { Search, Clock, TrendingUp, Zap, Star, ChevronRight, User, CheckCircle2, Circle } from 'lucide-react'
 import { format, parseISO, differenceInMinutes, isFuture } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { useProceduresList } from '@/hooks/useProcedures'
+import { useProcedureChecks, useToggleProcedureCheck } from '@/hooks/useProcedureChecks'
+import { useAuth } from '@/hooks/useAuth'
 import { Procedure } from '@/lib/supabase'
 
 type Filter = 'all' | 'active' | 'done'
@@ -81,7 +83,9 @@ function FreebetSubcard({ tipo, value }: { tipo: string; value: number }) {
   )
 }
 
-function ProcedureCard({ p, onClick }: { p: Procedure; onClick: () => void }) {
+function ProcedureCard({
+  p, onClick, isChecked, onToggleCheck,
+}: { p: Procedure; onClick: () => void; isChecked: boolean; onToggleCheck: (e: React.MouseEvent) => void }) {
   const sm = statusMeta(p.status)
   const lucro = lucroEfetivo(p)
   const kickoff = p.kickoff_at ? parseISO(p.kickoff_at) : null
@@ -169,6 +173,29 @@ function ProcedureCard({ p, onClick }: { p: Procedure; onClick: () => void }) {
           </div>
         )}
       </div>
+
+      {/* Check row — "Realizei esta operação" */}
+      <div className="flex items-center justify-between mt-3 pt-2.5"
+           style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+        <span className="text-[11px]" style={{ color: 'rgba(255,255,255,0.3)' }}>
+          Realizei esta operação?
+        </span>
+        <button
+          onClick={onToggleCheck}
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg active:scale-95 transition-all"
+          style={{
+            background: isChecked ? 'rgba(30,222,107,0.15)' : 'rgba(255,255,255,0.05)',
+            border: `1px solid ${isChecked ? 'rgba(30,222,107,0.4)' : 'rgba(255,255,255,0.1)'}`,
+          }}>
+          {isChecked
+            ? <CheckCircle2 size={14} style={{ color: 'hsl(145 80% 52%)' }} />
+            : <Circle size={14} style={{ color: 'rgba(255,255,255,0.3)' }} />}
+          <span className="text-[11px] font-semibold"
+                style={{ color: isChecked ? 'hsl(145 80% 52%)' : 'rgba(255,255,255,0.35)' }}>
+            {isChecked ? 'Sim!' : 'Marcar'}
+          </span>
+        </button>
+      </div>
     </button>
   )
 }
@@ -178,6 +205,9 @@ export function Procedures() {
   const [filter, setFilter] = useState<Filter>('all')
   const [search, setSearch] = useState('')
   const { data: procedures = [], isLoading } = useProceduresList(filter)
+  const { user } = useAuth()
+  const { data: checks = new Set<string>() } = useProcedureChecks(user?.email ?? null)
+  const toggleCheck = useToggleProcedureCheck(user?.email ?? null)
 
   const filtered = procedures.filter(p => {
     if (!search) return true
@@ -255,7 +285,11 @@ export function Procedures() {
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: idx * 0.03, duration: 0.2 }}>
-                <ProcedureCard p={p} onClick={() => navigate(`/procedimentos/${p.id}`)} />
+                <ProcedureCard p={p}
+                  onClick={() => navigate(`/procedimentos/${p.id}`)}
+                  isChecked={checks.has(p.id)}
+                  onToggleCheck={e => { e.stopPropagation(); toggleCheck.mutate({ procedureId: p.id, checked: !checks.has(p.id) }) }}
+                />
               </motion.div>
             ))}
           </div>

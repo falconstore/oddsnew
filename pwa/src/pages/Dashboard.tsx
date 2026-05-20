@@ -3,13 +3,17 @@ import { NavLink } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { motion, AnimatePresence } from 'framer-motion'
-import { TrendingUp, Zap, BarChart2, Users, Minus, Plus, User } from 'lucide-react'
+import { TrendingUp, Zap, BarChart2, Users, Minus, Plus, User, Send } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { usePeriodStats, useLast90DaysStats, PERIODS, PeriodKey, DayPoint } from '@/hooks/useStats'
+
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid, ReferenceLine, TooltipProps,
 } from 'recharts'
+
+// Atualize com o link real do grupo VIP do Telegram
+const VIP_TELEGRAM_URL = 'https://t.me/+SEU_LINK_VIP_AQUI'
 
 // ─── CPF count (localStorage) ───────────────────────────────────────────────
 function useCpfCount() {
@@ -400,6 +404,31 @@ export function Dashboard() {
           <User size={18} style={{ color: 'rgba(255,255,255,0.7)' }} />
         </NavLink>
       </div>
+
+      {/* Banner VIP Telegram — só para assinantes */}
+      {status === 'active_subscriber' && (
+        <a href={VIP_TELEGRAM_URL} target="_blank" rel="noopener noreferrer"
+           className="flex items-center gap-3 px-4 py-3 rounded-2xl mb-4 active:scale-[0.98] transition-transform"
+           style={{
+             background: 'linear-gradient(135deg, rgba(30,222,107,0.18) 0%, rgba(30,222,107,0.08) 100%)',
+             border: '1px solid rgba(30,222,107,0.35)',
+           }}>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+               style={{ background: 'rgba(30,222,107,0.2)', border: '1px solid rgba(30,222,107,0.4)' }}>
+            <Send size={18} style={{ color: 'hsl(145 80% 52%)' }} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-white leading-tight">Grupo VIP do Telegram</p>
+            <p className="text-xs mt-0.5 truncate" style={{ color: 'rgba(255,255,255,0.5)' }}>
+              Acompanhe os sinais em tempo real →
+            </p>
+          </div>
+          <span className="text-[10px] font-black px-2 py-1 rounded-lg flex-shrink-0"
+                style={{ background: 'rgba(30,222,107,0.25)', color: 'hsl(145 80% 58%)' }}>
+            ENTRAR
+          </span>
+        </a>
+      )}
 
       {/* Period selector */}
       <PeriodSelector active={period} onChange={setPeriod} />

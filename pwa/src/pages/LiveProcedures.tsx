@@ -2,8 +2,10 @@ import { useNavigate, NavLink } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { differenceInMinutes, isFuture, parseISO, format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { ChevronRight, Clock, Zap, Star, TrendingUp, User } from 'lucide-react'
+import { ChevronRight, Clock, Zap, Star, TrendingUp, User, CheckCircle2, Circle } from 'lucide-react'
 import { useProceduresToday } from '@/hooks/useProcedures'
+import { useProcedureChecks, useToggleProcedureCheck } from '@/hooks/useProcedureChecks'
+import { useAuth } from '@/hooks/useAuth'
 import { Procedure } from '@/lib/supabase'
 
 function isLiveProc(p: Procedure) {
@@ -75,7 +77,9 @@ function FreebetSubcard({ tipo, value }: { tipo: string; value: number }) {
   )
 }
 
-function LiveCard({ p, onClick }: { p: Procedure; onClick: () => void }) {
+function LiveCard({ p, onClick, isChecked, onToggleCheck }: {
+  p: Procedure; onClick: () => void; isChecked: boolean; onToggleCheck: (e: React.MouseEvent) => void
+}) {
   const mins = minutesLive(p.kickoff_at!)
   const elapsed = mins < 90 ? `${mins}'` : `+${mins - 90}'`
   const sc = statusColor(p.status)
@@ -158,14 +162,40 @@ function LiveCard({ p, onClick }: { p: Procedure; onClick: () => void }) {
           <ChevronRight size={15} style={{ color: 'rgba(255,255,255,0.25)', flexShrink: 0 }} />
         )}
       </div>
+
+      {/* Check row */}
+      <div className="flex items-center justify-between mt-3 pt-2.5"
+           style={{ borderTop: '1px solid rgba(239,68,68,0.12)' }}>
+        <span className="text-[11px]" style={{ color: 'rgba(255,255,255,0.3)' }}>
+          Realizei esta operação?
+        </span>
+        <button
+          onClick={onToggleCheck}
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg active:scale-95 transition-all"
+          style={{
+            background: isChecked ? 'rgba(30,222,107,0.15)' : 'rgba(255,255,255,0.05)',
+            border: `1px solid ${isChecked ? 'rgba(30,222,107,0.4)' : 'rgba(255,255,255,0.1)'}`,
+          }}>
+          {isChecked
+            ? <CheckCircle2 size={14} style={{ color: 'hsl(145 80% 52%)' }} />
+            : <Circle size={14} style={{ color: 'rgba(255,255,255,0.3)' }} />}
+          <span className="text-[11px] font-semibold"
+                style={{ color: isChecked ? 'hsl(145 80% 52%)' : 'rgba(255,255,255,0.35)' }}>
+            {isChecked ? 'Sim!' : 'Marcar'}
+          </span>
+        </button>
+      </div>
     </motion.button>
   )
 }
 
 export function LiveProcedures() {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const { data: procs = [], isLoading } = useProceduresToday()
   const live = procs.filter(isLiveProc)
+  const { data: checks = new Set<string>() } = useProcedureChecks(user?.email ?? null)
+  const toggleCheck = useToggleProcedureCheck(user?.email ?? null)
 
   return (
     <div className="page-content no-scrollbar px-4">
@@ -218,7 +248,11 @@ export function LiveProcedures() {
         <AnimatePresence>
           <div className="flex flex-col gap-2.5">
             {live.map(p => (
-              <LiveCard key={p.id} p={p} onClick={() => navigate(`/procedimentos/${p.id}`)} />
+              <LiveCard key={p.id} p={p}
+                onClick={() => navigate(`/procedimentos/${p.id}`)}
+                isChecked={checks.has(p.id)}
+                onToggleCheck={e => { e.stopPropagation(); toggleCheck.mutate({ procedureId: p.id, checked: !checks.has(p.id) }) }}
+              />
             ))}
           </div>
         </AnimatePresence>
