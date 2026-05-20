@@ -248,15 +248,17 @@ Deno.serve(async (req: Request) => {
 
     if (expired.length > 0) await supabase.from('push_subscriptions').delete().in('endpoint', expired)
 
-    await supabase.from('push_notification_logs').insert({
-      type: body.type,
-      title,
-      body: bodyText,
-      url,
-      target: body.user_id ? `user:${body.user_id}` : body.lead_id ? `lead:${body.lead_id}` : 'all',
-      sent_count: sent,
-      triggered_by: body.triggered_by ?? 'api',
-    }).catch(() => {})
+    try {
+      await supabase.from('push_notification_logs').insert({
+        type: body.type,
+        title,
+        body: bodyText,
+        url,
+        target: body.user_id ? `user:${body.user_id}` : body.lead_id ? `lead:${body.lead_id}` : 'all',
+        sent_count: sent,
+        triggered_by: body.triggered_by ?? 'api',
+      })
+    } catch (_) { /* log failure is non-fatal */ }
 
     return new Response(JSON.stringify({ sent, expired: expired.length }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   } catch (err: any) {
