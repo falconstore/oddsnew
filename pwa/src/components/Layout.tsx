@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom'
-import { LayoutDashboard } from 'lucide-react'
+import { LayoutDashboard, Star } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useProceduresToday } from '@/hooks/useProcedures'
 import { differenceInMinutes, isFuture, parseISO } from 'date-fns'
@@ -13,7 +13,7 @@ function useLiveCount() {
   }).length
 }
 
-// Inline soccer-ball SVG (simple pentagon pattern)
+// Inline soccer-ball SVG
 function SoccerIcon({ size = 20, color = 'currentColor' }: { size?: number; color?: string }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -40,14 +40,48 @@ function LiveIcon({ size = 20, color = '#ef4444' }: { size?: number; color?: str
   )
 }
 
+// 2× star icon for Duplo Green
+function DgIcon({ size = 20, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
+      <Star size={size} color={color} fill={color === 'rgba(255,255,255,0.4)' ? 'none' : color} style={{ opacity: color === 'rgba(255,255,255,0.4)' ? 1 : 0.85 }} />
+      <span className="absolute -bottom-0.5 -right-1 text-[7px] font-black leading-none"
+            style={{ color, fontVariantNumeric: 'tabular-nums' }}>2×</span>
+    </div>
+  )
+}
+
 export function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation()
   const liveCount = useLiveCount()
 
   const NAV = [
-    { to: '/',             label: 'Início',        renderIcon: (active: boolean) => <LayoutDashboard size={20} style={{ color: active ? 'hsl(145 80% 48%)' : 'rgba(255,255,255,0.4)' }} />, liveStyle: false },
-    { to: '/ao-vivo',      label: 'Ao Vivo',       renderIcon: (active: boolean) => <LiveIcon size={20} color={active ? '#ef4444' : 'rgba(255,255,255,0.4)'} />, liveStyle: true },
-    { to: '/procedimentos', label: 'Procedimentos', renderIcon: (active: boolean) => <SoccerIcon size={20} color={active ? 'hsl(145 80% 48%)' : 'rgba(255,255,255,0.4)'} />, liveStyle: false },
+    {
+      to: '/',
+      label: 'Início',
+      renderIcon: (active: boolean) => <LayoutDashboard size={18} style={{ color: active ? 'hsl(145 80% 48%)' : 'rgba(255,255,255,0.4)' }} />,
+      liveStyle: false,
+    },
+    {
+      to: '/ao-vivo',
+      label: 'Ao Vivo',
+      renderIcon: (active: boolean) => <LiveIcon size={18} color={active ? '#ef4444' : 'rgba(255,255,255,0.4)'} />,
+      liveStyle: true,
+    },
+    {
+      to: '/duplo-green',
+      label: 'Duplo Green',
+      renderIcon: (active: boolean) => <DgIcon size={18} color={active ? '#a78bfa' : 'rgba(255,255,255,0.4)'} />,
+      liveStyle: false,
+      accentColor: '#a78bfa',
+      accentBg: 'rgba(167,139,250,0.1)',
+    },
+    {
+      to: '/procedimentos',
+      label: 'Procedimentos',
+      renderIcon: (active: boolean) => <SoccerIcon size={18} color={active ? 'hsl(145 80% 48%)' : 'rgba(255,255,255,0.4)'} />,
+      liveStyle: false,
+    },
   ]
 
   return (
@@ -56,25 +90,24 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {children}
       </main>
 
-      <nav className="bottom-nav relative z-20 flex items-center justify-around px-2 pt-3"
+      <nav className="bottom-nav relative z-20 flex items-center justify-around px-1 pt-2.5"
            style={{ background: 'rgba(11,17,32,0.95)', backdropFilter: 'blur(20px)', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-        {NAV.map(({ to, label, renderIcon, liveStyle }) => {
+        {NAV.map(({ to, label, renderIcon, liveStyle, accentColor, accentBg }) => {
           const active = to === '/' ? location.pathname === '/' : location.pathname.startsWith(to)
-          const activeBg = liveStyle ? 'rgba(239,68,68,0.1)' : 'rgba(30,222,107,0.1)'
-          const activeColor = liveStyle ? '#ef4444' : 'hsl(145 80% 48%)'
+          const activeColor = accentColor ?? (liveStyle ? '#ef4444' : 'hsl(145 80% 48%)')
+          const activeBg   = accentBg   ?? (liveStyle ? 'rgba(239,68,68,0.1)' : 'rgba(30,222,107,0.1)')
           return (
             <NavLink key={to} to={to}
-              className="flex flex-col items-center gap-1 px-3 py-1 rounded-xl transition-all relative"
-              style={{ minWidth: 56 }}>
+              className="flex flex-col items-center gap-1 px-2 py-1 rounded-xl transition-all relative flex-1"
+              style={{ maxWidth: 72 }}>
               {active && (
-                <motion.div layoutId={`nav-pill-${liveStyle ? 'live' : 'std'}`}
+                <motion.div layoutId={`nav-pill-${to}`}
                   className="absolute inset-0 rounded-xl"
                   style={{ background: activeBg }}
                   transition={{ type: 'spring', bounce: 0.2, duration: 0.4 }} />
               )}
               <div className="relative">
                 {renderIcon(active)}
-                {/* Live badge on Ao Vivo tab when not active */}
                 {liveStyle && !active && liveCount > 0 && (
                   <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full text-[8px] font-bold flex items-center justify-center"
                     style={{ background: '#ef4444', color: 'white' }}>
@@ -82,7 +115,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   </span>
                 )}
               </div>
-              <span className="text-[10px] font-semibold tracking-wide"
+              <span className="text-[9px] font-semibold tracking-wide text-center leading-tight"
                     style={{ color: active ? activeColor : 'rgba(255,255,255,0.4)', transition: 'color 0.2s' }}>
                 {label}
               </span>

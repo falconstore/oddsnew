@@ -10,6 +10,7 @@ import { Dashboard } from '@/pages/Dashboard'
 import { Procedures } from '@/pages/Procedures'
 import { ProcedureDetail } from '@/pages/ProcedureDetail'
 import { LiveProcedures } from '@/pages/LiveProcedures'
+import { DuploGreen } from '@/pages/DuploGreen'
 import { Profile } from '@/pages/Profile'
 import { Paywall } from '@/pages/Paywall'
 
@@ -25,6 +26,11 @@ export default function App() {
 
           <Route path="/" element={
             <ProtectedRoute><Layout><Dashboard /></Layout></ProtectedRoute>
+          } />
+
+          {/* Duplo Green */}
+          <Route path="/duplo-green" element={
+            <ProtectedRoute><Layout><ProcedureRoute><DuploGreen /></ProcedureRoute></Layout></ProtectedRoute>
           } />
 
           {/* Procedimentos — bloqueados para trial expirado */}
