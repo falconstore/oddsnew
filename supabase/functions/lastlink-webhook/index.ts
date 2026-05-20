@@ -442,6 +442,28 @@ serve(async (req) => {
         isTest,
       }).catch((err) => log("alert-telegram-throw", { error: String(err) }));
 
+      // Push notification best-effort para assinatura pendente / cancelamento
+      if (!isTest && leadId) {
+        const PUSH_NOTIFY_EVENTS = new Set([
+          "Purchase_Order_Pending",
+          "Purchase_Order_Expired",
+          ...CANCELED_EVENTS,
+        ]);
+        if (PUSH_NOTIFY_EVENTS.has(eventType)) {
+          const pushType = CANCELED_EVENTS.has(eventType) ? "subscription_canceled"
+            : eventType === "Purchase_Order_Expired" ? "subscription_expired"
+            : "subscription_pending";
+          fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-push`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
+            },
+            body: JSON.stringify({ type: pushType, lead_id: leadId, triggered_by: "lastlink-webhook" }),
+          }).catch((err) => log("push-notification-throw", { error: String(err) }));
+        }
+      }
+
       return json({ ok: true, action: "matched", event: eventType, lead_id: leadId, is_test: isTest });
     }
 

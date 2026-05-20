@@ -70,6 +70,7 @@ export const PAGE_KEYS = {
   SCRAPER_STATUS: 'scraper_status',
   TELEGRAM_BOT: 'telegram_bot',
   WATERMARK: 'watermark',
+  PUSH_NOTIFICATIONS: 'push_notifications',
   // Manter keys legadas para não quebrar referências existentes
   LEAGUES: 'sharkodds',
   TEAMS: 'sharkodds',
@@ -96,6 +97,7 @@ export const PAGE_KEY_TO_COLUMN: Record<string, keyof UserPermissionRow> = {
   scraper_status: 'can_view_admin',
   telegram_bot: 'can_view_admin',
   watermark: 'can_view_watermark',
+  push_notifications: 'can_view_admin',
 };
 
 // Colunas de permissão editáveis (para o admin UI)
