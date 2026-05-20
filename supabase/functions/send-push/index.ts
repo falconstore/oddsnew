@@ -59,7 +59,32 @@ async function buildVapidJwt(endpoint: string, vapidPublicB64: string, vapidPriv
   return `${signingInput}.${base64url(sig)}`
 }
 
-// ─── RFC 8291 payload encryption using native Web Crypto HKDF ────────────────
+// ─── Manual HKDF via HMAC-SHA256 (avoids Deno Web Crypto HKDF edge cases) ────
+
+async function hmac256(key: Uint8Array, data: Uint8Array): Promise<Uint8Array> {
+  const k = await crypto.subtle.importKey('raw', key, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
+  return new Uint8Array(await crypto.subtle.sign('HMAC', k, data))
+}
+
+// HKDF-Extract: PRK = HMAC-SHA256(salt, IKM)
+async function hkdfExtract(salt: Uint8Array, ikm: Uint8Array): Promise<Uint8Array> {
+  return hmac256(salt, ikm)
+}
+
+// HKDF-Expand: OKM = T(1)[:len] where T(1) = HMAC-SHA256(PRK, info || 0x01)
+// (works for len ≤ 32 bytes only — sufficient for all Web Push usages)
+async function hkdfExpand(prk: Uint8Array, info: Uint8Array, len: number): Promise<Uint8Array> {
+  const t1 = await hmac256(prk, concat(info, new Uint8Array([0x01])))
+  return t1.slice(0, len)
+}
+
+// Full HKDF: Extract then Expand
+async function hkdf(salt: Uint8Array, ikm: Uint8Array, info: Uint8Array, len: number): Promise<Uint8Array> {
+  const prk = await hkdfExtract(salt, ikm)
+  return hkdfExpand(prk, info, len)
+}
+
+// ─── RFC 8291 payload encryption ─────────────────────────────────────────────
 
 async function encryptPayload(
   plaintext: string,
@@ -72,7 +97,7 @@ async function encryptPayload(
   const authSecret = fromBase64url(authB64)                // auth secret (16 bytes)
   const salt = crypto.getRandomValues(new Uint8Array(16))  // random 16-byte salt
 
-  // Ephemeral sender ECDH key pair
+  // ── Ephemeral sender ECDH key pair ──
   const senderKeyPair = await crypto.subtle.generateKey(
     { name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']
   )
@@ -80,69 +105,41 @@ async function encryptPayload(
     await crypto.subtle.exportKey('raw', senderKeyPair.publicKey)
   )  // 65 bytes uncompressed
 
-  // ECDH shared secret with receiver's public key
+  // ── ECDH shared secret ──
   const receiverKey = await crypto.subtle.importKey(
     'raw', receiverPublicBytes, { name: 'ECDH', namedCurve: 'P-256' }, false, []
   )
   const sharedBits = await crypto.subtle.deriveBits(
     { name: 'ECDH', public: receiverKey }, senderKeyPair.privateKey, 256
   )
-  const sharedSecret = new Uint8Array(sharedBits)
+  const sharedSecret = new Uint8Array(sharedBits)  // 32 bytes (x-coordinate of shared point)
 
-  // RFC 8291 §3.3: IKM via HKDF-Extract(auth_secret, ECDH) + HKDF-Expand with keyInfo
-  // key_info = "WebPush: info\x00" || ua_public || as_public
+  // ── RFC 8291 §3.3: derive IKM ──
+  // key_info = "WebPush: info" || 0x00 || ua_public(65) || as_public(65)
   const keyInfo = concat(
     enc.encode('WebPush: info\x00'),
     receiverPublicBytes,
     senderPublicBytes
   )
+  // IKM = HKDF(salt=auth_secret, IKM=ecdh_secret, info=key_info, len=32)
+  const ikm = await hkdf(authSecret, sharedSecret, keyInfo, 32)
 
-  // Use native HKDF to derive IKM (salt=authSecret, ikm=sharedSecret, info=keyInfo, len=32)
-  const sharedKey = await crypto.subtle.importKey(
-    'raw', sharedSecret, 'HKDF', false, ['deriveBits']
-  )
-  const ikmBits = await crypto.subtle.deriveBits(
-    { name: 'HKDF', hash: 'SHA-256', salt: authSecret, info: keyInfo },
-    sharedKey, 256
-  )
-  const ikm = new Uint8Array(ikmBits)
+  // ── RFC 8291 §3.4: derive CEK (16 bytes) and NONCE (12 bytes) ──
+  // Both use HKDF(salt=random_salt, IKM=ikm) with different info strings
+  const cek   = await hkdf(salt, ikm, enc.encode('Content-Encoding: aes128gcm\x00'), 16)
+  const nonce = await hkdf(salt, ikm, enc.encode('Content-Encoding: nonce\x00'), 12)
 
-  // RFC 8291 §3.4: CEK and nonce via HKDF(salt=random_salt, ikm=IKM)
-  const ikmKey = await crypto.subtle.importKey('raw', ikm, 'HKDF', false, ['deriveBits'])
-
-  const cekBits = await crypto.subtle.deriveBits(
-    {
-      name: 'HKDF', hash: 'SHA-256',
-      salt,
-      info: enc.encode('Content-Encoding: aes128gcm\x00'),
-    },
-    ikmKey, 128  // 16 bytes
-  )
-
-  // Derive nonce separately from same IKM (HKDF is stateless, reimport)
-  const ikmKey2 = await crypto.subtle.importKey('raw', ikm, 'HKDF', false, ['deriveBits'])
-  const nonceBits = await crypto.subtle.deriveBits(
-    {
-      name: 'HKDF', hash: 'SHA-256',
-      salt,
-      info: enc.encode('Content-Encoding: nonce\x00'),
-    },
-    ikmKey2, 96  // 12 bytes
-  )
-
-  const cek = new Uint8Array(cekBits)
-  const nonce = new Uint8Array(nonceBits)
-
-  // AES-128-GCM encrypt: plaintext + 0x02 delimiter (RFC 8291 §4)
+  // ── AES-128-GCM encrypt ──
+  // Plaintext record: data || 0x02  (delimiter byte per RFC 8291 §4, no padding)
   const padded = concat(enc.encode(plaintext), new Uint8Array([0x02]))
   const aesKey = await crypto.subtle.importKey('raw', cek, { name: 'AES-GCM' }, false, ['encrypt'])
   const ciphertext = new Uint8Array(
     await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, aesKey, padded)
   )
 
-  // aes128gcm record: salt(16) + rs(4 BE) + idlen(1) + keyid(senderPublic) + ciphertext
+  // ── aes128gcm binary header: salt(16) + rs(4 BE) + idlen(1) + keyid(65) + ciphertext ──
   const rs = new Uint8Array(4)
-  new DataView(rs.buffer).setUint32(0, 4096, false)  // record size big-endian
+  new DataView(rs.buffer).setUint32(0, 4096, false)  // record size, big-endian
   const idlen = new Uint8Array([senderPublicBytes.length])  // 65
 
   return concat(salt, rs, idlen, senderPublicBytes, ciphertext)
