@@ -34,6 +34,29 @@ function tipoIcon(tipo: string | null) {
   return <TrendingUp size={11} />
 }
 
+function tipoLabel(tipo: string | null) {
+  switch (tipo) {
+    case 'SUPER_ODD':   return 'SUPER ODD'
+    case 'GANHAR_FB':   return 'GANHAR FB'
+    case 'QUEIMAR_FB':  return 'QUEIMAR FB'
+    case 'ASR':         return 'ASR'
+    case 'SEM_FB':      return 'SEM FB'
+    case 'TENTATIVA_DG':return 'TENTATIVA DG'
+    default:            return tipo ?? null
+  }
+}
+
+function tipoColor(tipo: string | null): { color: string; bg: string } {
+  switch (tipo) {
+    case 'GANHAR_FB':  return { color: '#fb923c', bg: 'rgba(251,146,60,0.15)' }
+    case 'QUEIMAR_FB': return { color: '#f59e0b', bg: 'rgba(245,158,11,0.15)' }
+    case 'SUPER_ODD':  return { color: '#38bdf8', bg: 'rgba(56,189,248,0.15)' }
+    case 'ASR':        return { color: '#a78bfa', bg: 'rgba(167,139,250,0.15)' }
+    case 'TENTATIVA_DG': return { color: '#c084fc', bg: 'rgba(192,132,252,0.15)' }
+    default:           return { color: 'rgba(255,255,255,0.5)', bg: 'rgba(255,255,255,0.08)' }
+  }
+}
+
 function lucroEfetivo(p: Procedure) {
   return Number(p.duplo_green_lucro ?? p.resultado_lucro ?? p.profit_loss ?? 0)
 }
@@ -56,6 +79,7 @@ function ProcedureCard({ p, onClick }: { p: Procedure; onClick: () => void }) {
       </div>
 
       <div className="flex-1 min-w-0">
+        {/* Status row */}
         <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
           <span className="text-xs font-semibold" style={{ color: sm.color }}>
             {p.status}
@@ -66,16 +90,46 @@ function ProcedureCard({ p, onClick }: { p: Procedure; onClick: () => void }) {
               <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />AO VIVO
             </span>
           )}
-          {p.duplo_green_confirmado && (
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
-                  style={{ background: 'rgba(167,139,250,0.15)', color: '#a78bfa' }}>DG</span>
-          )}
         </div>
+
+        {/* Title */}
         <p className="text-sm font-medium text-white leading-snug"
            style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
           {p.promotion_name || p.platform || `Operação #${p.procedure_number}`}
         </p>
-        <p className="text-xs mt-0.5 truncate" style={{ color: 'rgba(255,255,255,0.35)' }}>
+
+        {/* Tag row: ID · tipo · freebet · DG */}
+        <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+          {/* ID */}
+          <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded-md"
+                style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.4)' }}>
+            #{p.procedure_number}
+          </span>
+          {/* Tipo */}
+          {p.tipo && (() => { const tc = tipoColor(p.tipo); return (
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"
+                  style={{ background: tc.bg, color: tc.color }}>
+              {tipoLabel(p.tipo)}
+            </span>
+          )})()}
+          {/* Freebet value */}
+          {(p.tipo === 'GANHAR_FB' || p.tipo === 'QUEIMAR_FB') && Number(p.freebet_value ?? 0) > 0 && (
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-0.5"
+                  style={{ background: 'rgba(251,146,60,0.15)', color: '#fb923c' }}>
+              <Zap size={9} />FB R${Number(p.freebet_value).toFixed(0)}
+            </span>
+          )}
+          {/* Duplo Green */}
+          {p.duplo_green_confirmado && (
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-0.5"
+                  style={{ background: 'rgba(167,139,250,0.15)', color: '#a78bfa' }}>
+              <Star size={9} />2x GREEN
+            </span>
+          )}
+        </div>
+
+        {/* Platform / date / kickoff */}
+        <p className="text-[11px] mt-1 truncate" style={{ color: 'rgba(255,255,255,0.28)' }}>
           {p.platform && <span>{p.platform} · </span>}
           {format(parseISO(p.date), 'dd/MM', { locale: ptBR })}
           {kickoff && <span> · {format(kickoff, 'HH:mm')}</span>}

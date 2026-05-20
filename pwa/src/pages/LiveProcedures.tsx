@@ -22,6 +22,29 @@ function tipoIcon(tipo: string | null) {
   return <TrendingUp size={13} />
 }
 
+function tipoLabel(tipo: string | null) {
+  switch (tipo) {
+    case 'SUPER_ODD':    return 'SUPER ODD'
+    case 'GANHAR_FB':    return 'GANHAR FB'
+    case 'QUEIMAR_FB':   return 'QUEIMAR FB'
+    case 'ASR':          return 'ASR'
+    case 'SEM_FB':       return 'SEM FB'
+    case 'TENTATIVA_DG': return 'TENTATIVA DG'
+    default:             return tipo ?? null
+  }
+}
+
+function tipoColor(tipo: string | null): { color: string; bg: string } {
+  switch (tipo) {
+    case 'GANHAR_FB':    return { color: '#fb923c', bg: 'rgba(251,146,60,0.15)' }
+    case 'QUEIMAR_FB':   return { color: '#f59e0b', bg: 'rgba(245,158,11,0.15)' }
+    case 'SUPER_ODD':    return { color: '#38bdf8', bg: 'rgba(56,189,248,0.15)' }
+    case 'ASR':          return { color: '#a78bfa', bg: 'rgba(167,139,250,0.15)' }
+    case 'TENTATIVA_DG': return { color: '#c084fc', bg: 'rgba(192,132,252,0.15)' }
+    default:             return { color: 'rgba(255,255,255,0.5)', bg: 'rgba(255,255,255,0.08)' }
+  }
+}
+
 function statusColor(status: string | null) {
   switch (status) {
     case 'Concluído': case 'Lucro Direto':           return 'hsl(145 80% 48%)'
@@ -54,8 +77,8 @@ function LiveCard({ p, onClick }: { p: Procedure; onClick: () => void }) {
       </div>
 
       <div className="flex-1 min-w-0">
+        {/* Status row */}
         <div className="flex items-center gap-2 mb-1">
-          {/* Pulsing live dot */}
           <span className="flex items-center gap-1.5 text-[10px] font-bold"
             style={{ color: '#ef4444' }}>
             <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse flex-shrink-0" />
@@ -66,25 +89,55 @@ function LiveCard({ p, onClick }: { p: Procedure; onClick: () => void }) {
             {p.status}
           </span>
         </div>
+
+        {/* Title */}
         <p className="text-sm font-semibold text-white leading-snug"
            style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
           {p.promotion_name || p.platform || `#${p.procedure_number}`}
         </p>
-        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-          <span style={{ color: sc }}>{tipoIcon(p.tipo)}</span>
-          {p.platform && <span className="text-[11px]" style={{ color: 'rgba(255,255,255,0.38)' }}>{p.platform}</span>}
-          {p.kickoff_at && (
-            <span className="text-[11px]" style={{ color: 'rgba(255,255,255,0.28)' }}>
-              · {format(parseISO(p.kickoff_at), 'HH:mm')}
+
+        {/* Tag row: ID · tipo · freebet · DG */}
+        <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+          {/* ID */}
+          <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded-md"
+                style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.4)' }}>
+            #{p.procedure_number}
+          </span>
+          {/* Tipo */}
+          {p.tipo && (() => { const tc = tipoColor(p.tipo); return (
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"
+                  style={{ background: tc.bg, color: tc.color }}>
+              {tipoLabel(p.tipo)}
+            </span>
+          )})()}
+          {/* Freebet value */}
+          {(p.tipo === 'GANHAR_FB' || p.tipo === 'QUEIMAR_FB') && Number(p.freebet_value ?? 0) > 0 && (
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-0.5"
+                  style={{ background: 'rgba(251,146,60,0.15)', color: '#fb923c' }}>
+              <Zap size={9} />FB R${Number(p.freebet_value).toFixed(0)}
             </span>
           )}
+          {/* Duplo Green */}
+          {p.duplo_green_confirmado && (
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-0.5"
+                  style={{ background: 'rgba(167,139,250,0.15)', color: '#a78bfa' }}>
+              <Star size={9} />2x GREEN
+            </span>
+          )}
+          {/* Pot. profit */}
           {Number(p.profit_loss ?? 0) !== 0 && (
-            <span className="text-[11px] font-semibold font-mono"
-                  style={{ color: 'rgba(255,255,255,0.38)' }}>
-              · pot. R${Math.abs(Number(p.profit_loss)).toFixed(0)}
+            <span className="text-[10px] font-semibold font-mono px-1.5 py-0.5 rounded-md"
+                  style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.38)' }}>
+              pot. R${Math.abs(Number(p.profit_loss)).toFixed(0)}
             </span>
           )}
         </div>
+
+        {/* Platform / kickoff */}
+        <p className="text-[11px] mt-1" style={{ color: 'rgba(255,255,255,0.28)' }}>
+          {p.platform && <span>{p.platform}</span>}
+          {p.kickoff_at && <span> · {format(parseISO(p.kickoff_at), 'HH:mm')}</span>}
+        </p>
       </div>
 
       <ChevronRight size={15} style={{ color: 'rgba(255,255,255,0.25)', flexShrink: 0 }} />
