@@ -5,18 +5,29 @@ import { NetworkFirst, StaleWhileRevalidate } from 'workbox-strategies'
 
 declare let self: ServiceWorkerGlobalScope & { __WB_MANIFEST: any[] }
 
+// globPatterns=[] → manifesto vazio → precache nada (evita cache corrompido)
+precacheAndRoute(self.__WB_MANIFEST)
+
 self.skipWaiting()
 clientsClaim()
 cleanupOutdatedCaches()
 
-// Network-first para HTML (navigation) — garante sempre o index.html atualizado
-// evita tela branca quando o bundle JS muda de hash após rebuild
+// Limpa todos os caches antigos (cache corrompido do vite preview) na ativação
+self.addEventListener('activate', (event: ExtendableEvent) => {
+  event.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(keys.map(key => caches.delete(key)))
+    )
+  )
+})
+
+// Network-first para HTML (navigation) — sempre busca o index.html mais recente
 registerRoute(
   ({ request }) => request.mode === 'navigate',
-  new NetworkFirst({ cacheName: 'pages-cache', networkTimeoutSeconds: 3 })
+  new NetworkFirst({ cacheName: 'pages-cache', networkTimeoutSeconds: 5 })
 )
 
-// Stale-while-revalidate para assets JS/CSS (logo hashed, atualiza em bg)
+// Stale-while-revalidate para assets JS/CSS com hash (atualiza em background)
 registerRoute(
   ({ request }) => request.destination === 'script' || request.destination === 'style',
   new StaleWhileRevalidate({ cacheName: 'assets-cache' })
@@ -27,8 +38,6 @@ registerRoute(
   ({ url }) => url.hostname.includes('.supabase.co'),
   new NetworkFirst({ cacheName: 'supabase-cache', networkTimeoutSeconds: 5 })
 )
-
-precacheAndRoute(self.__WB_MANIFEST)
 
 // ─── Push notification received ──────────────────────────────────────────────
 self.addEventListener('push', (event: PushEvent) => {
