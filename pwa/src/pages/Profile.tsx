@@ -1,5 +1,6 @@
-import { motion } from 'framer-motion'
-import { User, LogOut, Clock, Crown, Send, AlertCircle, Bell, BellOff, CreditCard, ChevronRight } from 'lucide-react'
+import { useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { User, LogOut, Clock, Crown, Send, AlertCircle, Bell, BellOff, CreditCard, ChevronRight, X, Settings } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { format, parseISO, differenceInDays } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -34,6 +35,7 @@ export function Profile() {
   const { lead, status, user } = useAuth()
   const navigate = useNavigate()
   const push = usePushNotifications()
+  const [showDeniedHelp, setShowDeniedHelp] = useState(false)
 
   async function handleLogout() {
     await signOut()
@@ -52,6 +54,11 @@ export function Profile() {
 
   const pushInfo = PUSH_LABELS[push.state] ?? PUSH_LABELS.unsupported
   const canTogglePush = push.state === 'subscribed' || push.state === 'unsubscribed'
+
+  function handlePushClick() {
+    if (push.state === 'denied') { setShowDeniedHelp(true); return }
+    if (canTogglePush) push.toggle()
+  }
 
   return (
     <div className="page-content no-scrollbar px-4">
@@ -139,22 +146,29 @@ export function Profile() {
         {/* Push notifications toggle */}
         {push.state !== 'unsupported' && (
           <button
-            onClick={canTogglePush ? push.toggle : undefined}
-            disabled={push.state === 'loading' || push.state === 'denied'}
+            onClick={handlePushClick}
+            disabled={push.state === 'loading'}
             className="glass flex items-center gap-3 p-4 w-full text-left transition-all active:scale-[0.98] disabled:opacity-60"
             style={{ border: `1px solid ${push.state === 'subscribed' ? 'rgba(30,222,107,0.2)' : push.state === 'denied' ? 'rgba(248,113,113,0.2)' : 'rgba(255,255,255,0.08)'}` }}>
             <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                 style={{ background: push.state === 'subscribed' ? 'rgba(30,222,107,0.1)' : 'rgba(255,255,255,0.05)' }}>
+                 style={{ background: push.state === 'subscribed' ? 'rgba(30,222,107,0.1)' : push.state === 'denied' ? 'rgba(248,113,113,0.08)' : 'rgba(255,255,255,0.05)' }}>
               {push.state === 'subscribed'
                 ? <Bell size={18} style={{ color: 'hsl(145 80% 48%)' }} />
-                : <BellOff size={18} style={{ color: push.state === 'denied' ? '#f87171' : 'rgba(255,255,255,0.4)' }} />}
+                : push.state === 'denied'
+                ? <Settings size={18} style={{ color: '#f87171' }} />
+                : <BellOff size={18} style={{ color: 'rgba(255,255,255,0.4)' }} />}
             </div>
             <div className="flex-1">
-              <p className="text-sm font-semibold text-white">{pushInfo.label}</p>
+              <p className="text-sm font-semibold" style={{ color: push.state === 'denied' ? '#f87171' : 'white' }}>{pushInfo.label}</p>
               {pushInfo.sub && (
-                <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>{pushInfo.sub}</p>
+                <p className="text-xs mt-0.5" style={{ color: push.state === 'denied' ? 'rgba(248,113,113,0.7)' : 'rgba(255,255,255,0.4)' }}>
+                  {push.state === 'denied' ? 'Toque para ver como desbloquear' : pushInfo.sub}
+                </p>
               )}
             </div>
+            {push.state === 'denied' && (
+              <ChevronRight size={16} style={{ color: '#f87171', opacity: 0.7 }} />
+            )}
             {/* Toggle pill */}
             {(push.state === 'subscribed' || push.state === 'unsubscribed') && (
               <div className="w-11 h-6 rounded-full relative flex-shrink-0 transition-all"
@@ -203,6 +217,68 @@ export function Profile() {
         </button>
 
       </motion.div>
+
+      {/* Modal: como desbloquear notificações */}
+      <AnimatePresence>
+        {showDeniedHelp && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setShowDeniedHelp(false)}
+              className="fixed inset-0 z-40"
+              style={{ background: 'rgba(0,0,0,0.7)' }}
+            />
+            <motion.div
+              initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+              className="fixed bottom-0 left-0 right-0 z-50 rounded-t-3xl p-6"
+              style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.08)' }}>
+
+              {/* Header */}
+              <div className="flex items-center justify-between mb-5">
+                <div className="flex items-center gap-2">
+                  <Settings size={18} style={{ color: '#f87171' }} />
+                  <h2 className="text-base font-bold text-white">Como ativar notificações</h2>
+                </div>
+                <button onClick={() => setShowDeniedHelp(false)}
+                  className="w-8 h-8 rounded-full flex items-center justify-center"
+                  style={{ background: 'rgba(255,255,255,0.08)' }}>
+                  <X size={16} style={{ color: 'rgba(255,255,255,0.6)' }} />
+                </button>
+              </div>
+
+              {/* Steps */}
+              <div className="flex flex-col gap-3 mb-6">
+                {[
+                  { n: 1, text: 'Na barra de endereço do Chrome, toque no ícone 🔒 ou nos três pontos ⋮' },
+                  { n: 2, text: 'Toque em "Configurações do site" ou "Permissões"' },
+                  { n: 3, text: 'Encontre "Notificações" e mude para Permitir' },
+                  { n: 4, text: 'Volte aqui e toque no card de notificações novamente' },
+                ].map(({ n, text }) => (
+                  <div key={n} className="flex items-start gap-3">
+                    <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
+                         style={{ background: 'rgba(248,113,113,0.15)', border: '1px solid rgba(248,113,113,0.3)' }}>
+                      <span className="text-xs font-bold" style={{ color: '#f87171' }}>{n}</span>
+                    </div>
+                    <p className="text-sm text-white leading-relaxed" style={{ opacity: 0.85 }}>{text}</p>
+                  </div>
+                ))}
+              </div>
+
+              <p className="text-xs text-center mb-4" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                No iPhone (Safari), vá em Ajustes → Safari → Notificações
+              </p>
+
+              <button
+                onClick={() => setShowDeniedHelp(false)}
+                className="w-full py-3.5 rounded-2xl font-semibold text-sm"
+                style={{ background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.7)' }}>
+                Entendi
+              </button>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
