@@ -1,14 +1,26 @@
 import { precacheAndRoute, cleanupOutdatedCaches } from 'workbox-precaching'
 import { clientsClaim } from 'workbox-core'
 import { registerRoute } from 'workbox-routing'
-import { NetworkFirst } from 'workbox-strategies'
+import { NetworkFirst, StaleWhileRevalidate } from 'workbox-strategies'
 
 declare let self: ServiceWorkerGlobalScope & { __WB_MANIFEST: any[] }
 
 self.skipWaiting()
 clientsClaim()
 cleanupOutdatedCaches()
-precacheAndRoute(self.__WB_MANIFEST)
+
+// Network-first para HTML (navigation) — garante sempre o index.html atualizado
+// evita tela branca quando o bundle JS muda de hash após rebuild
+registerRoute(
+  ({ request }) => request.mode === 'navigate',
+  new NetworkFirst({ cacheName: 'pages-cache', networkTimeoutSeconds: 3 })
+)
+
+// Stale-while-revalidate para assets JS/CSS (logo hashed, atualiza em bg)
+registerRoute(
+  ({ request }) => request.destination === 'script' || request.destination === 'style',
+  new StaleWhileRevalidate({ cacheName: 'assets-cache' })
+)
 
 // Network-first para chamadas ao Supabase
 registerRoute(
@@ -16,16 +28,16 @@ registerRoute(
   new NetworkFirst({ cacheName: 'supabase-cache', networkTimeoutSeconds: 5 })
 )
 
+precacheAndRoute(self.__WB_MANIFEST)
+
 // ─── Push notification received ──────────────────────────────────────────────
 self.addEventListener('push', (event: PushEvent) => {
-  // Always show something — even if data is null/undecryptable (diagnostic)
   let payload: { title?: string; body?: string; tag?: string; data?: Record<string, string> } = {}
   try {
     if (event.data) {
       try { payload = event.data.json() }
       catch { payload = { title: '🦈 Shark Green', body: event.data.text() } }
     } else {
-      // No payload — push arrived but without data (delivery works, encryption may not)
       payload = { title: '🦈 Shark Green', body: 'Nova atualização disponível!' }
     }
   } catch { payload = { title: '🦈 Shark Green', body: 'Nova atualização disponível!' } }
