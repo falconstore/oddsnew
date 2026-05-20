@@ -362,8 +362,22 @@ export function Dashboard() {
   const { data: allStats = [] } = useLast90DaysStats()
   const h = new Date().getHours()
   const greeting = h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite'
-  const firstName  = lead?.name?.split(' ')[0] ?? 'Trader'
   const lucroBruto = stats?.lucroBruto ?? 0
+
+  // Hype titles — rotate by day of week so it changes every dia sem precisar do nome real
+  const HYPE_TITLES = ['Jogador', 'Trader', 'Craque', 'Guerreiro', 'Vencedor', 'Monstro', 'Caro']
+  const HYPE_MOTTOS = [
+    'Hoje é dia de green! 🟢',
+    'Partiu procedimento! 🎯',
+    'Semana de lucro! 💰',
+    'Bora operar forte! 🦈',
+    'Hoje tem resultado! ⚡',
+    'Final de semana de green! 🏆',
+    'Domingo de lucro! 🟢',
+  ]
+  const dow = new Date().getDay() // 0 = domingo
+  const firstName = lead?.name?.split(' ')[0] ?? HYPE_TITLES[dow % HYPE_TITLES.length]
+  const motto = HYPE_MOTTOS[dow]
 
   // Slice chart data to match selected period
   const chartDays = period === '90d' ? 90 : period === '30d' ? 30 : 7
@@ -379,7 +393,8 @@ export function Dashboard() {
           <p className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>
             {format(new Date(), "EEEE, d 'de' MMMM", { locale: ptBR })}
           </p>
-          <h1 className="text-xl font-bold text-white mt-0.5">{greeting}, {firstName} 👋</h1>
+          <h1 className="text-xl font-bold text-white mt-0.5">{greeting}, {firstName}! 👋</h1>
+          <p className="text-xs font-semibold mt-0.5" style={{ color: 'hsl(145 80% 52%)' }}>{motto}</p>
         </div>
         <NavLink to="/perfil"
           className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 active:scale-90 transition-transform"
