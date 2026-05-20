@@ -356,6 +356,30 @@ serve(async (req) => {
           if (byLinkB) { bLead = byLinkB; bFoundVia = "bonus_invite_link"; }
         }
 
+        // Fallback por telegram_username — cobre o caso em que o admin adicionou
+        // manualmente e o telegram_user_id ainda não foi gravado no lead (usuário
+        // ainda não interagiu com o bot via /start).
+        if (!bLead && username) {
+          const { data: byUsernameB } = await supabase
+            .from("trial_leads")
+            .select("id, status, telegram_user_id, bonus_invite_link")
+            .eq("telegram_username", username.toLowerCase())
+            .in("status", ["active", "converted"])
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (byUsernameB) {
+            bLead = byUsernameB;
+            bFoundVia = "telegram_username";
+            log("bonus-lookup-by-username", {
+              update_id: updateId,
+              lead_id: byUsernameB.id,
+              username,
+              user_id: userId,
+            });
+          }
+        }
+
         const kickFromBonus = async () => {
           if (!botToken) return;
           try {
@@ -371,6 +395,15 @@ serve(async (req) => {
         };
 
         if (!bLead) {
+          if (wasAddedByOther) {
+            // Admin adicionou manualmente um usuário sem lead associado.
+            // Não kickamos — admin sabe o que está fazendo. Apenas registramos.
+            log("bonus-admin-add-no-lead", {
+              update_id: updateId, user_id: userId, username: username ?? null,
+              actor_user_id: actorUserId ?? null,
+            });
+            return json({ ok: true, action: "bonus-admin-add-no-lead" });
+          }
           await kickFromBonus();
           log("bonus-stranger-kicked", { update_id: updateId, user_id: userId, invite_link: inviteLink ?? null });
           return json({ ok: true, action: "bonus-stranger-kicked" });
