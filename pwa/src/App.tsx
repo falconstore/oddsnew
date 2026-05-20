@@ -12,6 +12,7 @@ import { ProcedureDetail } from '@/pages/ProcedureDetail'
 import { LiveProcedures } from '@/pages/LiveProcedures'
 import { DuploGreen } from '@/pages/DuploGreen'
 import { Profile } from '@/pages/Profile'
+import { Subscription } from '@/pages/Subscription'
 import { Paywall } from '@/pages/Paywall'
 
 export default function App() {
@@ -50,6 +51,9 @@ export default function App() {
 
           <Route path="/perfil" element={
             <ProtectedRoute><Layout><Profile /></Layout></ProtectedRoute>
+          } />
+          <Route path="/assinatura" element={
+            <ProtectedRoute><Layout><Subscription /></Layout></ProtectedRoute>
           } />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

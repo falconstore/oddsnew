@@ -1,9 +1,10 @@
 import { motion } from 'framer-motion'
-import { User, LogOut, Clock, Crown, Send, AlertCircle } from 'lucide-react'
+import { User, LogOut, Clock, Crown, Send, AlertCircle, Bell, BellOff, CreditCard, ChevronRight } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { format, parseISO, differenceInDays } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { useAuth, signOut } from '@/hooks/useAuth'
+import { usePushNotifications } from '@/hooks/usePushNotifications'
 
 function InfoRow({ label, value, icon: Icon }: { label: string; value: string; icon: any }) {
   return (
@@ -21,12 +22,20 @@ function InfoRow({ label, value, icon: Icon }: { label: string; value: string; i
   )
 }
 
+const PUSH_LABELS: Record<string, { label: string; sub: string; color: string }> = {
+  subscribed:   { label: 'Notificações ativas',    sub: 'Toque para desativar',  color: 'hsl(145 80% 48%)' },
+  unsubscribed: { label: 'Ativar notificações',    sub: 'Fique por dentro dos resultados', color: 'rgba(255,255,255,0.6)' },
+  denied:       { label: 'Notificações bloqueadas', sub: 'Ative nas configurações do browser', color: '#f87171' },
+  loading:      { label: 'Carregando...',           sub: '',                       color: 'rgba(255,255,255,0.4)' },
+  unsupported:  { label: 'Não suportado',           sub: 'Use Chrome/Edge para ativar notificações', color: 'rgba(255,255,255,0.3)' },
+}
+
 export function Profile() {
   const { lead, status, user } = useAuth()
   const navigate = useNavigate()
+  const push = usePushNotifications()
 
   async function handleLogout() {
-    // signOut já faz window.location.replace('/login') internamente
     await signOut()
   }
 
@@ -40,6 +49,9 @@ export function Profile() {
   const telegramLink = telegramUsername
     ? `https://t.me/${telegramUsername.replace('@', '')}`
     : 'https://t.me/sharkgreen'
+
+  const pushInfo = PUSH_LABELS[push.state] ?? PUSH_LABELS.unsupported
+  const canTogglePush = push.state === 'subscribed' || push.state === 'unsubscribed'
 
   return (
     <div className="page-content no-scrollbar px-4">
@@ -108,6 +120,51 @@ export function Profile() {
             />
           )}
         </div>
+
+        {/* Subscription detail link */}
+        <button onClick={() => navigate('/assinatura')}
+          className="glass flex items-center gap-3 p-4 w-full text-left active:scale-[0.98] transition-transform"
+          style={{ border: '1px solid rgba(167,139,250,0.15)' }}>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+               style={{ background: 'rgba(167,139,250,0.1)' }}>
+            <CreditCard size={18} style={{ color: '#a78bfa' }} />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-white">Minha Assinatura</p>
+            <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>Status, histórico e faturas</p>
+          </div>
+          <ChevronRight size={16} style={{ color: 'rgba(255,255,255,0.3)' }} />
+        </button>
+
+        {/* Push notifications toggle */}
+        {push.state !== 'unsupported' && (
+          <button
+            onClick={canTogglePush ? push.toggle : undefined}
+            disabled={push.state === 'loading' || push.state === 'denied'}
+            className="glass flex items-center gap-3 p-4 w-full text-left transition-all active:scale-[0.98] disabled:opacity-60"
+            style={{ border: `1px solid ${push.state === 'subscribed' ? 'rgba(30,222,107,0.2)' : push.state === 'denied' ? 'rgba(248,113,113,0.2)' : 'rgba(255,255,255,0.08)'}` }}>
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                 style={{ background: push.state === 'subscribed' ? 'rgba(30,222,107,0.1)' : 'rgba(255,255,255,0.05)' }}>
+              {push.state === 'subscribed'
+                ? <Bell size={18} style={{ color: 'hsl(145 80% 48%)' }} />
+                : <BellOff size={18} style={{ color: push.state === 'denied' ? '#f87171' : 'rgba(255,255,255,0.4)' }} />}
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-white">{pushInfo.label}</p>
+              {pushInfo.sub && (
+                <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>{pushInfo.sub}</p>
+              )}
+            </div>
+            {/* Toggle pill */}
+            {(push.state === 'subscribed' || push.state === 'unsubscribed') && (
+              <div className="w-11 h-6 rounded-full relative flex-shrink-0 transition-all"
+                   style={{ background: push.state === 'subscribed' ? 'hsl(145 80% 48%)' : 'rgba(255,255,255,0.15)' }}>
+                <div className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all"
+                     style={{ left: push.state === 'subscribed' ? '22px' : '2px' }} />
+              </div>
+            )}
+          </button>
+        )}
 
         {/* Telegram — only for subscribers */}
         {isSubscriber && (

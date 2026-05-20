@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Star } from 'lucide-react'
+import { LayoutDashboard, ChevronsUp } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useProceduresToday } from '@/hooks/useProcedures'
 import { differenceInMinutes, isFuture, parseISO } from 'date-fns'
@@ -40,15 +40,9 @@ function LiveIcon({ size = 20, color = '#ef4444' }: { size?: number; color?: str
   )
 }
 
-// 2× star icon for Duplo Green
+// Duplo Green — dois chevrons sobrepostos para cima (semântica: "ganho duplo")
 function DgIcon({ size = 20, color = 'currentColor' }: { size?: number; color?: string }) {
-  return (
-    <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
-      <Star size={size} color={color} fill={color === 'rgba(255,255,255,0.4)' ? 'none' : color} style={{ opacity: color === 'rgba(255,255,255,0.4)' ? 1 : 0.85 }} />
-      <span className="absolute -bottom-0.5 -right-1 text-[7px] font-black leading-none"
-            style={{ color, fontVariantNumeric: 'tabular-nums' }}>2×</span>
-    </div>
-  )
+  return <ChevronsUp size={size} color={color} strokeWidth={2.2} />
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {
