@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, NavLink } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, Clock, TrendingUp, Zap, Star, ChevronRight } from 'lucide-react'
+import { Search, Clock, TrendingUp, Zap, Star, ChevronRight, User } from 'lucide-react'
 import { format, parseISO, differenceInMinutes, isFuture } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { useProceduresList } from '@/hooks/useProcedures'
@@ -71,7 +71,8 @@ function ProcedureCard({ p, onClick }: { p: Procedure; onClick: () => void }) {
                   style={{ background: 'rgba(167,139,250,0.15)', color: '#a78bfa' }}>DG</span>
           )}
         </div>
-        <p className="text-sm font-medium text-white truncate">
+        <p className="text-sm font-medium text-white leading-snug"
+           style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
           {p.promotion_name || p.platform || `Operação #${p.procedure_number}`}
         </p>
         <p className="text-xs mt-0.5 truncate" style={{ color: 'rgba(255,255,255,0.35)' }}>
@@ -82,12 +83,17 @@ function ProcedureCard({ p, onClick }: { p: Procedure; onClick: () => void }) {
       </div>
 
       <div className="flex flex-col items-end gap-1 flex-shrink-0">
-        {hasLucro && (
+        {hasLucro ? (
           <span className="text-sm font-bold font-mono"
                 style={{ color: lucro >= 0 ? 'hsl(145 80% 48%)' : '#f87171' }}>
             {lucro >= 0 ? '+' : ''}R${lucro.toFixed(0)}
           </span>
-        )}
+        ) : Number(p.profit_loss ?? 0) !== 0 ? (
+          <span className="text-xs font-semibold font-mono"
+                style={{ color: 'rgba(255,255,255,0.35)' }}>
+            pot. R${Math.abs(Number(p.profit_loss)).toFixed(0)}
+          </span>
+        ) : null}
         <ChevronRight size={14} style={{ color: 'rgba(255,255,255,0.25)' }} />
       </div>
     </button>
@@ -113,11 +119,18 @@ export function Procedures() {
 
   return (
     <div className="page-content no-scrollbar px-4">
-      <div className="pt-2 mb-4">
-        <h1 className="text-xl font-bold text-white mb-1">Procedimentos</h1>
-        <p className="text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>
-          Todos os procedimentos em tempo real
-        </p>
+      <div className="flex items-start justify-between pt-2 mb-4">
+        <div>
+          <h1 className="text-xl font-bold text-white mb-1">Procedimentos</h1>
+          <p className="text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>
+            Todos os procedimentos em tempo real
+          </p>
+        </div>
+        <NavLink to="/perfil"
+          className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 active:scale-90 transition-transform"
+          style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)' }}>
+          <User size={18} style={{ color: 'rgba(255,255,255,0.7)' }} />
+        </NavLink>
       </div>
 
       {/* Search */}

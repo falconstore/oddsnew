@@ -83,7 +83,6 @@ export function useAuth(): AuthState {
 export async function signOut() {
   // scope: 'local' — só limpa a sessão local, sem broadcast para outros clients
   // Evita que o painel admin detecte o logout do PWA
+  // onAuthStateChange dispara SIGNED_OUT → status='unauthenticated' → ProtectedRoute redireciona pra /login
   await supabase.auth.signOut({ scope: 'local' })
-  // Força navegação para o login do PWA (sem depender de navigate do React Router)
-  window.location.replace('/login')
 }

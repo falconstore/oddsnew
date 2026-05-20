@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom'
-import { LayoutDashboard, User, Disc3 } from 'lucide-react'
+import { LayoutDashboard } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useProceduresToday } from '@/hooks/useProcedures'
 import { differenceInMinutes, isFuture, parseISO } from 'date-fns'
@@ -48,7 +48,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { to: '/',             label: 'Início',        renderIcon: (active: boolean) => <LayoutDashboard size={20} style={{ color: active ? 'hsl(145 80% 48%)' : 'rgba(255,255,255,0.4)' }} />, liveStyle: false },
     { to: '/ao-vivo',      label: 'Ao Vivo',       renderIcon: (active: boolean) => <LiveIcon size={20} color={active ? '#ef4444' : 'rgba(255,255,255,0.4)'} />, liveStyle: true },
     { to: '/procedimentos', label: 'Procedimentos', renderIcon: (active: boolean) => <SoccerIcon size={20} color={active ? 'hsl(145 80% 48%)' : 'rgba(255,255,255,0.4)'} />, liveStyle: false },
-    { to: '/perfil',        label: 'Perfil',        renderIcon: (active: boolean) => <User size={20} style={{ color: active ? 'hsl(145 80% 48%)' : 'rgba(255,255,255,0.4)' }} />, liveStyle: false },
   ]
 
   return (

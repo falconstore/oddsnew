@@ -1,8 +1,9 @@
 import { useState, useRef } from 'react'
+import { NavLink } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { motion, AnimatePresence } from 'framer-motion'
-import { TrendingUp, Zap, BarChart2, Users, Minus, Plus } from 'lucide-react'
+import { TrendingUp, Zap, BarChart2, Users, Minus, Plus, User } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { usePeriodStats, useLast90DaysStats, PERIODS, PeriodKey, DayPoint } from '@/hooks/useStats'
 import {
@@ -147,7 +148,7 @@ function CalendarHeatmap({ data }: { data: DayPoint[] }) {
 
   return (
     <div className="glass p-4 mb-5" style={{ border: '1px solid rgba(255,255,255,0.06)' }}>
-      <div className="flex flex-wrap gap-1 mb-3">
+      <div className="grid gap-1 mb-3" style={{ gridTemplateColumns: 'repeat(7, 1fr)' }}>
         {last30.map(s => {
           const ratio   = Math.abs(s.lucro) / max
           const pos     = s.lucro >= 0
@@ -160,9 +161,9 @@ function CalendarHeatmap({ data }: { data: DayPoint[] }) {
           return (
             <button key={s.date}
               onClick={() => setSelected(isSel ? null : s)}
-              className="rounded-lg flex-shrink-0 flex flex-col items-center justify-center transition-transform active:scale-90"
+              className="rounded-lg flex flex-col items-center justify-center transition-transform active:scale-90"
               style={{
-                width: 46, height: 52,
+                aspectRatio: '1 / 1.1',
                 background: bg,
                 border: isSel
                   ? `2px solid ${pos ? 'hsl(145 80% 55%)' : '#f87171'}`
@@ -380,7 +381,11 @@ export function Dashboard() {
           </p>
           <h1 className="text-xl font-bold text-white mt-0.5">{greeting}, {firstName} 👋</h1>
         </div>
-        <img src="/logo.png" alt="Shark" className="w-10 h-10 rounded-xl" />
+        <NavLink to="/perfil"
+          className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 active:scale-90 transition-transform"
+          style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)' }}>
+          <User size={18} style={{ color: 'rgba(255,255,255,0.7)' }} />
+        </NavLink>
       </div>
 
       {/* Period selector */}

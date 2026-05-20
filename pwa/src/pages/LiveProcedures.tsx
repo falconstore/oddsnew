@@ -1,8 +1,8 @@
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, NavLink } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { differenceInMinutes, isFuture, parseISO, format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { ChevronRight, Clock, Zap, Star, TrendingUp } from 'lucide-react'
+import { ChevronRight, Clock, Zap, Star, TrendingUp, User } from 'lucide-react'
 import { useProceduresToday } from '@/hooks/useProcedures'
 import { Procedure } from '@/lib/supabase'
 
@@ -94,23 +94,28 @@ export function LiveProcedures() {
     <div className="page-content no-scrollbar px-4">
 
       {/* Header */}
-      <div className="pt-2 mb-5 flex items-start justify-between">
-        <div>
+      <div className="pt-2 mb-5 flex items-start justify-between gap-2">
+        <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
             <span className="w-2 h-2 rounded-full bg-red-500 -ml-4" />
             <h1 className="text-xl font-bold text-white">Jogos Ao Vivo</h1>
+            {live.length > 0 && (
+              <div className="flex items-center justify-center px-2.5 py-1 rounded-xl"
+                style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)' }}>
+                <span className="text-sm font-black" style={{ color: '#ef4444' }}>{live.length}</span>
+              </div>
+            )}
           </div>
           <p className="text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>
             Procedimentos com partida em andamento
           </p>
         </div>
-        {live.length > 0 && (
-          <div className="flex items-center justify-center px-3 py-1.5 rounded-xl"
-            style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)' }}>
-            <span className="text-sm font-black" style={{ color: '#ef4444' }}>{live.length}</span>
-          </div>
-        )}
+        <NavLink to="/perfil"
+          className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 active:scale-90 transition-transform"
+          style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)' }}>
+          <User size={18} style={{ color: 'rgba(255,255,255,0.7)' }} />
+        </NavLink>
       </div>
 
       {isLoading ? (
