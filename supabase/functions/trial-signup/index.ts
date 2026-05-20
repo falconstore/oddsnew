@@ -174,6 +174,31 @@ serve(async (req) => {
       return json({ error: "Erro ao salvar cadastro." }, { status: 500 });
     }
 
+    // ── Auto-cria conta no Supabase Auth para acesso ao PWA ──────────────────
+    // Senha temporária = número do WhatsApp (só dígitos).
+    // email_confirm:true pula o e-mail de confirmação (o lead já validou o e-mail
+    // implicitamente ao preencher o formulário público).
+    // needs_password_change: true → PWA detecta no login e redireciona para /set-password.
+    // Se o e-mail já existir no Auth (ex: re-cadastro improvável), ignora silenciosamente.
+    try {
+      const { error: authErr } = await supabase.auth.admin.createUser({
+        email,
+        password: whatsapp,
+        email_confirm: true,
+        user_metadata: { name, whatsapp, needs_password_change: true },
+      });
+      if (authErr) {
+        const msg = authErr.message?.toLowerCase() ?? "";
+        if (!msg.includes("already registered") && !msg.includes("already exists")) {
+          console.warn("trial-signup: auth.admin.createUser:", authErr.message);
+        }
+      } else {
+        console.log("trial-signup: Auth user created for", email.slice(0, 4) + "***");
+      }
+    } catch (e) {
+      console.warn("trial-signup: auth creation exception:", e);
+    }
+
     // Deep-link do bot: força o lead a apertar Start no DM antes de receber
     // o invite_link via DM. Isso garante que o cron consiga mandar as DMs
     // de aviso (24h e 1h) — caso contrário o Telegram bloqueia (403).

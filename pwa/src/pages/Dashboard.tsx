@@ -1,9 +1,9 @@
 import { useState, useRef } from 'react'
 import { NavLink } from 'react-router-dom'
-import { format, parseISO } from 'date-fns'
+import { format, parseISO, differenceInDays } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { motion, AnimatePresence } from 'framer-motion'
-import { TrendingUp, Zap, BarChart2, Users, Minus, Plus, User, Send } from 'lucide-react'
+import { TrendingUp, Zap, BarChart2, Users, Minus, Plus, User, Send, Clock, Crown, AlertTriangle } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { usePeriodStats, useLast90DaysStats, PERIODS, PeriodKey, DayPoint } from '@/hooks/useStats'
 
@@ -359,7 +359,7 @@ function CpfCalculator({ lucroBruto, period }: { lucroBruto: number; period: Per
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export function Dashboard() {
-  const { lead }    = useAuth()
+  const { lead, status } = useAuth()
   const [period, setPeriod] = useState<PeriodKey>('today')
 
   const { data: stats }        = usePeriodStats(period)
@@ -404,6 +404,64 @@ export function Dashboard() {
           <User size={18} style={{ color: 'rgba(255,255,255,0.7)' }} />
         </NavLink>
       </div>
+
+      {/* Banner "Trial expirado" — para expirados */}
+      {status === 'expired' && (
+        <a href="https://sharkgreen.com.br"
+           className="flex items-center gap-3 px-4 py-3 rounded-2xl mb-4 active:scale-[0.98] transition-transform"
+           style={{
+             background: 'rgba(248,113,113,0.08)',
+             border: '1px solid rgba(248,113,113,0.3)',
+           }}>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+               style={{ background: 'rgba(248,113,113,0.15)', border: '1px solid rgba(248,113,113,0.3)' }}>
+            <AlertTriangle size={18} style={{ color: '#f87171' }} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-white leading-tight">Assinatura Pendente</p>
+            <p className="text-xs mt-0.5 truncate" style={{ color: 'rgba(255,255,255,0.5)' }}>
+              Seu trial expirou · toque para assinar
+            </p>
+          </div>
+          <span className="text-[10px] font-black px-2 py-1 rounded-lg flex-shrink-0"
+                style={{ background: 'rgba(248,113,113,0.2)', color: '#f87171' }}>
+            ASSINAR
+          </span>
+        </a>
+      )}
+
+      {/* Banner "Trial 7 dias" — para trial ativo */}
+      {status === 'active_trial' && lead?.expires_at && (() => {
+        const daysLeft = differenceInDays(parseISO(lead.expires_at), new Date())
+        const isUrgent = daysLeft <= 2
+        return (
+          <div className="flex items-center gap-3 px-4 py-3 rounded-2xl mb-4"
+               style={{
+                 background: isUrgent ? 'rgba(248,113,113,0.06)' : 'rgba(250,204,21,0.06)',
+                 border: `1px solid ${isUrgent ? 'rgba(248,113,113,0.25)' : 'rgba(250,204,21,0.2)'}`,
+               }}>
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                 style={{ background: isUrgent ? 'rgba(248,113,113,0.12)' : 'rgba(250,204,21,0.1)' }}>
+              <Clock size={18} style={{ color: isUrgent ? '#f87171' : '#facc15' }} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-white leading-tight">
+                Teste Gratuito · 7 Dias
+              </p>
+              <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                {daysLeft <= 0
+                  ? 'Encerra hoje!'
+                  : `Encerra em ${daysLeft} dia${daysLeft !== 1 ? 's' : ''}`}
+              </p>
+            </div>
+            <a href="https://sharkgreen.com.br"
+               className="text-[10px] font-black px-2.5 py-1.5 rounded-lg flex-shrink-0 flex items-center gap-1 active:scale-95 transition-transform"
+               style={{ background: 'hsl(145 80% 48%)', color: '#0b1120' }}>
+              <Crown size={9} /> Assinar
+            </a>
+          </div>
+        )
+      })()}
 
       {/* Banner VIP Telegram — só para assinantes */}
       {status === 'active_subscriber' && (

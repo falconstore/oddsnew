@@ -26,19 +26,24 @@ export function Login() {
     if (!email.trim() || !password) return
     setLoading(true)
     setError('')
-    const { error: err } = await supabase.auth.signInWithPassword({
+    const { data, error: err } = await supabase.auth.signInWithPassword({
       email: email.trim().toLowerCase(),
       password,
     })
     setLoading(false)
     if (err) {
       if (err.message?.includes('Invalid login credentials')) {
-        setError('E-mail ou senha incorretos.')
+        setError('E-mail ou senha incorretos. Lembre-se: a senha padrão é seu número de WhatsApp (só dígitos).')
       } else {
         setError('Erro ao entrar. Tente novamente.')
       }
+      return
     }
-    // Se ok, onAuthStateChange no useAuth redireciona automaticamente
+    // Primeiro acesso: redireciona para trocar a senha temporária (WhatsApp)
+    if (data?.user?.user_metadata?.needs_password_change) {
+      window.location.replace('/set-password')
+    }
+    // Caso contrário onAuthStateChange no useAuth redireciona automaticamente
   }
 
   async function handleForgot(e: React.FormEvent) {
