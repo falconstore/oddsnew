@@ -60,6 +60,14 @@ export function Profile() {
     if (canTogglePush) push.toggle()
   }
 
+  const [refreshDone, setRefreshDone] = useState(false)
+  async function handleRefresh() {
+    setRefreshDone(false)
+    await push.refresh()
+    setRefreshDone(true)
+    setTimeout(() => setRefreshDone(false), 3000)
+  }
+
   return (
     <div className="page-content no-scrollbar px-4">
       <div className="pt-2 mb-5">
@@ -145,39 +153,61 @@ export function Profile() {
 
         {/* Push notifications toggle */}
         {push.state !== 'unsupported' && (
-          <button
-            onClick={handlePushClick}
-            disabled={push.state === 'loading'}
-            className="glass flex items-center gap-3 p-4 w-full text-left transition-all active:scale-[0.98] disabled:opacity-60"
-            style={{ border: `1px solid ${push.state === 'subscribed' ? 'rgba(30,222,107,0.2)' : push.state === 'denied' ? 'rgba(248,113,113,0.2)' : 'rgba(255,255,255,0.08)'}` }}>
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                 style={{ background: push.state === 'subscribed' ? 'rgba(30,222,107,0.1)' : push.state === 'denied' ? 'rgba(248,113,113,0.08)' : 'rgba(255,255,255,0.05)' }}>
-              {push.state === 'subscribed'
-                ? <Bell size={18} style={{ color: 'hsl(145 80% 48%)' }} />
-                : push.state === 'denied'
-                ? <Settings size={18} style={{ color: '#f87171' }} />
-                : <BellOff size={18} style={{ color: 'rgba(255,255,255,0.4)' }} />}
-            </div>
-            <div className="flex-1">
-              <p className="text-sm font-semibold" style={{ color: push.state === 'denied' ? '#f87171' : 'white' }}>{pushInfo.label}</p>
-              {pushInfo.sub && (
-                <p className="text-xs mt-0.5" style={{ color: push.state === 'denied' ? 'rgba(248,113,113,0.7)' : 'rgba(255,255,255,0.4)' }}>
-                  {push.state === 'denied' ? 'Toque para ver como desbloquear' : pushInfo.sub}
-                </p>
-              )}
-            </div>
-            {push.state === 'denied' && (
-              <ChevronRight size={16} style={{ color: '#f87171', opacity: 0.7 }} />
-            )}
-            {/* Toggle pill */}
-            {(push.state === 'subscribed' || push.state === 'unsubscribed') && (
-              <div className="w-11 h-6 rounded-full relative flex-shrink-0 transition-all"
-                   style={{ background: push.state === 'subscribed' ? 'hsl(145 80% 48%)' : 'rgba(255,255,255,0.15)' }}>
-                <div className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all"
-                     style={{ left: push.state === 'subscribed' ? '22px' : '2px' }} />
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={handlePushClick}
+              disabled={push.state === 'loading'}
+              className="glass flex items-center gap-3 p-4 w-full text-left transition-all active:scale-[0.98] disabled:opacity-60"
+              style={{ border: `1px solid ${push.state === 'subscribed' ? 'rgba(30,222,107,0.2)' : push.state === 'denied' ? 'rgba(248,113,113,0.2)' : 'rgba(255,255,255,0.08)'}` }}>
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                   style={{ background: push.state === 'subscribed' ? 'rgba(30,222,107,0.1)' : push.state === 'denied' ? 'rgba(248,113,113,0.08)' : 'rgba(255,255,255,0.05)' }}>
+                {push.state === 'subscribed'
+                  ? <Bell size={18} style={{ color: 'hsl(145 80% 48%)' }} />
+                  : push.state === 'denied'
+                  ? <Settings size={18} style={{ color: '#f87171' }} />
+                  : <BellOff size={18} style={{ color: 'rgba(255,255,255,0.4)' }} />}
               </div>
+              <div className="flex-1">
+                <p className="text-sm font-semibold" style={{ color: push.state === 'denied' ? '#f87171' : 'white' }}>{pushInfo.label}</p>
+                {pushInfo.sub && (
+                  <p className="text-xs mt-0.5" style={{ color: push.state === 'denied' ? 'rgba(248,113,113,0.7)' : 'rgba(255,255,255,0.4)' }}>
+                    {push.state === 'denied' ? 'Toque para ver como desbloquear' : pushInfo.sub}
+                  </p>
+                )}
+              </div>
+              {push.state === 'denied' && (
+                <ChevronRight size={16} style={{ color: '#f87171', opacity: 0.7 }} />
+              )}
+              {/* Toggle pill */}
+              {(push.state === 'subscribed' || push.state === 'unsubscribed') && (
+                <div className="w-11 h-6 rounded-full relative flex-shrink-0 transition-all"
+                     style={{ background: push.state === 'subscribed' ? 'hsl(145 80% 48%)' : 'rgba(255,255,255,0.15)' }}>
+                  <div className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all"
+                       style={{ left: push.state === 'subscribed' ? '22px' : '2px' }} />
+                </div>
+              )}
+            </button>
+
+            {/* Refresh subscription — shown when subscribed, helps fix stale FCM tokens */}
+            {push.state === 'subscribed' && (
+              <button
+                onClick={handleRefresh}
+                disabled={push.refreshing}
+                className="flex items-center justify-center gap-2 py-2 px-4 rounded-xl text-xs transition-all active:scale-[0.97] disabled:opacity-50"
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: refreshDone ? 'hsl(145 80% 48%)' : 'rgba(255,255,255,0.35)' }}>
+                {push.refreshing ? (
+                  <>
+                    <div className="w-3 h-3 rounded-full border border-white/30 border-t-white/80 animate-spin" />
+                    Atualizando inscrição...
+                  </>
+                ) : refreshDone ? (
+                  <>✓ Inscrição atualizada — aguarde o próximo envio</>
+                ) : (
+                  <>↻ Notificações não chegando? Toque aqui para atualizar</>
+                )}
+              </button>
             )}
-          </button>
+          </div>
         )}
 
         {/* Telegram — only for subscribers */}

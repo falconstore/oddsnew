@@ -16,6 +16,7 @@ export type PushState = 'unsupported' | 'denied' | 'subscribed' | 'unsubscribed'
 export function usePushNotifications() {
   const { user, lead } = useAuth()
   const [state, setState] = useState<PushState>('loading')
+  const [refreshing, setRefreshing] = useState(false)
 
   const isSupported = typeof window !== 'undefined'
     && 'serviceWorker' in navigator
@@ -26,7 +27,6 @@ export function usePushNotifications() {
     if (!isSupported) { setState('unsupported'); return }
     if (Notification.permission === 'denied') { setState('denied'); return }
 
-    // Check if already subscribed
     navigator.serviceWorker.ready.then(reg =>
       reg.pushManager.getSubscription()
     ).then(sub => {
@@ -78,10 +78,48 @@ export function usePushNotifications() {
     }
   }
 
+  // Force fresh FCM token: removes current sub from browser + DB, then re-creates
+  async function refresh() {
+    if (!isSupported || !user) return
+    setRefreshing(true)
+    setState('loading')
+    try {
+      const reg = await navigator.serviceWorker.ready
+
+      // 1. Remove current subscription from browser and DB
+      const existing = await reg.pushManager.getSubscription()
+      if (existing) {
+        await supabase.from('push_subscriptions').delete().eq('endpoint', existing.endpoint)
+        await existing.unsubscribe()
+      }
+
+      // 2. Create brand-new subscription (gets fresh FCM token)
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      })
+
+      const json = sub.toJSON()
+      await supabase.from('push_subscriptions').upsert({
+        user_id: user.id,
+        lead_id: lead?.id ?? null,
+        endpoint: json.endpoint!,
+        p256dh: (json.keys as any).p256dh,
+        auth: (json.keys as any).auth,
+      }, { onConflict: 'endpoint' })
+
+      setState('subscribed')
+    } catch {
+      setState('subscribed') // keep showing as subscribed if refresh fails
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
   function toggle() {
     if (state === 'subscribed') unsubscribe()
     else subscribe()
   }
 
-  return { state, isSupported, subscribe, unsubscribe, toggle }
+  return { state, isSupported, subscribe, unsubscribe, toggle, refresh, refreshing }
 }
