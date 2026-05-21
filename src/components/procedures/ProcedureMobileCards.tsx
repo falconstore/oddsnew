@@ -178,7 +178,10 @@ export function ProcedureMobileCards({ procedures, proceduresById, onEdit, onDel
             </div>
             {(() => {
               const dpl = getDisplayProfitLoss(proc, proceduresById);
-              const showEffective = dpl.effective !== 0;
+              // Settled vs previsto deve ser decidido pelo LÍQUIDO cru (profit_loss),
+              // não pelo effective — pois effective = liquid + déficit das origens,
+              // então pode ser != 0 mesmo com jogo ainda em aberto (liquid=0).
+              const showEffective = dpl.liquidEffective !== 0;
               const showPrevisto = !showEffective && dpl.previsto !== 0;
               return (
                 <div className="bg-white/[0.03] rounded-xl p-2.5 border border-white/5">

@@ -223,7 +223,10 @@ export function ProcedureTable({ procedures, proceduresById, visibleColumns, onE
               )}
               {visibleColumns.includes('profit_loss') && (() => {
                 const dpl = getDisplayProfitLoss(proc, proceduresById);
-                const showEffective = dpl.effective !== 0;
+                // Settled vs previsto deve ser decidido pelo LÍQUIDO cru (profit_loss),
+                // não pelo effective — pois effective = liquid + déficit das origens,
+                // então pode ser != 0 mesmo com jogo ainda em aberto (liquid=0).
+                const showEffective = dpl.liquidEffective !== 0;
                 const showPrevisto = !showEffective && dpl.previsto !== 0;
                 return (
                   <TableCell className="py-2 px-2">
