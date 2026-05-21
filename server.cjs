@@ -41,6 +41,7 @@ const MIME = {
   '.webmanifest': 'application/manifest+json',
   '.mp4': 'video/mp4',
   '.mp3': 'audio/mpeg',
+  '.apk': 'application/vnd.android.package-archive',
 };
 
 function send(res, status, body, headers = {}) {
@@ -82,6 +83,23 @@ const server = http.createServer((req, res) => {
   // Bloqueia path traversal
   if (urlPath.includes('..') || urlPath.includes('\0')) {
     return send(res, 400, 'Bad Request');
+  }
+
+  // ── APK download ──────────────────────────────────────────────────────────
+  if (urlPath === '/download/sharkgreen.apk') {
+    const apkPath = path.join(__dirname, 'public', 'downloads', 'sharkgreen.apk');
+    return fs.stat(apkPath, (err, stat) => {
+      if (err || !stat.isFile()) {
+        return send(res, 404, 'APK not found', { 'Content-Type': 'text/plain' });
+      }
+      res.writeHead(200, {
+        'Content-Type': 'application/vnd.android.package-archive',
+        'Content-Disposition': 'attachment; filename="sharkgreen.apk"',
+        'Content-Length': stat.size,
+        'Cache-Control': 'no-cache',
+      });
+      fs.createReadStream(apkPath).pipe(res);
+    });
   }
 
   // ── PWA: /app e /app/* servidos a partir de pwa/dist/ ────────────────────
