@@ -71,7 +71,7 @@ export function Login() {
         initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
 
         <div className="text-center mb-10">
-          <img src="/logo.png" alt="Shark Green" className="w-20 h-20 rounded-2xl mx-auto mb-5 shadow-2xl glow-green" />
+          <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Shark Green" className="w-20 h-20 rounded-2xl mx-auto mb-5 shadow-2xl glow-green" />
           <h1 className="text-2xl font-bold text-gradient mb-1">Shark Green</h1>
           <p className="text-sm" style={{ color: 'rgba(255,255,255,0.5)' }}>
             {mode === 'login' ? 'Acesse seus sinais de apostas' : 'Recuperar acesso'}
