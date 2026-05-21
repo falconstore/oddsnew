@@ -547,7 +547,7 @@ function FreebetSelectField({ value, onChange }: { value: string; onChange: (v: 
       const { data, error } = await supabase
         .from('procedures')
         .select('procedure_number, platform, freebet_value, freebet_valor_previsto, partida_descricao, date, promotion_name, freebet_creditada, status')
-        .eq('tipo', 'GANHAR_FB')
+        .in('tipo', ['GANHAR_FB', 'ASR'])
         .eq('archived', false)
         .order('created_date', { ascending: false })
         .limit(200);

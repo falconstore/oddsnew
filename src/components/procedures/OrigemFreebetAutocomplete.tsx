@@ -75,7 +75,7 @@ export function OrigemFreebetAutocomplete({
   const elegiveis = useMemo(() => {
     return procedures
       .filter((p) =>
-        p.tipo === 'GANHAR_FB' &&
+        (p.tipo === 'GANHAR_FB' || p.tipo === 'ASR') &&
         p.freebet_creditada === 'SIM' &&
         !p.archived &&
         p.id !== currentId &&
@@ -234,7 +234,7 @@ export function OrigemFreebetAutocomplete({
               Nenhuma freebet disponível pra queimar.
               <br />
               <span className="text-[10px] opacity-70">
-                Origens elegíveis: GANHAR_FB com Freebet Creditada = SIM e ainda não queimadas.
+                Origens elegíveis: GANHAR_FB ou ASR com Freebet Creditada = SIM e ainda não queimadas.
               </span>
             </div>
           )}
