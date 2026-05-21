@@ -1,3 +1,5 @@
+// Servidor de desenvolvimento do PWA com base: '/app/'
+// Serve pwa/dist/ mapeando /app/* → dist/*
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -56,6 +58,16 @@ const server = http.createServer((req, res) => {
   catch { return send(res, 400, 'Bad Request'); }
 
   if (urlPath.includes('..') || urlPath.includes('\0')) return send(res, 400, 'Bad Request');
+
+  // Strip /app prefix (build uses base: '/app/')
+  if (urlPath === '/app' || urlPath === '/app/') {
+    urlPath = '/index.html';
+  } else if (urlPath.startsWith('/app/')) {
+    urlPath = urlPath.slice(4); // '/app/foo' → '/foo'
+  } else if (urlPath === '/') {
+    urlPath = '/index.html';
+  }
+
   if (urlPath.endsWith('/')) urlPath += 'index.html';
 
   const filePath = path.join(ROOT, urlPath);
@@ -68,5 +80,5 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`[pwa-server] serving dist/ on 0.0.0.0:${PORT}`);
+  console.log(`[pwa-server] serving pwa/dist/ via /app/ on 0.0.0.0:${PORT}`);
 });

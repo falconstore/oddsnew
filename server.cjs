@@ -2,12 +2,10 @@
 // Replit. Zero dependencias externas — usa só http/fs/path do Node stdlib.
 //
 // Comportamento:
-//   - GET /caminho/arquivo.ext  → serve dist/caminho/arquivo.ext
-//   - GET /caminho/             → serve dist/caminho/index.html
-//   - 404 (arquivo nao existe)  → serve dist/index.html (SPA fallback)
-//
-// Sem isso, fazer Ctrl+F5 numa rota tipo /lastlink-admin no app publicado
-// retorna 404 e o usuario perde o caminho.
+//   - GET /app/*                 → serve pwa/dist/* (PWA Shark Green)
+//   - GET /caminho/arquivo.ext   → serve dist/caminho/arquivo.ext (admin)
+//   - GET /caminho/              → serve dist/caminho/index.html
+//   - 404 (arquivo nao existe)   → serve dist/index.html (SPA fallback admin)
 
 const http = require('http');
 const fs = require('fs');
@@ -16,6 +14,8 @@ const path = require('path');
 const PORT = Number(process.env.PORT) || 5000;
 const ROOT = path.join(__dirname, 'dist');
 const INDEX = path.join(ROOT, 'index.html');
+const PWA_ROOT = path.join(__dirname, 'pwa', 'dist');
+const PWA_INDEX = path.join(PWA_ROOT, 'index.html');
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -55,8 +55,6 @@ function serveFile(res, filePath, statusOverride) {
     }
     const ext = path.extname(filePath).toLowerCase();
     const isHtml = ext === '.html';
-    // Hashed assets (dist/assets/*.js, *.css) podem cachear forte.
-    // HTML nunca pode cachear pra refletir novos deploys imediatamente.
     const cache = isHtml
       ? 'no-cache, no-store, must-revalidate'
       : 'public, max-age=31536000, immutable';
@@ -68,8 +66,6 @@ function serveFile(res, filePath, statusOverride) {
 }
 
 // Domínios que devem redirecionar / → /trial automaticamente.
-// Útil quando sharkgreen.com.br aponta para este app mas a rota
-// raiz deve exibir a landing page de trial, não o painel admin.
 const TRIAL_REDIRECT_HOSTS = new Set([
   'sharkgreen.com.br',
   'www.sharkgreen.com.br',
@@ -88,7 +84,26 @@ const server = http.createServer((req, res) => {
     return send(res, 400, 'Bad Request');
   }
 
-  // Redireciona raiz → /trial para domínios de entrada pública.
+  // ── PWA: /app e /app/* servidos a partir de pwa/dist/ ────────────────────
+  if (urlPath === '/app' || urlPath === '/app/' || urlPath.startsWith('/app/')) {
+    // Strip do prefixo /app → caminho dentro de pwa/dist/
+    let pwaPath = urlPath === '/app' || urlPath === '/app/'
+      ? '/index.html'
+      : urlPath.slice(4); // '/app/foo' → '/foo'
+
+    if (pwaPath.endsWith('/')) pwaPath += 'index.html';
+
+    const pwaFile = path.join(PWA_ROOT, pwaPath);
+    if (!pwaFile.startsWith(PWA_ROOT)) return send(res, 403, 'Forbidden');
+
+    return fs.stat(pwaFile, (err, stat) => {
+      if (!err && stat.isFile()) return serveFile(res, pwaFile);
+      // SPA fallback do PWA
+      serveFile(res, PWA_INDEX);
+    });
+  }
+
+  // ── Admin: tudo fora de /app ──────────────────────────────────────────────
   const host = (req.headers['host'] || '').split(':')[0].toLowerCase();
   if (TRIAL_REDIRECT_HOSTS.has(host) && (urlPath === '/' || urlPath === '')) {
     return send(res, 302, '', { Location: '/trial' });
@@ -105,13 +120,10 @@ const server = http.createServer((req, res) => {
     if (!err && stat.isFile()) {
       return serveFile(res, filePath);
     }
-    // SPA fallback: rota client-side desconhecida → serve index.html.
-    // O React Router resolve a rota no browser. Status 200 pra evitar
-    // que crawlers indexem como 404, mas Cache-Control no-store mantém HTML fresco.
     serveFile(res, INDEX);
   });
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`[server] static SPA server listening on 0.0.0.0:${PORT} (root: ${ROOT})`);
+  console.log(`[server] admin on 0.0.0.0:${PORT} | PWA at /app/ from pwa/dist/`);
 });

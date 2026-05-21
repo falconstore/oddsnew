@@ -24,7 +24,7 @@ function AppTracker() {
 export default function App() {
   return (
     <MobileOnly>
-      <BrowserRouter>
+      <BrowserRouter basename="/app">
         <AppTracker />
         <Routes>
           <Route path="/login" element={<Login />} />

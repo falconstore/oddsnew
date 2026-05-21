@@ -4,6 +4,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 import path from 'path'
 
 export default defineConfig({
+  base: '/app/',
   plugins: [
     react(),
     VitePWA({
@@ -20,7 +21,8 @@ export default defineConfig({
         background_color: '#0b1120',
         display: 'standalone',
         orientation: 'portrait',
-        start_url: '/',
+        start_url: '/app/',
+        scope: '/app/',
         icons: [
           { src: 'logo.png', sizes: '192x192', type: 'image/png' },
           { src: 'logo.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
