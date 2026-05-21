@@ -1007,6 +1007,8 @@ function InlineSignupForm({
             botStartUrl: json.bot_start_url,
             inviteLink: json.invite_link,
             leadEventId,
+            email: parsed.data.email,
+            initialPassword: parsed.data.whatsapp.replace(/\D/g, ''),
           }),
         );
       } catch {

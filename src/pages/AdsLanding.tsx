@@ -164,6 +164,7 @@ export default function AdsLanding() {
           botStartUrl: data.bot_start_url,
           inviteLink: data.invite_link,
           leadEventId: eventId,
+          initialPassword: whatsapp.replace(/\D/g, ''),
         }));
       } catch { /* fallback */ }
 

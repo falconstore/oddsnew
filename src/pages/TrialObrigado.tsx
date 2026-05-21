@@ -1,11 +1,17 @@
-import { useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Send, ExternalLink } from 'lucide-react';
+import { Send, ExternalLink, KeyRound, Download, Share2, Plus, Smartphone, ChevronDown } from 'lucide-react';
 
 // ── Configuração fácil ──────────────────────────────────────────────────────
 // Cole aqui a URL de embed da VSL (ex: YouTube, Vimeo, Panda Video…)
 // Deixe vazio para ocultar o player até ter a URL.
 const VSL_EMBED_URL = '';
+
+// URL do APK Android — deixe vazio para ocultar o botão de download
+const APK_DOWNLOAD_URL = '';
+
+// URL do PWA para o guia iOS — deixe vazio para ocultar a seção
+const PWA_URL = '';
 
 const SUPABASE_URL = import.meta.env.VITE_MAIN_SUPABASE_URL as string;
 const SUPABASE_ANON = import.meta.env.VITE_MAIN_SUPABASE_ANON_KEY as string;
@@ -19,6 +25,8 @@ interface TrialSuccess {
   botStartUrl: string;
   inviteLink: string;
   leadEventId?: string;
+  email?: string;
+  initialPassword?: string;
 }
 
 interface FbqStub {
@@ -179,7 +187,7 @@ export default function TrialObrigado() {
 
   if (!trialData?.botStartUrl) return null;
 
-  const { botStartUrl, inviteLink } = trialData;
+  const { botStartUrl, inviteLink, email, initialPassword } = trialData;
 
   const handleBotClick = () => {
     trackT4Y('cta_telegram', {
@@ -260,6 +268,56 @@ export default function TrialObrigado() {
           </div>
         )}
 
+        {/* Card de credenciais do PWA */}
+        {email && (
+          <div
+            className="w-full max-w-md rounded-2xl border border-emerald-500/25 bg-white/3 backdrop-blur-sm px-6 py-5 space-y-4"
+            data-testid="card-credentials"
+          >
+            <div className="flex items-center gap-2 text-emerald-300">
+              <KeyRound className="w-4 h-4 flex-shrink-0" />
+              <span className="text-sm font-semibold uppercase tracking-wide">Acesse o App</span>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <p className="text-[10px] text-white/40 uppercase tracking-wider mb-0.5">E-mail</p>
+                <p className="text-white font-mono text-sm break-all" data-testid="text-credential-email">{email}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-white/40 uppercase tracking-wider mb-0.5">Senha inicial</p>
+                <p className="text-white font-mono text-sm tracking-widest" data-testid="text-credential-password">{initialPassword}</p>
+              </div>
+            </div>
+            <p className="text-[11px] text-white/45 leading-relaxed border-t border-white/8 pt-3">
+              Na primeira entrada, você será solicitado a criar uma nova senha.
+            </p>
+          </div>
+        )}
+
+        {/* Blocos de instalação (Android + iOS) */}
+        {email && (APK_DOWNLOAD_URL || PWA_URL) && (
+          <div className="w-full max-w-md flex flex-col sm:flex-row gap-3" data-testid="block-install">
+
+            {/* Android APK */}
+            {APK_DOWNLOAD_URL && (
+              <a
+                href={APK_DOWNLOAD_URL}
+                download
+                onClick={() => trackT4Y('cta_apk_download', { url: APK_DOWNLOAD_URL })}
+                className="flex-1 flex items-center justify-center gap-2 rounded-xl px-4 py-4 font-bold text-sm text-black bg-gradient-to-r from-emerald-400 to-green-500 shadow-lg shadow-emerald-500/30 transition-transform hover:scale-[1.02] active:scale-[0.98]"
+                data-testid="link-apk-download"
+              >
+                <Download className="w-4 h-4 flex-shrink-0" />
+                📲 Baixar o App (Android)
+              </a>
+            )}
+
+            {/* iOS guia */}
+            {PWA_URL && <IosInstallAccordion pwaUrl={PWA_URL} />}
+
+          </div>
+        )}
+
         {/* Botão pulsante */}
         <a
           href={botStartUrl}
@@ -337,6 +395,65 @@ export default function TrialObrigado() {
           animation: pulse-glow 2s ease-in-out infinite;
         }
       `}</style>
+    </div>
+  );
+}
+
+function IosInstallAccordion({ pwaUrl }: { pwaUrl: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="flex-1 rounded-xl border border-emerald-500/20 bg-white/3 overflow-hidden" data-testid="accordion-ios-install">
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between gap-2 px-4 py-4 text-sm font-semibold text-white/80 hover:text-white transition-colors"
+        aria-expanded={open}
+        data-testid="button-ios-install-toggle"
+      >
+        <span className="flex items-center gap-2">
+          <Smartphone className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+          Instalar no iPhone
+        </span>
+        <ChevronDown className={`w-4 h-4 text-white/40 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="px-4 pb-4 space-y-3 border-t border-white/8 pt-3">
+          <div className="flex items-start gap-3">
+            <div className="w-7 h-7 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center flex-shrink-0 text-emerald-300 text-xs font-bold">1</div>
+            <div>
+              <p className="text-xs font-semibold text-white/80">Abra o link no Safari</p>
+              <a
+                href={pwaUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[11px] text-emerald-400 underline underline-offset-2 break-all hover:text-emerald-300"
+                data-testid="link-pwa-safari"
+              >
+                {pwaUrl}
+              </a>
+            </div>
+          </div>
+          <div className="flex items-start gap-3">
+            <div className="w-7 h-7 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center flex-shrink-0 text-emerald-300 text-xs font-bold">2</div>
+            <div>
+              <p className="text-xs font-semibold text-white/80">Toque no ícone de compartilhar</p>
+              <p className="text-[11px] text-white/45 flex items-center gap-1 mt-0.5">
+                <Share2 className="w-3 h-3 text-white/40" /> Ícone de caixa com seta (barra inferior)
+              </p>
+            </div>
+          </div>
+          <div className="flex items-start gap-3">
+            <div className="w-7 h-7 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center flex-shrink-0 text-emerald-300 text-xs font-bold">3</div>
+            <div>
+              <p className="text-xs font-semibold text-white/80">Toque em "Adicionar à Tela de Início"</p>
+              <p className="text-[11px] text-white/45 flex items-center gap-1 mt-0.5">
+                <Plus className="w-3 h-3 text-white/40" /> Role a lista de opções até encontrar
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
