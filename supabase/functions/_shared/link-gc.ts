@@ -17,6 +17,12 @@ import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
+// Statuses onde o lead já não tem expectativa de usar o link.
+// Leads "pending" ou "active" que ainda não entraram no grupo devem manter
+// o link no banco — apagá-lo aqui causaria o problema de kick falso-positivo
+// quando o usuário demora mais de 24h pra clicar no link.
+const TERMINAL_STATUSES = new Set(["expired", "removed", "blocked", "blocked_repeat", "converted"]);
+
 export type LinkGcParams = {
   supabase: SupabaseClient;
   botToken: string;
@@ -82,7 +88,7 @@ export async function runLinkGc(params: LinkGcParams): Promise<LinkGcResult> {
   // Busca leads antigos (>24h) que ainda tenham qualquer um dos 2 links salvos.
   const { data: rows, error } = await supabase
     .from("trial_leads")
-    .select("id, invite_link, bonus_invite_link, created_at, status")
+    .select("id, invite_link, bonus_invite_link, created_at, status, entered_at, bonus_entered_at")
     .lt("created_at", cutoff)
     .or("invite_link.not.is.null,bonus_invite_link.not.is.null")
     .limit(batchSize);
@@ -103,8 +109,13 @@ export async function runLinkGc(params: LinkGcParams): Promise<LinkGcResult> {
 
   for (const row of rows ?? []) {
     const updates: Record<string, unknown> = {};
+    const isTerminal = TERMINAL_STATUSES.has(row.status);
 
-    if (row.invite_link) {
+    // Só revoga/limpa o invite_link VIP se o lead já entrou no grupo (entered_at
+    // preenchido) OU está em status terminal. Leads pending/active que ainda não
+    // entraram mantêm o link — apagá-lo causaria kick falso quando o usuário
+    // demora mais de 24h para clicar.
+    if (row.invite_link && (row.entered_at != null || isTerminal)) {
       const ok = await revoke(botToken, chatId, row.invite_link);
       if (ok) {
         result.vip_revoked++;
@@ -114,18 +125,22 @@ export async function runLinkGc(params: LinkGcParams): Promise<LinkGcResult> {
       }
     }
 
-    if (row.bonus_invite_link && bonusChatId) {
-      const ok = await revoke(botToken, bonusChatId, row.bonus_invite_link);
-      if (ok) {
-        result.bonus_revoked++;
-        updates.bonus_invite_link = null;
+    // Mesma lógica para o bonus_invite_link: só apaga se o lead já entrou no
+    // grupo bônus (bonus_entered_at preenchido) OU está em status terminal.
+    if (row.bonus_invite_link && (row.bonus_entered_at != null || isTerminal)) {
+      if (bonusChatId) {
+        const ok = await revoke(botToken, bonusChatId, row.bonus_invite_link);
+        if (ok) {
+          result.bonus_revoked++;
+          updates.bonus_invite_link = null;
+        } else {
+          result.bonus_failed++;
+        }
       } else {
-        result.bonus_failed++;
+        // Bonus chat não configurado mais — limpa do banco mesmo sem revogar
+        // (não tem como revogar sem o chat_id). É raro, mas evita linha presa.
+        updates.bonus_invite_link = null;
       }
-    } else if (row.bonus_invite_link && !bonusChatId) {
-      // Bonus chat não configurado mais — limpa do banco mesmo sem revogar
-      // (não tem como revogar sem o chat_id). É raro, mas evita linha presa.
-      updates.bonus_invite_link = null;
     }
 
     if (Object.keys(updates).length > 0) {

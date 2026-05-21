@@ -380,9 +380,18 @@ serve(async (req) => {
           }
         }
 
-        const kickFromBonus = async () => {
+        // Revoga o link bônus ANTES de ban+unban para quebrar o loop de re-entrada.
+        // O Telegram reseta o member_limit durante o ciclo ban+unban; se o link
+        // já estiver revogado antes, o usuário não consegue re-entrar após o unban.
+        const kickFromBonus = async (linkToRevoke?: string | null) => {
           if (!botToken) return;
           try {
+            if (linkToRevoke) {
+              await fetch(`https://api.telegram.org/bot${botToken}/revokeChatInviteLink`, {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ chat_id: bonusChatId, invite_link: linkToRevoke }),
+              });
+            }
             await fetch(`https://api.telegram.org/bot${botToken}/banChatMember`, {
               method: "POST", headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ chat_id: bonusChatId, user_id: userId }),
@@ -404,9 +413,15 @@ serve(async (req) => {
             });
             return json({ ok: true, action: "bonus-admin-add-no-lead" });
           }
-          await kickFromBonus();
-          log("bonus-stranger-kicked", { update_id: updateId, user_id: userId, invite_link: inviteLink ?? null });
-          return json({ ok: true, action: "bonus-stranger-kicked" });
+          // Não conseguimos identificar o lead, mas isso não é evidência de bloqueio.
+          // A causa mais comum é o GC ter zerado o bonus_invite_link antes do usuário
+          // entrar (link criado há >24h mas ainda não utilizado). Deixamos entrar e
+          // registramos para auditoria — só kickamos quando há prova positiva de bloqueio.
+          log("bonus-unidentified-allowed", {
+            update_id: updateId, user_id: userId, username: username ?? null,
+            invite_link: inviteLink ?? null,
+          });
+          return json({ ok: true, action: "bonus-unidentified-allowed" });
         }
 
         // Anti-repeat A: invite_link bônus pertence a um lead cujo
@@ -416,15 +431,7 @@ serve(async (req) => {
           bLead.telegram_user_id &&
           bLead.telegram_user_id !== userId
         ) {
-          await kickFromBonus();
-          if (botToken && bLead.bonus_invite_link) {
-            try {
-              await fetch(`https://api.telegram.org/bot${botToken}/revokeChatInviteLink`, {
-                method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ chat_id: bonusChatId, invite_link: bLead.bonus_invite_link }),
-              });
-            } catch (e) { console.warn("bonus repeat revoke failed", e); }
-          }
+          await kickFromBonus(bLead.bonus_invite_link);
           log("bonus-repeat-kick", {
             update_id: updateId, lead_id: bLead.id,
             user_id: userId, owner_user_id: bLead.telegram_user_id,
@@ -467,18 +474,7 @@ serve(async (req) => {
               .eq("id", byLinkRepeatB.id)
               .eq("status", "pending");
 
-            await kickFromBonus();
-            if (botToken && byLinkRepeatB.bonus_invite_link) {
-              try {
-                await fetch(`https://api.telegram.org/bot${botToken}/revokeChatInviteLink`, {
-                  method: "POST", headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    chat_id: bonusChatId,
-                    invite_link: byLinkRepeatB.bonus_invite_link,
-                  }),
-                });
-              } catch (e) { console.warn("bonus repeat-B revoke failed", e); }
-            }
+            await kickFromBonus(byLinkRepeatB.bonus_invite_link);
             log("bonus-blocked-repeat", {
               update_id: updateId,
               lead_id: byLinkRepeatB.id,
@@ -491,7 +487,7 @@ serve(async (req) => {
         }
 
         if (BLOCKED_LEAD_STATUSES.has(bLead.status)) {
-          await kickFromBonus();
+          await kickFromBonus(bLead.bonus_invite_link ?? inviteLink);
           log("bonus-blocked-kick", { update_id: updateId, lead_id: bLead.id, status: bLead.status });
           return json({ ok: true, action: "bonus-blocked-kick", lead_id: bLead.id });
         }
@@ -728,6 +724,24 @@ serve(async (req) => {
             .eq("status", "pending");
 
           if (botToken && expectedChatId) {
+            // Revoga ANTES do ban+unban para quebrar o loop de re-entrada.
+            if (byLinkRepeat.invite_link) {
+              try {
+                await fetch(
+                  `https://api.telegram.org/bot${botToken}/revokeChatInviteLink`,
+                  {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      chat_id: expectedChatId,
+                      invite_link: byLinkRepeat.invite_link,
+                    }),
+                  },
+                );
+              } catch (e) {
+                console.warn("repeat revoke link failed", e);
+              }
+            }
             try {
               await fetch(`https://api.telegram.org/bot${botToken}/banChatMember`, {
                 method: "POST",
@@ -745,23 +759,6 @@ serve(async (req) => {
               });
             } catch (e) {
               console.error("repeat re-kick failed", e);
-            }
-            if (byLinkRepeat.invite_link) {
-              try {
-                await fetch(
-                  `https://api.telegram.org/bot${botToken}/revokeChatInviteLink`,
-                  {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                      chat_id: expectedChatId,
-                      invite_link: byLinkRepeat.invite_link,
-                    }),
-                  },
-                );
-              } catch (e) {
-                console.warn("repeat revoke link failed", e);
-              }
             }
           }
 
@@ -814,6 +811,24 @@ serve(async (req) => {
       // 1c) Se o lead já foi removido/bloqueado/expirado → re-kick imediato
       if (BLOCKED_LEAD_STATUSES.has(lead.status)) {
         if (botToken && expectedChatId) {
+          // Revoga ANTES do ban+unban para quebrar o loop de re-entrada.
+          if (lead.invite_link) {
+            try {
+              await fetch(
+                `https://api.telegram.org/bot${botToken}/revokeChatInviteLink`,
+                {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    chat_id: expectedChatId,
+                    invite_link: lead.invite_link,
+                  }),
+                },
+              );
+            } catch (e) {
+              console.warn("revoke link on re-kick failed", e);
+            }
+          }
           try {
             await fetch(`https://api.telegram.org/bot${botToken}/banChatMember`, {
               method: "POST",
@@ -831,24 +846,6 @@ serve(async (req) => {
             });
           } catch (e) {
             console.error("re-kick failed", e);
-          }
-          // Garante que o invite_link rastreado também esteja revogado
-          if (lead.invite_link) {
-            try {
-              await fetch(
-                `https://api.telegram.org/bot${botToken}/revokeChatInviteLink`,
-                {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    chat_id: expectedChatId,
-                    invite_link: lead.invite_link,
-                  }),
-                },
-              );
-            } catch (e) {
-              console.warn("revoke link on re-kick failed", e);
-            }
           }
         }
         // Mantém o status de bloqueio, só atualiza telegram_user_id (caso ainda não tinha)
@@ -907,6 +904,24 @@ serve(async (req) => {
             if (updErr) console.error("block-repeat update failed", updErr);
 
             if (botToken && expectedChatId) {
+              // Revoga ANTES do ban+unban para quebrar o loop de re-entrada.
+              if (lead.invite_link) {
+                try {
+                  await fetch(
+                    `https://api.telegram.org/bot${botToken}/revokeChatInviteLink`,
+                    {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        chat_id: expectedChatId,
+                        invite_link: lead.invite_link,
+                      }),
+                    },
+                  );
+                } catch (e) {
+                  console.warn("block-repeat revoke link failed", e);
+                }
+              }
               try {
                 await fetch(`https://api.telegram.org/bot${botToken}/banChatMember`, {
                   method: "POST",
@@ -924,23 +939,6 @@ serve(async (req) => {
                 });
               } catch (e) {
                 console.error("block-repeat re-kick failed", e);
-              }
-              if (lead.invite_link) {
-                try {
-                  await fetch(
-                    `https://api.telegram.org/bot${botToken}/revokeChatInviteLink`,
-                    {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({
-                        chat_id: expectedChatId,
-                        invite_link: lead.invite_link,
-                      }),
-                    },
-                  );
-                } catch (e) {
-                  console.warn("block-repeat revoke link failed", e);
-                }
               }
             }
 
