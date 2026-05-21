@@ -487,6 +487,26 @@ serve(async (req) => {
         }
 
         if (BLOCKED_LEAD_STATUSES.has(bLead.status)) {
+          // Só kicka se o usuário entrou via link RASTREADO pelo bot (o
+          // bonus_invite_link gerado pelo trial). Se entrou via link externo
+          // — admin enviou manualmente pelo Telegram pra alguém —, o bot
+          // não deve intervir mesmo se o lead estiver expired/blocked.
+          const isTrackedLink =
+            bFoundVia === "bonus_invite_link" ||
+            (!!inviteLink && inviteLink === bLead.bonus_invite_link);
+          if (!isTrackedLink) {
+            log("bonus-blocked-external-link-allowed", {
+              update_id: updateId,
+              lead_id: bLead.id,
+              status: bLead.status,
+              invite_link: inviteLink ?? null,
+            });
+            return json({
+              ok: true,
+              action: "bonus-blocked-external-link-allowed",
+              lead_id: bLead.id,
+            });
+          }
           await kickFromBonus(bLead.bonus_invite_link ?? inviteLink);
           log("bonus-blocked-kick", { update_id: updateId, lead_id: bLead.id, status: bLead.status });
           return json({ ok: true, action: "bonus-blocked-kick", lead_id: bLead.id });
