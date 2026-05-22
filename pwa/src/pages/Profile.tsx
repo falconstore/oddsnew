@@ -39,6 +39,7 @@ export function Profile() {
 
   async function handleLogout() {
     await signOut()
+    navigate('/login', { replace: true })
   }
 
   const isSubscriber = status === 'active_subscriber'
