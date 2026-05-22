@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { format } from 'date-fns';
+import { format, formatDistanceToNowStrict } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Bot, RefreshCw, AlertCircle, AlertTriangle, Info, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Bot, RefreshCw, AlertCircle, AlertTriangle, Info, Trash2, ChevronDown, ChevronUp, Activity } from 'lucide-react';
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -130,6 +130,40 @@ function LogRow({ log }: { log: BotLog }) {
   );
 }
 
+// Eventos que comprovam que o webhook do Telegram chegou na edge function
+// (mensagem real do canal, comando manual, edição, ignorada por chat errado, etc.).
+// Eventos puramente "internos" como trial_recall_*, freebetpro_sync_* não contam.
+const RECEIVED_EVENTS = new Set([
+  // Sucesso / fluxo normal
+  'inserted',
+  'registered_partial',
+  'edit_updated',
+  // Comandos manuais
+  'command_registered',
+  'command_resynced',
+  'command_not_found',
+  'command_parse_failed',
+  'command_insert_error',
+  'command_number_mismatch',
+  'command_lookup_error',
+  // Erros e descartes — provam que o webhook está vivo
+  'insert_error',
+  'ignored_no_number',
+  'ignored_no_text',
+  'ignored_no_message',
+  'ignored_via_bot',
+  'ignored_wrong_chat',
+  'ignored_bot_disabled',
+  'invalid_secret',
+]);
+
+function findLastReceivedAt(logs: BotLog[]): Date | null {
+  for (const l of logs) {
+    if (RECEIVED_EVENTS.has(l.event)) return new Date(l.created_at);
+  }
+  return null;
+}
+
 export default function BotLogs() {
   const { data: logs = [], isLoading, isFetching, refetch, dataUpdatedAt } = useBotLogs();
   const [levelFilter, setLevelFilter] = useState<'all' | 'error' | 'warning' | 'info'>('all');
@@ -141,6 +175,25 @@ export default function BotLogs() {
     warning: logs.filter(l => l.level === 'warning').length,
     info: logs.filter(l => l.level === 'info').length,
   };
+
+  const lastReceivedAt = findLastReceivedAt(logs);
+  const minutesSinceLast = lastReceivedAt
+    ? (Date.now() - lastReceivedAt.getTime()) / 60000
+    : null;
+  const freshnessTone =
+    minutesSinceLast == null
+      ? 'muted'
+      : minutesSinceLast < 60
+        ? 'ok'
+        : minutesSinceLast < 240
+          ? 'warn'
+          : 'bad';
+  const freshnessClass = {
+    muted: 'from-white/5 to-transparent border-white/10 text-muted-foreground',
+    ok: 'from-emerald-500/15 to-transparent border-emerald-500/30 text-emerald-300',
+    warn: 'from-amber-500/15 to-transparent border-amber-500/30 text-amber-300',
+    bad: 'from-red-500/15 to-transparent border-red-500/30 text-red-300',
+  }[freshnessTone];
 
   return (
     <Layout>
@@ -172,6 +225,29 @@ export default function BotLogs() {
               <RefreshCw className={cn('w-3.5 h-3.5 mr-1.5', isFetching && 'animate-spin')} />
               Atualizar
             </Button>
+          </div>
+        </div>
+
+        {/* Freshness — última atividade do bot */}
+        <div className={cn(
+          'rounded-2xl border bg-gradient-to-br p-4 flex items-center gap-3',
+          freshnessClass,
+        )}>
+          <Activity className="w-4 h-4 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-[10px] font-semibold uppercase tracking-widest opacity-80">
+              Última mensagem recebida do canal
+            </p>
+            <p className="text-sm font-medium mt-0.5" data-testid="text-bot-last-received">
+              {lastReceivedAt
+                ? `há ${formatDistanceToNowStrict(lastReceivedAt, { locale: ptBR })} · ${format(lastReceivedAt, "dd/MM 'às' HH:mm")}`
+                : 'Sem registro nos últimos 200 logs'}
+            </p>
+            {minutesSinceLast != null && minutesSinceLast >= 240 && (
+              <p className="text-[11px] opacity-80 mt-1">
+                ⚠️ Bot pode estar mudo — verifique o webhook no Telegram BotFather ou as variáveis TELEGRAM_PROC_*.
+              </p>
+            )}
           </div>
         </div>
 

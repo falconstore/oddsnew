@@ -226,15 +226,25 @@ interface EventCandidate {
   isoDate: string;
 }
 
-function extractEventCandidates(text: string, defaultYear: number): EventCandidate[] {
+function extractEventCandidates(
+  text: string,
+  defaultYear: number,
+  fallbackIsoDate?: string | null,
+): EventCandidate[] {
   const candidates: EventCandidate[] = [];
 
   // Padrão real dos templates:
   // "[TIME A] X [TIME B] - DD/MM/AAAA ÀS HH:MM"
   // ou "[TIME A] X [TIME B] - DD/MM ÀS HH:MM"
-  // Também suporta "às" (minúsculo) e "-" entre data e hora
+  // Variações cobertas:
+  //   - separador entre times e data: traço OU apenas espaço(s)
+  //     ("MILAN X CAGLIARI 24/05/2026 - 15:45")
+  //   - separador entre data e hora: combinação de espaço(s) e traço(s) repetidos
+  //     ("... 23/05/2026 - ÁS 15:00")
+  //   - prefixo de horário: ÀS / AS / às / as / ÁS / ás (acento agudo) — opcional
+  //   - mês inválido no texto (ex: "23/15/2026" — typo) cai pra fallbackIsoDate
   const eventRe =
-    /^([^\n\r\d🟢🔵🟡🟥🔴😍]+?)\s*[-–—]\s*(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)\s+(?:[AÀàa][Ss]|ÀS|às|as|-)\s*(\d{2}:\d{2})/iu;
+    /^([^\n\r\d🟢🔵🟡🟥🔴😍]+?)[\s\-–—]+(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)[\s\-–—]+(?:[AÀÁàáa][Ss]\s+)?(\d{2}:\d{2})/iu;
 
   const lines = text.split(/\r?\n/);
   for (const line of lines) {
@@ -249,8 +259,8 @@ function extractEventCandidates(text: string, defaultYear: number): EventCandida
       const dateStr = m[2];
       const timeStr = m[3];
       const p = parseDateDMY(dateStr, defaultYear);
-      if (p && desc && /\bX\b/i.test(desc)) {
-        const isoDate = toISODate(p.d, p.m, p.y);
+      const isoDate = p ? toISODate(p.d, p.m, p.y) : (fallbackIsoDate ?? null);
+      if (isoDate && desc && /\bX\b/i.test(desc)) {
         candidates.push({
           description: desc,
           time: timeStr,
@@ -448,7 +458,9 @@ export function parseMessage(text: string): ParseResult {
   }
 
   // 10. Evento
-  const events = extractEventCandidates(text, defaultYear);
+  // Passa a data do procedimento como fallback pra casos onde o texto tem typo de mês
+  // (ex: "23/15/2026") — assim ainda extraímos a partida e horário pro painel.
+  const events = extractEventCandidates(text, defaultYear, dateStr);
   const chosenEvent = pickClosestEvent(events);
   if (!chosenEvent) {
     missing.push("evento e horário (TIME A X TIME B - DD/MM/AAAA ÀS HH:MM)");

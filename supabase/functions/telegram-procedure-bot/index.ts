@@ -369,15 +369,44 @@ serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { status: 200 });
   }
-  if (req.method !== "POST") {
-    return json({ ok: false, error: "method not allowed" }, { status: 405 });
-  }
 
   const BOT_TOKEN = Deno.env.get("TELEGRAM_PROC_BOT_TOKEN");
   const CHAT_ID = Deno.env.get("TELEGRAM_PROC_CHAT_ID");
   const WEBHOOK_SECRET = Deno.env.get("TELEGRAM_PROC_WEBHOOK_SECRET");
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+  // ── Healthcheck GET endpoint (admin debug) ──
+  // Usage: GET /telegram-procedure-bot?action=status com header x-admin-secret = TELEGRAM_PROC_WEBHOOK_SECRET
+  // Retorna getWebhookInfo + chat_id esperado pra diagnosticar quando o bot fica mudo.
+  if (req.method === "GET") {
+    const url = new URL(req.url);
+    if (url.searchParams.get("action") === "status") {
+      const adminSecret = req.headers.get("x-admin-secret");
+      if (!WEBHOOK_SECRET || adminSecret !== WEBHOOK_SECRET) {
+        return json({ ok: false, error: "forbidden" }, { status: 403 });
+      }
+      if (!BOT_TOKEN) {
+        return json({ ok: false, error: "bot token not configured" }, { status: 500 });
+      }
+      try {
+        const r = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getWebhookInfo`);
+        const info = await r.json();
+        return json({
+          ok: true,
+          expected_chat_id: CHAT_ID ?? null,
+          webhook_info: info,
+        });
+      } catch (e: any) {
+        return json({ ok: false, error: e?.message ?? String(e) }, { status: 500 });
+      }
+    }
+    return json({ ok: false, error: "method not allowed" }, { status: 405 });
+  }
+
+  if (req.method !== "POST") {
+    return json({ ok: false, error: "method not allowed" }, { status: 405 });
+  }
 
   if (!BOT_TOKEN) {
     log("config_error", { missing: "TELEGRAM_PROC_BOT_TOKEN" });
@@ -394,6 +423,14 @@ serve(async (req) => {
   const headerSecret = req.headers.get("x-telegram-bot-api-secret-token");
   if (headerSecret !== WEBHOOK_SECRET) {
     log("invalid_secret", { has_header: !!headerSecret });
+    // Loga no painel pra dar visibilidade — pode indicar tentativa de probe OU
+    // que o secret no Telegram BotFather divergiu do TELEGRAM_PROC_WEBHOOK_SECRET.
+    await logToPanel(SUPABASE_URL, SERVICE_ROLE, {
+      level: "warning",
+      event: "invalid_secret",
+      message: "Webhook recebido sem secret válido — possível probe externo OU o secret do Telegram divergiu do TELEGRAM_PROC_WEBHOOK_SECRET. Re-registre o webhook se for o segundo caso.",
+      context: { has_header: !!headerSecret },
+    });
     return json({ ok: false, error: "forbidden" }, { status: 403 });
   }
 
@@ -413,16 +450,37 @@ serve(async (req) => {
     update?.edited_message ?? update?.edited_channel_post;
   if (!msg) {
     log("ignored", { reason: "no message/channel_post", update_id: updateId });
+    await logToPanel(SUPABASE_URL, SERVICE_ROLE, {
+      level: "info",
+      event: "ignored_no_message",
+      message: "Update do Telegram sem message/channel_post/edited_* (ex: my_chat_member, callback_query). Ignorado.",
+      updateId,
+      context: { update_keys: Object.keys(update ?? {}) },
+    });
     return json({ ok: true, ignored: "no message" });
   }
   if (msg.via_bot) {
     log("ignored", { reason: "via_bot", update_id: updateId });
+    await logToPanel(SUPABASE_URL, SERVICE_ROLE, {
+      level: "info",
+      event: "ignored_via_bot",
+      message: "Mensagem ignorada — postada via outro bot (msg.via_bot).",
+      updateId,
+      messageId: msg.message_id ?? null,
+    });
     return json({ ok: true, ignored: "via_bot" });
   }
 
   const text: string | undefined = msg.text ?? msg.caption;
   if (!text || !text.trim()) {
     log("ignored", { reason: "no text", update_id: updateId });
+    await logToPanel(SUPABASE_URL, SERVICE_ROLE, {
+      level: "info",
+      event: "ignored_no_text",
+      message: "Mensagem ignorada — sem texto nem caption (provavelmente foto/sticker/vídeo puro).",
+      updateId,
+      messageId: msg.message_id ?? null,
+    });
     return json({ ok: true, ignored: "no text" });
   }
 
@@ -430,6 +488,16 @@ serve(async (req) => {
   const expectedChatId = String(CHAT_ID);
   if (msgChatId !== expectedChatId) {
     log("ignored", { reason: "wrong chat", got: msgChatId, expected: expectedChatId, update_id: updateId });
+    // Visibilidade no painel: o grupo pode ter virado supergrupo e mudado de ID,
+    // ou o bot está em outro grupo. Logado como warning pra usuário detectar rápido.
+    await logToPanel(SUPABASE_URL, SERVICE_ROLE, {
+      level: "warning",
+      event: "ignored_wrong_chat",
+      message: `Mensagem ignorada — chat_id ${msgChatId} (${msg.chat?.title ?? "sem título"}) não é o esperado ${expectedChatId}. Se o grupo virou supergrupo, atualize TELEGRAM_PROC_CHAT_ID.`,
+      updateId,
+      messageId: msg.message_id ?? null,
+      context: { got: msgChatId, expected: expectedChatId, chat_title: msg.chat?.title ?? null, chat_type: msg.chat?.type ?? null },
+    });
     return json({ ok: true, ignored: "wrong chat" });
   }
 
@@ -465,6 +533,13 @@ serve(async (req) => {
 
   if (settings && settings.bot_enabled === false) {
     log("ignored", { reason: "bot_disabled", update_id: updateId });
+    await logToPanel(SUPABASE_URL, SERVICE_ROLE, {
+      level: "info",
+      event: "ignored_bot_disabled",
+      message: "Mensagem ignorada — bot_enabled=false em system_settings. Ative o bot para voltar a processar.",
+      updateId,
+      messageId: messageId ?? null,
+    });
     return json({ ok: true, ignored: "bot_disabled" });
   }
 
@@ -501,6 +576,15 @@ serve(async (req) => {
     if (existing) {
       await syncWithFreebetPro(supa, SUPABASE_URL, SERVICE_ROLE, existing.id, cmdNumber, updateId, messageId);
       log("command_resynced", { procedure_id: existing.id, number: cmdNumber });
+      await logToPanel(SUPABASE_URL, SERVICE_ROLE, {
+        level: "info",
+        event: "command_resynced",
+        message: `Comando REGISTRE recebido — proc #${cmdNumber} já existia, ressincronizado com FreeBet PRO.`,
+        procedureNumber: cmdNumber,
+        updateId,
+        messageId,
+        context: { procedure_id: existing.id },
+      });
       return json({ ok: true, action: "resynced", procedure_id: existing.id });
     }
 
@@ -565,6 +649,18 @@ serve(async (req) => {
         });
       }
       log("command_registered", { procedure_id: result.procedureId, number: cmdNumber, partial: result.isPartial });
+      if (!result.isPartial) {
+        // Caminho parcial já loga via "registered_partial" acima — evita duplicidade.
+        await logToPanel(SUPABASE_URL, SERVICE_ROLE, {
+          level: "info",
+          event: "command_registered",
+          message: `Comando REGISTRE recebido — proc #${cmdNumber} criado a partir da mensagem respondida.`,
+          procedureNumber: cmdNumber,
+          updateId,
+          messageId,
+          context: { procedure_id: result.procedureId },
+        });
+      }
       return json({ ok: true, action: "command_registered", procedure_id: result.procedureId });
     }
 
@@ -687,6 +783,15 @@ serve(async (req) => {
 
   if (result.ok === "no_number") {
     log("ignored_no_number", { update_id: updateId, missing: result.missingFields });
+    await logToPanel(SUPABASE_URL, SERVICE_ROLE, {
+      level: "info",
+      event: "ignored_no_number",
+      message: `Mensagem do canal ignorada — não reconhecida como procedimento (${result.missingFields.join(", ")}).`,
+      updateId,
+      messageId: messageId ?? null,
+      rawText: text,
+      context: { missing: result.missingFields },
+    });
     return json({ ok: true, action: "ignored_no_number" });
   }
 
@@ -729,6 +834,15 @@ serve(async (req) => {
   }
 
   log("inserted", { procedure_id: result.procedureId, procedure_number: result.procedureNumber });
+  await logToPanel(SUPABASE_URL, SERVICE_ROLE, {
+    level: "info",
+    event: "inserted",
+    message: `Proc #${result.procedureNumber} registrado a partir do canal do Telegram.`,
+    procedureNumber: result.procedureNumber,
+    updateId,
+    messageId,
+    context: { procedure_id: result.procedureId },
+  });
   await syncWithFreebetPro(supa, SUPABASE_URL, SERVICE_ROLE, result.procedureId, result.procedureNumber, updateId, messageId);
 
   return json({
