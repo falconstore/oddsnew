@@ -23,8 +23,9 @@ import {
   useTrialLeads, useKickTrialLead, usePurgeTrialLead, useDiagnoseTelegram, useManualActivateLead,
   useLinkManual, useResetWebhook, useForceActivate, useLinkGc, type TelegramDiagnose,
   useTrialSettings, useUpdateTrialSettings, useSendReminderTest,
-  useRecallLeads,
+  useRecallLeads, useTrialWebhookAudit,
 } from '@/hooks/useTrialLeads';
+import { Switch } from '@/components/ui/switch';
 import { useTrialPwaStats } from '@/hooks/useTrialPwaStats';
 import { useTrialUpgradeStats, type TrialStatsRange } from '@/hooks/useTrialUpgradeStats';
 import { useTrialCapiStats } from '@/hooks/useTrialCapiStats';
@@ -75,6 +76,8 @@ export default function TrialAdmin() {
 
   const settings = useTrialSettings();
   const updateSettings = useUpdateTrialSettings();
+  const webhookAudit = useTrialWebhookAudit();
+  const [showAuditEvents, setShowAuditEvents] = useState(false);
   const sendTest = useSendReminderTest();
   const recall = useRecallLeads();
   const { data: pwaStats } = useTrialPwaStats();
@@ -224,6 +227,121 @@ export default function TrialAdmin() {
               </a>
             </div>
           </div>
+        </div>
+
+        {/* Webhook Guard — auto-heal contra "sequestro" do bot token */}
+        <div
+          className={`glass rounded-3xl border p-5 md:p-6 ${
+            (webhookAudit.data?.recentDriftCount ?? 0) > 0
+              ? 'border-amber-500/40 bg-amber-500/[0.04]'
+              : 'border-white/8'
+          }`}
+          data-testid="webhook-guard-card"
+        >
+          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+            <div className="flex-1 min-w-0 space-y-2">
+              <h2 className="text-lg md:text-xl font-bold flex items-center gap-2">
+                <ShieldAlert className={`w-5 h-5 ${
+                  (webhookAudit.data?.recentDriftCount ?? 0) > 0 ? 'text-amber-300' : 'text-emerald-400'
+                }`} />
+                Guarda do Webhook
+              </h2>
+              {(webhookAudit.data?.recentDriftCount ?? 0) > 0 ? (
+                <div className="space-y-1.5">
+                  <p className="text-sm text-amber-100" data-testid="webhook-guard-banner">
+                    O webhook foi corrigido automaticamente{' '}
+                    <b>{webhookAudit.data!.recentDriftCount}× nas últimas 24h</b> — alguém (provavelmente
+                    outro projeto seu usando o mesmo token) está sobrescrevendo o webhook do bot do trial.
+                  </p>
+                  {webhookAudit.data?.lastDrift?.previous_url && (
+                    <p className="text-xs text-amber-200/80 font-mono break-all">
+                      Última URL estranha: {webhookAudit.data.lastDrift.previous_url}
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Ação recomendada: gere um novo token no @BotFather e atualize o secret
+                    <code className="bg-black/40 px-1 rounded mx-1">TELEGRAM_TRIAL_BOT_TOKEN</code>
+                    no Supabase. O auto-heal segue ligado como segunda linha de defesa.
+                  </p>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Cron roda a cada 5min checando se a URL do webhook continua apontando pro nosso
+                  <code className="bg-black/40 px-1 rounded mx-1">trial-webhook</code> com
+                  <code className="bg-black/40 px-1 rounded mx-1">chat_member</code> nas allowed_updates.
+                  Re-instala sozinho se algum projeto externo sobrescrever.
+                </p>
+              )}
+            </div>
+            <div className="flex flex-col items-end gap-2 shrink-0">
+              <label className="flex items-center gap-2 text-xs font-semibold text-muted-foreground select-none">
+                <span>Auto-heal</span>
+                <Switch
+                  checked={settings.data?.webhook_autoheal_enabled ?? true}
+                  disabled={settings.isLoading || updateSettings.isPending}
+                  onCheckedChange={(checked) =>
+                    updateSettings.mutate({ webhookAutohealEnabled: checked })
+                  }
+                  data-testid="switch-webhook-autoheal"
+                />
+                <span className={settings.data?.webhook_autoheal_enabled === false ? 'text-red-300' : 'text-emerald-300'}>
+                  {settings.data?.webhook_autoheal_enabled === false ? 'desligado' : 'ligado'}
+                </span>
+              </label>
+              {(webhookAudit.data?.events?.length ?? 0) > 0 && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => setShowAuditEvents(v => !v)}
+                  data-testid="button-toggle-audit-events"
+                >
+                  {showAuditEvents ? 'Ocultar histórico' : `Ver últimos ${webhookAudit.data!.events.length} eventos`}
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {showAuditEvents && (webhookAudit.data?.events?.length ?? 0) > 0 && (
+            <div className="mt-4 space-y-2" data-testid="webhook-audit-events">
+              {webhookAudit.data!.events.map(ev => (
+                <div
+                  key={ev.id}
+                  className={`rounded-xl border p-3 text-xs space-y-1 ${
+                    ev.was_drifted
+                      ? 'border-amber-500/25 bg-amber-500/[0.04]'
+                      : 'border-white/8 bg-white/[0.02]'
+                  }`}
+                  data-testid={`audit-event-${ev.id}`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-semibold flex items-center gap-1.5">
+                      {ev.was_drifted ? (
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-300" />
+                      ) : (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-300" />
+                      )}
+                      {ev.action_taken}
+                    </span>
+                    <span className="text-muted-foreground">{fmtDate(ev.checked_at)}</span>
+                  </div>
+                  {ev.previous_url && (
+                    <div className="font-mono text-amber-200/80 break-all">
+                      antes: {ev.previous_url}
+                    </div>
+                  )}
+                  {ev.new_url && (
+                    <div className="font-mono text-emerald-300/80 break-all">
+                      novo: {ev.new_url}
+                    </div>
+                  )}
+                  {ev.error_message && (
+                    <div className="text-red-300">erro: {ev.error_message}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Configurações dos avisos (cupom editável sem redeploy) */}

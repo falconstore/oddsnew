@@ -258,6 +258,7 @@ export type TrialSettings = {
   recall_after_hours: number;
   recall_repeat_after_days: number;
   recall_daily_cap: number;
+  webhook_autoheal_enabled: boolean;
   updated_at: string;
   updated_by: string | null;
 };
@@ -268,7 +269,7 @@ export const useTrialSettings = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('trial_settings')
-        .select('reminder_coupon, recall_after_hours, recall_repeat_after_days, recall_daily_cap, updated_at, updated_by')
+        .select('reminder_coupon, recall_after_hours, recall_repeat_after_days, recall_daily_cap, webhook_autoheal_enabled, updated_at, updated_by')
         .eq('id', true)
         .maybeSingle();
       if (error) throw error;
@@ -277,6 +278,7 @@ export const useTrialSettings = () => {
         recall_after_hours: 12,
         recall_repeat_after_days: 7,
         recall_daily_cap: 100,
+        webhook_autoheal_enabled: true,
         updated_at: '',
         updated_by: null,
       }) as TrialSettings;
@@ -290,6 +292,7 @@ export type UpdateTrialSettingsInput = {
   recallAfterHours?: number;
   recallRepeatAfterDays?: number;
   recallDailyCap?: number;
+  webhookAutohealEnabled?: boolean;
 };
 
 export const useUpdateTrialSettings = () => {
@@ -318,6 +321,9 @@ export const useUpdateTrialSettings = () => {
         const v = Math.floor(input.recallDailyCap);
         if (!Number.isFinite(v) || v < 1) throw new Error('Cap diário deve ser ≥ 1');
         patch.recall_daily_cap = v;
+      }
+      if (input.webhookAutohealEnabled !== undefined) {
+        patch.webhook_autoheal_enabled = !!input.webhookAutohealEnabled;
       }
       const { data: sessionData } = await supabase.auth.getSession();
       patch.updated_by = sessionData.session?.user?.email ?? null;
@@ -465,6 +471,52 @@ export const useLinkGc = () => {
     onError: (err: Error) => {
       toast({ title: 'Erro na limpeza', description: err.message, variant: 'destructive' });
     },
+  });
+};
+
+export type TrialWebhookAuditEvent = {
+  id: number;
+  checked_at: string;
+  was_drifted: boolean;
+  previous_url: string | null;
+  previous_allowed_updates: string[] | null;
+  new_url: string | null;
+  action_taken: string;
+  error_message: string | null;
+};
+
+export type TrialWebhookAuditSummary = {
+  events: TrialWebhookAuditEvent[];
+  recentDriftCount: number;
+  lastDrift: TrialWebhookAuditEvent | null;
+};
+
+export const useTrialWebhookAudit = () => {
+  return useQuery<TrialWebhookAuditSummary>({
+    queryKey: ['trial_webhook_audit'],
+    queryFn: async () => {
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { data: events, error } = await supabase
+        .from('trial_webhook_audit')
+        .select('id, checked_at, was_drifted, previous_url, previous_allowed_updates, new_url, action_taken, error_message')
+        .order('checked_at', { ascending: false })
+        .limit(10);
+      if (error) throw error;
+      const list = (events ?? []) as TrialWebhookAuditEvent[];
+      const { count } = await supabase
+        .from('trial_webhook_audit')
+        .select('id', { count: 'exact', head: true })
+        .eq('was_drifted', true)
+        .gte('checked_at', since);
+      return {
+        events: list,
+        recentDriftCount: count ?? 0,
+        lastDrift: list.find(e => e.was_drifted) ?? null,
+      };
+    },
+    staleTime: 60_000,
+    refetchInterval: 120_000,
+    placeholderData: (prev) => prev,
   });
 };
 

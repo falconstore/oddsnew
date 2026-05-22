@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.freebetpro-resync-cron]
 verify_jwt = false
+
+[functions.trial-webhook-guard]
+verify_jwt = false

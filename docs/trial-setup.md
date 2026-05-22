@@ -193,6 +193,55 @@ WHERE created_at > now() - interval '30 days'
 GROUP BY event_type ORDER BY 2 DESC;
 ```
 
+## Webhook sendo sobrescrito por outro projeto ("sequestro" do token)
+
+O Telegram só aceita **1 webhook por bot**. Se você usa o mesmo
+`TELEGRAM_TRIAL_BOT_TOKEN` em mais de um projeto (ex.: um Replit antigo,
+um script de teste, etc.), sempre que esse outro projeto chamar
+`setWebhook` o nosso webhook é silenciosamente derrubado e os leads param
+de ser processados — ficam todos presos em "Aguardando entrada".
+
+**1ª linha de defesa — rotacionar o token (manual):**
+
+1. Abra `@BotFather` → `/mybots` → selecione o bot → `API Token` → `Revoke current token`.
+2. Copie o novo token e atualize o secret `TELEGRAM_TRIAL_BOT_TOKEN` no Supabase.
+3. Re-rode o `setWebhook` (passo 5 deste guia) com o novo token.
+4. Apague/desative o outro projeto que estava sequestrando o webhook.
+
+**2ª linha de defesa — auto-heal automático (já configurado):**
+
+A migração `supabase/migrations/20260522_trial_webhook_autoheal.sql`
+adiciona um pg_cron `trial-webhook-autoheal-5min` que roda a cada 5
+minutos chamando a edge function `trial-webhook-guard`. O guard:
+
+- Faz `getWebhookInfo` no Telegram.
+- Se a URL **não termina em `/trial-webhook`** ou se `chat_member` sumiu
+  das `allowed_updates`, re-instala o webhook automaticamente.
+- Grava cada correção em `trial_webhook_audit` (data, URL anterior, URL nova).
+
+No painel `/trial-admin` aparece um banner amarelo "Guarda do Webhook"
+mostrando quantas correções ocorreram nas últimas 24h e qual foi a
+última URL estranha — se esse contador for > 0, alguém ainda está
+sequestrando o token e você deve rotacioná-lo.
+
+**Deploy do guard:**
+
+```bash
+supabase functions deploy trial-webhook-guard --no-verify-jwt
+```
+
+A função é protegida via header `x-cron-secret` (sem JWT). Por padrão
+aceita o mesmo valor do `TRIAL_CRON_SECRET` que o cron já usa via vault
+`trial_cron_secret`, então **não precisa configurar nada novo**. Se
+quiser rotacionar o segredo do guard separado, defina
+`TRIAL_WEBHOOK_GUARD_SECRET` como secret da edge function (tem
+precedência sobre `TRIAL_CRON_SECRET`) e atualize o vault.
+
+**Toggle de kill-switch:** no painel `/trial-admin`, dentro do card
+"Guarda do Webhook", existe um switch "Auto-heal: ligado/desligado" que
+escreve em `trial_settings.webhook_autoheal_enabled`. Use quando quiser
+investigar manualmente sem o cron ficar corrigindo no meio do caminho.
+
 ## Alternativa sem Edge Functions
 
 Caso prefira manter tudo em Python/PM2 (como `docs/scraper/standalone/run_telegram.py`),
