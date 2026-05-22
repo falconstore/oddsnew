@@ -12,7 +12,7 @@ const VSL_EMBED_URL = '/vsl.mp4';
 const APK_DOWNLOAD_URL = 'https://sharkgreen.com.br/download/sharkgreen.apk';
 
 // URL do PWA para o guia iOS — deixe vazio para ocultar a seção
-const PWA_URL = 'https://pwa.sharkgreen.com.br';
+const PWA_URL = 'https://sharkgreen.com.br/app';
 
 const SUPABASE_URL = import.meta.env.VITE_MAIN_SUPABASE_URL as string;
 const SUPABASE_ANON = import.meta.env.VITE_MAIN_SUPABASE_ANON_KEY as string;
