@@ -2,6 +2,7 @@
   "name": "Shark Green App",
   "short_name": "SharkGreen",
   "description": "Procedimentos e sinais de apostas esportivas em tempo real",
+  "id": "/app/",
   "start_url": "/app/",
   "scope": "/app/",
   "display": "standalone",
