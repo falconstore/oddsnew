@@ -85,6 +85,15 @@ const server = http.createServer((req, res) => {
     return send(res, 400, 'Bad Request');
   }
 
+  // ── Digital Asset Links (TWA verification) ───────────────────────────────
+  if (urlPath === '/.well-known/assetlinks.json') {
+    const alPath = path.join(__dirname, 'public', '.well-known', 'assetlinks.json');
+    return fs.stat(alPath, (err, stat) => {
+      if (err || !stat.isFile()) return send(res, 404, 'Not found');
+      serveFile(res, alPath);
+    });
+  }
+
   // ── APK download ──────────────────────────────────────────────────────────
   if (urlPath === '/download/sharkgreen.apk') {
     const apkPath = path.join(__dirname, 'public', 'downloads', 'sharkgreen.apk');
