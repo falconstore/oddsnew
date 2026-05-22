@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "br.com.sharkgreen.twa",
+        "sha256_cert_fingerprints": ["8F:CF:5D:65:32:B2:DF:93:C7:54:B6:B0:1C:30:AE:42:C6:12:DC:5B:4C:D6:0E:B2:18:83:55:8D:82:69:32:B5"]
+      }
+    }]
