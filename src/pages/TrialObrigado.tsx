@@ -4,8 +4,9 @@ import { Send, ExternalLink, KeyRound, Download, Share2, Plus, Smartphone, Chevr
 
 // ── Configuração fácil ──────────────────────────────────────────────────────
 // Cole aqui a URL de embed da VSL (ex: YouTube, Vimeo, Panda Video…)
+// Para mp4 local, use o caminho relativo: '/vsl.mp4'
 // Deixe vazio para ocultar o player até ter a URL.
-const VSL_EMBED_URL = '';
+const VSL_EMBED_URL = '/vsl.mp4';
 
 // URL do APK Android — deixe vazio para ocultar o botão de download
 const APK_DOWNLOAD_URL = 'https://sharkgreen.com.br/download/sharkgreen.apk';
@@ -247,13 +248,24 @@ export default function TrialObrigado() {
             style={{ aspectRatio: '16/9' }}
             data-testid="block-vsl"
           >
-            <iframe
-              src={VSL_EMBED_URL}
-              title="VSL — Shark 100% Green"
-              allow="autoplay; fullscreen; picture-in-picture"
-              allowFullScreen
-              className="w-full h-full border-0"
-            />
+            {VSL_EMBED_URL.match(/\.(mp4|webm|ogg)(\?|$)/i) ? (
+              <video
+                src={VSL_EMBED_URL}
+                controls
+                playsInline
+                preload="metadata"
+                className="w-full h-full object-contain bg-black"
+                style={{ display: 'block' }}
+              />
+            ) : (
+              <iframe
+                src={VSL_EMBED_URL}
+                title="VSL — Shark 100% Green"
+                allow="autoplay; fullscreen; picture-in-picture"
+                allowFullScreen
+                className="w-full h-full border-0"
+              />
+            )}
           </div>
         ) : (
           <div
