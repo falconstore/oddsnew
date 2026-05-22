@@ -31,6 +31,13 @@ import { useTrialUpgradeStats, type TrialStatsRange } from '@/hooks/useTrialUpgr
 import { useTrialCapiStats } from '@/hooks/useTrialCapiStats';
 import type { TrialLead, TrialStatus } from '@/types/trial';
 import { TRIAL_PUBLIC_URL } from '@/components/AnimatedRoutes';
+import { toast as toastFn } from '@/hooks/use-toast';
+import {
+  buildManualTelegramMessage,
+  buildTelegramChatUrl,
+  isValidTelegramUsername,
+  normalizeTelegramUsername,
+} from '@/lib/telegramManualMessage';
 
 const RANGE_LABELS: Record<TrialStatsRange, string> = {
   today: 'Hoje',
@@ -1267,6 +1274,48 @@ export default function TrialAdmin() {
                           ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
                           : <Send className="w-3.5 h-3.5" />}
                       </Button>
+                      {(() => {
+                        const tgValid = isValidTelegramUsername(lead.telegram_username);
+                        return (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 w-8 p-0 border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/10 disabled:opacity-40"
+                            disabled={!tgValid}
+                            onClick={async () => {
+                              const username = normalizeTelegramUsername(lead.telegram_username);
+                              if (!username) return;
+                              const message = buildManualTelegramMessage(lead.name);
+                              const chatUrl = buildTelegramChatUrl(username);
+                              let copied = false;
+                              try {
+                                if (navigator.clipboard?.writeText) {
+                                  await navigator.clipboard.writeText(message);
+                                  copied = true;
+                                }
+                              } catch {
+                                copied = false;
+                              }
+                              if (copied) {
+                                toastFn({ title: 'Mensagem copiada', description: 'Cole no chat com Ctrl+V e envie.' });
+                              } else {
+                                toastFn({
+                                  title: 'Não consegui copiar — copie manualmente',
+                                  description: message,
+                                  variant: 'destructive',
+                                });
+                              }
+                              window.open(chatUrl, '_blank', 'noopener');
+                            }}
+                            data-testid={`button-telegram-manual-${lead.id}`}
+                            title={tgValid
+                              ? 'Copiar mensagem e abrir chat no Telegram'
+                              : 'Usuário do Telegram inválido ou ausente'}
+                          >
+                            <MessageCircle className="w-3.5 h-3.5" />
+                          </Button>
+                        );
+                      })()}
                       <Button
                         size="sm"
                         variant="outline"
