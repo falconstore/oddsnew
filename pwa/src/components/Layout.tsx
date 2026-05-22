@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom'
-import { LayoutDashboard, ChevronsUp } from 'lucide-react'
+import { LayoutDashboard, ChevronsUp, GraduationCap } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useProceduresToday } from '@/hooks/useProcedures'
 import { differenceInMinutes, isFuture, parseISO } from 'date-fns'
@@ -72,8 +72,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
     },
     {
       to: '/procedimentos',
-      label: 'Procedimentos',
+      label: 'Proced.',
       renderIcon: (active: boolean) => <SoccerIcon size={18} color={active ? 'hsl(145 80% 48%)' : 'rgba(255,255,255,0.4)'} />,
+      liveStyle: false,
+    },
+    {
+      to: '/tutorial',
+      label: 'Tutorial',
+      renderIcon: (active: boolean) => <GraduationCap size={18} style={{ color: active ? 'hsl(145 80% 48%)' : 'rgba(255,255,255,0.4)' }} />,
       liveStyle: false,
     },
   ]

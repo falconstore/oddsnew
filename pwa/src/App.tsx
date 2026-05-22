@@ -14,6 +14,7 @@ import { DuploGreen } from '@/pages/DuploGreen'
 import { Profile } from '@/pages/Profile'
 import { Subscription } from '@/pages/Subscription'
 import { Paywall } from '@/pages/Paywall'
+import { Tutorial } from '@/pages/Tutorial'
 import { useAppTracking } from '@/hooks/useAppTracking'
 
 function AppTracker() {
@@ -61,6 +62,9 @@ export default function App() {
           } />
           <Route path="/assinatura" element={
             <ProtectedRoute><Layout><Subscription /></Layout></ProtectedRoute>
+          } />
+          <Route path="/tutorial" element={
+            <ProtectedRoute><Layout><Tutorial /></Layout></ProtectedRoute>
           } />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
