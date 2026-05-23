@@ -54,10 +54,11 @@ self.addEventListener('push', (event: PushEvent) => {
   event.waitUntil(
     self.registration.showNotification(payload.title ?? '🦈 Shark Green', {
       body: payload.body ?? '',
-      icon: '/logo.png',
-      badge: '/logo.png',
+      icon: '/app/icons/icon-192.png',
+      badge: '/app/icons/icon-96.png',
       tag: payload.tag ?? 'sg',
       renotify: true,
+      vibrate: [150, 80, 150],
       data: payload.data ?? {},
     } as NotificationOptions)
   )
