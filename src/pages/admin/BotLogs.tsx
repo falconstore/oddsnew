@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format, formatDistanceToNowStrict } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Bot, RefreshCw, AlertCircle, AlertTriangle, Info, Trash2, ChevronDown, ChevronUp, Activity } from 'lucide-react';
+import { Bot, RefreshCw, AlertCircle, AlertTriangle, Info, Trash2, ChevronDown, ChevronUp, Activity, PlugZap } from 'lucide-react';
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -10,6 +10,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabaseProcedures, isProceduresSupabaseConfigured } from '@/lib/supabaseProcedures';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 interface BotLog {
   id: string;
@@ -164,9 +165,38 @@ function findLastReceivedAt(logs: BotLog[]): Date | null {
   return null;
 }
 
+async function callRegisterWebhook(): Promise<{ ok: boolean; message: string }> {
+  if (!isProceduresSupabaseConfigured()) return { ok: false, message: 'Supabase de procedimentos não configurado' };
+  const url = `${import.meta.env.VITE_PROCEDURES_SUPABASE_URL}/functions/v1/telegram-procedure-bot?action=register-webhook`;
+  const key = import.meta.env.VITE_PROCEDURES_SUPABASE_ANON_KEY;
+  const res = await fetch(url, { headers: { apikey: key, Authorization: `Bearer ${key}` } });
+  const data = await res.json();
+  if (data.ok) return { ok: true, message: `Webhook registrado com sucesso! ${data.webhook_url ?? ''}` };
+  return { ok: false, message: data.error ?? data.description ?? 'Erro desconhecido' };
+}
+
 export default function BotLogs() {
   const { data: logs = [], isLoading, isFetching, refetch, dataUpdatedAt } = useBotLogs();
   const [levelFilter, setLevelFilter] = useState<'all' | 'error' | 'warning' | 'info'>('all');
+  const [registering, setRegistering] = useState(false);
+  const { toast } = useToast();
+
+  async function handleRegisterWebhook() {
+    setRegistering(true);
+    try {
+      const result = await callRegisterWebhook();
+      toast({
+        title: result.ok ? 'Webhook registrado!' : 'Falha ao registrar',
+        description: result.message,
+        variant: result.ok ? 'default' : 'destructive',
+      });
+      if (result.ok) setTimeout(() => refetch(), 2000);
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e?.message ?? 'Falha inesperada', variant: 'destructive' });
+    } finally {
+      setRegistering(false);
+    }
+  }
 
   const filtered = levelFilter === 'all' ? logs : logs.filter(l => l.level === levelFilter);
 
@@ -214,13 +244,23 @@ export default function BotLogs() {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
             {dataUpdatedAt && (
               <span className="text-xs text-muted-foreground/50 flex items-center gap-1">
                 <RefreshCw className={cn('h-3 w-3', isFetching && 'animate-spin')} />
                 {format(new Date(dataUpdatedAt), 'HH:mm:ss')}
               </span>
             )}
+            <Button
+              variant="outline" size="sm"
+              onClick={handleRegisterWebhook}
+              disabled={registering}
+              data-testid="button-register-webhook"
+              className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10 h-9"
+            >
+              <PlugZap className={cn('w-3.5 h-3.5 mr-1.5', registering && 'animate-pulse')} />
+              {registering ? 'Registrando…' : 'Registrar Webhook'}
+            </Button>
             <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching} className="border-white/10 hover:bg-white/5 h-9">
               <RefreshCw className={cn('w-3.5 h-3.5 mr-1.5', isFetching && 'animate-spin')} />
               Atualizar

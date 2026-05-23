@@ -376,12 +376,13 @@ serve(async (req) => {
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-  // ── Healthcheck GET endpoint (admin debug) ──
-  // Usage: GET /telegram-procedure-bot?action=status com header x-admin-secret = TELEGRAM_PROC_WEBHOOK_SECRET
-  // Retorna getWebhookInfo + chat_id esperado pra diagnosticar quando o bot fica mudo.
+  // ── GET endpoints (admin debug + auto-recovery) ──
   if (req.method === "GET") {
     const url = new URL(req.url);
-    if (url.searchParams.get("action") === "status") {
+    const action = url.searchParams.get("action");
+
+    // GET ?action=status — retorna getWebhookInfo (protegido por x-admin-secret)
+    if (action === "status") {
       const adminSecret = req.headers.get("x-admin-secret");
       if (!WEBHOOK_SECRET || adminSecret !== WEBHOOK_SECRET) {
         return json({ ok: false, error: "forbidden" }, { status: 403 });
@@ -401,7 +402,40 @@ serve(async (req) => {
         return json({ ok: false, error: e?.message ?? String(e) }, { status: 500 });
       }
     }
-    return json({ ok: false, error: "method not allowed" }, { status: 405 });
+
+    // GET ?action=register-webhook — re-registra o webhook apontando pra esta edge function.
+    // Não exige admin-secret pois é idempotente e não expõe dados sensíveis.
+    if (action === "register-webhook") {
+      if (!BOT_TOKEN || !WEBHOOK_SECRET) {
+        return json({ ok: false, error: "TELEGRAM_PROC_BOT_TOKEN ou TELEGRAM_PROC_WEBHOOK_SECRET não configurados" }, { status: 500 });
+      }
+      const selfUrl = `${SUPABASE_URL}/functions/v1/telegram-procedure-bot`;
+      try {
+        const r = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/setWebhook`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            url: selfUrl,
+            secret_token: WEBHOOK_SECRET,
+            allowed_updates: ["message", "channel_post", "edited_message", "edited_channel_post"],
+          }),
+        });
+        const result = await r.json();
+        await logToPanel(SUPABASE_URL, SERVICE_ROLE, {
+          level: result.ok ? "info" : "error",
+          event: result.ok ? "webhook_registered" : "webhook_register_failed",
+          message: result.ok
+            ? `Webhook re-registrado com sucesso → ${selfUrl}`
+            : `Falha ao re-registrar webhook: ${result.description ?? JSON.stringify(result)}`,
+          context: { selfUrl, telegram: result },
+        });
+        return json({ ok: result.ok, description: result.description, webhook_url: selfUrl, telegram: result });
+      } catch (e: any) {
+        return json({ ok: false, error: e?.message ?? String(e) }, { status: 500 });
+      }
+    }
+
+    return json({ ok: false, error: "action não reconhecida" }, { status: 405 });
   }
 
   if (req.method !== "POST") {
