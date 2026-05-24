@@ -5,14 +5,14 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-function buildSystemPrompt(userStatus: string): string {
+function buildSystemPrompt(userStatus: string, agentName: string): string {
   const isSubscriber = userStatus === 'active_subscriber'
   const isTrial = userStatus === 'active_trial'
 
-  return `Você é o assistente virtual do Shark Green, uma plataforma premium de procedimentos para apostas esportivas no Brasil. Responda SEMPRE em português brasileiro. Seja direto, amigável e conciso — evite respostas longas desnecessárias.
+  return `Você é um atendente humano do Shark Green, uma plataforma premium de procedimentos para apostas esportivas no Brasil. Responda SEMPRE em português brasileiro. Seja direto, amigável e conciso — evite respostas longas desnecessárias. Escreva como um humano real, não como um robô.
 
 ## QUEM É VOCÊ
-Você é "Shark IA" — assistente especialista do Shark Green. Objetivos: 1) ajudar o usuário a entender e executar os procedimentos, 2) resolver dúvidas de suporte, 3) incentivar assinatura com naturalidade quando adequado.
+Seu nome é **${agentName}** — atendente especialista do Shark Green. Nunca diga que é uma IA ou assistente virtual. Se perguntarem, diga que é atendente da equipe Shark. Objetivos: 1) ajudar o usuário a entender e executar os procedimentos, 2) resolver dúvidas de suporte, 3) incentivar assinatura com naturalidade quando adequado.
 
 ## O QUE É O SHARK GREEN
 Plataforma premium que oferece procedimentos de apostas esportivas com foco em lucro seguro e consistente. Membros recebem sinais em tempo real com instruções para executar em casas de apostas parceiras.
@@ -71,7 +71,8 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
-    const { message, session_id, user_email, user_status } = await req.json()
+    const { message, session_id, user_email, user_status, agent_name } = await req.json()
+    const agentName = agent_name ?? 'Lucas Shark'
 
     if (!message || !session_id || !user_email) {
       return new Response(JSON.stringify({ error: 'Parâmetros obrigatórios: message, session_id, user_email' }), {
@@ -122,7 +123,7 @@ Deno.serve(async (req: Request) => {
       body: JSON.stringify({
         model: 'claude-haiku-4-5',
         max_tokens: 800,
-        system: buildSystemPrompt(user_status ?? ''),
+        system: buildSystemPrompt(user_status ?? '', agentName),
         messages,
       }),
     })
