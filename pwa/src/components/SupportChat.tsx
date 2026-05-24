@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Send, MessageCircle, Loader2, ChevronDown } from 'lucide-react'
+import { X, Send, MessageCircle, Loader2, ChevronDown, Clock } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 
@@ -8,6 +8,7 @@ type Message = {
   id: string
   role: 'user' | 'assistant'
   content: string
+  ts?: number
 }
 
 const SUPABASE_URL = 'https://wspsuempnswljkphatur.supabase.co'
@@ -18,17 +19,25 @@ const AGENTS = [
   { name: 'Cleisson Shark', initials: 'CS', color: 'hsl(210 80% 42%)' },
 ]
 
+// Persistência em localStorage para manter histórico entre sessões
+const SESSION_KEY = 'sg-chat-v2'
+
 function getOrCreateSession(): { id: string; agentIndex: number } {
-  const key = 'sg-chat-session'
-  const raw = sessionStorage.getItem(key)
+  const raw = localStorage.getItem(SESSION_KEY)
   if (raw) {
     try { return JSON.parse(raw) } catch {}
   }
   const id = crypto.randomUUID()
   const agentIndex = Math.random() < 0.5 ? 0 : 1
-  sessionStorage.setItem(key, JSON.stringify({ id, agentIndex }))
+  localStorage.setItem(SESSION_KEY, JSON.stringify({ id, agentIndex }))
   return { id, agentIndex }
 }
+
+const QUICK_REPLIES = [
+  'Como funciona o Shark Green?',
+  'O que é freebet e como queimar?',
+  'Como executo um procedimento?',
+]
 
 function TypingDots() {
   return (
@@ -61,45 +70,85 @@ function AgentAvatar({ agent, size = 36 }: { agent: typeof AGENTS[0]; size?: num
   )
 }
 
+const WELCOME_ID = '__welcome__'
+
+function makeWelcome(agentName: string): Message {
+  return {
+    id: WELCOME_ID,
+    role: 'assistant',
+    content: `Olá! 👋 Sou o **${agentName}**, seu atendente aqui no Shark Green. Posso te ajudar com dúvidas sobre procedimentos, como usar o app, ou qualquer outra coisa. O que você precisa?`,
+    ts: Date.now(),
+  }
+}
+
 export function SupportChat() {
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [loadingHistory, setLoadingHistory] = useState(false)
   const [hasUnread, setHasUnread] = useState(true)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const session = useRef(getOrCreateSession())
   const agent = AGENTS[session.current.agentIndex]
   const { user, status } = useAuth()
+  const initialized = useRef(false)
 
   const scrollBottom = useCallback(() => {
-    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 60)
+    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 80)
   }, [])
 
+  // Carrega histórico do banco ao abrir pela primeira vez
   useEffect(() => {
-    if (open && messages.length === 0) {
-      setMessages([{
-        id: 'welcome',
-        role: 'assistant',
-        content: `Olá! 👋 Sou o **${agent.name}**, seu atendente aqui no Shark Green. Posso te ajudar com dúvidas sobre procedimentos, como usar o app, ou qualquer outra coisa. O que você precisa?`,
-      }])
-    }
+    if (!open || initialized.current || !user?.email) return
+    initialized.current = true
+    setLoadingHistory(true)
+
+    ;(async () => {
+      try {
+        const { data } = await supabase
+          .from('pwa_chat_messages')
+          .select('id, role, content, created_at')
+          .eq('session_id', session.current.id)
+          .order('created_at', { ascending: true })
+          .limit(40)
+        if (data && data.length > 0) {
+          setMessages(data.map((m: any) => ({
+            id: m.id,
+            role: m.role as 'user' | 'assistant',
+            content: m.content,
+            ts: new Date(m.created_at).getTime(),
+          })))
+        } else {
+          setMessages([makeWelcome(agent.name)])
+        }
+      } catch {
+        setMessages([makeWelcome(agent.name)])
+      } finally {
+        setLoadingHistory(false)
+      }
+    })()
+  }, [open, user?.email])
+
+  useEffect(() => {
     if (open) {
       setHasUnread(false)
       setTimeout(() => inputRef.current?.focus(), 350)
+      scrollBottom()
     }
   }, [open])
 
   useEffect(() => { if (open) scrollBottom() }, [messages, open])
 
-  async function send() {
-    if (!input.trim() || loading || !user?.email) return
-    const text = input.trim()
-    setInput('')
+  async function send(text?: string) {
+    const msg = (text ?? input).trim()
+    if (!msg || loading || !user?.email) return
+    if (!text) setInput('')
     const ta = inputRef.current
-    if (ta) { ta.style.height = 'auto' }
-    const userMsg: Message = { id: crypto.randomUUID(), role: 'user', content: text }
+    if (ta) ta.style.height = 'auto'
+
+    const userMsg: Message = { id: crypto.randomUUID(), role: 'user', content: msg, ts: Date.now() }
     setMessages(prev => [...prev, userMsg])
     setLoading(true)
     scrollBottom()
@@ -110,12 +159,9 @@ export function SupportChat() {
 
       const res = await fetch(`${SUPABASE_URL}/functions/v1/pwa-chat`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({
-          message: text,
+          message: msg,
           session_id: session.current.id,
           user_email: user.email,
           user_status: status,
@@ -127,12 +173,14 @@ export function SupportChat() {
         id: crypto.randomUUID(),
         role: 'assistant',
         content: data.reply ?? 'Desculpe, não consegui responder. Tente novamente!',
+        ts: Date.now(),
       }])
     } catch {
       setMessages(prev => [...prev, {
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: 'Ops, houve um problema de conexão. Tente novamente em instantes! 🦈',
+        content: 'Ops, problema de conexão. Tenta de novo! 🦈',
+        ts: Date.now(),
       }])
     } finally {
       setLoading(false)
@@ -145,13 +193,15 @@ export function SupportChat() {
 
   function renderContent(text: string) {
     const parts = text.split(/(\*\*[^*]+\*\*)/)
-    return parts.map((part, i) => {
-      if (part.startsWith('**') && part.endsWith('**')) {
-        return <strong key={i} className="font-semibold">{part.slice(2, -2)}</strong>
-      }
-      return <span key={i}>{part}</span>
-    })
+    return parts.map((part, i) =>
+      part.startsWith('**') && part.endsWith('**')
+        ? <strong key={i} className="font-semibold">{part.slice(2, -2)}</strong>
+        : <span key={i}>{part}</span>
+    )
   }
+
+  // Mostra chips só se a única mensagem for a de boas-vindas (sem histórico)
+  const showQuickReplies = messages.length === 1 && messages[0]?.id === WELCOME_ID && !loading
 
   return (
     <>
@@ -196,11 +246,7 @@ export function SupportChat() {
             exit={{ opacity: 0, y: '100%' }}
             transition={{ type: 'spring', bounce: 0.1, duration: 0.38 }}
             className="fixed z-50 flex flex-col"
-            style={{
-              inset: 0,
-              background: 'rgba(8, 14, 22, 0.99)',
-              backdropFilter: 'blur(24px)',
-            }}
+            style={{ inset: 0, background: 'rgba(8, 14, 22, 0.99)', backdropFilter: 'blur(24px)' }}
           >
             {/* Header */}
             <div
@@ -231,38 +277,66 @@ export function SupportChat() {
 
             {/* Mensagens */}
             <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3" style={{ overscrollBehavior: 'contain' }}>
-              {messages.map(m => (
-                <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} gap-2.5 items-end`}>
-                  {m.role === 'assistant' && (
-                    <AgentAvatar agent={agent} size={28} />
-                  )}
-                  <div
-                    className="max-w-[78%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed"
-                    style={{
-                      background: m.role === 'user'
-                        ? 'linear-gradient(135deg, hsl(145 80% 32%), hsl(145 80% 22%))'
-                        : 'rgba(255,255,255,0.07)',
-                      color: 'rgba(255,255,255,0.92)',
-                      borderRadius: m.role === 'user' ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
-                      border: m.role === 'assistant' ? '1px solid rgba(255,255,255,0.08)' : 'none',
-                    }}
-                  >
-                    {renderContent(m.content)}
+
+              {/* Loading histórico */}
+              {loadingHistory && (
+                <div className="flex justify-center py-4">
+                  <div className="flex items-center gap-2 text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                    <Clock size={12} />
+                    <span>Carregando histórico...</span>
                   </div>
+                </div>
+              )}
+
+              {messages.map((m, idx) => (
+                <div key={m.id}>
+                  <div className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} gap-2.5 items-end`}>
+                    {m.role === 'assistant' && <AgentAvatar agent={agent} size={28} />}
+                    <div
+                      className="max-w-[78%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed"
+                      style={{
+                        background: m.role === 'user'
+                          ? 'linear-gradient(135deg, hsl(145 80% 32%), hsl(145 80% 22%))'
+                          : 'rgba(255,255,255,0.07)',
+                        color: 'rgba(255,255,255,0.92)',
+                        borderRadius: m.role === 'user' ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
+                        border: m.role === 'assistant' ? '1px solid rgba(255,255,255,0.08)' : 'none',
+                      }}
+                    >
+                      {renderContent(m.content)}
+                    </div>
+                  </div>
+
+                  {/* Chips de perguntas rápidas logo abaixo da mensagem de boas-vindas */}
+                  {m.id === WELCOME_ID && showQuickReplies && (
+                    <div className="flex flex-col gap-2 mt-3 ml-10">
+                      {QUICK_REPLIES.map(q => (
+                        <button
+                          key={q}
+                          onClick={() => send(q)}
+                          className="text-left text-xs px-3.5 py-2 rounded-xl transition-all active:scale-95"
+                          style={{
+                            background: 'rgba(30,222,107,0.08)',
+                            border: '1px solid rgba(30,222,107,0.25)',
+                            color: 'hsl(145 80% 60%)',
+                          }}
+                        >
+                          {q}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
 
               {loading && (
                 <div className="flex justify-start gap-2.5 items-end">
                   <AgentAvatar agent={agent} size={28} />
-                  <div
-                    className="rounded-2xl"
-                    style={{
-                      background: 'rgba(255,255,255,0.07)',
-                      border: '1px solid rgba(255,255,255,0.08)',
-                      borderRadius: '18px 18px 18px 4px',
-                    }}
-                  >
+                  <div className="rounded-2xl" style={{
+                    background: 'rgba(255,255,255,0.07)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: '18px 18px 18px 4px',
+                  }}>
                     <TypingDots />
                   </div>
                 </div>
@@ -301,7 +375,7 @@ export function SupportChat() {
                 }}
               />
               <button
-                onClick={send}
+                onClick={() => send()}
                 disabled={!input.trim() || loading}
                 className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0 active:scale-90 transition-all"
                 style={{
