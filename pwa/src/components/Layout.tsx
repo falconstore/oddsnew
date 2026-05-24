@@ -3,6 +3,7 @@ import { LayoutDashboard, ChevronsUp, GraduationCap } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useProceduresToday } from '@/hooks/useProcedures'
 import { differenceInMinutes, isFuture, parseISO } from 'date-fns'
+import { SupportChat } from '@/components/SupportChat'
 
 function useLiveCount() {
   const { data: procs = [] } = useProceduresToday()
@@ -89,6 +90,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <main className="flex-1 overflow-hidden relative page-transition">
         {children}
       </main>
+
+      <SupportChat />
 
       <nav className="bottom-nav relative z-20 flex items-center justify-around px-1 pt-2.5"
            style={{ background: 'rgba(11,17,32,0.95)', backdropFilter: 'blur(20px)', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
