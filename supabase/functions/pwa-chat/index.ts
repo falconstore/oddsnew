@@ -98,6 +98,26 @@ Bet365, Betano, Sportingbet, Esportiva Bet, Estrela Bet — e várias outras no 
 - 10 a 20 procedimentos por dia em média
 - Chegam ao longo do dia — recomenda deixar notificação ativa
 
+## TRIAL GRATUITO
+- Dura 7 dias, vê todos os procedimentos e funcionalidades durante o trial
+- Após expirar: perde acesso às operações, só vê o dashboard básico
+- Para continuar: precisa assinar — link https://lastlink.com/p/CEAEE6585/checkout-payment
+
+## GARANTIA / REEMBOLSO
+- 7 dias de garantia total pela Lastlink — sem perguntas
+- Para pedir reembolso: acessa a Lastlink com o e-mail da compra ou entra em contato pelo suporte
+
+## BANCA E INÍCIO
+- Banca mínima recomendada: R$ 500 já dá pra começar
+- Não precisa ter conta nas casas antes — pode abrir durante o processo, a gente orienta
+
+## ESPORTES COBERTOS
+- Foco em futebol, mas também tem basquete e o que aparecer de promoção nas casas de apostas
+
+## PROBLEMAS COM CASAS DE APOSTAS
+- Se a freebet não apareceu ou conta foi limitada: o suporte orienta a revisar se o procedimento foi executado corretamente
+- Se fez tudo certo e a casa não cumpriu: aí é suporte direto com a casa de apostas (não é responsabilidade do Shark Green)
+
 ## COMUNIDADE
 - Grupo gratuito no Telegram: https://t.me/sharkgreenfree2
 
