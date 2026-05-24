@@ -4,11 +4,9 @@ import { PlayCircle, ChevronDown, BookOpen, Lock } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 
 // ── Configuração das aulas ────────────────────────────────────────────────────
-// Adicione novas aulas aqui. videoUrl aceita:
-//   - URL de embed do YouTube:  'https://www.youtube.com/embed/SEU_ID'
-//   - URL de embed do Vimeo:    'https://player.vimeo.com/video/SEU_ID'
-//   - Arquivo mp4 local:        '/app/aulas/aula1.mp4'
-// Deixe videoUrl vazio ('') para exibir a aula como "Em breve"
+// videoUrl aceita embed do YouTube, Vimeo ou mp4 local.
+// isShort: true → exibe o player em formato vertical (9:16) para YouTube Shorts.
+// Deixe videoUrl vazio ('') para exibir como "Em breve".
 // ─────────────────────────────────────────────────────────────────────────────
 const AULAS: {
   titulo: string
@@ -16,30 +14,38 @@ const AULAS: {
   duracao?: string
   videoUrl: string
   soAssinante?: boolean
+  isShort?: boolean
 }[] = [
   {
-    titulo: 'Aula 1 — Introdução ao Shark Green',
-    descricao: 'Entenda como funciona o sistema, o que são procedimentos e como acompanhar os sinais em tempo real.',
-    duracao: '',
-    videoUrl: '',
+    titulo: 'Aula 1 — Leitura do Procedimento',
+    descricao: 'Entenda como interpretar cada campo do procedimento: plataforma, tipo, status e o que fazer em cada etapa.',
+    videoUrl: 'https://www.youtube.com/embed/POxz_UJM9ec',
   },
   {
-    titulo: 'Aula 2 — Como executar um procedimento',
-    descricao: 'Passo a passo para executar um procedimento na casa de apostas e maximizar seus resultados.',
-    duracao: '',
-    videoUrl: '',
+    titulo: 'Aula 2 — Procedimento para Ganhar uma Freebet',
+    descricao: 'Passo a passo para executar um procedimento do tipo GANHAR FB e garantir freebets nas casas de apostas.',
+    videoUrl: 'https://www.youtube.com/embed/_PuI-OERb8s',
   },
   {
-    titulo: 'Aula 3 — Freebets e como aproveitá-las',
-    descricao: 'Aprenda a identificar e usar freebets para aumentar o lucro sem arriscar capital próprio.',
-    duracao: '',
-    videoUrl: '',
-    soAssinante: true,
+    titulo: 'Aula 3 — Procedimento de Apostas Sem Risco (ASR)',
+    descricao: 'Como executar corretamente os procedimentos ASR, aproveitando promoções de aposta grátis sem arriscar capital.',
+    videoUrl: 'https://www.youtube.com/embed/aBVgBaL9AKM',
+  },
+  {
+    titulo: 'Aula 4 — Procedimento para Ganhar Giros Grátis',
+    descricao: 'Veja como aproveitar promoções de giros grátis e converter em lucro garantido.',
+    videoUrl: 'https://www.youtube.com/embed/JYH8erPlplM',
+  },
+  {
+    titulo: 'Aula 5 — Super Odds e Lucros Diretos',
+    descricao: 'Como executar procedimentos do tipo SUPER ODD e Lucro Direto para resultados rápidos.',
+    videoUrl: 'https://www.youtube.com/embed/5qHDxRfswmE',
+    isShort: true,
   },
 ]
 // ─────────────────────────────────────────────────────────────────────────────
 
-function VideoPlayer({ url }: { url: string }) {
+function VideoPlayer({ url, isShort }: { url: string; isShort?: boolean }) {
   const isMp4 = /\.(mp4|webm|ogg)(\?|$)/i.test(url)
   if (isMp4) {
     return (
@@ -51,6 +57,21 @@ function VideoPlayer({ url }: { url: string }) {
         className="w-full rounded-xl bg-black"
         style={{ maxHeight: 260, display: 'block' }}
       />
+    )
+  }
+  if (isShort) {
+    return (
+      <div className="flex justify-center">
+        <div className="rounded-xl overflow-hidden" style={{ width: '56%', aspectRatio: '9/16' }}>
+          <iframe
+            src={url}
+            title="Aula"
+            allow="autoplay; fullscreen; picture-in-picture"
+            allowFullScreen
+            className="w-full h-full border-0"
+          />
+        </div>
+      </div>
     )
   }
   return (
@@ -192,7 +213,7 @@ export function Tutorial() {
                     style={{ overflow: 'hidden' }}
                   >
                     <div className="px-4 pb-4">
-                      <VideoPlayer url={aula.videoUrl} />
+                      <VideoPlayer url={aula.videoUrl} isShort={aula.isShort} />
                     </div>
                   </motion.div>
                 )}
