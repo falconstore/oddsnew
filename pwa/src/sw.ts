@@ -40,6 +40,9 @@ registerRoute(
 )
 
 // ─── Push notification received ──────────────────────────────────────────────
+const ICON  = '/app/icons/icon-192.png'
+const BADGE = '/app/icons/icon-96.png'
+
 self.addEventListener('push', (event: PushEvent) => {
   let payload: { title?: string; body?: string; tag?: string; data?: Record<string, string> } = {}
   try {
@@ -52,15 +55,33 @@ self.addEventListener('push', (event: PushEvent) => {
   } catch { payload = { title: '🦈 Shark Green', body: 'Nova atualização disponível!' } }
 
   event.waitUntil(
-    self.registration.showNotification(payload.title ?? '🦈 Shark Green', {
-      body: payload.body ?? '',
-      icon: '/app/icons/icon-192.png',
-      badge: '/app/icons/icon-96.png',
-      tag: payload.tag ?? 'sg',
-      renotify: true,
-      vibrate: [150, 80, 150],
-      data: payload.data ?? {},
-    } as NotificationOptions)
+    self.registration.getNotifications().then(existing => {
+      // Se já há notificações visíveis, fecha todas e exibe resumo agrupado
+      if (existing.length >= 1) {
+        existing.forEach(n => n.close())
+        const total = existing.length + 1
+        return self.registration.showNotification('🦈 Shark Green', {
+          body: `${total} novos avisos — toque para ver`,
+          icon: ICON,
+          badge: BADGE,
+          tag: 'sg-group',
+          renotify: true,
+          vibrate: [150, 80, 150],
+          data: { url: '/procedures' },
+        } as NotificationOptions)
+      }
+
+      // Primeira notificação: exibe normalmente
+      return self.registration.showNotification(payload.title ?? '🦈 Shark Green', {
+        body: payload.body ?? '',
+        icon: ICON,
+        badge: BADGE,
+        tag: payload.tag ?? 'sg',
+        renotify: true,
+        vibrate: [150, 80, 150],
+        data: payload.data ?? {},
+      } as NotificationOptions)
+    })
   )
 })
 

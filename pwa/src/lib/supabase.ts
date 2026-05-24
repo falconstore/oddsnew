@@ -46,11 +46,13 @@ export type Procedure = {
   promotion_name: string | null
   profit_loss: number | null
   resultado_lucro: number | null
+  lucro_prejuizo_previsto: number | null
   kickoff_at: string | null
   esporte: string | null
   duplo_green_confirmado: boolean | null
   duplo_green_lucro: number | null
   freebet_value: number | null
+  freebet_valor_previsto: number | null
   freebet_creditada: string | null
   tachado: boolean | null
   archived: boolean | null

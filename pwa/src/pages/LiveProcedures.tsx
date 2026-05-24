@@ -83,7 +83,9 @@ function LiveCard({ p, onClick, isChecked, onToggleCheck }: {
   const mins = minutesLive(p.kickoff_at!)
   const elapsed = mins < 90 ? `${mins}'` : `+${mins - 90}'`
   const sc = statusColor(p.status)
-  const hasFb = (p.tipo === 'GANHAR_FB' || p.tipo === 'QUEIMAR_FB') && Number(p.freebet_value ?? 0) > 0
+  const fbVal = Number(p.freebet_valor_previsto ?? p.freebet_value ?? 0)
+  const hasFb = (p.tipo === 'GANHAR_FB' || p.tipo === 'QUEIMAR_FB') && fbVal > 0
+  const previstoLucro = Number(p.lucro_prejuizo_previsto ?? p.profit_loss ?? 0)
 
   return (
     <motion.button onClick={onClick}
@@ -140,10 +142,10 @@ function LiveCard({ p, onClick, isChecked, onToggleCheck }: {
                 <Star size={9} />2x GREEN
               </span>
             )}
-            {!hasFb && Number(p.profit_loss ?? 0) !== 0 && (
+            {!hasFb && previstoLucro !== 0 && (
               <span className="text-[10px] font-semibold font-mono px-1.5 py-0.5 rounded-md"
                     style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.38)' }}>
-                pot. R${Math.abs(Number(p.profit_loss)).toFixed(0)}
+                pot. R${Math.abs(previstoLucro).toFixed(0)}
               </span>
             )}
           </div>
@@ -157,7 +159,7 @@ function LiveCard({ p, onClick, isChecked, onToggleCheck }: {
 
         {/* Right: freebet subcard or chevron */}
         {hasFb ? (
-          <FreebetSubcard tipo={p.tipo!} value={Number(p.freebet_value)} />
+          <FreebetSubcard tipo={p.tipo!} value={fbVal} />
         ) : (
           <ChevronRight size={15} style={{ color: 'rgba(255,255,255,0.25)', flexShrink: 0 }} />
         )}

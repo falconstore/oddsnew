@@ -91,7 +91,9 @@ function ProcedureCard({
   const kickoff = p.kickoff_at ? parseISO(p.kickoff_at) : null
   const isLive = kickoff && !isFuture(kickoff) && differenceInMinutes(new Date(), kickoff) < 240
   const hasLucro = p.status === 'Concluído' || p.status === 'Lucro Direto'
-  const hasFb = (p.tipo === 'GANHAR_FB' || p.tipo === 'QUEIMAR_FB') && Number(p.freebet_value ?? 0) > 0
+  const fbVal = Number(p.freebet_valor_previsto ?? p.freebet_value ?? 0)
+  const hasFb = (p.tipo === 'GANHAR_FB' || p.tipo === 'QUEIMAR_FB') && fbVal > 0
+  const previstoLucro = Number(p.lucro_prejuizo_previsto ?? p.profit_loss ?? 0)
 
   return (
     <button onClick={onClick}
@@ -155,7 +157,7 @@ function ProcedureCard({
 
         {/* Right: freebet subcard OR lucro/pot/chevron */}
         {hasFb ? (
-          <FreebetSubcard tipo={p.tipo!} value={Number(p.freebet_value)} />
+          <FreebetSubcard tipo={p.tipo!} value={fbVal} />
         ) : (
           <div className="flex flex-col items-end gap-1 flex-shrink-0">
             {hasLucro ? (
@@ -163,10 +165,10 @@ function ProcedureCard({
                     style={{ color: lucro >= 0 ? 'hsl(145 80% 48%)' : '#f87171' }}>
                 {lucro >= 0 ? '+' : ''}R${lucro.toFixed(0)}
               </span>
-            ) : Number(p.profit_loss ?? 0) !== 0 ? (
+            ) : previstoLucro !== 0 ? (
               <span className="text-xs font-semibold font-mono"
                     style={{ color: 'rgba(255,255,255,0.35)' }}>
-                pot. R${Math.abs(Number(p.profit_loss)).toFixed(0)}
+                pot. R${Math.abs(previstoLucro).toFixed(0)}
               </span>
             ) : null}
             <ChevronRight size={14} style={{ color: 'rgba(255,255,255,0.25)' }} />
