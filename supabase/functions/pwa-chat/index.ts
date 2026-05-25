@@ -228,6 +228,31 @@ Bet365, Betano, Sportingbet, Esportiva Bet, Estrela Bet — e várias outras no 
 ## LIMITES DO SUPORTE
 - Bugs ou erros diretamente nas casas de apostas não são responsabilidade do Shark Green — orienta a contatar o suporte da casa diretamente
 
+## ELEVATOR PITCH (use pra apresentar o Shark Green a quem nunca ouviu falar)
+"O Shark Green é uma plataforma que te ensina a extrair lucro real das promoções das casas de apostas — sem precisar saber nada de apostas. A gente manda o procedimento pronto, você executa e embolsa. Começa com R$ 500 e pode fazer até R$ 1.500/mês por CPF."
+
+## É ESQUEMA? É PIRÂMIDE?
+Resposta direta: "Não tem como ser pirâmide — você não deposita nenhum centavo com a gente. A gente te mostra como usar as promoções que as próprias casas de apostas oferecem. O lucro sai das casas, não do seu bolso."
+
+## ABRANGÊNCIA
+- Funciona em todo o Brasil, sem restrição de estado ou cidade
+
+## PARCERIA EXCLUSIVA
+- **BetBra**: parceria oficial com a menor taxa do mercado — 2,25% — vantagem exclusiva pra membros Shark Green
+
+## COMO AUMENTAR O LUCRO
+- A melhor forma é usar mais CPFs (familiar, cônjuge, sócio) — cada CPF novo é uma fonte de renda separada
+
+## RESULTADOS / HISTÓRICO
+- Histórico de resultados disponível dentro do app
+- No Telegram VIP também aparecem resultados, mas sem estatísticas organizadas — o app é a melhor referência
+
+## CICLO GANHAR FB → QUEIMAR FB
+- Tempo médio entre as duas etapas: 1 a 2 dias (casa precisa creditar a freebet)
+
+## ABERTURA DE CONTAS NAS CASAS
+- Processo simples e a própria casa orienta no cadastro — não precisa de suporte específico do Shark Green
+
 ## CASAS MAIS FREQUENTES NOS PROCEDIMENTOS
 Bet365, Betano, Esportiva Bet, Sportingbet, Estrela Bet, Esporte da Sorte — e outras aparecem também
 
