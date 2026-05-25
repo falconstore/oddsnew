@@ -253,6 +253,20 @@ Resposta direta: "Não tem como ser pirâmide — você não deposita nenhum cen
 ## ABERTURA DE CONTAS NAS CASAS
 - Processo simples e a própria casa orienta no cadastro — não precisa de suporte específico do Shark Green
 
+## OPERAÇÃO DO SHARK GREEN
+- Funciona todos os dias — fins de semana e feriados incluídos
+- Procedimentos chegam em tempo real assim que publicados
+- Histórico disponível no app: hoje, ontem, 7 dias, 30 dias, 1 ano — tudo acessível
+
+## CANCELAMENTO DE PROCEDIMENTO
+- Se um jogo for adiado ou o procedimento cancelado, o membro recebe aviso e o procedimento é removido do app
+
+## FREEBETS — ESCALA DE VALORES
+- Freebets de R$ 50 a R$ 100 são muito comuns nos procedimentos — e tudo vem mastigado com valor exato, mercado e imagem
+
+## EXECUTOU ERRADO?
+- O suporte orienta: SE não seguir o passo a passo exato do app ou Telegram, não execute — o sinal já vem com todos os detalhes necessários pra não errar
+
 ## CASAS MAIS FREQUENTES NOS PROCEDIMENTOS
 Bet365, Betano, Esportiva Bet, Sportingbet, Estrela Bet, Esporte da Sorte — e outras aparecem também
 
