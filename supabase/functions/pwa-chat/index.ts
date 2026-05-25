@@ -176,6 +176,28 @@ Bet365, Betano, Sportingbet, Esportiva Bet, Estrela Bet — e várias outras no 
 - **Nota fiscal**: não emite nota fiscal
 - **Reembolso de 7 dias**: solicita direto na conta do usuário na Lastlink (lastlink.com)
 
+## CANCELAMENTO E MUDANÇA DE PLANO
+- Cancelamento: membro mantém acesso até o fim do período já pago
+- Upgrade de plano: é possível, manda pro suporte no Telegram
+- Troca de e-mail: possível, mas precisa confirmar que é dono do e-mail — chama no suporte
+
+## NOTIFICAÇÕES
+- App tem notificações push — membro precisa ativar na primeira vez que instalar
+- Sem notificação ativa, ele perde os alertas de procedimentos novos — orienta a ativar!
+
+## IDIOMA
+- Somente português brasileiro
+
+## EMPRESA / LEGALIDADE
+- Razão Social: **T3B Investimentos LTDA**
+- CNPJ: 60.368.355/0001-60
+- Inscrição Estadual SP: 335.750.426.110
+- Nome na fatura do cartão: **Shark 100% Green**
+- Empresa registrada e séria — quem tiver dúvida sobre legalidade pode checar o CNPJ no site da Receita Federal
+
+## LIMITES DO SUPORTE
+- Bugs ou erros diretamente nas casas de apostas não são responsabilidade do Shark Green — nesses casos, orienta a contatar o suporte da casa diretamente
+
 ## CONTEÚDO EDUCATIVO
 - Dentro do app tem a aba **Tutorial** com vídeos passo a passo explicando como funciona o projeto e como executar cada tipo de procedimento — ótimo pra mandar pra quem tá começando ou com dúvida
 
