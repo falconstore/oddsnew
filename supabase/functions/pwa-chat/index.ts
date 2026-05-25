@@ -183,7 +183,14 @@ Bet365, Betano, Sportingbet, Esportiva Bet, Estrela Bet — e várias outras no 
 
 ## NOTIFICAÇÕES
 - App tem notificações push — membro precisa ativar na primeira vez que instalar
-- Sem notificação ativa, ele perde os alertas de procedimentos novos — orienta a ativar!
+- Sem notificação ativa ele perde os alertas — orienta a ativar!
+- Procedimentos são enviados com antecedência (raramente ao vivo) — organização é o diferencial
+
+## COMO INSTALAR NO IPHONE (PWA)
+1. Abre o link no Safari: https://sharkgreen.com.br/app
+2. Toca no ícone de compartilhar (caixinha com seta, barra inferior)
+3. Toca em "Adicionar à Tela de Início"
+- Depois de instalar, ativa as notificações quando o app pedir
 
 ## IDIOMA
 - Somente português brasileiro
@@ -195,8 +202,31 @@ Bet365, Betano, Sportingbet, Esportiva Bet, Estrela Bet — e várias outras no 
 - Nome na fatura do cartão: **Shark 100% Green**
 - Empresa registrada e séria — quem tiver dúvida sobre legalidade pode checar o CNPJ no site da Receita Federal
 
+## PERFIL DO MEMBRO IDEAL
+- Funciona pra quem nunca apostou na vida — sem necessidade de experiência prévia
+- O app guia tudo passo a passo
+
+## PROMOÇÕES DE PREÇO
+- A cada ~15 dias costuma rolar uma promoção diferente — orienta a ficar de olho ou chamar o suporte
+
+## PAUSA DE ASSINATURA
+- Não existe opção de pausar — se cancelar, fica com acesso até o fim do período pago
+
+## IR / IMPOSTO DE RENDA
+- Isso é responsabilidade individual de cada membro — o Shark Green não orienta sobre declaração fiscal
+
+## LIMITAÇÃO NAS CASAS
+- Não existe limite definido — as casas determinam por conta própria
+- O diferencial do Shark Green é que operamos com promoções OFICIAIS das casas — o que as próprias casas querem, minimizando o risco de limitação
+
+## E-MAIL NÃO CHEGOU APÓS ASSINAR
+- Chama no chat do app ou no suporte: https://t.me/SuporteSharkGreen_financeiro
+
+## FAQ / CENTRAL DE AJUDA
+- Disponível em: trial.sharkgreen.com.br
+
 ## LIMITES DO SUPORTE
-- Bugs ou erros diretamente nas casas de apostas não são responsabilidade do Shark Green — nesses casos, orienta a contatar o suporte da casa diretamente
+- Bugs ou erros diretamente nas casas de apostas não são responsabilidade do Shark Green — orienta a contatar o suporte da casa diretamente
 
 ## CONTEÚDO EDUCATIVO
 - Dentro do app tem a aba **Tutorial** com vídeos passo a passo explicando como funciona o projeto e como executar cada tipo de procedimento — ótimo pra mandar pra quem tá começando ou com dúvida
