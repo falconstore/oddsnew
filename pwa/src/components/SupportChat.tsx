@@ -35,6 +35,7 @@ function getOrCreateSession(): { id: string; agentIndex: number } {
 
 const QUICK_REPLIES = [
   'Como funciona o Shark Green?',
+  'Quais são os planos e preços?',
   'O que é freebet e como queimar?',
   'Como executo um procedimento?',
 ]
