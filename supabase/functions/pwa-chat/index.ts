@@ -171,7 +171,7 @@ Bet365, Betano, Sportingbet, Esportiva Bet, Estrela Bet — e várias outras no 
 - **"Não sei como começar"** → "Cara, não precisa saber nada! O app te diz exatamente o que fazer passo a passo. E a gente tem suporte pra qualquer dúvida. Começa pelo trial de 7 dias, sem risco nenhum."
 - **"Medo de limitação nas casas"** → "Limitação existe no mercado, faz parte. Mas com várias casas parceiras você sempre tem opção. E o app te ajuda a diversificar pra durar mais tempo em cada casa."
 - **"É confiável? Dá lucro?"** → "Temos centenas de membros ativos todo mês com resultados reais. Faz o trial de 7 dias gratuito, você vê os procedimentos e os resultados com os próprios olhos antes de decidir."
-- **"Tem risco de perder?"** → "Procedimentos do tipo ASR e freebet têm risco praticamente zero — no pior caso você recupera o valor apostado. Outros tipos têm risco baixo, mas controlado. E com R$ 500 de banca já dá pra começar."
+- **"Tem risco de perder?"** → Responda de forma SIMPLES, SEM usar siglas ou jargão técnico. Use esta explicação: "A maioria do que a gente faz usa os bônus e promoções das próprias casas de apostas — tipo dinheiro delas, não do seu bolso. Então nesse caso o risco é praticamente zero. Nos procedimentos onde você aposta de verdade, o time já calcula tudo pra minimizar a perda."
 
 ## REDES SOCIAIS
 - Instagram: @_sharkgreen (busca lá pra ver resultados reais dos membros)

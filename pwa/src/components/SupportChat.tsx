@@ -198,31 +198,108 @@ export function SupportChat() {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() }
   }
 
-  function renderContent(text: string) {
-    // Quebra por [PRINT:N] para exibir imagens reais de depoimentos
-    const segments = text.split(/(\[PRINT:\d+\])/)
-    return segments.map((seg, i) => {
-      const match = seg.match(/^\[PRINT:(\d+)\]$/)
-      if (match) {
-        const n = match[1]
+  function renderText(text: string, keyPrefix: string) {
+    const urlRegex = /(https?:\/\/[^\s]+)/g
+    const parts = text.split(urlRegex)
+    return parts.map((part, j) => {
+      if (/^https?:\/\//.test(part)) {
+        const clean = part.replace(/[.,!?)]+$/, '')
+        const label = clean.includes('checkout') || clean.includes('lastlink')
+          ? '🛒 Garantir acesso agora'
+          : clean.includes('t.me')
+            ? '💬 Abrir grupo no Telegram'
+            : '🔗 Abrir link'
         return (
-          <div key={i} className="mt-2 mb-1">
-            <img
-              src={`/proof${n}.png`}
-              alt="Print de resultado de membro"
-              className="rounded-xl max-w-full"
-              style={{ maxHeight: 320, objectFit: 'contain' }}
-            />
+          <div key={`${keyPrefix}-url-${j}`} className="mt-2.5">
+            <a
+              href={clean}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold active:scale-95 transition-transform"
+              style={{
+                background: 'linear-gradient(135deg, hsl(145 80% 38%), hsl(145 80% 26%))',
+                color: 'white',
+                boxShadow: '0 2px 14px rgba(30,222,107,0.3)',
+                border: '1px solid rgba(30,222,107,0.35)',
+              }}
+            >
+              {label}
+            </a>
           </div>
         )
       }
-      // Dentro de cada segmento de texto, processa **bold**
-      const parts = seg.split(/(\*\*[^*]+\*\*)/)
-      return parts.map((part, j) =>
-        part.startsWith('**') && part.endsWith('**')
-          ? <strong key={`${i}-${j}`} className="font-semibold">{part.slice(2, -2)}</strong>
-          : <span key={`${i}-${j}`}>{part}</span>
+      const boldParts = part.split(/(\*\*[^*]+\*\*)/)
+      return boldParts.map((bp, k) =>
+        bp.startsWith('**') && bp.endsWith('**')
+          ? <strong key={`${keyPrefix}-${j}-${k}`} className="font-semibold">{bp.slice(2, -2)}</strong>
+          : <span key={`${keyPrefix}-${j}-${k}`}>{bp}</span>
       )
+    })
+  }
+
+  function renderContent(text: string) {
+    type Seg = { type: 'text'; value: string } | { type: 'prints'; ids: string[] }
+    const raw = text.split(/(\[PRINT:\d+\])/)
+    const grouped: Seg[] = []
+
+    for (const seg of raw) {
+      const match = seg.match(/^\[PRINT:(\d+)\]$/)
+      if (match) {
+        const last = grouped[grouped.length - 1]
+        if (last?.type === 'prints') {
+          last.ids.push(match[1])
+        } else {
+          grouped.push({ type: 'prints', ids: [match[1]] })
+        }
+      } else {
+        grouped.push({ type: 'text', value: seg })
+      }
+    }
+
+    return grouped.map((seg, i) => {
+      if (seg.type === 'prints') {
+        if (seg.ids.length === 1) {
+          return (
+            <div key={i} className="mt-2 mb-1">
+              <img
+                src={`/proof${seg.ids[0]}.png`}
+                alt="Print de resultado de membro"
+                className="rounded-xl max-w-full"
+                style={{ maxHeight: 300, objectFit: 'contain' }}
+              />
+            </div>
+          )
+        }
+        return (
+          <div key={i} className="mt-2 mb-1 -mx-2">
+            <div
+              className="flex gap-2.5 overflow-x-auto snap-x snap-mandatory px-2 pb-2"
+              style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
+            >
+              {seg.ids.map((n, j) => (
+                <div key={j} className="flex-shrink-0 snap-center" style={{ width: '75%' }}>
+                  <img
+                    src={`/proof${n}.png`}
+                    alt={`Print ${j + 1}`}
+                    className="rounded-xl w-full"
+                    style={{ maxHeight: 280, objectFit: 'contain' }}
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-center gap-1 mt-0.5">
+              {seg.ids.map((_, j) => (
+                <span
+                  key={j}
+                  className="w-1.5 h-1.5 rounded-full"
+                  style={{ background: 'rgba(30,222,107,0.45)' }}
+                />
+              ))}
+            </div>
+          </div>
+        )
+      }
+      return <span key={i}>{renderText(seg.value, String(i))}</span>
     })
   }
 
