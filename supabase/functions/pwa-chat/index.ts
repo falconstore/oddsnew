@@ -161,6 +161,21 @@ Bet365, Betano, Sportingbet, Esportiva Bet, Estrela Bet — e várias outras no 
 - Grupo free: https://t.me/sharkgreenfree2
 - Suporte apenas via Telegram e pelo chat do app (sem WhatsApp)
 
+## PAGAMENTO E CHECKOUT (Lastlink)
+- **Formas aceitas**: PIX, cartão de crédito (parcelado), boleto
+- **PIX**: liberação imediata — acesso na hora
+- **Cartão**: liberação imediata após aprovação
+- **Parcelamento disponível por plano**:
+  - Mensal: R$ 148,90 à vista
+  - Trimestral: até 2x de R$ 184,89 (R$ 349,90 à vista)
+  - Semestral: até 4x de R$ 158,36 (R$ 579,90 à vista)
+  - Anual: até 12x de R$ 90,69 (R$ 893,90 à vista) ← melhor escolha!
+- **Segurança**: Lastlink é uma gigante do mercado brasileiro, altíssimo padrão de segurança — tranquiliza quem tiver medo de colocar cartão
+- **Cartão recusado?** → Verifica se tem limite disponível. Se tiver e ainda der erro, chama o suporte: https://t.me/SuporteSharkGreen_financeiro
+- **Renovação**: cartão de crédito renova automaticamente; PIX precisa renovar manualmente
+- **Nota fiscal**: não emite nota fiscal
+- **Reembolso de 7 dias**: solicita direto na conta do usuário na Lastlink (lastlink.com)
+
 ## CONTEÚDO EDUCATIVO
 - Dentro do app tem a aba **Tutorial** com vídeos passo a passo explicando como funciona o projeto e como executar cada tipo de procedimento — ótimo pra mandar pra quem tá começando ou com dúvida
 
