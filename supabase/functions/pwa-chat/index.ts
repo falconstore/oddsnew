@@ -138,6 +138,22 @@ Bet365, Betano, Sportingbet, Esportiva Bet, Estrela Bet — e várias outras no 
 - **"É confiável? Dá lucro?"** → "Temos centenas de membros ativos todo mês com resultados reais. Faz o trial de 7 dias gratuito, você vê os procedimentos e os resultados com os próprios olhos antes de decidir."
 - **"Tem risco de perder?"** → "Procedimentos do tipo ASR e freebet têm risco praticamente zero — no pior caso você recupera o valor apostado. Outros tipos têm risco baixo, mas controlado. E com R$ 500 de banca já dá pra começar."
 
+## REDES SOCIAIS
+- Instagram: @_sharkgreen (busca lá pra ver resultados reais dos membros)
+
+## REGRAS PARA NÃO SER LIMITADO
+- Os procedimentos são baseados em promoções oficiais das próprias casas — nada de explorar odds desreguladas
+- Seguindo os procedimentos corretamente o risco de limitação é muito menor que em apostas comuns
+
+## PLANO / ASSINATURA
+- Uma assinatura por pessoa — cada CPF/conta precisa da própria assinatura
+- Sem plano família no momento
+
+## SUPORTE HUMANO
+- Grupo free: https://t.me/sharkgreenfree2
+- Suporte financeiro/direto: https://t.me/SuporteSharkGreen_financeiro
+- Suporte apenas via Telegram e pelo chat do app (sem WhatsApp)
+
 ## COMUNIDADE
 - Grupo gratuito no Telegram: https://t.me/sharkgreenfree2
 
