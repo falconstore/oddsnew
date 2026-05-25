@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Star, Pencil, Trash2, ExternalLink, Tag, Archive, ArchiveRestore, Trophy, CheckCircle2, AlertCircle, ShieldCheck, AlertTriangle, ShieldAlert, Timer } from 'lucide-react';
 import { Procedure } from '@/types/procedures';
-import { formatProcedureDate, translateCategory, getDisplayProfitLoss } from '@/lib/procedureUtils';
+import { formatProcedureDate, translateCategory, getDisplayProfitLoss, getCategoryBadgeClass } from '@/lib/procedureUtils';
 import { canCheckResult } from '@/lib/procedureGameTime';
 import { KickoffBadge } from './KickoffBadge';
 import { StatusActionToggles } from './StatusActionToggles';
@@ -40,7 +40,7 @@ export function ProcedureTable({ procedures, proceduresById, visibleColumns, onE
     ) {
       return 'bg-amber-500/20 text-amber-400 border-amber-500/30';
     }
-    return 'bg-primary/20 text-primary border-primary/30';
+    return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
   };
 
   return (
@@ -187,7 +187,7 @@ export function ProcedureTable({ procedures, proceduresById, visibleColumns, onE
               {visibleColumns.includes('category') && (
                 <TableCell className="py-2 px-2">
                   <div className="flex items-center gap-1 flex-wrap">
-                    <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary text-[10px] px-1.5 py-0 font-medium">
+                    <Badge variant="outline" className={`${getCategoryBadgeClass(proc.category)} text-[10px] px-1.5 py-0 font-medium`}>
                       {translateCategory(proc.category)}
                     </Badge>
                     {proc.is_extra && (

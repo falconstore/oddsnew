@@ -463,6 +463,26 @@ export const translateCategory = (category: string): string => {
   return translations[category] || category;
 };
 
+export const getCategoryBadgeClass = (category: string): string => {
+  const normalized = category?.toLowerCase() ?? '';
+  if (normalized === 'aposta sem risco') {
+    return 'border-amber-500/30 bg-amber-500/10 text-amber-400';
+  }
+  if (normalized === 'cashback') {
+    return 'border-blue-500/30 bg-blue-500/10 text-blue-400';
+  }
+  if (normalized === 'promoção' || normalized === 'promotion') {
+    return 'border-violet-500/30 bg-violet-500/10 text-violet-400';
+  }
+  if (normalized === 'superodd') {
+    return 'border-red-500/30 bg-red-500/10 text-red-400';
+  }
+  if (normalized === 'freebet') {
+    return 'border-orange-600/30 bg-orange-600/10 text-orange-500';
+  }
+  return 'border-primary/30 bg-primary/10 text-primary';
+};
+
 export const getAllPlatforms = (procedures: Procedure[]): string[] => {
   if (!procedures || !Array.isArray(procedures)) return [];
   const platforms = [...new Set(procedures.map(proc => proc.platform).filter(Boolean))];

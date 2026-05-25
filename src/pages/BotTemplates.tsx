@@ -523,6 +523,7 @@ const TEMPLATES: TemplateConfig[] = [
 // ─────────────────────────────────────────
 
 interface FreebetOption {
+  id: string;
   procedure_number: string;
   platform: string | null;
   freebet_value: number | null;
@@ -532,6 +533,7 @@ interface FreebetOption {
   promotion_name: string | null;
   freebet_creditada: string | null;
   status: string | null;
+  is_extra: boolean;
 }
 
 function FreebetSelectField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
@@ -546,7 +548,7 @@ function FreebetSelectField({ value, onChange }: { value: string; onChange: (v: 
     queryFn: async (): Promise<FreebetOption[]> => {
       const { data, error } = await supabase
         .from('procedures')
-        .select('procedure_number, platform, freebet_value, freebet_valor_previsto, partida_descricao, date, promotion_name, freebet_creditada, status')
+        .select('id, is_extra, procedure_number, platform, freebet_value, freebet_valor_previsto, partida_descricao, date, promotion_name, freebet_creditada, status')
         .in('tipo', ['GANHAR_FB', 'ASR'])
         .eq('archived', false)
         .order('created_date', { ascending: false })
@@ -566,26 +568,66 @@ function FreebetSelectField({ value, onChange }: { value: string; onChange: (v: 
     return `${d}/${m}/${y}`;
   };
 
-  // Multi-select: value é string CSV ("145, 147"). Internamente trabalhamos com array.
-  const selectedNums = useMemo(
-    () => value.split(',').map(s => s.trim()).filter(Boolean),
-    [value]
-  );
-  const selectedSet = useMemo(() => new Set(selectedNums), [selectedNums]);
-  const selectedFbs = useMemo(
-    () => selectedNums.map(n => freebets.find(fb => fb.procedure_number === n)).filter(Boolean) as FreebetOption[],
-    [selectedNums, freebets]
-  );
+  // Multi-select: rastreamos por ID internamente para evitar conflito quando dois
+  // procedimentos têm o mesmo procedure_number (ex: original + EXTRA na mesma casa).
+  const suppressSync = useRef(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
-  function toggleSelection(num: string) {
-    const next = selectedSet.has(num)
-      ? selectedNums.filter(n => n !== num)
-      : [...selectedNums, num];
-    onChange(next.join(', '));
+  // Sincroniza selectedIds a partir do value externo (apenas quando não foi disparado
+  // pelo próprio onChange do componente via buildOutputValue).
+  useEffect(() => {
+    if (suppressSync.current) { suppressSync.current = false; return; }
+    if (freebets.length === 0) { if (!value) setSelectedIds([]); return; }
+    const nums = value.split(',').map(s => s.trim()).filter(Boolean);
+    if (nums.length === 0) { setSelectedIds([]); return; }
+    const ids = nums.flatMap(numStr => {
+      const isExtraRef = /\bEXTRA\b/i.test(numStr);
+      const num = numStr.replace(/\s*EXTRA\s*/i, '').trim();
+      const matches = freebets.filter(fb => fb.procedure_number === num);
+      if (matches.length === 0) return [];
+      const preferred = isExtraRef
+        ? (matches.find(fb => fb.is_extra) ?? matches[0])
+        : (matches.find(fb => !fb.is_extra) ?? matches[0]);
+      return [preferred.id];
+    });
+    setSelectedIds(ids);
+  }, [value, freebets]);
+
+  const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+  const selectedFbs = useMemo(
+    () => selectedIds.map(id => freebets.find(fb => fb.id === id)).filter(Boolean) as FreebetOption[],
+    [selectedIds, freebets]
+  );
+  // Para exibição de contagem e texto resumido
+  const selectedNums = useMemo(() => selectedFbs.map(fb => fb.procedure_number), [selectedFbs]);
+  // Para o caso "não encontrado na lista" (value existe mas freebets ainda não carregou)
+  const rawNums = useMemo(() => value.split(',').map(s => s.trim()).filter(Boolean), [value]);
+
+  function buildOutputValue(ids: string[]): string {
+    return ids
+      .map(id => {
+        const fb = freebets.find(f => f.id === id);
+        if (!fb) return null;
+        return fb.is_extra ? `${fb.procedure_number} EXTRA` : fb.procedure_number;
+      })
+      .filter(Boolean)
+      .join(', ');
   }
 
-  function removeSelection(num: string) {
-    onChange(selectedNums.filter(n => n !== num).join(', '));
+  function toggleSelection(id: string) {
+    const next = selectedIdSet.has(id)
+      ? selectedIds.filter(x => x !== id)
+      : [...selectedIds, id];
+    setSelectedIds(next);
+    suppressSync.current = true;
+    onChange(buildOutputValue(next));
+  }
+
+  function removeSelection(id: string) {
+    const next = selectedIds.filter(x => x !== id);
+    setSelectedIds(next);
+    suppressSync.current = true;
+    onChange(buildOutputValue(next));
   }
 
   // Elegíveis = SIM/AGUARDANDO ou ainda não definida (NULL)
@@ -650,14 +692,14 @@ function FreebetSelectField({ value, onChange }: { value: string; onChange: (v: 
           )}
         >
           {selectedFbs.length > 0 ? (
-            <span className="truncate text-foreground">
+            <span className="truncate text-foreground flex items-center gap-1.5">
               {selectedFbs.length === 1
-                ? `#${selectedFbs[0].procedure_number} · ${selectedFbs[0].platform ?? '—'} · ${fmtCurrency(selectedFbs[0].freebet_value ?? selectedFbs[0].freebet_valor_previsto) ?? '—'}`
+                ? `#${selectedFbs[0].procedure_number}${selectedFbs[0].is_extra ? ' EXTRA' : ''} · ${selectedFbs[0].platform ?? '—'} · ${fmtCurrency(selectedFbs[0].freebet_value ?? selectedFbs[0].freebet_valor_previsto) ?? '—'}`
                 : `${selectedFbs.length} freebets selecionadas: ${selectedNums.join(', ')}`}
             </span>
-          ) : selectedNums.length > 0 ? (
+          ) : rawNums.length > 0 ? (
             <span className="truncate text-amber-400">
-              REF N° {selectedNums.join(', ')} <span className="text-muted-foreground/60">(não encontrado na lista)</span>
+              REF N° {rawNums.join(', ')} <span className="text-muted-foreground/60">(não encontrado na lista)</span>
             </span>
           ) : (
             <span className="text-muted-foreground">Selecione a(s) freebet(s) a queimar...</span>
@@ -740,7 +782,7 @@ function FreebetSelectField({ value, onChange }: { value: string; onChange: (v: 
                   filtered.map(fb => {
                     const val = fmtCurrency(fb.freebet_value ?? fb.freebet_valor_previsto);
                     const dataBR = fmtDateBR(fb.date);
-                    const isSelected = selectedSet.has(fb.procedure_number);
+                    const isSelected = selectedIdSet.has(fb.id);
                     const credStatus = fb.freebet_creditada ?? 'PENDENTE';
                     const credBadgeColor =
                       credStatus === 'SIM' ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' :
@@ -749,9 +791,9 @@ function FreebetSelectField({ value, onChange }: { value: string; onChange: (v: 
                       'bg-muted/30 text-muted-foreground border-border/50';
                     return (
                       <button
-                        key={fb.procedure_number}
+                        key={fb.id}
                         type="button"
-                        onClick={() => toggleSelection(fb.procedure_number)}
+                        onClick={() => toggleSelection(fb.id)}
                         className={cn(
                           'w-full text-left px-3 py-2.5 flex flex-col gap-0.5 transition-colors border-b border-border/30 last:border-0',
                           isSelected
@@ -761,11 +803,16 @@ function FreebetSelectField({ value, onChange }: { value: string; onChange: (v: 
                       >
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-sm font-medium">
-                            #{fb.procedure_number} · {fb.platform ?? '—'} · {val ?? '—'}
+                            #{fb.procedure_number}{fb.is_extra ? ' EXTRA' : ''} · {fb.platform ?? '—'} · {val ?? '—'}
                           </span>
                           <span className={cn('text-[10px] px-1.5 py-0.5 rounded border font-medium', credBadgeColor)}>
                             {credStatus}
                           </span>
+                          {fb.is_extra && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded border font-bold bg-amber-500/15 text-amber-300 border-amber-500/30">
+                              EXTRA
+                            </span>
+                          )}
                           {isSelected && <Check className="h-3 w-3 text-primary ml-auto" />}
                         </div>
                         {(fb.partida_descricao || dataBR) && (
@@ -784,7 +831,7 @@ function FreebetSelectField({ value, onChange }: { value: string; onChange: (v: 
                   <span className="text-[11px] text-muted-foreground">{selectedNums.length} selecionada(s)</span>
                   <button
                     type="button"
-                    onClick={() => onChange('')}
+                    onClick={() => { setSelectedIds([]); suppressSync.current = true; onChange(''); }}
                     className="text-[11px] text-red-400 hover:text-red-300"
                   >
                     Limpar todas
@@ -800,10 +847,10 @@ function FreebetSelectField({ value, onChange }: { value: string; onChange: (v: 
       {selectedFbs.length > 0 && (
         <div className="flex flex-col gap-1.5">
           {selectedFbs.map(fb => (
-            <div key={fb.procedure_number} className="bg-cyan-500/5 border border-cyan-500/20 rounded-lg px-3 py-2 flex flex-col gap-0.5 relative">
+            <div key={fb.id} className="bg-cyan-500/5 border border-cyan-500/20 rounded-lg px-3 py-2 flex flex-col gap-0.5 relative">
               <button
                 type="button"
-                onClick={() => removeSelection(fb.procedure_number)}
+                onClick={() => removeSelection(fb.id)}
                 className="absolute top-1.5 right-1.5 h-5 w-5 flex items-center justify-center rounded text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-colors"
                 title="Remover seleção"
               >
@@ -812,6 +859,9 @@ function FreebetSelectField({ value, onChange }: { value: string; onChange: (v: 
               <div className="flex items-center gap-2 text-xs flex-wrap pr-6">
                 <span className="text-muted-foreground">Proc:</span>
                 <span className="font-mono font-medium text-foreground">#{fb.procedure_number}</span>
+                {fb.is_extra && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded border font-bold bg-amber-500/15 text-amber-300 border-amber-500/30">EXTRA</span>
+                )}
                 <span className="text-muted-foreground">·</span>
                 <span className="text-cyan-400 font-medium">{fmtCurrency(fb.freebet_value ?? fb.freebet_valor_previsto) ?? '—'}</span>
                 {fb.platform && <>
