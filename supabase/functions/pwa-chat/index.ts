@@ -228,6 +228,26 @@ Bet365, Betano, Sportingbet, Esportiva Bet, Estrela Bet — e várias outras no 
 ## LIMITES DO SUPORTE
 - Bugs ou erros diretamente nas casas de apostas não são responsabilidade do Shark Green — orienta a contatar o suporte da casa diretamente
 
+## CASAS MAIS FREQUENTES NOS PROCEDIMENTOS
+Bet365, Betano, Esportiva Bet, Sportingbet, Estrela Bet, Esporte da Sorte — e outras aparecem também
+
+## VALOR DAS APOSTAS NOS PROCEDIMENTOS
+- O valor exato a apostar já vem no app e no Telegram — com imagem, mercado e tudo mastigado
+- Não precisa adivinhar nada — é só seguir o que está indicado
+
+## FERRAMENTAS EXCLUSIVAS DO SHARK GREEN
+- **Monitor de Odds**: rastreador de odds de mais de 20 casas de apostas — puxa as melhores cotações pra o membro fazer as operações com máximo lucro e proteção
+- **Freebet Pro** (sistema parceiro separado): gerencia TUDO sobre as operações nos mínimos detalhes — o melhor sistema de gerenciamento operacional do mercado
+
+## GRUPO VIP TELEGRAM
+- Acesso automático após pagamento — o link de convite é enviado na hora
+- No VIP: todos os sinais em tempo real, sem filtro
+
+## COMUNIDADE
+- Somente Telegram (sem Discord ou outras plataformas)
+- Grupo free: https://t.me/sharkgreenfree2
+- Grupo VIP: acesso automático ao assinar
+
 ## CONTEÚDO EDUCATIVO
 - Dentro do app tem a aba **Tutorial** com vídeos passo a passo explicando como funciona o projeto e como executar cada tipo de procedimento — ótimo pra mandar pra quem tá começando ou com dúvida
 
