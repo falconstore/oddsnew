@@ -92,7 +92,13 @@ export function SupportChat() {
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const session = useRef(getOrCreateSession())
   const agent = AGENTS[session.current.agentIndex]
-  const { user, status } = useAuth()
+  const { user, status, lead } = useAuth()
+
+  const trialDaysLeft = (() => {
+    if (!lead?.expires_at) return null
+    const diff = new Date(lead.expires_at).getTime() - Date.now()
+    return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)))
+  })()
   const initialized = useRef(false)
 
   const scrollBottom = useCallback(() => {
@@ -166,6 +172,7 @@ export function SupportChat() {
           user_email: user.email,
           user_status: status,
           agent_name: agent.name,
+          trial_days_left: trialDaysLeft,
         }),
       })
       const data = await res.json()
@@ -238,13 +245,13 @@ export function SupportChat() {
             style={{
               bottom: 84,
               right: 16,
-              background: 'linear-gradient(135deg, hsl(145 80% 36%), hsl(145 80% 26%))',
-              border: '1px solid rgba(30,222,107,0.4)',
-              boxShadow: '0 4px 24px rgba(30,222,107,0.35)',
+              background: 'linear-gradient(135deg, #ffffff, #e8fdf0)',
+              border: '1px solid rgba(30,222,107,0.5)',
+              boxShadow: '0 4px 28px rgba(0,0,0,0.45), 0 0 16px rgba(30,222,107,0.2)',
             }}
           >
-            <MessageCircle size={16} className="text-white" />
-            <span className="text-xs font-bold text-white">Precisa de ajuda?</span>
+            <MessageCircle size={16} style={{ color: 'hsl(145 80% 30%)' }} />
+            <span className="text-xs font-bold" style={{ color: 'hsl(145 80% 25%)' }}>Precisa de ajuda?</span>
             {hasUnread && (
               <>
                 <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-red-500 animate-ping" />

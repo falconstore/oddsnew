@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { useProceduresToday } from '@/hooks/useProcedures'
 import { differenceInMinutes, isFuture, parseISO } from 'date-fns'
 import { SupportChat } from '@/components/SupportChat'
+import { TrialCountdown } from '@/components/TrialCountdown'
 
 function useLiveCount() {
   const { data: procs = [] } = useProceduresToday()
@@ -91,6 +92,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {children}
       </main>
 
+      <TrialCountdown />
       <SupportChat />
 
       <nav className="bottom-nav relative z-20 flex items-center justify-around px-1 pt-2.5"

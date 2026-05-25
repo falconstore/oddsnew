@@ -5,9 +5,10 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-function buildSystemPrompt(userStatus: string, agentName: string): string {
+function buildSystemPrompt(userStatus: string, agentName: string, trialDaysLeft: number | null): string {
   const isSubscriber = userStatus === 'active_subscriber'
   const isTrial = userStatus === 'active_trial'
+  const isExpired = userStatus === 'expired'
   const noAccess = !isSubscriber && !isTrial
 
   return `Você é ${agentName}, atendente da equipe Shark Green. Responda SEMPRE em português brasileiro informal, como um cara que entende de futebol e apostas esportivas. Tom: parceiro, direto ao ponto, sem enrolação. Nunca fale que é IA ou robô — você é da equipe, ponto final.
@@ -85,8 +86,19 @@ O Shark Green é uma plataforma 100% focada em procedimentos de apostas esportiv
 - **Tutorial** → Vídeos explicando como usar o app e executar cada tipo
 - **Perfil** → Dados da conta, status do acesso, logout
 
-## STATUS DO USUÁRIO
-${isSubscriber ? '✅ Assinante ativo — cara, você tem acesso completo. Aproveita cada procedimento!' : isTrial ? '⏳ Em trial — você tá no período de teste. Boa oportunidade pra ver o potencial da plataforma!' : '❌ Sem acesso ativo — esse cara precisa assinar pra receber os procedimentos.'}
+## STATUS DO USUÁRIO E ESTRATÉGIA DE CONVERSÃO
+${isSubscriber
+  ? '✅ ASSINANTE ATIVO — não tente vender nada, ele já é cliente. Foco total em suporte e experiência.'
+  : isTrial && trialDaysLeft !== null && trialDaysLeft <= 1
+    ? `🔴 TRIAL ENCERRANDO — faltam ${trialDaysLeft === 0 ? 'MENOS DE 1 DIA' : '1 DIA'} do trial! URGÊNCIA MÁXIMA. Use frases como "hoje é o último dia fera", "não deixa o acesso fechar agora que tá no flow". Link: https://lastlink.com/p/CEAEE6585/checkout-payment`
+    : isTrial && trialDaysLeft !== null && trialDaysLeft <= 3
+      ? `🟡 TRIAL ACABANDO — faltam ${trialDaysLeft} dias. Empurre gentilmente: "aproveita que ainda tá no trial pra garantir o plano". Mencione a parcela mensal R$ 148,90 ou o anual parcelado.`
+      : isTrial
+        ? '⏳ EM TRIAL — pode mencionar a assinatura ao final de respostas de dúvida, mas sem pressão. Foco em ajudar.'
+        : isExpired
+          ? '❌ TRIAL EXPIRADO — remarketing direto mas empático. "Fera, vi que o trial expirou — vimos que você curtiu a plataforma! A diferença entre quem ganha e quem fica olhando é um passo. Que tal garantir o acesso?" Link: https://lastlink.com/p/CEAEE6585/checkout-payment'
+          : '❌ SEM ACESSO — orienta a assinar, link: https://lastlink.com/p/CEAEE6585/checkout-payment'
+}
 
 ## DÚVIDAS FREQUENTES
 - "Não vejo procedimentos" → Confirma se o acesso tá ativo no Perfil. Se trial expirou, precisa assinar.
@@ -365,7 +377,7 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
-    const { message, session_id, user_email, user_status, agent_name } = await req.json()
+    const { message, session_id, user_email, user_status, agent_name, trial_days_left } = await req.json()
     const agentName = agent_name ?? 'Lucas Shark'
 
     if (!message || !session_id || !user_email) {
@@ -417,7 +429,7 @@ Deno.serve(async (req: Request) => {
       body: JSON.stringify({
         model: 'claude-haiku-4-5',
         max_tokens: 300,
-        system: buildSystemPrompt(user_status ?? '', agentName),
+        system: buildSystemPrompt(user_status ?? '', agentName, trial_days_left ?? null),
         messages,
       }),
     })
