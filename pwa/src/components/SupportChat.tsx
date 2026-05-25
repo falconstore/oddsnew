@@ -159,23 +159,32 @@ export function SupportChat() {
     setLoading(true)
     scrollBottom()
 
+    const minDelay = 1800 + Math.random() * 1200
+    const started = Date.now()
+
     try {
       const { data: { session: authSession } } = await supabase.auth.getSession()
       const token = authSession?.access_token ?? ANON_KEY
 
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/pwa-chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({
-          message: msg,
-          session_id: session.current.id,
-          user_email: user.email,
-          user_status: status,
-          agent_name: agent.name,
-          trial_days_left: trialDaysLeft,
+      const [res] = await Promise.all([
+        fetch(`${SUPABASE_URL}/functions/v1/pwa-chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({
+            message: msg,
+            session_id: session.current.id,
+            user_email: user.email,
+            user_status: status,
+            agent_name: agent.name,
+            trial_days_left: trialDaysLeft,
+          }),
         }),
-      })
-      const data = await res.json()
+        new Promise(r => setTimeout(r, minDelay)),
+      ])
+      const data = await (res as Response).json()
+      const elapsed = Date.now() - started
+      const remaining = Math.max(0, minDelay - elapsed)
+      if (remaining > 0) await new Promise(r => setTimeout(r, remaining))
       setMessages(prev => [...prev, {
         id: crypto.randomUUID(),
         role: 'assistant',
@@ -237,12 +246,71 @@ export function SupportChat() {
     })
   }
 
+  function PlanosCard() {
+    const plans = [
+      { label: 'Mensal',     price: 'R$ 148,90', per: '≈ R$ 149/mês', tag: null },
+      { label: 'Trimestral', price: 'R$ 349,90', per: '≈ R$ 116/mês', tag: null },
+      { label: 'Semestral',  price: 'R$ 579,90', per: '≈ R$ 96/mês',  tag: null },
+      { label: 'Anual',      price: 'R$ 893,90', per: '≈ R$ 74/mês',  tag: '⭐ Melhor custo' },
+    ]
+    return (
+      <div className="mt-2.5 mb-1 space-y-1.5">
+        {plans.map(p => (
+          <div
+            key={p.label}
+            className="flex items-center justify-between px-3 py-2.5 rounded-xl"
+            style={{
+              background: p.tag
+                ? 'linear-gradient(135deg, rgba(30,222,107,0.14), rgba(30,222,107,0.06))'
+                : 'rgba(255,255,255,0.04)',
+              border: p.tag ? '1px solid rgba(30,222,107,0.35)' : '1px solid rgba(255,255,255,0.07)',
+            }}
+          >
+            <div>
+              <span className="text-xs font-bold text-white">{p.label}</span>
+              {p.tag && (
+                <span
+                  className="ml-2 text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+                  style={{ background: 'rgba(30,222,107,0.2)', color: 'hsl(145 80% 55%)' }}
+                >
+                  {p.tag}
+                </span>
+              )}
+              <p className="text-[10px] mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>{p.per}</p>
+            </div>
+            <span className="text-sm font-bold" style={{ color: p.tag ? 'hsl(145 80% 55%)' : 'rgba(255,255,255,0.7)' }}>
+              {p.price}
+            </span>
+          </div>
+        ))}
+        <a
+          href="https://lastlink.com/p/CEAEE6585/checkout-payment"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-xs font-bold mt-1 active:scale-95 transition-transform"
+          style={{
+            background: 'linear-gradient(135deg, hsl(145 80% 38%), hsl(145 80% 26%))',
+            color: 'white',
+            boxShadow: '0 2px 14px rgba(30,222,107,0.3)',
+            border: '1px solid rgba(30,222,107,0.35)',
+          }}
+        >
+          🛒 Escolher plano agora
+        </a>
+      </div>
+    )
+  }
+
   function renderContent(text: string) {
-    type Seg = { type: 'text'; value: string } | { type: 'prints'; ids: string[] }
-    const raw = text.split(/(\[PRINT:\d+\])/)
+    type Seg = { type: 'text'; value: string } | { type: 'prints'; ids: string[] } | { type: 'planos' }
+    const raw = text.split(/(\[PRINT:\d+\]|\[PLANOS\])/)
     const grouped: Seg[] = []
 
     for (const seg of raw) {
+      if (seg === '[PLANOS]') {
+        grouped.push({ type: 'planos' })
+        continue
+      }
       const match = seg.match(/^\[PRINT:(\d+)\]$/)
       if (match) {
         const last = grouped[grouped.length - 1]
@@ -257,6 +325,9 @@ export function SupportChat() {
     }
 
     return grouped.map((seg, i) => {
+      if (seg.type === 'planos') {
+        return <PlanosCard key={i} />
+      }
       if (seg.type === 'prints') {
         if (seg.ids.length === 1) {
           return (
