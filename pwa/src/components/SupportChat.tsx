@@ -209,41 +209,50 @@ export function SupportChat() {
 
   function renderText(text: string, keyPrefix: string) {
     const urlRegex = /(https?:\/\/[^\s]+)/g
-    const parts = text.split(urlRegex)
-    return parts.map((part, j) => {
-      if (/^https?:\/\//.test(part)) {
-        const clean = part.replace(/[.,!?)]+$/, '')
-        const label = clean.includes('checkout') || clean.includes('lastlink')
-          ? '🛒 Garantir acesso agora'
-          : clean.includes('t.me')
-            ? '💬 Abrir grupo no Telegram'
-            : '🔗 Abrir link'
-        return (
-          <div key={`${keyPrefix}-url-${j}`} className="mt-2.5">
-            <a
-              href={clean}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold active:scale-95 transition-transform"
-              style={{
-                background: 'linear-gradient(135deg, hsl(145 80% 38%), hsl(145 80% 26%))',
-                color: 'white',
-                boxShadow: '0 2px 14px rgba(30,222,107,0.3)',
-                border: '1px solid rgba(30,222,107,0.35)',
-              }}
-            >
-              {label}
-            </a>
-          </div>
-        )
-      }
-      const boldParts = part.split(/(\*\*[^*]+\*\*)/)
+
+    // Separate URLs from prose — render prose first, buttons after
+    const urls: string[] = []
+    const prose = text.replace(urlRegex, (url) => {
+      urls.push(url.replace(/[.,!?)]+$/, ''))
+      return ''
+    }).replace(/\s{2,}/g, ' ').trim()
+
+    const proseNodes = prose ? (() => {
+      const boldParts = prose.split(/(\*\*[^*]+\*\*)/)
       return boldParts.map((bp, k) =>
         bp.startsWith('**') && bp.endsWith('**')
-          ? <strong key={`${keyPrefix}-${j}-${k}`} className="font-semibold">{bp.slice(2, -2)}</strong>
-          : <span key={`${keyPrefix}-${j}-${k}`}>{bp}</span>
+          ? <strong key={`${keyPrefix}-b-${k}`} className="font-semibold">{bp.slice(2, -2)}</strong>
+          : <span key={`${keyPrefix}-t-${k}`}>{bp}</span>
+      )
+    })() : null
+
+    const btnNodes = urls.map((url, j) => {
+      const label = url.includes('checkout') || url.includes('lastlink')
+        ? '🛒 Garantir acesso agora'
+        : url.includes('t.me')
+          ? '💬 Abrir grupo no Telegram'
+          : '🔗 Abrir link'
+      return (
+        <div key={`${keyPrefix}-url-${j}`} className="mt-2.5">
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold active:scale-95 transition-transform"
+            style={{
+              background: 'linear-gradient(135deg, hsl(145 80% 38%), hsl(145 80% 26%))',
+              color: 'white',
+              boxShadow: '0 2px 14px rgba(30,222,107,0.3)',
+              border: '1px solid rgba(30,222,107,0.35)',
+            }}
+          >
+            {label}
+          </a>
+        </div>
       )
     })
+
+    return <>{proseNodes}{btnNodes}</>
   }
 
   function PlanosCard() {
