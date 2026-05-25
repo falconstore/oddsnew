@@ -42,13 +42,16 @@ const QUICK_REPLIES = [
 
 function TypingDots() {
   return (
-    <div className="flex items-center gap-1 px-4 py-3">
-      {[0, 1, 2].map(i => (
-        <motion.span key={i} className="w-2 h-2 rounded-full"
-          style={{ background: 'hsl(145 80% 48%)' }}
-          animate={{ opacity: [0.3, 1, 0.3], scale: [0.8, 1.15, 0.8] }}
-          transition={{ duration: 1.2, delay: i * 0.2, repeat: Infinity }} />
-      ))}
+    <div className="flex items-center gap-2 px-4 py-3">
+      <div className="flex items-center gap-1">
+        {[0, 1, 2].map(i => (
+          <motion.span key={i} className="w-2 h-2 rounded-full"
+            style={{ background: 'hsl(145 80% 48%)' }}
+            animate={{ opacity: [0.3, 1, 0.3], scale: [0.8, 1.2, 0.8] }}
+            transition={{ duration: 1.0, delay: i * 0.18, repeat: Infinity }} />
+        ))}
+      </div>
+      <span className="text-[11px]" style={{ color: 'rgba(255,255,255,0.35)' }}>digitando...</span>
     </div>
   )
 }
@@ -160,8 +163,7 @@ export function SupportChat() {
     setLoading(true)
     scrollBottom()
 
-    const minDelay = 1800 + Math.random() * 1200
-    const started = Date.now()
+    const minDelay = 3500 + Math.random() * 2500
 
     try {
       const { data: { session: authSession } } = await supabase.auth.getSession()
@@ -183,9 +185,6 @@ export function SupportChat() {
         new Promise(r => setTimeout(r, minDelay)),
       ])
       const data = await (res as Response).json()
-      const elapsed = Date.now() - started
-      const remaining = Math.max(0, minDelay - elapsed)
-      if (remaining > 0) await new Promise(r => setTimeout(r, remaining))
       setMessages(prev => [...prev, {
         id: crypto.randomUUID(),
         role: 'assistant',
