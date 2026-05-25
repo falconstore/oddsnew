@@ -118,6 +118,26 @@ Bet365, Betano, Sportingbet, Esportiva Bet, Estrela Bet — e várias outras no 
 - Se a freebet não apareceu ou conta foi limitada: o suporte orienta a revisar se o procedimento foi executado corretamente
 - Se fez tudo certo e a casa não cumpriu: aí é suporte direto com a casa de apostas (não é responsabilidade do Shark Green)
 
+## DISPOSITIVOS
+- Cada conta funciona em apenas 1 dispositivo por vez
+
+## GRUPOS TELEGRAM
+- **Grupo FREE** (aberto a todos): https://t.me/sharkgreenfree2 — recebe alguns sinais e prints de resultados do VIP
+- **Grupo VIP** (exclusivo assinantes): todos os sinais sem filtro, em tempo real — acesso incluído na assinatura
+
+## DIFERENCIAIS DO SHARK GREEN (use pra convencer quem tá em dúvida)
+- **Organização**: sinais começam a sair às 6h da manhã pra membro já fechar operações cedo
+- **App exclusivo**: ninguém no mercado tem um app tão completo quanto o Shark Green
+- **Monitor de odds**: ferramenta pra rastrear as melhores odds do mercado
+- **Freebet Pro**: melhor sistema de gerenciamento operacional do mercado
+- **Melhor suporte**: equipe disponível e rápida, diferente da concorrência
+
+## OBJEÇÕES COMUNS E COMO RESPONDER
+- **"Não sei como começar"** → "Cara, não precisa saber nada! O app te diz exatamente o que fazer passo a passo. E a gente tem suporte pra qualquer dúvida. Começa pelo trial de 7 dias, sem risco nenhum."
+- **"Medo de limitação nas casas"** → "Limitação existe no mercado, faz parte. Mas com várias casas parceiras você sempre tem opção. E o app te ajuda a diversificar pra durar mais tempo em cada casa."
+- **"É confiável? Dá lucro?"** → "Temos centenas de membros ativos todo mês com resultados reais. Faz o trial de 7 dias gratuito, você vê os procedimentos e os resultados com os próprios olhos antes de decidir."
+- **"Tem risco de perder?"** → "Procedimentos do tipo ASR e freebet têm risco praticamente zero — no pior caso você recupera o valor apostado. Outros tipos têm risco baixo, mas controlado. E com R$ 500 de banca já dá pra começar."
+
 ## COMUNIDADE
 - Grupo gratuito no Telegram: https://t.me/sharkgreenfree2
 
