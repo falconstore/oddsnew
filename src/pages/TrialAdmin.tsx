@@ -26,7 +26,7 @@ import {
   useRecallLeads, useTrialWebhookAudit,
 } from '@/hooks/useTrialLeads';
 import { Switch } from '@/components/ui/switch';
-import { useTrialPwaStats } from '@/hooks/useTrialPwaStats';
+import { useTrialPwaStats, getActivityInfo, type ActivityLevel } from '@/hooks/useTrialPwaStats';
 import { useTrialUpgradeStats, type TrialStatsRange } from '@/hooks/useTrialUpgradeStats';
 import { useTrialCapiStats } from '@/hooks/useTrialCapiStats';
 import type { TrialLead, TrialStatus } from '@/types/trial';
@@ -108,6 +108,7 @@ export default function TrialAdmin() {
   const [statusFilter, setStatusFilter] = useState<'all' | TrialStatus>('all');
   const [cohortFilter, setCohortFilter] = useState<'all' | 'v1' | 'v2' | 'ads'>('all');
   const [monthFilter, setMonthFilter] = useState<string>(() => format(new Date(), 'yyyy-MM'));
+  const [activityFilter, setActivityFilter] = useState<'all' | ActivityLevel>('all');
 
   const monthOptions = useMemo(() => {
     const now = new Date();
@@ -158,6 +159,13 @@ export default function TrialAdmin() {
     if (cohortFilter !== 'all') list = list.filter(l => l.cohort === cohortFilter);
     if (recallFilter === 'never') list = list.filter(l => !l.last_recall_at);
     else if (recallFilter === 'sent') list = list.filter(l => !!l.last_recall_at);
+    if (activityFilter !== 'all' && pwaStats) {
+      list = list.filter(l => {
+        const lastSeen = pwaStats.lastSeenMap.get(l.id);
+        const info = getActivityInfo(lastSeen);
+        return info.level === activityFilter;
+      });
+    }
     if (q) {
       list = list.filter(l =>
         (l.name ?? '').toLowerCase().includes(q) ||
@@ -169,7 +177,7 @@ export default function TrialAdmin() {
       );
     }
     return list;
-  }, [leads, monthFilter, statusFilter, cohortFilter, search, recallFilter]);
+  }, [leads, monthFilter, statusFilter, cohortFilter, search, recallFilter, activityFilter, pwaStats]);
 
   return (
     <Layout>
@@ -853,9 +861,23 @@ export default function TrialAdmin() {
               <SelectItem value="sent">Recall: já enviado</SelectItem>
             </SelectContent>
           </Select>
-          {(search || statusFilter !== 'all' || cohortFilter !== 'all' || monthFilter !== 'all' || recallFilter !== 'all') && (
+          <Select value={activityFilter} onValueChange={v => setActivityFilter(v as 'all' | ActivityLevel)}>
+            <SelectTrigger className="bg-white/5 border-white/10 h-9 text-sm w-[190px]" data-testid="select-trial-activity-filter">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">📱 App: todos</SelectItem>
+              <SelectItem value="today">🟢 Ativo hoje</SelectItem>
+              <SelectItem value="recent">🔵 Ativo recente (1-3d)</SelectItem>
+              <SelectItem value="sleeping">🟡 Dormindo (3-7d)</SelectItem>
+              <SelectItem value="inactive">🟠 Inativo (7-14d)</SelectItem>
+              <SelectItem value="gone">🔴 Sumiu (14d+)</SelectItem>
+              <SelectItem value="never">⚫ Nunca abriu</SelectItem>
+            </SelectContent>
+          </Select>
+          {(search || statusFilter !== 'all' || cohortFilter !== 'all' || monthFilter !== 'all' || recallFilter !== 'all' || activityFilter !== 'all') && (
             <Button variant="ghost" size="sm" className="h-9 text-xs text-muted-foreground hover:text-foreground"
-              onClick={() => { setSearch(''); setStatusFilter('all'); setCohortFilter('all'); setMonthFilter('all'); setRecallFilter('all'); }}
+              onClick={() => { setSearch(''); setStatusFilter('all'); setCohortFilter('all'); setMonthFilter('all'); setRecallFilter('all'); setActivityFilter('all'); }}
               data-testid="button-trial-clear-filters">
               Limpar filtros
             </Button>
@@ -1108,17 +1130,24 @@ export default function TrialAdmin() {
                             {lead.subscription_status === 'active' ? 'Assinante' : `Assin. ${lead.subscription_status}`}
                           </Badge>
                         )}
-                        {/* PWA presence */}
-                        {pwaStats?.appLeadIds.has(lead.id) ? (
-                          <Badge
-                            className="text-[10px] bg-blue-500/15 text-blue-300 border-blue-500/30"
-                            data-testid={`badge-app-active-${lead.id}`}
-                            title="Usuário já acessou o Shark Green App"
-                          >
-                            <Smartphone className="w-2.5 h-2.5 mr-1" />
-                            No app
-                          </Badge>
-                        ) : null}
+                        {/* PWA activity badge */}
+                        {pwaStats && (() => {
+                          const lastSeen = pwaStats.lastSeenMap.get(lead.id);
+                          const sessions = pwaStats.sessionCountMap.get(lead.id) ?? 0;
+                          if (!lastSeen) return null;
+                          const info = getActivityInfo(lastSeen);
+                          return (
+                            <Badge
+                              className={`text-[10px] ${info.bgClass} ${info.textClass} ${info.borderClass}`}
+                              data-testid={`badge-app-active-${lead.id}`}
+                              title={`${info.sublabel} · ${sessions} sessão${sessions !== 1 ? 'ões' : ''}`}
+                            >
+                              <Smartphone className="w-2.5 h-2.5 mr-1" />
+                              {info.label}
+                              {sessions > 1 && <span className="ml-1 opacity-60">·{sessions}x</span>}
+                            </Badge>
+                          );
+                        })()}
                         {/* Push notification */}
                         {pwaStats?.pushLeadIds.has(lead.id) ? (
                           <Badge

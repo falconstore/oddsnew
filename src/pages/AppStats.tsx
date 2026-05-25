@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format, parseISO, subDays, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { BarChart3, Users, Smartphone, Bell, TrendingUp, Eye, RefreshCw, Activity, UserCheck, UserX, Crown } from 'lucide-react';
+import { BarChart3, Users, Smartphone, Bell, TrendingUp, Eye, RefreshCw, Activity, UserCheck, UserX, Crown, Search } from 'lucide-react';
+import { getActivityInfo } from '@/hooks/useTrialPwaStats';
 import { supabaseProcedures } from '@/lib/supabaseProcedures';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -105,6 +106,7 @@ export function AppStats() {
   const { data: events = [], isLoading: eventsLoading } = usePwaEvents();
   const { data: pushSubs = 0 } = usePushSubs();
   const [activeTab, setActiveTab] = useState<'overview' | 'pages' | 'users'>('overview');
+  const [userSearch, setUserSearch] = useState('');
 
   // ── Lead funnel ──────────────────────────────────────────────────────────
   const totalLeads = leads.length;
@@ -124,6 +126,22 @@ export function AppStats() {
   // ── PWA events (last 30d) ────────────────────────────────────────────────
   const sessions = events.filter(e => e.event_type === 'session_start');
   const pageViews = events.filter(e => e.event_type === 'page_view');
+
+  // ── Per-lead activity map ────────────────────────────────────────────────
+  const perLeadStats = (() => {
+    const lastSeenMap = new Map<string, string>();
+    const sessionSetMap = new Map<string, Set<string>>();
+    for (const e of events as any[]) {
+      const lid = e.lead_id as string;
+      if (!lid) continue;
+      if (!lastSeenMap.has(lid) || e.created_at > lastSeenMap.get(lid)!) {
+        lastSeenMap.set(lid, e.created_at as string);
+      }
+      if (!sessionSetMap.has(lid)) sessionSetMap.set(lid, new Set());
+      if (e.session_id) sessionSetMap.get(lid)!.add(e.session_id as string);
+    }
+    return { lastSeenMap, sessionCountMap: new Map(Array.from(sessionSetMap.entries()).map(([k, v]) => [k, v.size])) };
+  })();
 
   const uniqueUsers = new Set(events.map(e => e.user_id).filter(Boolean)).size;
   const uniqueLeadsInApp = new Set(events.map(e => e.lead_id).filter(Boolean)).size;
@@ -325,15 +343,17 @@ export function AppStats() {
 
       {activeTab === 'users' && (
         <div className="space-y-4">
+          {/* KPIs */}
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             <KpiCard label="Usuários únicos (30d)" value={uniqueUsers} icon={Smartphone} color="text-green-400" loading={eventsLoading} />
             <KpiCard label="Leads com acesso app" value={uniqueLeadsInApp} sub="que abriram o app" icon={UserCheck} color="text-blue-400" loading={eventsLoading} />
             <KpiCard label="Push inscritos" value={pushSubs} sub={`${uniqueUsers > 0 ? ((pushSubs / uniqueUsers) * 100).toFixed(0) : 0}% dos usuários`} icon={Bell} color="text-amber-400" />
           </div>
 
+          {/* Funnel */}
           <div className="bg-card border border-border rounded-xl p-5">
-            <p className="text-sm font-semibold mb-3">Funnel de Conversão</p>
-            <div className="space-y-4">
+            <p className="text-sm font-semibold mb-3">Funil de Ativação</p>
+            <div className="space-y-3">
               {[
                 { label: 'Total de leads cadastrados', value: totalLeads, color: 'bg-slate-500', pct: 100 },
                 { label: 'Que acessaram o app', value: uniqueLeadsInApp, color: 'bg-blue-500', pct: totalLeads > 0 ? (uniqueLeadsInApp / totalLeads) * 100 : 0 },
@@ -341,16 +361,106 @@ export function AppStats() {
                 { label: 'Convertidos (assinantes)', value: subscribers, color: 'bg-amber-500', pct: totalLeads > 0 ? (subscribers / totalLeads) * 100 : 0 },
               ].map(step => (
                 <div key={step.label}>
-                  <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center justify-between mb-1">
                     <span className="text-sm text-muted-foreground">{step.label}</span>
                     <span className="text-sm font-bold">{step.value} <span className="text-xs text-muted-foreground font-normal">({step.pct.toFixed(1)}%)</span></span>
                   </div>
-                  <div className="h-2 bg-muted rounded-full overflow-hidden">
+                  <div className="h-1.5 bg-muted rounded-full overflow-hidden">
                     <div className={`h-full rounded-full ${step.color}`} style={{ width: `${step.pct}%` }} />
                   </div>
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* Per-lead activity table */}
+          <div className="bg-card border border-border rounded-xl overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-border flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold">Atividade por Lead — últimos 30 dias</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{uniqueLeadsInApp} leads com acesso ao app</p>
+              </div>
+              <div className="relative">
+                <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  value={userSearch}
+                  onChange={e => setUserSearch(e.target.value)}
+                  placeholder="Buscar..."
+                  className="bg-muted border border-border rounded-lg pl-8 pr-3 py-1.5 text-xs w-40 outline-none focus:ring-1 focus:ring-primary"
+                />
+              </div>
+            </div>
+            {eventsLoading || leadsLoading ? (
+              <div className="p-4 space-y-2">
+                {[1,2,3,4,5].map(i => <div key={i} className="h-10 bg-muted rounded animate-pulse" />)}
+              </div>
+            ) : (() => {
+              // Build per-lead rows: join leads + activity data, sorted by last_seen desc
+              const q = userSearch.trim().toLowerCase();
+              const rows = leads
+                .filter(l => perLeadStats.lastSeenMap.has(l.id))
+                .map(l => ({
+                  ...l,
+                  lastSeen: perLeadStats.lastSeenMap.get(l.id)!,
+                  sessions: perLeadStats.sessionCountMap.get(l.id) ?? 0,
+                }))
+                .filter(r => !q || (r as any).email?.toLowerCase().includes(q))
+                .sort((a, b) => b.lastSeen.localeCompare(a.lastSeen));
+
+              if (rows.length === 0) return (
+                <div className="py-12 text-center text-muted-foreground text-sm">
+                  <Smartphone size={28} className="mx-auto mb-2 opacity-30" />
+                  Nenhum lead acessou o app ainda
+                </div>
+              );
+
+              return (
+                <div className="divide-y divide-border">
+                  {/* Header */}
+                  <div className="grid grid-cols-[1fr_140px_80px_60px] gap-2 px-4 py-2 text-[10px] text-muted-foreground uppercase tracking-wider">
+                    <span>Lead</span>
+                    <span>Atividade</span>
+                    <span>Status</span>
+                    <span className="text-right">Sess.</span>
+                  </div>
+                  {rows.slice(0, 100).map(row => {
+                    const info = getActivityInfo(row.lastSeen);
+                    return (
+                      <div key={row.id} className="grid grid-cols-[1fr_140px_80px_60px] gap-2 items-center px-4 py-2.5 hover:bg-muted/40 transition-colors">
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium truncate">{row.email ?? row.id.slice(0, 8)}</p>
+                          <p className="text-[10px] text-muted-foreground truncate">{row.status}</p>
+                        </div>
+                        <div>
+                          <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full ${info.bgClass} ${info.textClass}`}>
+                            {info.label}
+                          </span>
+                        </div>
+                        <div>
+                          <span className={`text-[10px] font-medium ${
+                            row.subscription_status === 'active' ? 'text-amber-400' :
+                            row.status === 'active' ? 'text-emerald-400' :
+                            row.status === 'expired' ? 'text-zinc-400' : 'text-muted-foreground'
+                          }`}>
+                            {row.subscription_status === 'active' ? '👑 Assinante' :
+                             row.status === 'active' ? 'Trial' :
+                             row.status === 'expired' ? 'Expirado' : row.status}
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-xs font-bold text-muted-foreground">{row.sessions}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {rows.length > 100 && (
+                    <div className="px-4 py-3 text-xs text-muted-foreground text-center">
+                      Mostrando 100 de {rows.length} leads — use a busca para filtrar
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}
