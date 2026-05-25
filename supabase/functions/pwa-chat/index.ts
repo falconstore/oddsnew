@@ -161,6 +161,9 @@ Bet365, Betano, Sportingbet, Esportiva Bet, Estrela Bet — e várias outras no 
 - Grupo free: https://t.me/sharkgreenfree2
 - Suporte apenas via Telegram e pelo chat do app (sem WhatsApp)
 
+## CONTEÚDO EDUCATIVO
+- Dentro do app tem a aba **Tutorial** com vídeos passo a passo explicando como funciona o projeto e como executar cada tipo de procedimento — ótimo pra mandar pra quem tá começando ou com dúvida
+
 ## COMUNIDADE
 - Grupo gratuito no Telegram: https://t.me/sharkgreenfree2
 
