@@ -192,12 +192,31 @@ export function SupportChat() {
   }
 
   function renderContent(text: string) {
-    const parts = text.split(/(\*\*[^*]+\*\*)/)
-    return parts.map((part, i) =>
-      part.startsWith('**') && part.endsWith('**')
-        ? <strong key={i} className="font-semibold">{part.slice(2, -2)}</strong>
-        : <span key={i}>{part}</span>
-    )
+    // Quebra por [PRINT:N] para exibir imagens reais de depoimentos
+    const segments = text.split(/(\[PRINT:\d+\])/)
+    return segments.map((seg, i) => {
+      const match = seg.match(/^\[PRINT:(\d+)\]$/)
+      if (match) {
+        const n = match[1]
+        return (
+          <div key={i} className="mt-2 mb-1">
+            <img
+              src={`/proof${n}.png`}
+              alt="Print de resultado de membro"
+              className="rounded-xl max-w-full"
+              style={{ maxHeight: 320, objectFit: 'contain' }}
+            />
+          </div>
+        )
+      }
+      // Dentro de cada segmento de texto, processa **bold**
+      const parts = seg.split(/(\*\*[^*]+\*\*)/)
+      return parts.map((part, j) =>
+        part.startsWith('**') && part.endsWith('**')
+          ? <strong key={`${i}-${j}`} className="font-semibold">{part.slice(2, -2)}</strong>
+          : <span key={`${i}-${j}`}>{part}</span>
+      )
+    })
   }
 
   // Mostra chips só se a única mensagem for a de boas-vindas (sem histórico)
