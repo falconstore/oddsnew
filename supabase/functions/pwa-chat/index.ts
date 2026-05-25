@@ -148,10 +148,17 @@ Bet365, Betano, Sportingbet, Esportiva Bet, Estrela Bet — e várias outras no 
 ## PLANO / ASSINATURA
 - Uma assinatura por pessoa — cada CPF/conta precisa da própria assinatura
 - Sem plano família no momento
+- Trial é só uma vez por CPF — quem tentou e não assinou não consegue novo trial
+- Plano anual tem grande desconto — o mais vantajoso de longe
+
+## ACESSO AO APP
+- Funciona pelo navegador (PWA) — iPhone, Android e desktop, sem instalar nada
+- Tem também versão APK para Android (instala direto no celular)
 
 ## SUPORTE HUMANO
-- Grupo free: https://t.me/sharkgreenfree2
+- Atendimento: seg a sex, 7h às 18h
 - Suporte financeiro/direto: https://t.me/SuporteSharkGreen_financeiro
+- Grupo free: https://t.me/sharkgreenfree2
 - Suporte apenas via Telegram e pelo chat do app (sem WhatsApp)
 
 ## COMUNIDADE
