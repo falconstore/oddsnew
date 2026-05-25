@@ -234,7 +234,7 @@ export function SupportChat() {
             exit={{ scale: 0, opacity: 0 }}
             transition={{ type: 'spring', bounce: 0.4 }}
             onClick={() => setOpen(true)}
-            className="fixed z-50 flex items-center gap-2 pl-3 pr-4 py-2.5 rounded-full shadow-2xl"
+            className="absolute z-50 flex items-center gap-2 pl-3 pr-4 py-2.5 rounded-full shadow-2xl"
             style={{
               bottom: 84,
               right: 16,
@@ -264,7 +264,7 @@ export function SupportChat() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: '100%' }}
             transition={{ type: 'spring', bounce: 0.1, duration: 0.38 }}
-            className="fixed z-50 flex flex-col"
+            className="absolute z-50 flex flex-col"
             style={{ inset: 0, background: 'rgba(8, 14, 22, 0.99)', backdropFilter: 'blur(24px)' }}
           >
             {/* Header */}
