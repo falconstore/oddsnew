@@ -5,6 +5,7 @@ import { useProceduresToday } from '@/hooks/useProcedures'
 import { differenceInMinutes, isFuture, parseISO } from 'date-fns'
 import { SupportChat } from '@/components/SupportChat'
 import { TrialCountdown } from '@/components/TrialCountdown'
+import { PushPromptBanner } from '@/components/PushPromptBanner'
 
 function useLiveCount() {
   const { data: procs = [] } = useProceduresToday()
@@ -93,6 +94,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </main>
 
       <TrialCountdown />
+      <PushPromptBanner />
       <SupportChat />
 
       <nav className="bottom-nav relative z-20 flex items-center justify-around px-1 pt-2.5"
