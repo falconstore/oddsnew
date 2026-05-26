@@ -124,7 +124,22 @@ function saveCustomCategories(cats: string[]) {
 }
 
 // ─────────────────────────────────────────
-// Definição dos 5 templates built-in
+// Giros Grátis — campos e linha de saída compartilhados
+// ─────────────────────────────────────────
+
+const GIROS_FIELDS: FieldConfig[] = [
+  { id: 'incluirGiros', label: 'Giros Grátis', placeholder: '', type: 'toggle', default: () => 'false' },
+  { id: 'girosLucro', label: 'Recompensa cash dos Giros (ex: 203,00)', placeholder: '203,00', type: 'text', showIf: (f) => f.incluirGiros === 'true' },
+  { id: 'girosQtd', label: 'Quantidade de Giros (ex: 301)', placeholder: '301', type: 'text', showIf: (f) => f.incluirGiros === 'true' },
+  { id: 'girosValor', label: 'Valor por Giro em R$ (ex: 1)', placeholder: '1', type: 'text', showIf: (f) => f.incluirGiros === 'true' },
+];
+
+function fmtGiros(f: Record<string, string>): string {
+  return `🟡 RECOMPENSA: 🎁 ${fmtVal(f.girosLucro)} + ${f.girosQtd || 'N'} GIROS DE ${f.girosValor || '1'} REAL`;
+}
+
+// ─────────────────────────────────────────
+// Definição dos templates built-in
 // ─────────────────────────────────────────
 
 const TEMPLATES: TemplateConfig[] = [
@@ -139,6 +154,7 @@ const TEMPLATES: TemplateConfig[] = [
     fields: [
       { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
       { id: 'incluirDG', label: 'Chance de Duplo Green', placeholder: '', type: 'toggle', default: () => 'true' },
+      ...GIROS_FIELDS,
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 130', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'numRef', label: 'Freebet a Queimar', placeholder: '', type: 'freebet_select', hint: 'Selecione o procedimento GANHAR_FB cuja freebet será queimada aqui.' },
@@ -168,6 +184,7 @@ const TEMPLATES: TemplateConfig[] = [
         `🔴 CASO HAJA ALTERAÇÃO NAS ODDS, CHAME O SUPORTE`,
         ``,
         `🟡 LUCRO: 💵 ${fmtVal(f.lucro)} 💵`,
+        ...(f.incluirGiros === 'true' ? [fmtGiros(f)] : []),
         `📋 CATEGORIA: ${f.categoria || 'Freebet'}`,
         ...(f.incluirDG !== 'false' ? [`😍 chance de duplo green 😍`] : []),
       ].join('\n');
@@ -184,6 +201,7 @@ const TEMPLATES: TemplateConfig[] = [
     fields: [
       { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
       { id: 'incluirDG', label: 'Chance de Duplo Green', placeholder: '', type: 'toggle', default: () => 'true' },
+      ...GIROS_FIELDS,
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 129', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'casa', label: 'Casa de Apostas', placeholder: 'Ex: Sportingbet', type: 'text', uppercase: true },
@@ -212,6 +230,7 @@ const TEMPLATES: TemplateConfig[] = [
         `🔴 CASO HAJA ALTERAÇÃO NAS ODDS, UTILIZE A CALCULADORA`,
         ``,
         recompensa,
+        ...(f.incluirGiros === 'true' ? [fmtGiros(f)] : []),
         `📋 CATEGORIA: ${f.categoria || 'Freebet'}`,
         ...(f.incluirDG !== 'false' ? [`😍 chance de duplo green 😍`] : []),
       ].join('\n');
@@ -228,6 +247,7 @@ const TEMPLATES: TemplateConfig[] = [
     fields: [
       { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
       { id: 'incluirDG', label: 'Chance de Duplo Green', placeholder: '', type: 'toggle', default: () => 'true' },
+      ...GIROS_FIELDS,
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 115', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'missao', label: 'Nome da Missão', placeholder: 'Ex: LIGA DOS CAMPEÕES', type: 'text', uppercase: true },
@@ -256,6 +276,7 @@ const TEMPLATES: TemplateConfig[] = [
         `🔴 CASO HAJA ALTERAÇÃO NAS ODDS, UTILIZE A CALCULADORA`,
         ``,
         recompensa,
+        ...(f.incluirGiros === 'true' ? [fmtGiros(f)] : []),
         `📋 CATEGORIA: ${f.categoria || 'Extra'}`,
         ...(f.incluirDG !== 'false' ? [`😍 chance de duplo green para um lado 😍`] : []),
       ].join('\n');
@@ -272,6 +293,7 @@ const TEMPLATES: TemplateConfig[] = [
     fields: [
       { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
       { id: 'incluirDG', label: 'Chance de Duplo Green', placeholder: '', type: 'toggle', default: () => 'true' },
+      ...GIROS_FIELDS,
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 116', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'casa', label: 'Casa de Apostas', placeholder: 'Ex: Betesporte', type: 'text', uppercase: true, hint: 'A casa aparece na linha 2 ("DA BETESPORTE") — não precisa de linha CASA: separada neste tipo.' },
@@ -292,6 +314,7 @@ const TEMPLATES: TemplateConfig[] = [
       ``,
       `🟡 LUCRO: 💵 ${fmtVal(f.lucroMin)} A ${fmtVal(f.lucroMax)} 💵`,
       ...(f.incluirDG !== 'false' ? [`🟡 POSSÍVEL DUPLO GREEN - 💵 ${fmtVal(f.valorDG)}`] : []),
+      ...(f.incluirGiros === 'true' ? [fmtGiros(f)] : []),
       `📋 CATEGORIA: ${f.categoria || 'Superodd'}`,
       ...(f.incluirDG !== 'false' ? [`😍 chance de duplo green 😍`] : []),
     ].join('\n'),
@@ -307,6 +330,7 @@ const TEMPLATES: TemplateConfig[] = [
     fields: [
       { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
       { id: 'incluirDG', label: 'Chance de Duplo Green', placeholder: '', type: 'toggle', default: () => 'true' },
+      ...GIROS_FIELDS,
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 141', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'casa', label: 'Casa de Apostas', placeholder: 'Ex: BET365', type: 'text', uppercase: true },
@@ -339,6 +363,7 @@ const TEMPLATES: TemplateConfig[] = [
         ``,
         `🟡LUCRO: 💵 ${fmtVal(f.lucroMin)} A ${fmtVal(f.lucroMax)}💵`,
         ``,
+        ...(f.incluirGiros === 'true' ? [fmtGiros(f)] : []),
         ...(f.incluirDG !== 'false' ? [`😍 chance de duplo green😍`] : []),
       ].join('\n');
     },
@@ -353,6 +378,7 @@ const TEMPLATES: TemplateConfig[] = [
     emoji: '🟢',
     fields: [
       { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
+      ...GIROS_FIELDS,
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 120', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'casa', label: 'Casa de Apostas', placeholder: 'Ex: Betesporte', type: 'text', uppercase: true },
@@ -373,6 +399,7 @@ const TEMPLATES: TemplateConfig[] = [
       ``,
       `🟡 OBJETIVO DUPLO GREEN - 💵 ${f.valorDG ? `R$ ${f.valorDG}` : 'R$ XXX,XX'}`,
       `🟡 LUCRO MÍNIMO GARANTIDO: 💵 ${f.lucro ? `R$ ${f.lucro}` : 'R$ XX,XX'}`,
+      ...(f.incluirGiros === 'true' ? [fmtGiros(f)] : []),
       ``,
       `😍 chance de duplo green 😍`,
     ].join('\n'),
@@ -388,6 +415,7 @@ const TEMPLATES: TemplateConfig[] = [
     fields: [
       { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
       { id: 'incluirDG', label: 'Chance de Duplo Green', placeholder: '', type: 'toggle', default: () => 'true' },
+      ...GIROS_FIELDS,
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 117', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'campanha', label: 'Nome da Promoção/Campanha', placeholder: 'Ex: SUPER ODDS WEEK', type: 'text', uppercase: true },
@@ -408,6 +436,7 @@ const TEMPLATES: TemplateConfig[] = [
       `🔴 CASO HAJA ALTERAÇÃO NAS ODDS, UTILIZE A CALCULADORA 👆`,
       ``,
       `🟡 LUCRO: 💵 ${fmtVal(f.lucroMin)} À ${fmtVal(f.lucroMax)} 💵`,
+      ...(f.incluirGiros === 'true' ? [fmtGiros(f)] : []),
       `📋 CATEGORIA: ${f.categoria || 'Promoção'}`,
       ...(f.incluirDG !== 'false' ? [`😍 chance de duplo green 😍`] : []),
     ].join('\n'),
@@ -423,6 +452,7 @@ const TEMPLATES: TemplateConfig[] = [
     fields: [
       { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
       { id: 'incluirDG', label: 'Chance de Duplo Green', placeholder: '', type: 'toggle', default: () => 'true' },
+      ...GIROS_FIELDS,
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 138', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'casa', label: 'Casa de Apostas', placeholder: 'Ex: Sportingbet', type: 'text', uppercase: true },
@@ -448,6 +478,7 @@ const TEMPLATES: TemplateConfig[] = [
         `🟡 LUCRO: 💵 ${fmtVal(f.lucro1)}`,
         `🟡 RECOMPENSA: 🎁 ${fmtVal(f.free1)} EM FREEBET`,
       ];
+      if (f.incluirGiros === 'true') lines.push(fmtGiros(f));
       if (f.obs && f.obs.trim()) {
         lines.push(`📝 OBS: OPÇÃO 2 — ${f.obs.trim().toUpperCase()}`);
       }
@@ -467,6 +498,7 @@ const TEMPLATES: TemplateConfig[] = [
     fields: [
       { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
       { id: 'incluirDG', label: 'Chance de Duplo Green', placeholder: '', type: 'toggle', default: () => 'true' },
+      ...GIROS_FIELDS,
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 140', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'valorTotal', label: 'Valor total a utilizar (ex: 100,00)', placeholder: '100,00', type: 'text' },
@@ -487,6 +519,7 @@ const TEMPLATES: TemplateConfig[] = [
       `🟥 Atenção: Sempre confira se os links dos bilhetes são os mesmos da imagem .`,
       ``,
       `🟡 LUCRO : 💵 ${fmtVal(f.lucroMin)} À ${fmtVal(f.lucroMax)} OU ANULA 💵`,
+      ...(f.incluirGiros === 'true' ? [fmtGiros(f)] : []),
       `📋 CATEGORIA: ${f.categoria || 'Superodd'}`,
       ...(f.incluirDG !== 'false' ? [`😍 chance de duplo green 😍`] : []),
     ].join('\n'),
@@ -502,6 +535,7 @@ const TEMPLATES: TemplateConfig[] = [
     fields: [
       { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
       { id: 'incluirDG', label: 'Chance de Duplo Green', placeholder: '', type: 'toggle', default: () => 'true' },
+      ...GIROS_FIELDS,
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 139', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'casa', label: 'Casa de Apostas', placeholder: 'Ex: Betano', type: 'text', uppercase: true },
@@ -522,6 +556,7 @@ const TEMPLATES: TemplateConfig[] = [
       `🔴 CASO HAJA ALTERAÇÃO NAS ODDS, UTILIZE CALCULADORA 🎲`,
       ``,
       `🟡 OBJETIVO DUPLO GREEN - 🟩 ${fmtVal(f.valorDG)}`,
+      ...(f.incluirGiros === 'true' ? [fmtGiros(f)] : []),
       `📋 CATEGORIA: ${f.categoria || 'Superodd'}`,
       ...(f.incluirDG !== 'false' ? [`😍 chance de duplo green 😍`] : []),
     ].join('\n'),
