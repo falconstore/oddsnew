@@ -127,15 +127,17 @@ function saveCustomCategories(cats: string[]) {
 // Giros Grátis — campos e linha de saída compartilhados
 // ─────────────────────────────────────────
 
-const GIROS_FIELDS: FieldConfig[] = [
+const GIROS_TOGGLE: FieldConfig[] = [
   { id: 'incluirGiros', label: 'Giros Grátis', placeholder: '', type: 'toggle', default: () => 'false' },
-  { id: 'girosLucro', label: 'Recompensa cash dos Giros (ex: 203,00)', placeholder: '203,00', type: 'text', showIf: (f) => f.incluirGiros === 'true' },
+];
+
+const GIROS_SUBFIELDS: FieldConfig[] = [
   { id: 'girosQtd', label: 'Quantidade de Giros (ex: 301)', placeholder: '301', type: 'text', showIf: (f) => f.incluirGiros === 'true' },
   { id: 'girosValor', label: 'Valor por Giro em R$ (ex: 1)', placeholder: '1', type: 'text', showIf: (f) => f.incluirGiros === 'true' },
 ];
 
 function fmtGiros(f: Record<string, string>): string {
-  return `🟡 RECOMPENSA: 🎁 ${fmtVal(f.girosLucro)} + ${f.girosQtd || 'N'} GIROS DE ${f.girosValor || '1'} REAL`;
+  return `🟡 RECOMPENSA: 🎁 ${f.girosQtd || 'N'} GIROS DE ${f.girosValor || '1'} REAL`;
 }
 
 // ─────────────────────────────────────────
@@ -154,13 +156,14 @@ const TEMPLATES: TemplateConfig[] = [
     fields: [
       { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
       { id: 'incluirDG', label: 'Chance de Duplo Green', placeholder: '', type: 'toggle', default: () => 'true' },
-      ...GIROS_FIELDS,
+      ...GIROS_TOGGLE,
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 130', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'numRef', label: 'Freebet a Queimar', placeholder: '', type: 'freebet_select', hint: 'Selecione o procedimento GANHAR_FB cuja freebet será queimada aqui.' },
       { id: 'casa', label: 'Casa de Apostas', placeholder: 'Ex: Bet365', type: 'text', uppercase: true },
       { id: 'evento1', label: 'Partida', placeholder: 'Ex: Flamengo x Palmeiras', type: 'evento' },
       { id: 'lucro', label: 'Lucro Previsto (ex: 17,00)', placeholder: '17,00', type: 'text' },
+      ...GIROS_SUBFIELDS,
       { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Freebet' },
       { id: 'evento2', label: 'Partida 2', placeholder: 'Ex: Real Madrid x Barcelona', type: 'evento', optional: true },
     ],
@@ -201,7 +204,7 @@ const TEMPLATES: TemplateConfig[] = [
     fields: [
       { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
       { id: 'incluirDG', label: 'Chance de Duplo Green', placeholder: '', type: 'toggle', default: () => 'true' },
-      ...GIROS_FIELDS,
+      ...GIROS_TOGGLE,
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 129', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'casa', label: 'Casa de Apostas', placeholder: 'Ex: Sportingbet', type: 'text', uppercase: true },
@@ -209,6 +212,7 @@ const TEMPLATES: TemplateConfig[] = [
       { id: 'evento1', label: 'Partida 1', placeholder: 'Ex: RB Leipzig x St Pauli', type: 'evento' },
       { id: 'freebetValor', label: 'Valor da Freebet (ex: 25,00)', placeholder: '25,00', type: 'text' },
       { id: 'obsRecompensa', label: 'Observação da Recompensa (opcional)', placeholder: 'Ex: A CADA GOL DO SANTOS', type: 'text', uppercase: true, hint: 'Aparece após "EM FREEBET". Deixe vazio se não houver condição especial.' },
+      ...GIROS_SUBFIELDS,
       { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Freebet' },
       { id: 'evento2', label: 'Partida 2', placeholder: 'Ex: Real Madrid x Barcelona', type: 'evento', optional: true },
     ],
@@ -247,7 +251,7 @@ const TEMPLATES: TemplateConfig[] = [
     fields: [
       { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
       { id: 'incluirDG', label: 'Chance de Duplo Green', placeholder: '', type: 'toggle', default: () => 'true' },
-      ...GIROS_FIELDS,
+      ...GIROS_TOGGLE,
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 115', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'missao', label: 'Nome da Missão', placeholder: 'Ex: LIGA DOS CAMPEÕES', type: 'text', uppercase: true },
@@ -255,6 +259,7 @@ const TEMPLATES: TemplateConfig[] = [
       { id: 'evento1', label: 'Partida 1', placeholder: 'Ex: Bayern x PSG', type: 'evento' },
       { id: 'freebetValor', label: 'Valor da Freebet (ex: 50,00)', placeholder: '50,00', type: 'text' },
       { id: 'obsRecompensa', label: 'Observação da Recompensa (opcional)', placeholder: 'Ex: A CADA GOL DO SANTOS', type: 'text', uppercase: true, hint: 'Aparece após "EM FREEBET". Deixe vazio se não houver condição especial.' },
+      ...GIROS_SUBFIELDS,
       { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Extra' },
       { id: 'evento2', label: 'Partida 2', placeholder: 'Ex: Real Madrid x Barcelona', type: 'evento', optional: true },
     ],
@@ -293,7 +298,7 @@ const TEMPLATES: TemplateConfig[] = [
     fields: [
       { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
       { id: 'incluirDG', label: 'Chance de Duplo Green', placeholder: '', type: 'toggle', default: () => 'true' },
-      ...GIROS_FIELDS,
+      ...GIROS_TOGGLE,
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 116', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'casa', label: 'Casa de Apostas', placeholder: 'Ex: Betesporte', type: 'text', uppercase: true, hint: 'A casa aparece na linha 2 ("DA BETESPORTE") — não precisa de linha CASA: separada neste tipo.' },
@@ -301,6 +306,7 @@ const TEMPLATES: TemplateConfig[] = [
       { id: 'lucroMin', label: 'Lucro Mínimo (ex: 17,63)', placeholder: '17,63', type: 'text' },
       { id: 'lucroMax', label: 'Lucro Máximo (ex: 248,00)', placeholder: '248,00', type: 'text' },
       { id: 'valorDG', label: 'Possível Duplo Green (ex: 210,00)', placeholder: '210,00', type: 'text', showIf: (f) => f.incluirDG !== 'false' },
+      ...GIROS_SUBFIELDS,
       { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Superodd' },
     ],
     generate: (f) => [
@@ -330,7 +336,7 @@ const TEMPLATES: TemplateConfig[] = [
     fields: [
       { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
       { id: 'incluirDG', label: 'Chance de Duplo Green', placeholder: '', type: 'toggle', default: () => 'true' },
-      ...GIROS_FIELDS,
+      ...GIROS_TOGGLE,
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 141', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'casa', label: 'Casa de Apostas', placeholder: 'Ex: BET365', type: 'text', uppercase: true },
@@ -338,6 +344,7 @@ const TEMPLATES: TemplateConfig[] = [
       { id: 'evento1', label: 'Partida', placeholder: 'Ex: Real Oviedo x Getafe', type: 'evento' },
       { id: 'lucroMin', label: 'Lucro Mínimo (ex: 17,63)', placeholder: '17,63', type: 'text' },
       { id: 'lucroMax', label: 'Lucro Máximo (ex: 248,00)', placeholder: '248,00', type: 'text' },
+      ...GIROS_SUBFIELDS,
       { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Promoção' },
     ],
     generate: (f) => {
@@ -378,13 +385,14 @@ const TEMPLATES: TemplateConfig[] = [
     emoji: '🟢',
     fields: [
       { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
-      ...GIROS_FIELDS,
+      ...GIROS_TOGGLE,
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 120', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'casa', label: 'Casa de Apostas', placeholder: 'Ex: Betesporte', type: 'text', uppercase: true },
       { id: 'evento1', label: 'Partida', placeholder: 'Ex: Corinthians x Vasco', type: 'evento' },
       { id: 'valorDG', label: 'Valor Alvo Duplo Green (ex: 210,00)', placeholder: '210,00', type: 'text' },
       { id: 'lucro', label: 'Lucro Mínimo Garantido (ex: 17,00)', placeholder: '17,00', type: 'text' },
+      ...GIROS_SUBFIELDS,
       { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Tentativa de Duplo Green' },
     ],
     generate: (f) => [
@@ -415,7 +423,7 @@ const TEMPLATES: TemplateConfig[] = [
     fields: [
       { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
       { id: 'incluirDG', label: 'Chance de Duplo Green', placeholder: '', type: 'toggle', default: () => 'true' },
-      ...GIROS_FIELDS,
+      ...GIROS_TOGGLE,
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 117', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'campanha', label: 'Nome da Promoção/Campanha', placeholder: 'Ex: SUPER ODDS WEEK', type: 'text', uppercase: true },
@@ -423,6 +431,7 @@ const TEMPLATES: TemplateConfig[] = [
       { id: 'evento1', label: 'Partida', placeholder: 'Ex: São Paulo x Santos', type: 'evento' },
       { id: 'lucroMin', label: 'Lucro Mínimo (ex: 3,25)', placeholder: '3,25', type: 'text' },
       { id: 'lucroMax', label: 'Lucro Máximo (ex: 3,75)', placeholder: '3,75', type: 'text' },
+      ...GIROS_SUBFIELDS,
       { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Promoção' },
     ],
     generate: (f) => [
@@ -452,7 +461,7 @@ const TEMPLATES: TemplateConfig[] = [
     fields: [
       { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
       { id: 'incluirDG', label: 'Chance de Duplo Green', placeholder: '', type: 'toggle', default: () => 'true' },
-      ...GIROS_FIELDS,
+      ...GIROS_TOGGLE,
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 138', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'casa', label: 'Casa de Apostas', placeholder: 'Ex: Sportingbet', type: 'text', uppercase: true },
@@ -460,6 +469,7 @@ const TEMPLATES: TemplateConfig[] = [
       { id: 'evento1', label: 'Partida', placeholder: 'Ex: Bahia x Cruzeiro', type: 'evento' },
       { id: 'lucro1', label: 'Opção 1 — Lucro cash se ganhar (ex: 2,00)', placeholder: '2,00', type: 'text' },
       { id: 'free1', label: 'Opção 1 — Freebet se ganhar fora (ex: 10,00)', placeholder: '10,00', type: 'text' },
+      ...GIROS_SUBFIELDS,
       { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Promoção' },
       { id: 'obs', label: 'Opção 2 (opcional) — vai para observações', placeholder: 'Ex: LUCRO DE 16,00 / FORA FREE DE 100,00', type: 'text', optional: true, hint: 'Se houver uma segunda opção de valor, registre aqui. Fica salvo no campo Observações do procedimento.' },
     ],
@@ -498,12 +508,13 @@ const TEMPLATES: TemplateConfig[] = [
     fields: [
       { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
       { id: 'incluirDG', label: 'Chance de Duplo Green', placeholder: '', type: 'toggle', default: () => 'true' },
-      ...GIROS_FIELDS,
+      ...GIROS_TOGGLE,
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 140', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'valorTotal', label: 'Valor total a utilizar (ex: 100,00)', placeholder: '100,00', type: 'text' },
       { id: 'lucroMin', label: 'Lucro mínimo (ex: 8,00)', placeholder: '8,00', type: 'text' },
       { id: 'lucroMax', label: 'Lucro máximo (ex: 20,00)', placeholder: '20,00', type: 'text', hint: 'O texto "OU ANULA" é adicionado automaticamente.' },
+      ...GIROS_SUBFIELDS,
       { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Superodd' },
     ],
     generate: (f) => [
@@ -535,12 +546,13 @@ const TEMPLATES: TemplateConfig[] = [
     fields: [
       { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
       { id: 'incluirDG', label: 'Chance de Duplo Green', placeholder: '', type: 'toggle', default: () => 'true' },
-      ...GIROS_FIELDS,
+      ...GIROS_TOGGLE,
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 139', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'casa', label: 'Casa de Apostas', placeholder: 'Ex: Betano', type: 'text', uppercase: true },
       { id: 'evento1', label: 'Partida', placeholder: 'Ex: Manchester City x Brentford', type: 'evento' },
       { id: 'valorDG', label: 'Objetivo Duplo Green (ex: 706,64)', placeholder: '706,64', type: 'text' },
+      ...GIROS_SUBFIELDS,
       { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Superodd' },
     ],
     generate: (f) => [
