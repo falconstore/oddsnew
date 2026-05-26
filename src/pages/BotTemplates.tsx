@@ -72,6 +72,7 @@ interface FieldConfig {
   hint?: string;
   optional?: boolean;
   uppercase?: boolean;
+  showIf?: (fields: Record<string, string>) => boolean;
 }
 
 interface TemplateConfig {
@@ -262,9 +263,9 @@ const TEMPLATES: TemplateConfig[] = [
   },
   {
     id: 'superodd_dg',
-    name: 'Superodd — Duplo Green',
-    shortName: 'Superodd (DG)',
-    description: 'Superodd com objetivo de Duplo Green em cash. Emoji azul 🔵.',
+    name: 'Superodd',
+    shortName: 'Superodd',
+    description: 'Superodd com lucro mínimo e máximo. Opção de Possível Duplo Green quando ativada. Emoji azul 🔵.',
     color: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
     dotColor: 'bg-blue-400',
     emoji: '🔵',
@@ -275,7 +276,9 @@ const TEMPLATES: TemplateConfig[] = [
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'casa', label: 'Casa de Apostas', placeholder: 'Ex: Betesporte', type: 'text', uppercase: true, hint: 'A casa aparece na linha 2 ("DA BETESPORTE") — não precisa de linha CASA: separada neste tipo.' },
       { id: 'evento1', label: 'Partida', placeholder: 'Ex: Corinthians x Vasco', type: 'evento' },
-      { id: 'valorDG', label: 'Objetivo Duplo Green (ex: 210,00)', placeholder: '210,00', type: 'text' },
+      { id: 'lucroMin', label: 'Lucro Mínimo (ex: 17,63)', placeholder: '17,63', type: 'text' },
+      { id: 'lucroMax', label: 'Lucro Máximo (ex: 248,00)', placeholder: '248,00', type: 'text' },
+      { id: 'valorDG', label: 'Possível Duplo Green (ex: 210,00)', placeholder: '210,00', type: 'text', showIf: (f) => f.incluirDG !== 'false' },
       { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Superodd' },
     ],
     generate: (f) => [
@@ -287,7 +290,8 @@ const TEMPLATES: TemplateConfig[] = [
       ``,
       `🔴 CASO HAJA ALTERAÇÃO NAS ODDS, UTILIZE CALCULADORA 🧮`,
       ``,
-      `🟡 OBJETIVO DUPLO GREEN - 💵 ${fmtVal(f.valorDG)}`,
+      `🟡 LUCRO: 💵 ${fmtVal(f.lucroMin)} A ${fmtVal(f.lucroMax)} 💵`,
+      ...(f.incluirDG !== 'false' ? [`🟡 POSSÍVEL DUPLO GREEN - 💵 ${fmtVal(f.valorDG)}`] : []),
       `📋 CATEGORIA: ${f.categoria || 'Superodd'}`,
       ...(f.incluirDG !== 'false' ? [`😍 chance de duplo green 😍`] : []),
     ].join('\n'),
@@ -296,7 +300,7 @@ const TEMPLATES: TemplateConfig[] = [
     id: 'aumento_25',
     name: 'Aumento 25%',
     shortName: 'Aumento 25%',
-    description: 'Promoção de aumento de 25% da casa. Exige 1 CPF. Lucro em range mínimo–máximo.',
+    description: 'Promoção de aumento de 25% da casa. Lucro em range mínimo–máximo. Quantidade de CPFs configurável.',
     color: 'bg-green-500/15 text-green-400 border-green-500/30',
     dotColor: 'bg-green-400',
     emoji: '🟢',
@@ -306,32 +310,38 @@ const TEMPLATES: TemplateConfig[] = [
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 141', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'casa', label: 'Casa de Apostas', placeholder: 'Ex: BET365', type: 'text', uppercase: true },
+      { id: 'cpfCount', label: 'Quantidade de CPFs necessários', placeholder: 'Ex: 1', type: 'text', default: () => '1', hint: 'Ex: 1, 2, 3... Aparece na linha 🚨SERÁ NECESSÁRIO N CPF(s)🚨' },
       { id: 'evento1', label: 'Partida', placeholder: 'Ex: Real Oviedo x Getafe', type: 'evento' },
       { id: 'lucroMin', label: 'Lucro Mínimo (ex: 17,63)', placeholder: '17,63', type: 'text' },
       { id: 'lucroMax', label: 'Lucro Máximo (ex: 248,00)', placeholder: '248,00', type: 'text' },
       { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Promoção' },
     ],
-    generate: (f) => [
-      `🟢 PROCEDIMENTO ${f.isExtra === 'true' ? 'EXTRA ' : ''}${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
-      ``,
-      `🟢 PROCEDIMENTO REFERENTE AO AUMENTO DE 25%🔥`,
-      ``,
-      `CASA: ${(f.casa || 'CASA').toUpperCase()}`,
-      ``,
-      `🚨SERÁ NECESSÁRIO 1 CPF NA ${(f.casa || 'CASA').toUpperCase()}🚨`,
-      ``,
-      `UTILIZAREMOS A PARTIDA ENTRE:`,
-      ``,
-      `${f.evento1 || 'TIME A X TIME B'} - ${f.evento1_data || 'DD/MM/AAAA'} ÀS ${f.evento1_hora || 'HH:MM'}`,
-      ``,
-      `🟥 Atenção : sempre confere data e horário da partida nos bilhetes também.`,
-      `🟥 Atenção: Sempre confira se os links dos bilhetes são os mesmo da imagem .`,
-      `🔴 CASO HAJA ALTERAÇÃO NAS ODDS, UTILIZE A CALCULADORA!`,
-      ``,
-      `🟡LUCRO: 💵 ${fmtVal(f.lucroMin)} A ${fmtVal(f.lucroMax)}💵`,
-      ``,
-      ...(f.incluirDG !== 'false' ? [`😍 chance de duplo green😍`] : []),
-    ].join('\n'),
+    generate: (f) => {
+      const cpf = (f.cpfCount || '1').trim();
+      const cpfNum = parseInt(cpf, 10);
+      const cpfLabel = !isNaN(cpfNum) && cpfNum > 1 ? `${cpf} CPFs` : `${cpf} CPF`;
+      return [
+        `🟢 PROCEDIMENTO ${f.isExtra === 'true' ? 'EXTRA ' : ''}${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
+        ``,
+        `🟢 PROCEDIMENTO REFERENTE AO AUMENTO DE 25%🔥`,
+        ``,
+        `CASA: ${(f.casa || 'CASA').toUpperCase()}`,
+        ``,
+        `🚨SERÁ NECESSÁRIO ${cpfLabel} NA ${(f.casa || 'CASA').toUpperCase()}🚨`,
+        ``,
+        `UTILIZAREMOS A PARTIDA ENTRE:`,
+        ``,
+        `${f.evento1 || 'TIME A X TIME B'} - ${f.evento1_data || 'DD/MM/AAAA'} ÀS ${f.evento1_hora || 'HH:MM'}`,
+        ``,
+        `🟥 Atenção : sempre confere data e horário da partida nos bilhetes também.`,
+        `🟥 Atenção: Sempre confira se os links dos bilhetes são os mesmo da imagem .`,
+        `🔴 CASO HAJA ALTERAÇÃO NAS ODDS, UTILIZE A CALCULADORA!`,
+        ``,
+        `🟡LUCRO: 💵 ${fmtVal(f.lucroMin)} A ${fmtVal(f.lucroMax)}💵`,
+        ``,
+        ...(f.incluirDG !== 'false' ? [`😍 chance de duplo green😍`] : []),
+      ].join('\n');
+    },
   },
   {
     id: 'tentativa_dg',
@@ -1631,7 +1641,7 @@ export default function BotTemplates() {
                 </div>
 
                 <div className="flex flex-col gap-3">
-                  {requiredFields.map(f =>
+                  {requiredFields.filter(f => !f.showIf || f.showIf(fields)).map(f =>
                     f.type === 'evento' ? (
                       <div key={f.id} className="flex flex-col gap-1">
                         <Label className="text-xs font-medium text-muted-foreground">{f.label}</Label>
