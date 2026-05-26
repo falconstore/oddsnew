@@ -145,6 +145,18 @@ function fmtRange(min: string, max: string, sep = 'A'): string {
   return `${fmtVal(min)} ${sep} ${fmtVal(max)}`;
 }
 
+const PARTIDAS_OPCIONAIS: FieldConfig[] = [
+  { id: 'evento2', label: 'Partida 2', placeholder: 'Ex: Real Madrid x Barcelona', type: 'evento', optional: true },
+  { id: 'evento3', label: 'Partida 3', placeholder: 'Ex: Juventus x Inter de Milão', type: 'evento', optional: true },
+];
+
+function buildPartidas(f: Record<string, string>): string[] {
+  const partidas = [`${f.evento1 || 'TIME A X TIME B'} - ${f.evento1_data || 'DD/MM/AAAA'} ÀS ${f.evento1_hora || 'HH:MM'}`];
+  if (f.evento2) partidas.push(`${f.evento2} - ${f.evento2_data || 'DD/MM/AAAA'} ÀS ${f.evento2_hora || 'HH:MM'}`);
+  if (f.evento3) partidas.push(`${f.evento3} - ${f.evento3_data || 'DD/MM/AAAA'} ÀS ${f.evento3_hora || 'HH:MM'}`);
+  return partidas;
+}
+
 // ─────────────────────────────────────────
 // Definição dos templates built-in
 // ─────────────────────────────────────────
@@ -170,15 +182,12 @@ const TEMPLATES: TemplateConfig[] = [
       { id: 'lucro', label: 'Lucro Previsto (ex: 17,00)', placeholder: '17,00', type: 'text' },
       ...GIROS_SUBFIELDS,
       { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Freebet' },
-      { id: 'evento2', label: 'Partida 2', placeholder: 'Ex: Real Madrid x Barcelona', type: 'evento', optional: true },
+      ...PARTIDAS_OPCIONAIS,
     ],
     generate: (f) => {
       const refStr = f.numRef || '[NNN]';
       const linha2 = `🟢 PROCEDIMENTO REFERENTE ÀS FREEBETS — REF N° ${refStr} 🔥`;
-      const partidas = [`${f.evento1 || 'TIME A X TIME B'} - ${f.evento1_data || 'DD/MM/AAAA'} ÀS ${f.evento1_hora || 'HH:MM'}`];
-      if (f.evento2) {
-        partidas.push(`${f.evento2} - ${f.evento2_data || 'DD/MM/AAAA'} ÀS ${f.evento2_hora || 'HH:MM'}`);
-      }
+      const partidas = buildPartidas(f);
       return [
         `🟢 PROCEDIMENTO ${f.isExtra === 'true' ? 'EXTRA ' : ''}${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
         linha2,
@@ -219,13 +228,10 @@ const TEMPLATES: TemplateConfig[] = [
       { id: 'obsRecompensa', label: 'Observação da Recompensa (opcional)', placeholder: 'Ex: A CADA GOL DO SANTOS', type: 'text', uppercase: true, hint: 'Aparece após "EM FREEBET". Deixe vazio se não houver condição especial.' },
       ...GIROS_SUBFIELDS,
       { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Freebet' },
-      { id: 'evento2', label: 'Partida 2', placeholder: 'Ex: Real Madrid x Barcelona', type: 'evento', optional: true },
+      ...PARTIDAS_OPCIONAIS,
     ],
     generate: (f) => {
-      const partidas = [`${f.evento1 || 'TIME A X TIME B'} - ${f.evento1_data || 'DD/MM/AAAA'} ÀS ${f.evento1_hora || 'HH:MM'}`];
-      if (f.evento2) {
-        partidas.push(`${f.evento2} - ${f.evento2_data || 'DD/MM/AAAA'} ÀS ${f.evento2_hora || 'HH:MM'}`);
-      }
+      const partidas = buildPartidas(f);
       const recompensa = `🟡 RECOMPENSA: 🎁 ${fmtVal(f.freebetValor)} EM FREEBET${f.obsRecompensa ? ` - ${f.obsRecompensa.toUpperCase()}` : ''}`;
       return [
         `🟢 PROCEDIMENTO ${f.isExtra === 'true' ? 'EXTRA ' : ''}${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
@@ -266,13 +272,10 @@ const TEMPLATES: TemplateConfig[] = [
       { id: 'obsRecompensa', label: 'Observação da Recompensa (opcional)', placeholder: 'Ex: A CADA GOL DO SANTOS', type: 'text', uppercase: true, hint: 'Aparece após "EM FREEBET". Deixe vazio se não houver condição especial.' },
       ...GIROS_SUBFIELDS,
       { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Extra' },
-      { id: 'evento2', label: 'Partida 2', placeholder: 'Ex: Real Madrid x Barcelona', type: 'evento', optional: true },
+      ...PARTIDAS_OPCIONAIS,
     ],
     generate: (f) => {
-      const partidas = [`${f.evento1 || 'TIME A X TIME B'} - ${f.evento1_data || 'DD/MM/AAAA'} ÀS ${f.evento1_hora || 'HH:MM'}`];
-      if (f.evento2) {
-        partidas.push(`${f.evento2} - ${f.evento2_data || 'DD/MM/AAAA'} ÀS ${f.evento2_hora || 'HH:MM'}`);
-      }
+      const partidas = buildPartidas(f);
       const recompensa = `🟡 RECOMPENSA: 🎁 ${fmtVal(f.freebetValor)} EM FREEBET${f.obsRecompensa ? ` - ${f.obsRecompensa.toUpperCase()}` : ''}`;
       return [
         `🟢 PROCEDIMENTO ${f.isExtra === 'true' ? 'EXTRA ' : ''}${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
@@ -313,13 +316,14 @@ const TEMPLATES: TemplateConfig[] = [
       { id: 'valorDG', label: 'Possível Duplo Green (ex: 210,00)', placeholder: '210,00', type: 'text', showIf: (f) => f.incluirDG !== 'false' },
       ...GIROS_SUBFIELDS,
       { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Superodd' },
+      ...PARTIDAS_OPCIONAIS,
     ],
     generate: (f) => [
       `🔵 PROCEDIMENTO ${f.isExtra === 'true' ? 'EXTRA ' : ''}${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
       `🟢 PROCEDIMENTO REFERENTE A SUPERODD DA ${(f.casa || 'CASA').toUpperCase()} 🔥`,
       ``,
       `UTILIZAREMOS O JOGO ENTRE:`,
-      `${f.evento1 || 'TIME A X TIME B'} - ${f.evento1_data || 'DD/MM/AAAA'} ÀS ${f.evento1_hora || 'HH:MM'}`,
+      ...buildPartidas(f),
       ``,
       `🔴 CASO HAJA ALTERAÇÃO NAS ODDS, UTILIZE CALCULADORA 🧮`,
       ``,
@@ -351,6 +355,7 @@ const TEMPLATES: TemplateConfig[] = [
       { id: 'lucroMax', label: 'Lucro Máximo (ex: 248,00)', placeholder: '248,00 — ou vazio para valor único', type: 'text', hint: 'Deixe vazio para exibir valor único em vez de range.' },
       ...GIROS_SUBFIELDS,
       { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Promoção' },
+      ...PARTIDAS_OPCIONAIS,
     ],
     generate: (f) => {
       const cpf = (f.cpfCount || '1').trim();
@@ -367,7 +372,7 @@ const TEMPLATES: TemplateConfig[] = [
         ``,
         `UTILIZAREMOS A PARTIDA ENTRE:`,
         ``,
-        `${f.evento1 || 'TIME A X TIME B'} - ${f.evento1_data || 'DD/MM/AAAA'} ÀS ${f.evento1_hora || 'HH:MM'}`,
+        ...buildPartidas(f),
         ``,
         `🟥 Atenção : sempre confere data e horário da partida nos bilhetes também.`,
         `🟥 Atenção: Sempre confira se os links dos bilhetes são os mesmo da imagem .`,
@@ -399,6 +404,7 @@ const TEMPLATES: TemplateConfig[] = [
       { id: 'lucro', label: 'Lucro Mínimo Garantido (ex: 17,00)', placeholder: '17,00', type: 'text' },
       ...GIROS_SUBFIELDS,
       { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Tentativa de Duplo Green' },
+      ...PARTIDAS_OPCIONAIS,
     ],
     generate: (f) => [
       `🟢 PROCEDIMENTO ${f.isExtra === 'true' ? 'EXTRA ' : ''}${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
@@ -406,7 +412,7 @@ const TEMPLATES: TemplateConfig[] = [
       `🟢 TENTATIVA DE DUPLO GREEN NA ${(f.casa || 'CASA').toUpperCase()} 🔥`,
       ``,
       `UTILIZAREMOS O JOGO ENTRE:`,
-      `${f.evento1 || 'TIME A X TIME B'} - ${f.evento1_data || 'DD/MM/AAAA'} ÀS ${f.evento1_hora || 'HH:MM'}`,
+      ...buildPartidas(f),
       ``,
       `🔴 CASO HAJA ALTERAÇÃO NAS ODDS, UTILIZE CALCULADORA 🧮`,
       ``,
@@ -438,6 +444,7 @@ const TEMPLATES: TemplateConfig[] = [
       { id: 'lucroMax', label: 'Lucro Máximo (ex: 3,75)', placeholder: '3,75 — ou vazio para valor único', type: 'text', hint: 'Deixe vazio para exibir valor único em vez de range.' },
       ...GIROS_SUBFIELDS,
       { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Promoção' },
+      ...PARTIDAS_OPCIONAIS,
     ],
     generate: (f) => [
       `🟢 PROCEDIMENTO ${f.isExtra === 'true' ? 'EXTRA ' : ''}${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
@@ -445,7 +452,7 @@ const TEMPLATES: TemplateConfig[] = [
       `CASA: 🏠 ${(f.casa || 'CASA').toUpperCase()}`,
       ``,
       `UTILIZAREMOS A PARTIDA ENTRE:`,
-      `${f.evento1 || 'TIME A X TIME B'} - ${f.evento1_data || 'DD/MM/AAAA'} ÀS ${f.evento1_hora || 'HH:MM'}`,
+      ...buildPartidas(f),
       ``,
       `🔴 CASO HAJA ALTERAÇÃO NAS ODDS, UTILIZE A CALCULADORA 👆`,
       ``,
@@ -476,7 +483,8 @@ const TEMPLATES: TemplateConfig[] = [
       { id: 'free1', label: 'Opção 1 — Freebet se ganhar fora (ex: 10,00)', placeholder: '10,00', type: 'text' },
       ...GIROS_SUBFIELDS,
       { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Promoção' },
-      { id: 'obs', label: 'Opção 2 (opcional) — vai para observações', placeholder: 'Ex: LUCRO DE 16,00 / FORA FREE DE 100,00', type: 'text', optional: true, hint: 'Se houver uma segunda opção de valor, registre aqui. Fica salvo no campo Observações do procedimento.' },
+      { id: 'obs', label: 'Opção 2 (opcional) — vai para observações', placeholder: 'Ex: LUCRO DE 16,00 / FORA FREE DE 100,00', type: 'text', hint: 'Se houver uma segunda opção de valor, registre aqui. Fica salvo no campo Observações do procedimento.' },
+      ...PARTIDAS_OPCIONAIS,
     ],
     generate: (f) => {
       const lines = [
@@ -485,7 +493,7 @@ const TEMPLATES: TemplateConfig[] = [
         `CASA: 🏠 ${(f.casa || 'CASA').toUpperCase()}`,
         ``,
         `UTILIZAREMOS A PARTIDA ENTRE:`,
-        `${f.evento1 || 'TIME A X TIME B'} - ${f.evento1_data || 'DD/MM/AAAA'} ÀS ${f.evento1_hora || 'HH:MM'}`,
+        ...buildPartidas(f),
         ``,
         `🟥 Atenção: sempre confere data e horário da partida nos bilhetes também.`,
         `🔴 CASO HAJA ALTERAÇÃO NAS ODDS, UTILIZE A CALCULADORA`,
@@ -519,8 +527,10 @@ const TEMPLATES: TemplateConfig[] = [
       { id: 'valorTotal', label: 'Valor total a utilizar (ex: 100,00)', placeholder: '100,00', type: 'text' },
       { id: 'lucroMin', label: 'Lucro mínimo (ex: 8,00)', placeholder: '8,00', type: 'text' },
       { id: 'lucroMax', label: 'Lucro máximo (ex: 20,00)', placeholder: '20,00 — ou vazio para valor único', type: 'text', hint: 'Deixe vazio para valor único. "OU ANULA" é adicionado automaticamente.' },
+      { id: 'evento1', label: 'Partida', placeholder: 'Ex: Corinthians x Vasco', type: 'evento' },
       ...GIROS_SUBFIELDS,
       { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Superodd' },
+      ...PARTIDAS_OPCIONAIS,
     ],
     generate: (f) => [
       `🟢 PROCEDIMENTO ${f.isExtra === 'true' ? 'EXTRA ' : ''}${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
@@ -530,6 +540,9 @@ const TEMPLATES: TemplateConfig[] = [
       `🟢PLATAFORMAS`,
       ``,
       `( BOLSA DE APOSTA ) - UTILIZARÁ AO TODO ( 💵 ${fmtVal(f.valorTotal)} )`,
+      ``,
+      `UTILIZAREMOS O JOGO ENTRE:`,
+      ...buildPartidas(f),
       ``,
       `🟥 Atenção : sempre confere data e horário da partida nos bilhetes também.`,
       `🟥 Atenção: Sempre confira se os links dos bilhetes são os mesmos da imagem .`,
@@ -559,6 +572,7 @@ const TEMPLATES: TemplateConfig[] = [
       { id: 'valorDG', label: 'Objetivo Duplo Green (ex: 706,64)', placeholder: '706,64', type: 'text' },
       ...GIROS_SUBFIELDS,
       { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Superodd' },
+      ...PARTIDAS_OPCIONAIS,
     ],
     generate: (f) => [
       `🟢 PROCEDIMENTO ${f.isExtra === 'true' ? 'EXTRA ' : ''}${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
@@ -568,7 +582,7 @@ const TEMPLATES: TemplateConfig[] = [
       `CASA: ${(f.casa || 'CASA').toUpperCase()}`,
       ``,
       `UTILIZAREMOS O JOGO ENTRE:`,
-      `${f.evento1 || 'TIME A X TIME B'} - ${f.evento1_data || 'DD/MM/AAAA'} ÀS ${f.evento1_hora || 'HH:MM'}`,
+      ...buildPartidas(f),
       ``,
       `🔴 CASO HAJA ALTERAÇÃO NAS ODDS, UTILIZE CALCULADORA 🎲`,
       ``,
@@ -1788,7 +1802,7 @@ export default function BotTemplates() {
                       data-testid="btn-toggle-optional"
                     >
                       {showOptional ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-                      {showOptional ? 'Ocultar' : 'Adicionar'} 2ª partida (opcional)
+                      {showOptional ? 'Ocultar' : 'Adicionar'} partidas extras (2ª e 3ª)
                     </button>
 
                     {showOptional && (
