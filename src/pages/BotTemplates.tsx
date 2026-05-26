@@ -140,6 +140,11 @@ function fmtGiros(f: Record<string, string>): string {
   return `🟡 RECOMPENSA: 🎁 ${f.girosQtd || 'N'} GIROS DE ${f.girosValor || '1'} REAL`;
 }
 
+function fmtRange(min: string, max: string, sep = 'A'): string {
+  if (!max || !max.trim()) return fmtVal(min);
+  return `${fmtVal(min)} ${sep} ${fmtVal(max)}`;
+}
+
 // ─────────────────────────────────────────
 // Definição dos templates built-in
 // ─────────────────────────────────────────
@@ -304,7 +309,7 @@ const TEMPLATES: TemplateConfig[] = [
       { id: 'casa', label: 'Casa de Apostas', placeholder: 'Ex: Betesporte', type: 'text', uppercase: true, hint: 'A casa aparece na linha 2 ("DA BETESPORTE") — não precisa de linha CASA: separada neste tipo.' },
       { id: 'evento1', label: 'Partida', placeholder: 'Ex: Corinthians x Vasco', type: 'evento' },
       { id: 'lucroMin', label: 'Lucro Mínimo (ex: 17,63)', placeholder: '17,63', type: 'text' },
-      { id: 'lucroMax', label: 'Lucro Máximo (ex: 248,00)', placeholder: '248,00', type: 'text' },
+      { id: 'lucroMax', label: 'Lucro Máximo (ex: 248,00)', placeholder: '248,00', type: 'text', optional: true, hint: 'Deixe vazio para exibir valor único em vez de range.' },
       { id: 'valorDG', label: 'Possível Duplo Green (ex: 210,00)', placeholder: '210,00', type: 'text', showIf: (f) => f.incluirDG !== 'false' },
       ...GIROS_SUBFIELDS,
       { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Superodd' },
@@ -318,7 +323,7 @@ const TEMPLATES: TemplateConfig[] = [
       ``,
       `🔴 CASO HAJA ALTERAÇÃO NAS ODDS, UTILIZE CALCULADORA 🧮`,
       ``,
-      `🟡 LUCRO: 💵 ${fmtVal(f.lucroMin)} A ${fmtVal(f.lucroMax)} 💵`,
+      `🟡 LUCRO: 💵 ${fmtRange(f.lucroMin, f.lucroMax)} 💵`,
       ...(f.incluirDG !== 'false' ? [`🟡 POSSÍVEL DUPLO GREEN - 💵 ${fmtVal(f.valorDG)}`] : []),
       ...(f.incluirGiros === 'true' ? [fmtGiros(f)] : []),
       `📋 CATEGORIA: ${f.categoria || 'Superodd'}`,
@@ -343,7 +348,7 @@ const TEMPLATES: TemplateConfig[] = [
       { id: 'cpfCount', label: 'Quantidade de CPFs necessários', placeholder: 'Ex: 1', type: 'text', default: () => '1', hint: 'Ex: 1, 2, 3... Aparece na linha 🚨SERÁ NECESSÁRIO N CPF(s)🚨' },
       { id: 'evento1', label: 'Partida', placeholder: 'Ex: Real Oviedo x Getafe', type: 'evento' },
       { id: 'lucroMin', label: 'Lucro Mínimo (ex: 17,63)', placeholder: '17,63', type: 'text' },
-      { id: 'lucroMax', label: 'Lucro Máximo (ex: 248,00)', placeholder: '248,00', type: 'text' },
+      { id: 'lucroMax', label: 'Lucro Máximo (ex: 248,00)', placeholder: '248,00', type: 'text', optional: true, hint: 'Deixe vazio para exibir valor único em vez de range.' },
       ...GIROS_SUBFIELDS,
       { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Promoção' },
     ],
@@ -368,7 +373,7 @@ const TEMPLATES: TemplateConfig[] = [
         `🟥 Atenção: Sempre confira se os links dos bilhetes são os mesmo da imagem .`,
         `🔴 CASO HAJA ALTERAÇÃO NAS ODDS, UTILIZE A CALCULADORA!`,
         ``,
-        `🟡LUCRO: 💵 ${fmtVal(f.lucroMin)} A ${fmtVal(f.lucroMax)}💵`,
+        `🟡LUCRO: 💵 ${fmtRange(f.lucroMin, f.lucroMax)}💵`,
         ``,
         ...(f.incluirGiros === 'true' ? [fmtGiros(f)] : []),
         ...(f.incluirDG !== 'false' ? [`😍 chance de duplo green😍`] : []),
@@ -430,7 +435,7 @@ const TEMPLATES: TemplateConfig[] = [
       { id: 'casa', label: 'Casa de Apostas', placeholder: 'Ex: Betfair', type: 'text', uppercase: true },
       { id: 'evento1', label: 'Partida', placeholder: 'Ex: São Paulo x Santos', type: 'evento' },
       { id: 'lucroMin', label: 'Lucro Mínimo (ex: 3,25)', placeholder: '3,25', type: 'text' },
-      { id: 'lucroMax', label: 'Lucro Máximo (ex: 3,75)', placeholder: '3,75', type: 'text' },
+      { id: 'lucroMax', label: 'Lucro Máximo (ex: 3,75)', placeholder: '3,75', type: 'text', optional: true, hint: 'Deixe vazio para exibir valor único em vez de range.' },
       ...GIROS_SUBFIELDS,
       { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Promoção' },
     ],
@@ -444,7 +449,7 @@ const TEMPLATES: TemplateConfig[] = [
       ``,
       `🔴 CASO HAJA ALTERAÇÃO NAS ODDS, UTILIZE A CALCULADORA 👆`,
       ``,
-      `🟡 LUCRO: 💵 ${fmtVal(f.lucroMin)} À ${fmtVal(f.lucroMax)} 💵`,
+      `🟡 LUCRO: 💵 ${fmtRange(f.lucroMin, f.lucroMax, 'À')} 💵`,
       ...(f.incluirGiros === 'true' ? [fmtGiros(f)] : []),
       `📋 CATEGORIA: ${f.categoria || 'Promoção'}`,
       ...(f.incluirDG !== 'false' ? [`😍 chance de duplo green 😍`] : []),
@@ -513,7 +518,7 @@ const TEMPLATES: TemplateConfig[] = [
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'valorTotal', label: 'Valor total a utilizar (ex: 100,00)', placeholder: '100,00', type: 'text' },
       { id: 'lucroMin', label: 'Lucro mínimo (ex: 8,00)', placeholder: '8,00', type: 'text' },
-      { id: 'lucroMax', label: 'Lucro máximo (ex: 20,00)', placeholder: '20,00', type: 'text', hint: 'O texto "OU ANULA" é adicionado automaticamente.' },
+      { id: 'lucroMax', label: 'Lucro máximo (ex: 20,00)', placeholder: '20,00', type: 'text', optional: true, hint: 'Deixe vazio para valor único. "OU ANULA" é adicionado automaticamente.' },
       ...GIROS_SUBFIELDS,
       { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Superodd' },
     ],
@@ -529,7 +534,7 @@ const TEMPLATES: TemplateConfig[] = [
       `🟥 Atenção : sempre confere data e horário da partida nos bilhetes também.`,
       `🟥 Atenção: Sempre confira se os links dos bilhetes são os mesmos da imagem .`,
       ``,
-      `🟡 LUCRO : 💵 ${fmtVal(f.lucroMin)} À ${fmtVal(f.lucroMax)} OU ANULA 💵`,
+      `🟡 LUCRO : 💵 ${fmtRange(f.lucroMin, f.lucroMax, 'À')} OU ANULA 💵`,
       ...(f.incluirGiros === 'true' ? [fmtGiros(f)] : []),
       `📋 CATEGORIA: ${f.categoria || 'Superodd'}`,
       ...(f.incluirDG !== 'false' ? [`😍 chance de duplo green 😍`] : []),
