@@ -23,6 +23,7 @@ import { Sidebar } from '@/components/Sidebar';
 import { parseMessage, type ParseResult } from '@/lib/botParser';
 import { EventoAutocomplete } from '@/components/procedures/EventoAutocomplete';
 import { useProcedures } from '@/hooks/useProcedures';
+import { useBookmakers } from '@/hooks/useOddsData';
 import { getAllPlatforms } from '@/lib/procedureUtils';
 import { PROCEDURE_CATEGORIES } from '@/types/procedures';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -2203,15 +2204,28 @@ function FieldInput({
   value: string;
   onChange: (v: string) => void;
 }) {
-  // Autocomplete pra campo "Casa de Apostas": sugere casas já usadas
-  // no sistema (procedimentos existentes), evitando erro de digitação.
-  // react-query dedupa a query entre instâncias, sem custo extra.
+  // Autocomplete pra campo "Casa de Apostas": combina as casas cadastradas
+  // (tabela bookmakers) com as casas já usadas em procedimentos existentes.
+  // Tudo normalizado para UPPERCASE e deduplicado — sem custo extra
+  // (react-query dedupa queries entre instâncias).
   const isCasaField = field.id === 'casa';
   const { data: procedures = [] } = useProcedures();
-  const platformSuggestions = useMemo(
-    () => (isCasaField ? getAllPlatforms(procedures) : []),
-    [isCasaField, procedures],
-  );
+  const { data: bookmakers = [] } = useBookmakers();
+  const platformSuggestions = useMemo(() => {
+    if (!isCasaField) return [];
+    const seen = new Set<string>();
+    const result: string[] = [];
+    // Casas cadastradas primeiro (fonte primária)
+    for (const b of bookmakers) {
+      const name = b.name.trim().toUpperCase();
+      if (name && !seen.has(name)) { seen.add(name); result.push(name); }
+    }
+    // Plataformas de procedimentos existentes (já normalizadas pelo getAllPlatforms)
+    for (const p of getAllPlatforms(procedures)) {
+      if (!seen.has(p)) { seen.add(p); result.push(p); }
+    }
+    return result.sort();
+  }, [isCasaField, procedures, bookmakers]);
   const datalistId = isCasaField ? `casas-datalist-${field.id}` : undefined;
 
   const handleChange = (v: string) => {
