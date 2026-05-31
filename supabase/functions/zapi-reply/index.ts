@@ -191,8 +191,13 @@ Deno.serve(async (req) => {
   const step: string = stateRow?.step ?? "initial";
   const leadId: string | null = stateRow?.lead_id ?? null;
 
+  // IDs de botão válidos — usados em dois pontos abaixo
+  const VALID_CHOICES = ["opt_telegram", "opt_app", "opt_both"];
+
   // ── Resposta a botão selecionado ──────────────────────────────────────────
-  if (step === "awaiting_choice") {
+  // Também aceita no estado "done" para o caso de o lead clicar em outro botão
+  // do mesmo menu após já ter recebido uma opção (estado não volta pra awaiting_choice).
+  if (step === "awaiting_choice" || (step === "done" && VALID_CHOICES.includes(text))) {
     const choice = text; // id do botão: opt_telegram | opt_app | opt_both
 
     // Busca dados do lead para montar mensagens
