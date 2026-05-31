@@ -509,7 +509,65 @@ Deno.serve(async (req) => {
     });
   }
 
-  // ── Primeira mensagem (ou estado "done" reinicia) ─────────────────────────
+  // ── Botões de confirmação chegando fora de ordem (step != awaiting_confirmation) ──
+  // Ex: lead clicou conf_sim (processado, step virou done) e depois conf_ajuda.
+  // Ignorar silenciosamente para não disparar o catch-all abaixo.
+  const CONFIRM_IDS = ["conf_sim", "conf_nao", "conf_ajuda"];
+  if (CONFIRM_IDS.includes(text)) {
+    log("late-confirm-ignored", { phone: phone.slice(0, 6) + "****", step, text });
+    return new Response(JSON.stringify({ ok: true, action: "late-confirm-ignored" }), {
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  // ── Texto livre de quem já tem conversa ativa → Claude AI ─────────────────
+  // Se o lead já passou pelo funil (qualquer step diferente de "initial") e
+  // mandou texto livre que não foi capturado pelos blocos anteriores,
+  // responde com o Claude em vez de reenviar o menu de boas-vindas.
+  const ACTIVE_STEPS = ["done", "awaiting_choice", "awaiting_confirmation", "awaiting_help_type"];
+  if (ACTIVE_STEPS.includes(step) && text.length > 0) {
+    const question = text.trim();
+    let aiReply = "Vou verificar isso pra você! 🦈\n\nMe dá um segundo — se for urgente, pode me mandar mais detalhes aqui.";
+
+    const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
+    if (anthropicKey && question.length > 1) {
+      try {
+        const aiRes = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: {
+            "Content-Type":      "application/json",
+            "x-api-key":         anthropicKey,
+            "anthropic-version": "2023-06-01",
+          },
+          body: JSON.stringify({
+            model:      "claude-3-5-haiku-20241022",
+            max_tokens: 250,
+            system:     WA_AI_SYSTEM_PROMPT,
+            messages:   [{ role: "user", content: question }],
+          }),
+        });
+        const aiData = await aiRes.json().catch(() => ({}));
+        const content: string | undefined = aiData?.content?.[0]?.text;
+        if (content) aiReply = content;
+        else log("ai-empty", { aiData });
+      } catch (e) {
+        log("ai-error", { error: String(e) });
+      }
+    }
+
+    await sendZApiText({ phone, message: aiReply });
+    // Entra em modo awaiting_ai para continuar o diálogo
+    await supabase.from("zapi_conversation_state")
+      .update({ step: "awaiting_ai", updated_at: new Date().toISOString() })
+      .eq("phone", phone);
+
+    log("ai-replied-freetext", { phone: phone.slice(0, 6) + "****", step });
+    return new Response(JSON.stringify({ ok: true, action: "ai-replied-freetext" }), {
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  // ── Primeira mensagem (contato novo, step = initial) ──────────────────────
   // Tenta casar o lead pelo número de WhatsApp (todas as variantes BR)
   let resolvedLeadId = leadId;
   if (!resolvedLeadId) {
