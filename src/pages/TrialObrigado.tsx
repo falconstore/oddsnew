@@ -1,25 +1,23 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Send, ExternalLink, KeyRound, Download, Share2, Plus, Smartphone, ChevronDown } from 'lucide-react';
+import { MessageCircle } from 'lucide-react';
 
-// ── Configuração fácil ──────────────────────────────────────────────────────
-// Cole aqui a URL de embed da VSL (ex: YouTube, Vimeo, Panda Video…)
-// Para mp4 local, use o caminho relativo: '/vsl.mp4'
-// Deixe vazio para ocultar o player até ter a URL.
+// ── Configuração ──────────────────────────────────────────────────────────────
 const VSL_EMBED_URL = '/vsl.mp4';
 
-// URL do APK Android — deixe vazio para ocultar o botão de download
-const APK_DOWNLOAD_URL = 'https://sharkgreen.com.br/download/sharkgreen.apk';
+// Número WhatsApp da equipe (55 + DDD + número, só dígitos)
+const ZAPI_WHATSAPP_NUMBER = '5545988407803';
 
-// URL do PWA para o guia iOS — deixe vazio para ocultar a seção
-const PWA_URL = 'https://sharkgreen.com.br/app';
+// Mensagem pré-programada que abre no WhatsApp do lead
+const WHATSAPP_PREFILL = encodeURIComponent(
+  'Me cadastrei no trial e quero usar meus 7 dias e baixar o app 🦈',
+);
 
-const SUPABASE_URL = import.meta.env.VITE_MAIN_SUPABASE_URL as string;
-const SUPABASE_ANON = import.meta.env.VITE_MAIN_SUPABASE_ANON_KEY as string;
 const PIXEL_ID = '1672225667108236';
 const PIXEL_SCRIPT_SRC = 'https://connect.facebook.net/en_US/fbevents.js';
 const PIXEL_SCRIPT_DATA_ATTR = 'data-obrigado-pixel';
-
+const SUPABASE_URL = import.meta.env.VITE_MAIN_SUPABASE_URL as string;
+const SUPABASE_ANON = import.meta.env.VITE_MAIN_SUPABASE_ANON_KEY as string;
 const SESSION_KEY = 'trial_success';
 
 interface TrialSuccess {
@@ -56,9 +54,7 @@ function makeEventId(): string {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
       return crypto.randomUUID();
     }
-  } catch {
-    /* fallback */
-  }
+  } catch { /* fallback */ }
   return `evt-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
@@ -92,31 +88,23 @@ function initPixel() {
     const first = document.getElementsByTagName('script')[0];
     first?.parentNode?.insertBefore(script, first);
     window.fbq('init', PIXEL_ID);
-  } catch {
-    /* adblock / pixel indisponível */
-  }
+  } catch { /* adblock */ }
 }
 
 function trackPixelLead(savedEventId?: string) {
   if (typeof window === 'undefined') return;
   const eventId = makeEventId();
-
   try {
     if (typeof window.fbq === 'function') {
       window.fbq('track', 'Lead', { content_name: 'trial-7d' }, { eventID: eventId });
     }
-  } catch {
-    /* adblock / pixel não carregado — ignora */
-  }
+  } catch { /* adblock */ }
 
   if (SUPABASE_URL && SUPABASE_ANON) {
     fetch(`${SUPABASE_URL}/functions/v1/trial-pixel-track`, {
       method: 'POST',
       keepalive: true,
-      headers: {
-        'Content-Type': 'application/json',
-        apikey: SUPABASE_ANON,
-      },
+      headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON },
       body: JSON.stringify({
         event_name: 'Lead',
         event_id: eventId,
@@ -134,25 +122,15 @@ function trackT4Y(eventName: string, params: Record<string, unknown> = {}) {
   if (typeof window === 'undefined') return;
   try {
     const w = window;
-    if (typeof w.t4y === 'function') {
-      w.t4y(eventName, params);
-    } else if (typeof w.track4you === 'function') {
-      w.track4you(eventName, params);
-    } else if (typeof w.T4Y === 'function') {
-      (w.T4Y as Track4YouFn)(eventName, params);
-    } else if (w.T4Y && typeof (w.T4Y as { track?: Track4YouFn }).track === 'function') {
+    if (typeof w.t4y === 'function') w.t4y(eventName, params);
+    else if (typeof w.track4you === 'function') w.track4you(eventName, params);
+    else if (typeof w.T4Y === 'function') (w.T4Y as Track4YouFn)(eventName, params);
+    else if (w.T4Y && typeof (w.T4Y as { track?: Track4YouFn }).track === 'function')
       (w.T4Y as { track: Track4YouFn }).track(eventName, params);
-    }
     try {
-      window.dispatchEvent(
-        new CustomEvent('t4y:event', { detail: { name: eventName, params } }),
-      );
-    } catch {
-      /* ignora */
-    }
-  } catch {
-    /* nunca propaga */
-  }
+      window.dispatchEvent(new CustomEvent('t4y:event', { detail: { name: eventName, params } }));
+    } catch { /* ignora */ }
+  } catch { /* nunca propaga */ }
 }
 
 export default function TrialObrigado() {
@@ -161,23 +139,16 @@ export default function TrialObrigado() {
   let trialData: TrialSuccess | null = null;
   try {
     const raw = sessionStorage.getItem(SESSION_KEY);
-    if (raw) {
-      trialData = JSON.parse(raw) as TrialSuccess;
-    }
-  } catch {
-    /* sessionStorage indisponível */
-  }
+    if (raw) trialData = JSON.parse(raw) as TrialSuccess;
+  } catch { /* sessionStorage indisponível */ }
 
   useEffect(() => {
     if (!trialData?.botStartUrl) {
       navigate('/', { replace: true });
       return;
     }
-
     document.title = 'Obrigado — Shark 100% Green';
-
     initPixel();
-
     const run = () => trackPixelLead(trialData?.leadEventId);
     if (typeof requestIdleCallback !== 'undefined') {
       requestIdleCallback(run, { timeout: 1500 });
@@ -188,13 +159,12 @@ export default function TrialObrigado() {
 
   if (!trialData?.botStartUrl) return null;
 
-  const { botStartUrl, inviteLink, email, initialPassword } = trialData;
+  const waUrl = `https://wa.me/${ZAPI_WHATSAPP_NUMBER}?text=${WHATSAPP_PREFILL}`;
 
-  const handleBotClick = () => {
-    trackT4Y('cta_telegram', {
-      button: 'bot_start_obrigado',
-      destination: 'trial_bot',
-      url: botStartUrl,
+  const handleWaClick = () => {
+    trackT4Y('cta_whatsapp', {
+      button: 'whatsapp_obrigado',
+      destination: 'zapi_funil',
     });
   };
 
@@ -217,7 +187,6 @@ export default function TrialObrigado() {
         </div>
       </header>
 
-      {/* Conteúdo principal */}
       <main className="relative z-10 w-full max-w-3xl mx-auto px-4 pt-10 pb-20 flex flex-col items-center gap-8">
 
         {/* Badge de confirmação */}
@@ -241,7 +210,7 @@ export default function TrialObrigado() {
           sem dor de cabeça e sem vender nada pra ninguém...
         </h1>
 
-        {/* Bloco VSL */}
+        {/* VSL */}
         {VSL_EMBED_URL ? (
           <div
             className="w-full rounded-2xl overflow-hidden border border-emerald-500/25 shadow-2xl shadow-emerald-500/10"
@@ -275,125 +244,54 @@ export default function TrialObrigado() {
           >
             <div className="text-emerald-400/60 text-4xl">▶</div>
             <p className="text-white/40 text-sm">
-              VSL em breve — cole a URL em <code className="bg-white/10 px-1 rounded text-xs">VSL_EMBED_URL</code> no topo do arquivo
+              VSL em breve — cole a URL em <code className="bg-white/10 px-1 rounded text-xs">VSL_EMBED_URL</code>
             </p>
           </div>
         )}
 
-        {/* Card de credenciais do PWA */}
-        {email && (
-          <div
-            className="w-full max-w-md rounded-2xl border border-emerald-500/25 bg-white/3 backdrop-blur-sm px-6 py-5 space-y-4"
-            data-testid="card-credentials"
-          >
-            <div className="flex items-center gap-2 text-emerald-300">
-              <KeyRound className="w-4 h-4 flex-shrink-0" />
-              <span className="text-sm font-semibold uppercase tracking-wide">Acesse o App</span>
-            </div>
-            <div className="space-y-3">
-              <div>
-                <p className="text-[10px] text-white/40 uppercase tracking-wider mb-0.5">E-mail</p>
-                <p className="text-white font-mono text-sm break-all" data-testid="text-credential-email">{email}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-white/40 uppercase tracking-wider mb-0.5">Senha inicial</p>
-                <p className="text-white font-mono text-sm tracking-widest" data-testid="text-credential-password">{initialPassword}</p>
-              </div>
-            </div>
-            <p className="text-[11px] text-white/45 leading-relaxed border-t border-white/8 pt-3">
-              Na primeira entrada, você será solicitado a criar uma nova senha.
-            </p>
-          </div>
-        )}
-
-        {/* Blocos de instalação (Android + iOS) */}
-        {email && (APK_DOWNLOAD_URL || PWA_URL) && (
-          <div className="w-full max-w-md flex flex-col sm:flex-row gap-3" data-testid="block-install">
-
-            {/* Android APK */}
-            {APK_DOWNLOAD_URL && (
-              <a
-                href={APK_DOWNLOAD_URL}
-                download
-                onClick={() => trackT4Y('cta_apk_download', { url: APK_DOWNLOAD_URL })}
-                className="flex-1 flex items-center justify-center gap-2 rounded-xl px-4 py-4 font-bold text-sm text-black bg-gradient-to-r from-emerald-400 to-green-500 shadow-lg shadow-emerald-500/30 transition-transform hover:scale-[1.02] active:scale-[0.98]"
-                data-testid="link-apk-download"
-              >
-                <Download className="w-4 h-4 flex-shrink-0" />
-                📲 Baixar o App (Android)
-              </a>
-            )}
-
-            {/* iOS guia */}
-            {PWA_URL && <IosInstallAccordion pwaUrl={PWA_URL} />}
-
-          </div>
-        )}
-
-        {/* Botão pulsante */}
-        <a
-          href={botStartUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={handleBotClick}
-          className="pulse-glow-btn relative w-full max-w-md flex items-center justify-center gap-2 rounded-xl px-4 py-5 font-extrabold text-sm sm:text-base md:text-lg uppercase tracking-wide text-black bg-gradient-to-r from-emerald-400 to-green-500 shadow-xl shadow-emerald-500/40 transition-transform hover:scale-[1.02] active:scale-[0.98]"
-          data-testid="link-bot-start-obrigado"
-        >
-          <Send className="w-5 h-5 flex-shrink-0" />
-          ACESSAR GRUPO + CURSO GRÁTIS
-        </a>
-
-        {/* Instrução rápida */}
-        <p className="text-white/55 text-sm text-center max-w-sm">
-          Clique no botão acima, abra o bot no Telegram e toque em <strong className="text-white">Iniciar</strong> — o link do grupo VIP chega em segundos.
+        {/* Instrução */}
+        <p className="text-white/70 text-base text-center max-w-sm leading-relaxed">
+          👇 Clique no botão abaixo para receber seu acesso direto no WhatsApp
         </p>
 
-        {/* Fallback colapsável */}
-        <details
-          className="w-full max-w-md rounded-xl border border-emerald-500/20 bg-white/3 px-4 py-3"
-          data-testid="details-fallback"
+        {/* Botão WhatsApp — único CTA */}
+        <a
+          href={waUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={handleWaClick}
+          className="pulse-glow-btn relative w-full max-w-md flex items-center justify-center gap-3 rounded-xl px-6 py-5 font-extrabold text-base sm:text-lg uppercase tracking-wide text-black bg-gradient-to-r from-emerald-400 to-green-500 shadow-xl shadow-emerald-500/40 transition-transform hover:scale-[1.02] active:scale-[0.98]"
+          data-testid="link-whatsapp-obrigado"
         >
-          <summary className="text-xs text-white/45 cursor-pointer select-none hover:text-white/65 transition-colors">
-            Não conseguiu abrir o bot? Acesse diretamente o grupo VIP
-          </summary>
-          <div className="mt-3 space-y-2">
-            <a
-              href={inviteLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1.5 text-xs text-emerald-300 underline underline-offset-2 break-all hover:text-emerald-200"
-              data-testid="link-invite-fallback-obrigado"
-              onClick={() =>
-                trackT4Y('cta_telegram', {
-                  button: 'invite_fallback_obrigado',
-                  destination: 'vip_invite',
-                  url: inviteLink,
-                })
-              }
-            >
-              <ExternalLink className="w-3 h-3 flex-shrink-0" />
-              {inviteLink}
-            </a>
-            <p className="text-[10px] text-white/35">
-              Atenção: pelo link direto você não recebe os avisos automáticos do bot durante o trial.
-            </p>
-          </div>
-        </details>
+          {/* WhatsApp icon */}
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            className="w-6 h-6 flex-shrink-0"
+            aria-hidden="true"
+          >
+            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+          </svg>
+          Quero meu acesso agora
+        </a>
+
+        {/* Sub-texto explicativo */}
+        <p className="text-white/45 text-sm text-center max-w-xs leading-relaxed">
+          Você receberá o link do Telegram VIP e/ou as instruções do App diretamente no seu WhatsApp 📲
+        </p>
 
       </main>
 
-      {/* Meta Pixel noscript fallback */}
+      {/* Meta Pixel noscript */}
       <noscript>
         <img
-          height="1"
-          width="1"
-          style={{ display: 'none' }}
+          height="1" width="1" style={{ display: 'none' }}
           src={`https://www.facebook.com/tr?id=${PIXEL_ID}&ev=Lead&noscript=1`}
           alt=""
         />
       </noscript>
 
-      {/* Estilos da animação pulse-glow */}
       <style>{`
         @keyframes pulse-glow {
           0%, 100% {
@@ -411,104 +309,23 @@ export default function TrialObrigado() {
   );
 }
 
-function IosInstallAccordion({ pwaUrl }: { pwaUrl: string }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="flex-1 rounded-xl border border-emerald-500/20 bg-white/3 overflow-hidden" data-testid="accordion-ios-install">
-      <button
-        type="button"
-        onClick={() => setOpen(v => !v)}
-        className="w-full flex items-center justify-between gap-2 px-4 py-4 text-sm font-semibold text-white/80 hover:text-white transition-colors"
-        aria-expanded={open}
-        data-testid="button-ios-install-toggle"
-      >
-        <span className="flex items-center gap-2">
-          <Smartphone className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-          Instalar no iPhone
-        </span>
-        <ChevronDown className={`w-4 h-4 text-white/40 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
-      </button>
-
-      {open && (
-        <div className="px-4 pb-4 space-y-3 border-t border-white/8 pt-3">
-          <div className="flex items-start gap-3">
-            <div className="w-7 h-7 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center flex-shrink-0 text-emerald-300 text-xs font-bold">1</div>
-            <div>
-              <p className="text-xs font-semibold text-white/80">Abra o link no Safari</p>
-              <a
-                href={pwaUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[11px] text-emerald-400 underline underline-offset-2 break-all hover:text-emerald-300"
-                data-testid="link-pwa-safari"
-              >
-                {pwaUrl}
-              </a>
-            </div>
-          </div>
-          <div className="flex items-start gap-3">
-            <div className="w-7 h-7 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center flex-shrink-0 text-emerald-300 text-xs font-bold">2</div>
-            <div>
-              <p className="text-xs font-semibold text-white/80">Toque no ícone de compartilhar</p>
-              <p className="text-[11px] text-white/45 flex items-center gap-1 mt-0.5">
-                <Share2 className="w-3 h-3 text-white/40" /> Ícone de caixa com seta (barra inferior)
-              </p>
-            </div>
-          </div>
-          <div className="flex items-start gap-3">
-            <div className="w-7 h-7 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center flex-shrink-0 text-emerald-300 text-xs font-bold">3</div>
-            <div>
-              <p className="text-xs font-semibold text-white/80">Toque em "Adicionar à Tela de Início"</p>
-              <p className="text-[11px] text-white/45 flex items-center gap-1 mt-0.5">
-                <Plus className="w-3 h-3 text-white/40" /> Role a lista de opções até encontrar
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 function SharkLogo() {
   return (
     <div className="flex items-center gap-2.5" data-testid="logo-shark-obrigado">
-      <svg
-        width="32"
-        height="32"
-        viewBox="0 0 32 32"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        aria-hidden="true"
-      >
+      <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
         <defs>
           <linearGradient id="sharkGradOb" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
             <stop offset="0%" stopColor="#34d399" />
             <stop offset="100%" stopColor="#10b981" />
           </linearGradient>
         </defs>
-        <path
-          d="M4 26 C4 26 8 10 16 6 C16 6 13 16 20 20 C20 20 14 22 12 26 Z"
-          fill="url(#sharkGradOb)"
-        />
-        <path
-          d="M12 26 C12 26 14 18 22 18 C26 18 28 22 28 26 Z"
-          fill="url(#sharkGradOb)"
-          opacity="0.7"
-        />
-        <path
-          d="M2 26 L30 26"
-          stroke="url(#sharkGradOb)"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          opacity="0.5"
-        />
+        <path d="M4 26 C4 26 8 10 16 6 C16 6 13 16 20 20 C20 20 14 22 12 26 Z" fill="url(#sharkGradOb)" />
+        <path d="M12 26 C12 26 14 18 22 18 C26 18 28 22 28 26 Z" fill="url(#sharkGradOb)" opacity="0.7" />
+        <path d="M2 26 L30 26" stroke="url(#sharkGradOb)" strokeWidth="1.5" strokeLinecap="round" opacity="0.5" />
       </svg>
       <span className="font-extrabold text-lg tracking-tight leading-none">
         SHARK{' '}
-        <span className="bg-gradient-to-r from-emerald-300 to-green-400 bg-clip-text text-transparent">
-          GREEN
-        </span>
+        <span className="bg-gradient-to-r from-emerald-300 to-green-400 bg-clip-text text-transparent">GREEN</span>
       </span>
     </div>
   );

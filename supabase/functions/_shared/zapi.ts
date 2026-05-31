@@ -1,15 +1,15 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Z-API helper — envia mensagem de texto via WhatsApp
-// Docs: https://developer.z-api.io/message/send-text
+// Z-API helper — envia mensagens via WhatsApp
+// Docs: https://developer.z-api.io
 //
 // Secrets necessários (Supabase):
-//   ZAPI_INSTANCE_ID   — ID da instância (ex: 3D...)
+//   ZAPI_INSTANCE_ID   — ID da instância
 //   ZAPI_TOKEN         — Token da instância
-//   ZAPI_CLIENT_TOKEN  — Client-Token de segurança (gerado em Security no painel)
+//   ZAPI_CLIENT_TOKEN  — Client-Token de segurança
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface ZApiTextPayload {
-  phone: string;   // apenas dígitos, incluindo DDI (ex: "5511999999999")
+  phone: string;
   message: string;
 }
 
@@ -18,41 +18,82 @@ export interface ZApiResult {
   error?: string;
 }
 
+function zapiHeaders(): Record<string, string> {
+  return {
+    "Content-Type": "application/json",
+    "Client-Token": Deno.env.get("ZAPI_CLIENT_TOKEN") ?? "",
+  };
+}
+
+function zapiBaseUrl(): string | null {
+  const id    = Deno.env.get("ZAPI_INSTANCE_ID");
+  const token = Deno.env.get("ZAPI_TOKEN");
+  if (!id || !token) return null;
+  return `https://api.z-api.io/instances/${id}/token/${token}`;
+}
+
+function normalizePhone(phone: string): string {
+  const digits = phone.replace(/\D/g, "");
+  return digits.startsWith("55") ? digits : `55${digits}`;
+}
+
 /**
- * Envia uma mensagem de texto via Z-API.
- * Retorna { ok: true } em caso de sucesso, { ok: false, error } caso contrário.
+ * Envia uma mensagem de texto simples via Z-API.
  * Nunca lança — ideal para fire-and-forget.
  */
 export async function sendZApiText(payload: ZApiTextPayload): Promise<ZApiResult> {
-  const instanceId   = Deno.env.get("ZAPI_INSTANCE_ID");
-  const token        = Deno.env.get("ZAPI_TOKEN");
-  const clientToken  = Deno.env.get("ZAPI_CLIENT_TOKEN");
-
-  if (!instanceId || !token || !clientToken) {
-    return { ok: false, error: "ZAPI secrets não configurados (ZAPI_INSTANCE_ID / ZAPI_TOKEN / ZAPI_CLIENT_TOKEN)" };
-  }
-
-  // Remove qualquer não-dígito e garante DDI 55
-  const digits = payload.phone.replace(/\D/g, "");
-  const phone  = digits.startsWith("55") ? digits : `55${digits}`;
-
-  const url = `https://api.z-api.io/instances/${instanceId}/token/${token}/send-text`;
+  const base = zapiBaseUrl();
+  if (!base) return { ok: false, error: "ZAPI secrets não configurados" };
 
   try {
-    const res = await fetch(url, {
+    const res = await fetch(`${base}/send-text`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Client-Token": clientToken,
-      },
-      body: JSON.stringify({ phone, message: payload.message }),
+      headers: zapiHeaders(),
+      body: JSON.stringify({ phone: normalizePhone(payload.phone), message: payload.message }),
     });
-
     if (!res.ok) {
       const body = await res.text().catch(() => "");
       return { ok: false, error: `Z-API HTTP ${res.status}: ${body.slice(0, 200)}` };
     }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+}
 
+export interface ZApiButtonItem {
+  id: string;
+  label: string;
+}
+
+export interface ZApiButtonListPayload {
+  phone: string;
+  message: string;
+  buttonList: { buttons: ZApiButtonItem[] };
+}
+
+/**
+ * Envia mensagem com lista de botões interativos (WhatsApp Business).
+ * Nunca lança.
+ */
+export async function sendZApiButtonList(payload: ZApiButtonListPayload): Promise<ZApiResult> {
+  const base = zapiBaseUrl();
+  if (!base) return { ok: false, error: "ZAPI secrets não configurados" };
+
+  try {
+    const res = await fetch(`${base}/send-button-list`, {
+      method: "POST",
+      headers: zapiHeaders(),
+      body: JSON.stringify({
+        phone: normalizePhone(payload.phone),
+        message: payload.message,
+        buttonList: payload.buttonList,
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      return { ok: false, error: `Z-API HTTP ${res.status}: ${body.slice(0, 200)}` };
+    }
     return { ok: true };
   } catch (e) {
     return { ok: false, error: String(e) };
@@ -61,7 +102,6 @@ export async function sendZApiText(payload: ZApiTextPayload): Promise<ZApiResult
 
 /**
  * Monta a mensagem de boas-vindas para novos leads do trial.
- * Inclui orientação sobre instalar o Telegram e link do bot.
  */
 export function buildWelcomeMessage(firstName: string, botStartUrl: string): string {
   return [
