@@ -233,7 +233,17 @@ Deno.serve(async (req) => {
     });
   }
 
-  // ── Primeira mensagem (ou estado "initial" / "done" reinicia) ─────────────
+  // ── Se estiver em awaiting_choice mas mandou texto (não botão), ignora ───
+  // Evita reenviar o menu quando o webhook chega duplicado ou o lead manda
+  // texto em vez de clicar no botão.
+  if (step === "awaiting_choice") {
+    log("awaiting-text-ignored", { phone: phone.slice(0, 6) + "****" });
+    return new Response(JSON.stringify({ ok: true, action: "awaiting-ignored" }), {
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  // ── Primeira mensagem (ou estado "done" reinicia) ─────────────────────────
   // Tenta casar o lead pelo número de WhatsApp
   let resolvedLeadId = leadId;
   if (!resolvedLeadId) {
