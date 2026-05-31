@@ -516,7 +516,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Marca como concluído + agenda follow-up de 10 minutos
+    // Marca como concluído + agenda follow-up de 10 minutos + cancela nudges de inatividade
     const followUpAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
     await supabase
       .from("zapi_conversation_state")
@@ -526,11 +526,39 @@ Deno.serve(async (req) => {
         lead_id: leadId ?? effectiveLeadId,
         follow_up_at: followUpAt,
         follow_up_sent: false,
+        nudge_at: null,      // cancela cobrança de inatividade
+        nudge_count: 3,      // marca como esgotado para não reagendar
         updated_at: new Date().toISOString(),
       }, { onConflict: "phone" });
 
     log("choice-handled", { phone: phone.slice(0, 6) + "****", choice });
     return new Response(JSON.stringify({ ok: true, action: "choice", choice }), {
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  // ── Botões do dia 7 (oferta de assinatura) ───────────────────────────────
+  const DAY7_IDS = ["day7_mensal", "day7_trimestre", "day7_anual"];
+  if (DAY7_IDS.includes(text)) {
+    const checkoutUrl = Deno.env.get("ZAPI_CHECKOUT_URL") || "https://lastlink.com/p/CEAEE6585/checkout-payment";
+    const planLabels: Record<string, string> = {
+      day7_mensal:    "Mensal (R$ 148,90/mês)",
+      day7_trimestre: "Trimestral — Melhor Plano (R$ 99/mês)",
+      day7_anual:     "Anual (R$ 74,49/mês)",
+    };
+    const label = planLabels[text] ?? "seu plano";
+    const msg = [
+      `Ótima escolha! 🎉 Plano *${label}* selecionado.`,
+      ``,
+      `Garanta seu acesso agora clicando no link abaixo 👇`,
+      ``,
+      checkoutUrl,
+      ``,
+      `_Após o pagamento, seu acesso é mantido sem interrupção. Qualquer dúvida, é só me chamar aqui!_ 🦈`,
+    ].join("\n");
+    await sendZApiText({ phone, message: msg });
+    log("day7-plan-selected", { phone: phone.slice(0, 6) + "****", plan: text });
+    return new Response(JSON.stringify({ ok: true, action: "day7-plan", plan: text }), {
       headers: { "Content-Type": "application/json" },
     });
   }
@@ -617,11 +645,19 @@ Deno.serve(async (req) => {
   // Envia o menu
   await sendMenu(phone);
 
-  // Salva/atualiza estado como "awaiting_choice"
+  // Salva/atualiza estado como "awaiting_choice" + agenda 1º nudge de inatividade em 10 min
+  const nudgeAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
   await supabase
     .from("zapi_conversation_state")
     .upsert(
-      { phone, step: "awaiting_choice", lead_id: resolvedLeadId, updated_at: new Date().toISOString() },
+      {
+        phone,
+        step: "awaiting_choice",
+        lead_id: resolvedLeadId,
+        nudge_count: 0,
+        nudge_at: nudgeAt,
+        updated_at: new Date().toISOString(),
+      },
       { onConflict: "phone" }
     );
 

@@ -100,6 +100,40 @@ export async function sendZApiButtonList(payload: ZApiButtonListPayload): Promis
   }
 }
 
+export interface ZApiImagePayload {
+  phone: string;
+  imageUrl: string;
+  caption?: string;
+}
+
+/**
+ * Envia imagem com legenda opcional via Z-API.
+ * Nunca lança.
+ */
+export async function sendZApiImage(payload: ZApiImagePayload): Promise<ZApiResult> {
+  const base = zapiBaseUrl();
+  if (!base) return { ok: false, error: "ZAPI secrets não configurados" };
+
+  try {
+    const res = await fetch(`${base}/send-image`, {
+      method: "POST",
+      headers: zapiHeaders(),
+      body: JSON.stringify({
+        phone: normalizePhone(payload.phone),
+        image: payload.imageUrl,
+        caption: payload.caption ?? "",
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      return { ok: false, error: `Z-API HTTP ${res.status}: ${body.slice(0, 200)}` };
+    }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+}
+
 /**
  * Mensagem curta de "primeiro contato" enviada pelo trial-signup.
  * Propositalmente sem links — apenas convida o lead a responder,
