@@ -54,6 +54,39 @@ const log = (event: string, data: Record<string, unknown> = {}) =>
 const APK_URL   = Deno.env.get("ZAPI_APK_URL")   || "https://sharkgreen.com.br/download/sharkgreen.apk";
 const PWA_URL   = Deno.env.get("ZAPI_PWA_URL")   || "https://sharkgreen.com.br/app";
 
+// System prompt do Claude para o modo atendimento IA no WhatsApp
+const WA_AI_SYSTEM_PROMPT = `Você é Lucas, atendente humano da equipe Shark Green. Responda SEMPRE em português brasileiro informal, como um amigo que entende de apostas esportivas. Tom: parceiro, direto, sem enrolação.
+
+REGRA ABSOLUTA: máximo 3 frases curtas por resposta. Sem listas, sem bullets. Uma ideia por vez.
+NUNCA diga que é IA ou robô — você é da equipe, ponto final.
+
+O QUE É O SHARK GREEN: plataforma de procedimentos de apostas esportivas. Os membros recebem sinais em tempo real no app com instruções passo a passo pra aproveitar promoções (freebets, bônus) nas casas de apostas parceiras. Objetivo: lucro consistente de R$ 200/dia seguindo os procedimentos.
+
+ACESSO AO APP: login = email cadastrado, senha = número do celular (só dígitos, sem espaço ou traço).
+ACESSO AO TELEGRAM: precisa baixar o Telegram e clicar no link de convite exclusivo enviado no WhatsApp.
+PLANOS: Mensal R$ 148,90 / Anual R$ 893,90. Link: https://lastlink.com/p/CEAEE6585/checkout-payment
+
+DÚVIDAS COMUNS:
+- Não consegue entrar no app → login = email cadastrado, senha = celular (só dígitos)
+- Telegram não funciona → precisa baixar o app Telegram + clicar no link de convite que foi enviado aqui
+- Não vê procedimentos → acesso pode ter expirado, orienta assinar
+- Freebet não apareceu → normal até 24h após executar o procedimento
+- Como sacar? → O lucro fica na conta da casa de apostas, saque direto de lá`;
+
+// Botões do menu de confirmação (follow-up 10 min)
+const CONFIRM_BUTTONS = [
+  { id: "conf_sim",   label: "✅ SIM, deu certo!" },
+  { id: "conf_nao",   label: "❌ NÃO consegui" },
+  { id: "conf_ajuda", label: "🆘 Preciso de ajuda" },
+];
+
+// Variações da mensagem de sucesso (clicou conf_sim)
+const SUCCESS_VARIANTS = [
+  "Toooop! 🎉🦈\n\nVocê também tem acesso ao *curso completo* que chegou no seu email — é pra você começar faturar R$ 200,00 por dia de casa sem vender nada pra ninguém!\n\nDá o Start o quanto antes, tô aqui pra qualquer dúvida! 💬",
+  "Arrasou! 🙌 Agora é só acompanhar os procedimentos no App ou os sinais no grupo — todo dia tem operação saindo.\n\nSeu acesso ao *curso completo* chegou no email também. Qualquer dúvida me chama aqui, guerreiro! 🦈",
+  "Que ótimo! 🚀 Bem-vindo(a) de verdade ao Shark Green!\n\nO segredo é seguir os procedimentos todo dia — a galera que vai do começo ao fim é a que coloca no bolso.\n\nVerifica também o email com o acesso ao *curso*. Tô aqui sempre que precisar! 💪",
+];
+
 // Mensagem de boas-vindas aleatória (variação para parecer humano)
 const WELCOME_VARIANTS = [
   "Oi, tudo bem? 😊\n\nAqui é a equipe do *Shark Green* 🦈\n\nVi que você se cadastrou no nosso trial de 7 dias — seja muito bem-vindo(a)!\n\nVocê tem acesso gratuito e completo ao sistema, sem precisar de cartão. Isso inclui:\n\n🟢 *Grupo Telegram VIP* — onde caem os sinais em tempo real\n📱 *App VIP Shark* — nosso app exclusivo com painel completo\n\nO que você gostaria de acessar agora?",
@@ -215,6 +248,130 @@ Deno.serve(async (req) => {
   const step: string = stateRow?.step ?? "initial";
   const leadId: string | null = stateRow?.lead_id ?? null;
 
+  // ── Follow-up: confirmação de acesso (10 min após escolha) ───────────────
+  if (step === "awaiting_confirmation") {
+    if (text === "conf_sim") {
+      const msg = SUCCESS_VARIANTS[Math.floor(Math.random() * SUCCESS_VARIANTS.length)];
+      await sendZApiText({ phone, message: msg });
+      await supabase.from("zapi_conversation_state")
+        .update({ step: "done", updated_at: new Date().toISOString() })
+        .eq("phone", phone);
+    } else if (text === "conf_nao") {
+      await sendZApiButtonList({
+        phone,
+        message: "Certo, eu vou te ajudar então! 💪\n\nClique no botão abaixo pra saber em qual precisa de ajuda 👇",
+        buttonList: { buttons: [
+          { id: "help_telegram", label: "📲 Telegram VIP" },
+          { id: "help_app",      label: "📱 App VIP Shark" },
+        ]},
+      });
+      await supabase.from("zapi_conversation_state")
+        .update({ step: "awaiting_help_type", updated_at: new Date().toISOString() })
+        .eq("phone", phone);
+    } else if (text === "conf_ajuda") {
+      await sendZApiText({ phone, message: "Certo, vamos lá então! 💪🦈\n\nNão é problema — estou aqui pra te guiar até os R$ 200,00 por dia...\n\nMe conta aqui qual é a sua dúvida que eu te ajudo! 👇" });
+      await supabase.from("zapi_conversation_state")
+        .update({ step: "awaiting_ai", updated_at: new Date().toISOString() })
+        .eq("phone", phone);
+    } else {
+      // Texto livre durante awaiting_confirmation — ignora silenciosamente
+      log("confirmation-ignored", { phone: phone.slice(0, 6) + "****", text: text.slice(0, 30) });
+    }
+    return new Response(JSON.stringify({ ok: true, action: "confirmation-handled", choice: text }), {
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  // ── Tipo de ajuda (Telegram ou App) ──────────────────────────────────────
+  if (step === "awaiting_help_type") {
+    if (text === "help_telegram") {
+      const msg = [
+        "📲 *Como entrar no Grupo VIP Telegram*",
+        "",
+        "Primeiro você vai precisar baixar o Telegram e criar uma conta — é parecido com o WhatsApp, só que melhor! 😄",
+        "",
+        "Aqui tem um vídeo rápido ensinando a baixar em 2 minutinhos:",
+        "https://www.youtube.com/watch?v=itsTBLRVK-I",
+        "",
+        "Depois de criar a conta, é só clicar no *link de convite* que eu te mandei aqui e entrar no grupo VIP! 🥳",
+      ].join("\n");
+      await sendZApiText({ phone, message: msg });
+      await supabase.from("zapi_conversation_state")
+        .update({ step: "done", updated_at: new Date().toISOString() })
+        .eq("phone", phone);
+    } else if (text === "help_app") {
+      const msg = [
+        "📱 *Como baixar o App VIP Shark*",
+        "",
+        "Aqui é mais simples ainda!",
+        "",
+        `🤖 *Android:*\nClica no link abaixo pro download:\n${APK_URL}`,
+        "",
+        `🍎 *iPhone:*\nAbra o link abaixo pelo *Safari* 👇\n${PWA_URL}`,
+        "",
+        `_Toque em compartilhar → "Adicionar à Tela de Início" e o ícone aparece na tela!_`,
+        "",
+        `Seu login é o *email* que você cadastrou e a *senha* é o número do seu celular (só dígitos) 🔑`,
+      ].join("\n");
+      await sendZApiText({ phone, message: msg });
+      await supabase.from("zapi_conversation_state")
+        .update({ step: "done", updated_at: new Date().toISOString() })
+        .eq("phone", phone);
+    } else {
+      log("help-type-ignored", { phone: phone.slice(0, 6) + "****", text: text.slice(0, 30) });
+    }
+    return new Response(JSON.stringify({ ok: true, action: "help-type-handled", type: text }), {
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  // ── Atendimento IA (Claude) — lead pediu ajuda personalizada ──────────────
+  if (step === "awaiting_ai") {
+    // Se lead clicou botão do menu principal, deixa cair no bloco awaiting_choice
+    if (!["opt_telegram", "opt_app", "opt_both"].includes(text)) {
+      const question = text.trim();
+      let aiReply = "Vou verificar isso pra você! 🦈\n\nMe dá um segundo — se for urgente, pode me mandar mais detalhes aqui.";
+
+      const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
+      if (anthropicKey && question.length > 1) {
+        try {
+          const aiRes = await fetch("https://api.anthropic.com/v1/messages", {
+            method: "POST",
+            headers: {
+              "Content-Type":      "application/json",
+              "x-api-key":         anthropicKey,
+              "anthropic-version": "2023-06-01",
+            },
+            body: JSON.stringify({
+              model:      "claude-3-5-haiku-20241022",
+              max_tokens: 250,
+              system:     WA_AI_SYSTEM_PROMPT,
+              messages:   [{ role: "user", content: question }],
+            }),
+          });
+          const aiData = await aiRes.json().catch(() => ({}));
+          const content: string | undefined = aiData?.content?.[0]?.text;
+          if (content) aiReply = content;
+          else log("ai-empty", { aiData });
+        } catch (e) {
+          log("ai-error", { error: String(e) });
+        }
+      }
+
+      await sendZApiText({ phone, message: aiReply });
+      // Permanece em awaiting_ai para continuar o diálogo
+      await supabase.from("zapi_conversation_state")
+        .update({ updated_at: new Date().toISOString() })
+        .eq("phone", phone);
+
+      log("ai-replied", { phone: phone.slice(0, 6) + "****" });
+      return new Response(JSON.stringify({ ok: true, action: "ai-replied" }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    // Se chegou aqui é porque text é opt_*, cai no bloco abaixo
+  }
+
   // IDs de botão válidos — usados em dois pontos abaixo
   const VALID_CHOICES = ["opt_telegram", "opt_app", "opt_both"];
 
@@ -333,10 +490,18 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Marca como concluído
+    // Marca como concluído + agenda follow-up de 10 minutos
+    const followUpAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
     await supabase
       .from("zapi_conversation_state")
-      .upsert({ phone, step: "done", lead_id: leadId, updated_at: new Date().toISOString() }, { onConflict: "phone" });
+      .upsert({
+        phone,
+        step: "done",
+        lead_id: leadId ?? effectiveLeadId,
+        follow_up_at: followUpAt,
+        follow_up_sent: false,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "phone" });
 
     log("choice-handled", { phone: phone.slice(0, 6) + "****", choice });
     return new Response(JSON.stringify({ ok: true, action: "choice", choice }), {
