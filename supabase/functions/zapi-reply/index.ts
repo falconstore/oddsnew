@@ -23,6 +23,30 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { sendZApiText, sendZApiButtonList } from "../_shared/zapi.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
+/**
+ * Gera todas as variantes de lookup para um número de telefone.
+ * Cobre: com/sem prefixo 55 E números BR antigos de 8 dígitos
+ * (Z-API omite o "9" extra; o lead foi cadastrado com ele).
+ *
+ * Exemplos:
+ *   "559981717256" → ["559981717256","9981717256","99981717256"]
+ *   "5513981822756" → ["5513981822756","13981822756"]
+ */
+function buildPhoneVariants(phone: string): string[] {
+  const variants = new Set<string>();
+  variants.add(phone);
+  if (phone.startsWith("55") && phone.length >= 12) {
+    const local = phone.slice(2); // sem prefixo 55
+    variants.add(local);
+    // Número BR antigo de 8 dígitos (DDD 2 chars + 8 dígitos = 10 total)
+    // → tenta inserir "9" após o DDD para casar com cadastros de 11 dígitos
+    if (local.length === 10) {
+      variants.add(local.slice(0, 2) + "9" + local.slice(2));
+    }
+  }
+  return [...variants];
+}
+
 const log = (event: string, data: Record<string, unknown> = {}) =>
   console.log(JSON.stringify({ tag: "zapi-reply", event, ...data }));
 
@@ -218,12 +242,10 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Fallback se não achou o lead pelo estado — tenta pelo phone (com e sem prefixo 55)
-    if (!inviteLink || !email) {
-      const phoneVariants = [phone];
-      // trial_leads.whatsapp guarda SEM "55" — adicionamos variante sem prefixo
-      if (phone.startsWith("55") && phone.length > 11) phoneVariants.push(phone.slice(2));
-      for (const variant of phoneVariants) {
+    // Fallback se não achou o lead pelo estado — tenta pelo phone (variantes)
+    let resolvedLeadIdFromFallback: string | null = null;
+    if (!email) {
+      for (const variant of buildPhoneVariants(phone)) {
         const { data: lead } = await supabase
           .from("trial_leads")
           .select("id, invite_link, email, whatsapp")
@@ -232,10 +254,47 @@ Deno.serve(async (req) => {
           .limit(1)
           .maybeSingle();
         if (lead) {
+          resolvedLeadIdFromFallback = lead.id;
           inviteLink = lead.invite_link ?? null;
           email      = lead.email ?? null;
           password   = lead.whatsapp ?? null;
           break;
+        }
+      }
+    }
+    // Propaga o lead_id encontrado para o estado (se ainda não estava salvo)
+    const effectiveLeadId = leadId ?? resolvedLeadIdFromFallback;
+
+    // ── Auto-geração do invite_link quando NULL ────────────────────────────
+    // Se o lead foi encontrado mas não tem invite_link, gera agora via Telegram API.
+    if (!inviteLink && effectiveLeadId) {
+      const botToken  = Deno.env.get("TELEGRAM_TRIAL_BOT_TOKEN");
+      const chatId    = Deno.env.get("TELEGRAM_TRIAL_CHAT_ID");
+      if (botToken && chatId) {
+        try {
+          const tgRes = await fetch(
+            `https://api.telegram.org/bot${botToken}/createChatInviteLink`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ chat_id: Number(chatId), member_limit: 1 }),
+            }
+          );
+          const tgData = await tgRes.json().catch(() => ({}));
+          const generatedLink: string | undefined = tgData?.result?.invite_link;
+          if (generatedLink) {
+            inviteLink = generatedLink;
+            // Persiste no lead para futuros usos
+            await supabase
+              .from("trial_leads")
+              .update({ invite_link: generatedLink })
+              .eq("id", effectiveLeadId);
+            log("invite-link-generated", { lead_id: effectiveLeadId });
+          } else {
+            log("invite-link-gen-failed", { tgData });
+          }
+        } catch (e) {
+          log("invite-link-gen-error", { error: String(e) });
         }
       }
     }
@@ -286,12 +345,10 @@ Deno.serve(async (req) => {
   }
 
   // ── Primeira mensagem (ou estado "done" reinicia) ─────────────────────────
-  // Tenta casar o lead pelo número de WhatsApp (com e sem prefixo "55")
+  // Tenta casar o lead pelo número de WhatsApp (todas as variantes BR)
   let resolvedLeadId = leadId;
   if (!resolvedLeadId) {
-    const phoneVariants = [phone];
-    if (phone.startsWith("55") && phone.length > 11) phoneVariants.push(phone.slice(2));
-    for (const variant of phoneVariants) {
+    for (const variant of buildPhoneVariants(phone)) {
       const { data: lead } = await supabase
         .from("trial_leads")
         .select("id")

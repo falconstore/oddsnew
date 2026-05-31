@@ -101,26 +101,19 @@ export async function sendZApiButtonList(payload: ZApiButtonListPayload): Promis
 }
 
 /**
- * Monta a mensagem de boas-vindas para novos leads do trial.
+ * Mensagem curta de "primeiro contato" enviada pelo trial-signup.
+ * Propositalmente sem links — apenas convida o lead a responder,
+ * o que dispara o funil interativo Z-API (menu de botões).
+ * Sem links = menor risco de spam pelo WhatsApp.
  */
-export function buildWelcomeMessage(firstName: string, botStartUrl: string): string {
+export function buildWelcomeMessage(firstName: string, _botStartUrl: string): string {
   return [
     `Oi ${firstName}! 👋`,
     ``,
     `Aqui é a equipe do *Shark Green* 🦈`,
     ``,
-    `Seu cadastro no trial gratuito foi confirmado com sucesso! 🎉`,
+    `Seu trial de *7 dias grátis* acabou de ser ativado! 🎉`,
     ``,
-    `Para receber os sinais, você vai precisar do *Telegram* — é gratuito e leva menos de 2 minutos pra instalar:`,
-    ``,
-    `📲 *Baixe o Telegram:*`,
-    `🤖 Android → https://play.google.com/store/apps/details?id=org.telegram.messenger`,
-    `🍎 iPhone → https://apps.apple.com/br/app/telegram-messenger/id686449807`,
-    ``,
-    `Depois de instalar, é só clicar no link abaixo e apertar *START* para ativar seu acesso:`,
-    ``,
-    `👉 ${botStartUrl}`,
-    ``,
-    `Qualquer dúvida é só responder aqui! 😊`,
+    `Me responda com *"Oi"* aqui que eu te envio seu acesso completo agora 🚀`,
   ].join("\n");
 }
