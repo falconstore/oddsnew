@@ -1,0 +1,2 @@
+- [Trial obrigado routing](trial-obrigado-routing.md) — /obrigado só existe no bloco isTrialHost(); preview local requer ?host=trial&preview=1
+- [Z-API funil WhatsApp](zapi-funil.md) — zapi-reply edge function + zapi_conversation_state; webhook Z-API pendente de config manual no painel

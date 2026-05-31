@@ -142,6 +142,12 @@ export default function TrialObrigado() {
     if (raw) trialData = JSON.parse(raw) as TrialSuccess;
   } catch { /* sessionStorage indisponível */ }
 
+  // Preview mode — permite visualizar a página sem sessão ativa
+  const isPreview = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('preview') === '1';
+  if (isPreview && !trialData) {
+    trialData = { botStartUrl: 'https://t.me/sharkbot?start=preview', inviteLink: '#', email: 'seuemail@gmail.com', initialPassword: '5545988407803' };
+  }
+
   useEffect(() => {
     if (!trialData?.botStartUrl) {
       navigate('/', { replace: true });
