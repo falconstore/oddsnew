@@ -123,12 +123,48 @@ Deno.serve(async (req) => {
   const fromMe  = Boolean(payload.fromMe);
   const isGroup = Boolean(payload.isGroup);
   const phone   = String(payload.phone ?? "").replace(/\D/g, "");
-  const text    = String(
-    (payload as any).text?.message ??
-    (payload as any).buttonResponseMessage?.selectedButtonId ??
-    (payload as any).listResponseMessage?.singleSelectReply?.selectedRowId ??
+
+  // Extrai o texto ou o ID do botão clicado.
+  // Z-API usa `buttonsResponseMessage` (plural) para respostas de botão.
+  // Cobrimos também variações documentadas e não-documentadas da API.
+  const p = payload as any;
+  const text = String(
+    p.text?.message ??
+    // Resposta de botão (send-button-list) — nome correto Z-API
+    p.buttonsResponseMessage?.selectedButtonId ??
+    p.buttonsResponseMessage?.buttonId ??
+    // Variação alternativa (alguns SDKs Z-API usam singular)
+    p.buttonResponseMessage?.selectedButtonId ??
+    p.buttonResponseMessage?.buttonId ??
+    // Resposta de lista (send-list)
+    p.listResponseMessage?.singleSelectReply?.selectedRowId ??
+    p.listResponse?.singleSelectReply?.selectedRowId ??
     ""
   ).trim();
+
+  // Log completo do payload para diagnóstico
+  log("raw-payload", {
+    phone: phone.slice(0, 6) + "****",
+    type: p.type ?? p.messageType ?? "?",
+    keys: Object.keys(payload).join(","),
+    text_extracted: text.slice(0, 80),
+    fromMe,
+    isGroup,
+  });
+
+  // Salva payload bruto na tabela de debug para inspeção
+  // (útil para identificar o formato exato da resposta de botão)
+  try {
+    const sbDebug = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      { auth: { persistSession: false } },
+    );
+    await sbDebug.from("zapi_debug_log").insert({
+      phone: phone.slice(0, 6) + "****",
+      payload,
+    });
+  } catch { /* nunca bloqueia o fluxo principal */ }
 
   if (fromMe || isGroup || !phone) {
     log("ignored", { fromMe, isGroup, phone: phone.slice(0, 6) });
@@ -215,9 +251,14 @@ Deno.serve(async (req) => {
     }
 
     if (choice !== "opt_telegram" && choice !== "opt_app" && choice !== "opt_both") {
-      // Não reconheceu — reenvia o menu
-      await sendMenu(phone);
-      return new Response(JSON.stringify({ ok: true, action: "menu-resent" }), {
+      // Não reconheceu o botão (texto livre ou webhook duplicado) — ignora silenciosamente.
+      // NUNCA reenvia o menu aqui para evitar loops.
+      log("choice-unrecognized", {
+        phone: phone.slice(0, 6) + "****",
+        choice: choice.slice(0, 40),
+        step,
+      });
+      return new Response(JSON.stringify({ ok: true, action: "choice-ignored", raw_choice: choice.slice(0, 40) }), {
         headers: { "Content-Type": "application/json" },
       });
     }
@@ -229,16 +270,6 @@ Deno.serve(async (req) => {
 
     log("choice-handled", { phone: phone.slice(0, 6) + "****", choice });
     return new Response(JSON.stringify({ ok: true, action: "choice", choice }), {
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-
-  // ── Se estiver em awaiting_choice mas mandou texto (não botão), ignora ───
-  // Evita reenviar o menu quando o webhook chega duplicado ou o lead manda
-  // texto em vez de clicar no botão.
-  if (step === "awaiting_choice") {
-    log("awaiting-text-ignored", { phone: phone.slice(0, 6) + "****" });
-    return new Response(JSON.stringify({ ok: true, action: "awaiting-ignored" }), {
       headers: { "Content-Type": "application/json" },
     });
   }
