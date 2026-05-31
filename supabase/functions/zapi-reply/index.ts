@@ -125,20 +125,20 @@ Deno.serve(async (req) => {
   const phone   = String(payload.phone ?? "").replace(/\D/g, "");
 
   // Extrai o texto ou o ID do botão clicado.
-  // Z-API usa `buttonsResponseMessage` (plural) para respostas de botão.
-  // Cobrimos também variações documentadas e não-documentadas da API.
+  // Debug log confirmou: Z-API usa buttonsResponseMessage.buttonId (não selectedButtonId).
   const p = payload as any;
   const text = String(
-    p.text?.message ??
-    // Resposta de botão (send-button-list) — nome correto Z-API
-    p.buttonsResponseMessage?.selectedButtonId ??
+    // Resposta de botão confirmada: buttonsResponseMessage.buttonId
     p.buttonsResponseMessage?.buttonId ??
-    // Variação alternativa (alguns SDKs Z-API usam singular)
-    p.buttonResponseMessage?.selectedButtonId ??
+    p.buttonsResponseMessage?.selectedButtonId ??
+    // Variações alternativas
     p.buttonResponseMessage?.buttonId ??
-    // Resposta de lista (send-list)
+    p.buttonResponseMessage?.selectedButtonId ??
+    // Resposta de lista
     p.listResponseMessage?.singleSelectReply?.selectedRowId ??
     p.listResponse?.singleSelectReply?.selectedRowId ??
+    // Texto livre
+    p.text?.message ??
     ""
   ).trim();
 
@@ -213,19 +213,25 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Fallback se não achou o lead pelo estado — tenta pelo phone
+    // Fallback se não achou o lead pelo estado — tenta pelo phone (com e sem prefixo 55)
     if (!inviteLink || !email) {
-      const { data: lead } = await supabase
-        .from("trial_leads")
-        .select("id, invite_link, email, whatsapp")
-        .eq("whatsapp", phone)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (lead) {
-        inviteLink = lead.invite_link ?? null;
-        email      = lead.email ?? null;
-        password   = lead.whatsapp ?? null;
+      const phoneVariants = [phone];
+      // trial_leads.whatsapp guarda SEM "55" — adicionamos variante sem prefixo
+      if (phone.startsWith("55") && phone.length > 11) phoneVariants.push(phone.slice(2));
+      for (const variant of phoneVariants) {
+        const { data: lead } = await supabase
+          .from("trial_leads")
+          .select("id, invite_link, email, whatsapp")
+          .eq("whatsapp", variant)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (lead) {
+          inviteLink = lead.invite_link ?? null;
+          email      = lead.email ?? null;
+          password   = lead.whatsapp ?? null;
+          break;
+        }
       }
     }
 
@@ -275,17 +281,21 @@ Deno.serve(async (req) => {
   }
 
   // ── Primeira mensagem (ou estado "done" reinicia) ─────────────────────────
-  // Tenta casar o lead pelo número de WhatsApp
+  // Tenta casar o lead pelo número de WhatsApp (com e sem prefixo "55")
   let resolvedLeadId = leadId;
   if (!resolvedLeadId) {
-    const { data: lead } = await supabase
-      .from("trial_leads")
-      .select("id")
-      .eq("whatsapp", phone)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (lead) resolvedLeadId = lead.id;
+    const phoneVariants = [phone];
+    if (phone.startsWith("55") && phone.length > 11) phoneVariants.push(phone.slice(2));
+    for (const variant of phoneVariants) {
+      const { data: lead } = await supabase
+        .from("trial_leads")
+        .select("id")
+        .eq("whatsapp", variant)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (lead) { resolvedLeadId = lead.id; break; }
+    }
   }
 
   // Envia o menu
