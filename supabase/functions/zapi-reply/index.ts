@@ -357,16 +357,21 @@ Deno.serve(async (req) => {
               "anthropic-version": "2023-06-01",
             },
             body: JSON.stringify({
-              model:      "claude-3-5-haiku-20241022",
+              model:      "claude-haiku-4-5",
               max_tokens: 250,
               system:     WA_AI_SYSTEM_PROMPT,
               messages:   [{ role: "user", content: question }],
             }),
           });
-          const aiData = await aiRes.json().catch(() => ({}));
-          const content: string | undefined = aiData?.content?.[0]?.text;
-          if (content) aiReply = content;
-          else log("ai-empty", { aiData });
+          if (!aiRes.ok) {
+            const errText = await aiRes.text();
+            log("ai-http-error", { status: aiRes.status, body: errText.slice(0, 200) });
+          } else {
+            const aiData = await aiRes.json().catch(() => ({}));
+            const content: string | undefined = aiData?.content?.[0]?.text;
+            if (content) aiReply = content;
+            else log("ai-empty", { aiData });
+          }
         } catch (e) {
           log("ai-error", { error: String(e) });
         }
@@ -554,16 +559,21 @@ Deno.serve(async (req) => {
             "anthropic-version": "2023-06-01",
           },
           body: JSON.stringify({
-            model:      "claude-3-5-haiku-20241022",
+            model:      "claude-haiku-4-5",
             max_tokens: 250,
             system:     WA_AI_SYSTEM_PROMPT,
             messages:   [{ role: "user", content: question }],
           }),
         });
-        const aiData = await aiRes.json().catch(() => ({}));
-        const content: string | undefined = aiData?.content?.[0]?.text;
-        if (content) aiReply = content;
-        else log("ai-empty", { aiData });
+        if (!aiRes.ok) {
+          const errText = await aiRes.text();
+          log("ai-http-error", { status: aiRes.status, body: errText.slice(0, 200) });
+        } else {
+          const aiData = await aiRes.json().catch(() => ({}));
+          const content: string | undefined = aiData?.content?.[0]?.text;
+          if (content) aiReply = content;
+          else log("ai-empty", { aiData });
+        }
       } catch (e) {
         log("ai-error", { error: String(e) });
       }
