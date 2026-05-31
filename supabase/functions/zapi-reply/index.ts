@@ -249,6 +249,8 @@ Deno.serve(async (req) => {
   const leadId: string | null = stateRow?.lead_id ?? null;
 
   // ── Follow-up: confirmação de acesso (10 min após escolha) ───────────────
+  // Cada case retorna explicitamente. Texto livre NÃO retorna aqui — cai
+  // no bloco de Claude AI mais abaixo.
   if (step === "awaiting_confirmation") {
     if (text === "conf_sim") {
       const msg = SUCCESS_VARIANTS[Math.floor(Math.random() * SUCCESS_VARIANTS.length)];
@@ -256,7 +258,11 @@ Deno.serve(async (req) => {
       await supabase.from("zapi_conversation_state")
         .update({ step: "done", updated_at: new Date().toISOString() })
         .eq("phone", phone);
-    } else if (text === "conf_nao") {
+      return new Response(JSON.stringify({ ok: true, action: "conf-sim" }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    if (text === "conf_nao") {
       await sendZApiButtonList({
         phone,
         message: "Certo, eu vou te ajudar então! 💪\n\nClique no botão abaixo pra saber em qual precisa de ajuda 👇",
@@ -268,21 +274,25 @@ Deno.serve(async (req) => {
       await supabase.from("zapi_conversation_state")
         .update({ step: "awaiting_help_type", updated_at: new Date().toISOString() })
         .eq("phone", phone);
-    } else if (text === "conf_ajuda") {
+      return new Response(JSON.stringify({ ok: true, action: "conf-nao" }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    if (text === "conf_ajuda") {
       await sendZApiText({ phone, message: "Certo, vamos lá então! 💪🦈\n\nNão é problema — estou aqui pra te guiar até os R$ 200,00 por dia...\n\nMe conta aqui qual é a sua dúvida que eu te ajudo! 👇" });
       await supabase.from("zapi_conversation_state")
         .update({ step: "awaiting_ai", updated_at: new Date().toISOString() })
         .eq("phone", phone);
-    } else {
-      // Texto livre durante awaiting_confirmation — ignora silenciosamente
-      log("confirmation-ignored", { phone: phone.slice(0, 6) + "****", text: text.slice(0, 30) });
+      return new Response(JSON.stringify({ ok: true, action: "conf-ajuda" }), {
+        headers: { "Content-Type": "application/json" },
+      });
     }
-    return new Response(JSON.stringify({ ok: true, action: "confirmation-handled", choice: text }), {
-      headers: { "Content-Type": "application/json" },
-    });
+    // Texto livre em awaiting_confirmation → não retorna, cai no bloco de Claude abaixo
+    log("confirmation-freetext", { phone: phone.slice(0, 6) + "****", text: text.slice(0, 30) });
   }
 
   // ── Tipo de ajuda (Telegram ou App) ──────────────────────────────────────
+  // Mesmo padrão: cada case retorna; texto livre cai no Claude abaixo.
   if (step === "awaiting_help_type") {
     if (text === "help_telegram") {
       const msg = [
@@ -299,7 +309,11 @@ Deno.serve(async (req) => {
       await supabase.from("zapi_conversation_state")
         .update({ step: "done", updated_at: new Date().toISOString() })
         .eq("phone", phone);
-    } else if (text === "help_app") {
+      return new Response(JSON.stringify({ ok: true, action: "help-telegram" }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    if (text === "help_app") {
       const msg = [
         "📱 *Como baixar o App VIP Shark*",
         "",
@@ -317,12 +331,12 @@ Deno.serve(async (req) => {
       await supabase.from("zapi_conversation_state")
         .update({ step: "done", updated_at: new Date().toISOString() })
         .eq("phone", phone);
-    } else {
-      log("help-type-ignored", { phone: phone.slice(0, 6) + "****", text: text.slice(0, 30) });
+      return new Response(JSON.stringify({ ok: true, action: "help-app" }), {
+        headers: { "Content-Type": "application/json" },
+      });
     }
-    return new Response(JSON.stringify({ ok: true, action: "help-type-handled", type: text }), {
-      headers: { "Content-Type": "application/json" },
-    });
+    // Texto livre em awaiting_help_type → não retorna, cai no Claude abaixo
+    log("help-type-freetext", { phone: phone.slice(0, 6) + "****", text: text.slice(0, 30) });
   }
 
   // ── Atendimento IA (Claude) — lead pediu ajuda personalizada ──────────────
