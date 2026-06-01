@@ -17,6 +17,16 @@ function Row({ label, value, accent }: { label: string; value: string | null; ac
   )
 }
 
+function Cell({ label, value, accent }: { label: string; value: string | null; accent?: string }) {
+  if (!value) return null
+  return (
+    <div className="flex flex-col gap-0.5 py-2.5">
+      <span className="text-[11px]" style={{ color: 'rgba(255,255,255,0.4)' }}>{label}</span>
+      <span className="text-sm font-semibold" style={{ color: accent ?? '#fff' }}>{value}</span>
+    </div>
+  )
+}
+
 function ImageLightbox({ images, index, onClose, onPrev, onNext }: {
   images: string[]; index: number; onClose: () => void; onPrev: () => void; onNext: () => void
 }) {
@@ -173,9 +183,13 @@ export function ProcedureDetail() {
         <div className="glass px-4 py-1 mb-5">
           <Row label="Casa / Plataforma" value={p.platform} />
           <Row label="Promoção" value={p.promotion_name} />
-          <Row label="Tipo" value={p.tipo} />
-          {kickoff && (
-            <Row label="Kickoff" value={format(kickoff, "dd/MM/yyyy · HH:mm", { locale: ptBR })} />
+          {/* Tipo + Kickoff lado a lado */}
+          {(p.tipo || kickoff) && (
+            <div className="grid grid-cols-2 gap-2 py-1"
+                 style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              <Cell label="Tipo" value={p.tipo} />
+              {kickoff && <Cell label="Kickoff" value={format(kickoff, "dd/MM · HH:mm", { locale: ptBR })} />}
+            </div>
           )}
           {p.freebet_value && p.freebet_value > 0 && (
             <Row label="Valor Freebet" value={`R$${Number(p.freebet_value).toFixed(2)}`} accent="#facc15" />
