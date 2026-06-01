@@ -546,26 +546,19 @@ serve(async (req) => {
       // Nome do arquivo no Storage
       const ext = filePath.split(".").pop() ?? "jpg";
       const storageName = `${Date.now()}_${photoMessageId}.${ext}`;
+      const contentType = `image/${ext === "jpg" ? "jpeg" : ext}`;
 
-      // Upload para Supabase Storage via REST
-      const uploadRes = await fetch(
-        `${SUPABASE_URL}/storage/v1/object/procedure-images/${storageName}`,
-        {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${SERVICE_ROLE}`,
-            "Content-Type": `image/${ext === "jpg" ? "jpeg" : ext}`,
-            "x-upsert": "true",
-          },
-          body: imgBytes,
-        }
-      );
-      if (!uploadRes.ok) {
-        const errText = await uploadRes.text().catch(() => "");
-        throw new Error(`Storage upload failed ${uploadRes.status}: ${errText}`);
+      // Upload via SDK (evita problema de JWS com raw fetch)
+      const { error: uploadError } = await supaPhoto.storage
+        .from("procedure-images")
+        .upload(storageName, imgBytes, { contentType, upsert: true });
+      if (uploadError) {
+        throw new Error(`Storage upload failed: ${uploadError.message}`);
       }
 
-      const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/procedure-images/${storageName}`;
+      const { data: { publicUrl } } = supaPhoto.storage
+        .from("procedure-images")
+        .getPublicUrl(storageName);
 
       // ── Vincula ao procedimento ─────────────────────────────
       // Estratégia 1: Caption com número do procedimento ("PROCEDIMENTO 491" / "PROC 491")
