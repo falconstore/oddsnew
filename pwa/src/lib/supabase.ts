@@ -59,4 +59,9 @@ export type Procedure = {
   reenviado_em: string | null
   reenviado_count: number | null
   telegram_images: string[] | null
+  telegram_cards: Array<{
+    image_url: string
+    caption: string | null
+    links: Array<{ label: string; url: string }> | null
+  }> | null
 }

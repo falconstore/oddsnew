@@ -602,8 +602,27 @@ serve(async (req) => {
         if (recent) procedureId = recent.id;
       }
 
+      // ── Monta o card rico (imagem + legenda + links) ───────
+      const captionText: string = msg.caption ?? "";
+      const captionEntities: any[] = msg.caption_entities ?? [];
+      const cardLinks: { label: string; url: string }[] = captionEntities
+        .filter((e: any) => e.type === "text_link" || e.type === "url")
+        .map((e: any) => ({
+          label: captionText.slice(e.offset, e.offset + e.length).trim(),
+          url: e.type === "text_link" ? e.url : captionText.slice(e.offset, e.offset + e.length).trim(),
+        }))
+        .filter((l: any) => l.url && l.label);
+
+      const telegramCard = {
+        image_url: publicUrl,
+        caption: captionText || null,
+        links: cardLinks.length > 0 ? cardLinks : null,
+      };
+
       if (procedureId) {
-        // Append da URL no array telegram_images
+        // Salva card rico (imagem + legenda + links)
+        await supaPhoto.rpc("append_telegram_card", { proc_id: procedureId, card: telegramCard });
+        // Mantém telegram_images para backward compat
         await supaPhoto.rpc("append_telegram_image", { proc_id: procedureId, img_url: publicUrl });
         log("photo_linked", { procedure_id: procedureId, url: publicUrl, update_id: updateId });
         await logToPanel(SUPABASE_URL, SERVICE_ROLE, {
@@ -612,7 +631,7 @@ serve(async (req) => {
           message: `Foto do Telegram vinculada ao procedimento ${procedureId}`,
           updateId,
           messageId: photoMessageId,
-          context: { procedure_id: procedureId, url: publicUrl },
+          context: { procedure_id: procedureId, url: publicUrl, links: cardLinks.length },
         });
       } else {
         log("photo_no_proc", { url: publicUrl, update_id: updateId });

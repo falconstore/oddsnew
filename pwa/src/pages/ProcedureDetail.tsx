@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowLeft, Clock, TrendingUp, Zap, Star, ExternalLink, X, ChevronLeft, ChevronRight, Images } from 'lucide-react'
+import { ArrowLeft, Star, ExternalLink, X, ChevronLeft, ChevronRight, Images, Link2 } from 'lucide-react'
 import { format, parseISO, differenceInMinutes, isFuture } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { useProcedureById } from '@/hooks/useProcedures'
@@ -193,51 +193,108 @@ export function ProcedureDetail() {
           )}
         </div>
 
-        {/* Galeria de imagens do Telegram */}
-        {p.telegram_images && p.telegram_images.length > 0 && (
-          <div className="mb-6">
-            <div className="flex items-center gap-2 mb-3">
-              <Images size={14} style={{ color: 'rgba(255,255,255,0.4)' }} />
-              <span className="text-xs font-semibold uppercase tracking-wider"
-                style={{ color: 'rgba(255,255,255,0.4)' }}>
-                Imagens do sinal ({p.telegram_images.length})
-              </span>
+        {/* Cards ricos do Telegram (imagem + legenda + links) */}
+        {(() => {
+          const cards = p.telegram_cards && p.telegram_cards.length > 0 ? p.telegram_cards : null
+          const fallbackImgs = !cards && p.telegram_images && p.telegram_images.length > 0 ? p.telegram_images : null
+          const lightboxUrls = cards ? cards.map(c => c.image_url) : (fallbackImgs ?? [])
+
+          if (!cards && !fallbackImgs) return null
+          return (
+            <div className="mb-6">
+              <div className="flex items-center gap-2 mb-3">
+                <Images size={14} style={{ color: 'rgba(255,255,255,0.4)' }} />
+                <span className="text-xs font-semibold uppercase tracking-wider"
+                  style={{ color: 'rgba(255,255,255,0.4)' }}>
+                  Sinais do Telegram ({lightboxUrls.length})
+                </span>
+              </div>
+
+              {/* Cards ricos */}
+              {cards ? (
+                <div className="flex flex-col gap-3">
+                  {cards.map((card, i) => (
+                    <div key={i} className="glass rounded-2xl overflow-hidden"
+                         style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
+                      {/* Imagem clicável */}
+                      <motion.button
+                        className="w-full relative overflow-hidden"
+                        style={{ aspectRatio: '16/9' }}
+                        onClick={() => setLightboxIndex(i)}
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        <img src={card.image_url} alt={`Sinal ${i + 1}`}
+                          className="w-full h-full object-cover" loading="lazy" />
+                        <div className="absolute inset-0"
+                          style={{ background: 'linear-gradient(to bottom, transparent 60%, rgba(0,0,0,0.5))' }} />
+                        <div className="absolute bottom-2 right-2">
+                          <ExternalLink size={14} style={{ color: 'rgba(255,255,255,0.6)' }} />
+                        </div>
+                      </motion.button>
+
+                      {/* Legenda */}
+                      {card.caption && (
+                        <div className="px-4 pt-3 pb-2">
+                          <p className="text-xs leading-relaxed whitespace-pre-line"
+                             style={{ color: 'rgba(255,255,255,0.75)' }}>
+                            {card.caption}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Links clicáveis */}
+                      {card.links && card.links.length > 0 && (
+                        <div className="px-3 pb-3 flex flex-col gap-2 mt-1">
+                          {card.links.map((link, j) => (
+                            <a key={j} href={link.url} target="_blank" rel="noopener noreferrer"
+                               className="flex items-center gap-2 px-3 py-2.5 rounded-xl active:scale-95 transition-transform"
+                               style={{ background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.25)' }}>
+                              <Link2 size={13} style={{ color: 'hsl(145 80% 48%)' }} className="flex-shrink-0" />
+                              <span className="text-sm font-semibold truncate"
+                                    style={{ color: 'hsl(145 80% 55%)' }}>
+                                {link.label}
+                              </span>
+                              <ExternalLink size={11} className="ml-auto flex-shrink-0"
+                                style={{ color: 'rgba(255,255,255,0.3)' }} />
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                /* Fallback: grade simples para procs sem telegram_cards */
+                <div className={`grid gap-2 ${fallbackImgs!.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                  {fallbackImgs!.map((url, i) => (
+                    <motion.button key={i}
+                      onClick={() => setLightboxIndex(i)}
+                      className="relative overflow-hidden rounded-xl"
+                      style={{ aspectRatio: '16/9' }}
+                      whileTap={{ scale: 0.96 }}>
+                      <img src={url} alt={`Imagem ${i + 1}`}
+                        className="w-full h-full object-cover" loading="lazy" />
+                    </motion.button>
+                  ))}
+                </div>
+              )}
+
+              {/* Lightbox */}
+              {lightboxIndex !== null && (
+                <ImageLightbox
+                  images={lightboxUrls}
+                  index={lightboxIndex}
+                  onClose={() => setLightboxIndex(null)}
+                  onPrev={() => setLightboxIndex(i => i !== null && i > 0 ? i - 1 : lightboxUrls.length - 1)}
+                  onNext={() => setLightboxIndex(i => i !== null && i < lightboxUrls.length - 1 ? i + 1 : 0)}
+                />
+              )}
             </div>
-            <div className={`grid gap-2 ${p.telegram_images.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
-              {p.telegram_images.map((url, i) => (
-                <motion.button
-                  key={i}
-                  onClick={() => setLightboxIndex(i)}
-                  className="relative overflow-hidden rounded-xl active:scale-95 transition-transform"
-                  style={{ aspectRatio: '16/9' }}
-                  whileTap={{ scale: 0.96 }}
-                >
-                  <img
-                    src={url}
-                    alt={`Imagem ${i + 1} do sinal`}
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                  />
-                  <div className="absolute inset-0 rounded-xl"
-                    style={{ border: '1px solid rgba(255,255,255,0.08)' }} />
-                </motion.button>
-              ))}
-            </div>
-          </div>
-        )}
+          )
+        })()}
 
       </motion.div>
 
-      {/* Lightbox */}
-      {lightboxIndex !== null && p.telegram_images && (
-        <ImageLightbox
-          images={p.telegram_images}
-          index={lightboxIndex}
-          onClose={() => setLightboxIndex(null)}
-          onPrev={() => setLightboxIndex(i => i !== null && i > 0 ? i - 1 : (p.telegram_images!.length - 1))}
-          onNext={() => setLightboxIndex(i => i !== null && i < p.telegram_images!.length - 1 ? i + 1 : 0)}
-        />
-      )}
     </div>
   )
 }
