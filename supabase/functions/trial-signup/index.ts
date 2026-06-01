@@ -256,23 +256,10 @@ serve(async (req) => {
     ).replace(/^@+/, "");
     const botStartUrl = `https://t.me/${botUsername}?start=lead_${inserted.id}`;
 
-    // WhatsApp de boas-vindas via Z-API — fire-and-forget.
-    // Orienta o lead a instalar o Telegram e clicar no bot pra ativar o trial.
-    // Silencioso em caso de erro (secrets ausentes ou instância desconectada)
-    // para não bloquear o cadastro nem expor detalhes ao usuário.
-    {
-      const firstName = name.split(" ")[0];
-      const welcomeMsg = buildWelcomeMessage(firstName, botStartUrl);
-      const zapiPromise = sendZApiText({ phone: whatsapp, message: welcomeMsg })
-        .then((r) => {
-          if (!r.ok) console.warn("trial-signup: Z-API falhou:", r.error);
-          else console.log("trial-signup: WhatsApp boas-vindas enviado para", whatsapp.slice(0, 4) + "****");
-        })
-        .catch((e) => console.warn("trial-signup: Z-API exception:", e));
-      // @ts-ignore — EdgeRuntime existe em Supabase Edge / Deno Deploy
-      const er = (globalThis as { EdgeRuntime?: { waitUntil: (p: Promise<unknown>) => void } }).EdgeRuntime;
-      if (er && typeof er.waitUntil === "function") er.waitUntil(zapiPromise);
-    }
+    // WhatsApp de boas-vindas: DESATIVADO.
+    // A página /obrigado instrui o lead a nos mandar uma mensagem diretamente,
+    // o que dispara o funil interativo (menu de botões) sem precisar de uma
+    // mensagem inicial proativa da nossa parte.
 
     // Conversions API: dispara Lead server-side em paralelo ao pixel do
     // browser, deduplicando pelo mesmo event_id. Fire-and-forget pra não

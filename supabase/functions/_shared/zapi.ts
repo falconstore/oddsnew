@@ -134,11 +134,45 @@ export async function sendZApiImage(payload: ZApiImagePayload): Promise<ZApiResu
   }
 }
 
+export interface ZApiVideoPayload {
+  phone: string;
+  videoUrl: string;
+  caption?: string;
+}
+
 /**
- * Mensagem curta de "primeiro contato" enviada pelo trial-signup.
- * Propositalmente sem links — apenas convida o lead a responder,
- * o que dispara o funil interativo Z-API (menu de botões).
- * Sem links = menor risco de spam pelo WhatsApp.
+ * Envia vídeo com legenda opcional via Z-API.
+ * Nunca lança.
+ */
+export async function sendZApiVideo(payload: ZApiVideoPayload): Promise<ZApiResult> {
+  const base = zapiBaseUrl();
+  if (!base) return { ok: false, error: "ZAPI secrets não configurados" };
+
+  try {
+    const res = await fetch(`${base}/send-video`, {
+      method: "POST",
+      headers: zapiHeaders(),
+      body: JSON.stringify({
+        phone: normalizePhone(payload.phone),
+        video: payload.videoUrl,
+        caption: payload.caption ?? "",
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      return { ok: false, error: `Z-API HTTP ${res.status}: ${body.slice(0, 200)}` };
+    }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+}
+
+/**
+ * Mensagem curta de "primeiro contato" — mantida por compatibilidade,
+ * mas o envio proativo no trial-signup foi desativado.
+ * O lead é instruído na página /obrigado a nos mandar uma mensagem,
+ * que dispara o funil interativo diretamente.
  */
 export function buildWelcomeMessage(firstName: string, _botStartUrl: string): string {
   return [

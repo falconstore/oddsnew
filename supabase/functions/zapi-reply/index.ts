@@ -20,7 +20,7 @@
 //
 // deno-lint-ignore-file
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { sendZApiText, sendZApiButtonList } from "../_shared/zapi.ts";
+import { sendZApiText, sendZApiButtonList, sendZApiVideo } from "../_shared/zapi.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
 /**
@@ -500,6 +500,25 @@ Deno.serve(async (req) => {
         await sendZApiText({ phone, message: buildAppMessage(email, password) });
       } else {
         await sendZApiText({ phone, message: "📱 *App VIP Shark*\n\nSuas credenciais estão sendo processadas! Em instantes você recebe aqui. 🦈" });
+      }
+    }
+
+    // Vídeo de boas-vindas — enviado após as credenciais, se configurado
+    const welcomeVideoUrl = Deno.env.get("ZAPI_WELCOME_VIDEO_URL") ?? "";
+    if (
+      welcomeVideoUrl &&
+      (choice === "opt_telegram" || choice === "opt_app" || choice === "opt_both")
+    ) {
+      await sleep(3000);
+      const videoResult = await sendZApiVideo({
+        phone,
+        videoUrl: welcomeVideoUrl,
+        caption: "🎥 Assista esse vídeo para aproveitar ao máximo seu trial no *Shark Green* 🦈",
+      });
+      if (!videoResult.ok) {
+        log("welcome-video-error", { phone: phone.slice(0, 6) + "****", error: videoResult.error });
+      } else {
+        log("welcome-video-sent", { phone: phone.slice(0, 6) + "****" });
       }
     }
 
