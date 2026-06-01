@@ -174,8 +174,6 @@ export function ProcedureDetail() {
           <Row label="Casa / Plataforma" value={p.platform} />
           <Row label="Promoção" value={p.promotion_name} />
           <Row label="Tipo" value={p.tipo} />
-          <Row label="Esporte" value={p.esporte} />
-          <Row label="Data" value={format(parseISO(p.date), "dd/MM/yyyy", { locale: ptBR })} />
           {kickoff && (
             <Row label="Kickoff" value={format(kickoff, "dd/MM/yyyy · HH:mm", { locale: ptBR })} />
           )}
