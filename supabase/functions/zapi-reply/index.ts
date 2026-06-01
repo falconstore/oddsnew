@@ -503,25 +503,6 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Vídeo de boas-vindas — enviado após as credenciais, se configurado
-    const welcomeVideoUrl = Deno.env.get("ZAPI_WELCOME_VIDEO_URL") ?? "";
-    if (
-      welcomeVideoUrl &&
-      (choice === "opt_telegram" || choice === "opt_app" || choice === "opt_both")
-    ) {
-      await sleep(3000);
-      const videoResult = await sendZApiVideo({
-        phone,
-        videoUrl: welcomeVideoUrl,
-        caption: "🎥 Assista esse vídeo para aproveitar ao máximo seu trial no *Shark Green* 🦈",
-      });
-      if (!videoResult.ok) {
-        log("welcome-video-error", { phone: phone.slice(0, 6) + "****", error: videoResult.error });
-      } else {
-        log("welcome-video-sent", { phone: phone.slice(0, 6) + "****" });
-      }
-    }
-
     if (choice !== "opt_telegram" && choice !== "opt_app" && choice !== "opt_both") {
       // Não reconheceu o botão (texto livre ou webhook duplicado) — ignora silenciosamente.
       // NUNCA reenvia o menu aqui para evitar loops.
@@ -535,8 +516,12 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Marca como concluído + agenda follow-up de 10 minutos + cancela nudges de inatividade
-    const followUpAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    // Marca como concluído + agenda follow-up de 10 min + vídeo de boas-vindas em +5min
+    const now = Date.now();
+    const followUpAt = new Date(now + 10 * 60 * 1000).toISOString();
+    const hasWelcomeVideo = !!Deno.env.get("ZAPI_WELCOME_VIDEO_URL");
+    const welcomeVideoAt = hasWelcomeVideo ? new Date(now + 5 * 60 * 1000).toISOString() : null;
+
     await supabase
       .from("zapi_conversation_state")
       .upsert({
@@ -545,6 +530,8 @@ Deno.serve(async (req) => {
         lead_id: leadId ?? effectiveLeadId,
         follow_up_at: followUpAt,
         follow_up_sent: false,
+        welcome_video_at: welcomeVideoAt,
+        welcome_video_sent: false,
         nudge_at: null,      // cancela cobrança de inatividade
         nudge_count: 3,      // marca como esgotado para não reagendar
         updated_at: new Date().toISOString(),
