@@ -588,15 +588,15 @@ serve(async (req) => {
         if (byReply) procedureId = byReply.id;
       }
 
-      // Estratégia 3: proc mais recente dos últimos 15 minutos
+      // Estratégia 3: proc mais recente dos últimos 30 minutos (usa updated_date)
       if (!procedureId) {
-        const cutoff = new Date(Date.now() - 15 * 60_000).toISOString();
+        const cutoff = new Date(Date.now() - 30 * 60_000).toISOString();
         const { data: recent } = await supaPhoto
           .from("procedures")
           .select("id")
-          .gte("updated_at", cutoff)
+          .gte("updated_date", cutoff)
           .eq("archived", false)
-          .order("updated_at", { ascending: false })
+          .order("updated_date", { ascending: false })
           .limit(1)
           .maybeSingle();
         if (recent) procedureId = recent.id;
