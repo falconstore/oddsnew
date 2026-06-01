@@ -58,4 +58,5 @@ export type Procedure = {
   archived: boolean | null
   reenviado_em: string | null
   reenviado_count: number | null
+  telegram_images: string[] | null
 }

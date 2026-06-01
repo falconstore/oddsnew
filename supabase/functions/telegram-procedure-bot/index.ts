@@ -506,6 +506,147 @@ serve(async (req) => {
   }
 
   const text: string | undefined = msg.text ?? msg.caption;
+
+  // ──────────────────────────────────────────────────────────
+  // Fotos: captura imagens enviadas no canal e vincula ao proc
+  // ──────────────────────────────────────────────────────────
+  const hasPhoto = Array.isArray(msg.photo) && msg.photo.length > 0;
+  if (hasPhoto && !isEdit) {
+    const msgChatIdPhoto = String(msg.chat?.id ?? "");
+    if (msgChatIdPhoto !== String(CHAT_ID)) {
+      return json({ ok: true, ignored: "wrong chat (photo)" });
+    }
+    const photoMessageId: number = msg.message_id;
+    const supaPhoto = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
+
+    // Dedup por update_id
+    if (updateId != null) {
+      const { data: dupLog } = await supaPhoto.from("bot_logs").select("id").eq("update_id", updateId).limit(1).maybeSingle();
+      if (dupLog) return json({ ok: true, action: "ignored_duplicate_update" });
+    }
+
+    try {
+      // Pega o maior tamanho disponível (último elemento do array)
+      const largest = msg.photo[msg.photo.length - 1];
+      const fileId: string = largest.file_id;
+
+      // Obtém file_path via getFile
+      const fileRes = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getFile?file_id=${fileId}`);
+      const fileData = await fileRes.json();
+      if (!fileData.ok || !fileData.result?.file_path) {
+        throw new Error(`getFile failed: ${JSON.stringify(fileData)}`);
+      }
+      const filePath: string = fileData.result.file_path;
+
+      // Baixa os bytes da imagem
+      const imgRes = await fetch(`https://api.telegram.org/file/bot${BOT_TOKEN}/${filePath}`);
+      if (!imgRes.ok) throw new Error(`Download failed: ${imgRes.status}`);
+      const imgBytes = new Uint8Array(await imgRes.arrayBuffer());
+
+      // Nome do arquivo no Storage
+      const ext = filePath.split(".").pop() ?? "jpg";
+      const storageName = `${Date.now()}_${photoMessageId}.${ext}`;
+
+      // Upload para Supabase Storage via REST
+      const uploadRes = await fetch(
+        `${SUPABASE_URL}/storage/v1/object/procedure-images/${storageName}`,
+        {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${SERVICE_ROLE}`,
+            "Content-Type": `image/${ext === "jpg" ? "jpeg" : ext}`,
+            "x-upsert": "true",
+          },
+          body: imgBytes,
+        }
+      );
+      if (!uploadRes.ok) {
+        const errText = await uploadRes.text().catch(() => "");
+        throw new Error(`Storage upload failed ${uploadRes.status}: ${errText}`);
+      }
+
+      const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/procedure-images/${storageName}`;
+
+      // ── Vincula ao procedimento ─────────────────────────────
+      // Estratégia 1: Caption com número do procedimento ("PROCEDIMENTO 491" / "PROC 491")
+      let procedureId: string | null = null;
+      const caption: string = msg.caption ?? "";
+      const captionMatch = caption.match(/PROC(?:EDIMENTO)?\s+#?(\d+)/i);
+      if (captionMatch) {
+        const { data: byNum } = await supaPhoto
+          .from("procedures")
+          .select("id")
+          .eq("procedure_number", captionMatch[1])
+          .order("created_date", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (byNum) procedureId = byNum.id;
+      }
+
+      // Estratégia 2: reply_to_message_id → telegram_link termina com /{id}
+      if (!procedureId && msg.reply_to_message?.message_id) {
+        const replyMsgId = msg.reply_to_message.message_id;
+        const { data: byReply } = await supaPhoto
+          .from("procedures")
+          .select("id")
+          .ilike("telegram_link", `%/${replyMsgId}`)
+          .limit(1)
+          .maybeSingle();
+        if (byReply) procedureId = byReply.id;
+      }
+
+      // Estratégia 3: proc mais recente dos últimos 15 minutos
+      if (!procedureId) {
+        const cutoff = new Date(Date.now() - 15 * 60_000).toISOString();
+        const { data: recent } = await supaPhoto
+          .from("procedures")
+          .select("id")
+          .gte("updated_at", cutoff)
+          .eq("archived", false)
+          .order("updated_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (recent) procedureId = recent.id;
+      }
+
+      if (procedureId) {
+        // Append da URL no array telegram_images
+        await supaPhoto.rpc("append_telegram_image", { proc_id: procedureId, img_url: publicUrl });
+        log("photo_linked", { procedure_id: procedureId, url: publicUrl, update_id: updateId });
+        await logToPanel(SUPABASE_URL, SERVICE_ROLE, {
+          level: "info",
+          event: "photo_linked",
+          message: `Foto do Telegram vinculada ao procedimento ${procedureId}`,
+          updateId,
+          messageId: photoMessageId,
+          context: { procedure_id: procedureId, url: publicUrl },
+        });
+      } else {
+        log("photo_no_proc", { url: publicUrl, update_id: updateId });
+        await logToPanel(SUPABASE_URL, SERVICE_ROLE, {
+          level: "warning",
+          event: "photo_no_proc",
+          message: "Foto do Telegram salva mas nenhum procedimento encontrado para vincular",
+          updateId,
+          messageId: photoMessageId,
+          context: { url: publicUrl },
+        });
+      }
+    } catch (e: any) {
+      log("photo_error", { err: e?.message, update_id: updateId });
+      await logToPanel(SUPABASE_URL, SERVICE_ROLE, {
+        level: "error",
+        event: "photo_error",
+        message: `Erro ao processar foto do Telegram: ${e?.message}`,
+        updateId,
+        messageId: msg.message_id ?? null,
+        context: { error: e?.message },
+      });
+    }
+
+    return json({ ok: true, action: "photo_processed" });
+  }
+
   if (!text || !text.trim()) {
     log("ignored", { reason: "no text", update_id: updateId });
     await logToPanel(SUPABASE_URL, SERVICE_ROLE, {

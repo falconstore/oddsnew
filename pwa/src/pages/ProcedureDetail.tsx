@@ -1,6 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
-import { ArrowLeft, Clock, TrendingUp, Zap, Star, ExternalLink } from 'lucide-react'
+import { useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { ArrowLeft, Clock, TrendingUp, Zap, Star, ExternalLink, X, ChevronLeft, ChevronRight, Images } from 'lucide-react'
 import { format, parseISO, differenceInMinutes, isFuture } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { useProcedureById } from '@/hooks/useProcedures'
@@ -16,10 +17,65 @@ function Row({ label, value, accent }: { label: string; value: string | null; ac
   )
 }
 
+function ImageLightbox({ images, index, onClose, onPrev, onNext }: {
+  images: string[]; index: number; onClose: () => void; onPrev: () => void; onNext: () => void
+}) {
+  return (
+    <AnimatePresence>
+      <motion.div
+        className="fixed inset-0 z-50 flex items-center justify-center"
+        style={{ background: 'rgba(0,0,0,0.92)' }}
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        onClick={onClose}
+      >
+        <button onClick={onClose}
+          className="absolute top-4 right-4 w-10 h-10 rounded-full flex items-center justify-center z-10"
+          style={{ background: 'rgba(255,255,255,0.1)' }}>
+          <X size={20} className="text-white" />
+        </button>
+
+        {images.length > 1 && (
+          <>
+            <button onClick={e => { e.stopPropagation(); onPrev() }}
+              className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center z-10"
+              style={{ background: 'rgba(255,255,255,0.1)' }}>
+              <ChevronLeft size={22} className="text-white" />
+            </button>
+            <button onClick={e => { e.stopPropagation(); onNext() }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center z-10"
+              style={{ background: 'rgba(255,255,255,0.1)' }}>
+              <ChevronRight size={22} className="text-white" />
+            </button>
+          </>
+        )}
+
+        <motion.img
+          key={index}
+          src={images[index]}
+          initial={{ scale: 0.92, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="max-w-[90vw] max-h-[85vh] rounded-xl object-contain"
+          onClick={e => e.stopPropagation()}
+        />
+
+        {images.length > 1 && (
+          <div className="absolute bottom-5 left-1/2 -translate-x-1/2 flex gap-1.5">
+            {images.map((_, i) => (
+              <div key={i} className="w-1.5 h-1.5 rounded-full transition-all"
+                style={{ background: i === index ? '#fff' : 'rgba(255,255,255,0.3)' }} />
+            ))}
+          </div>
+        )}
+      </motion.div>
+    </AnimatePresence>
+  )
+}
+
 export function ProcedureDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { data: p, isLoading } = useProcedureById(id ?? '')
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
 
   if (isLoading) {
     return (
@@ -132,7 +188,51 @@ export function ProcedureDetail() {
           )}
         </div>
 
+        {/* Galeria de imagens do Telegram */}
+        {p.telegram_images && p.telegram_images.length > 0 && (
+          <div className="mb-6">
+            <div className="flex items-center gap-2 mb-3">
+              <Images size={14} style={{ color: 'rgba(255,255,255,0.4)' }} />
+              <span className="text-xs font-semibold uppercase tracking-wider"
+                style={{ color: 'rgba(255,255,255,0.4)' }}>
+                Imagens do sinal ({p.telegram_images.length})
+              </span>
+            </div>
+            <div className={`grid gap-2 ${p.telegram_images.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+              {p.telegram_images.map((url, i) => (
+                <motion.button
+                  key={i}
+                  onClick={() => setLightboxIndex(i)}
+                  className="relative overflow-hidden rounded-xl active:scale-95 transition-transform"
+                  style={{ aspectRatio: '16/9' }}
+                  whileTap={{ scale: 0.96 }}
+                >
+                  <img
+                    src={url}
+                    alt={`Imagem ${i + 1} do sinal`}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                  <div className="absolute inset-0 rounded-xl"
+                    style={{ border: '1px solid rgba(255,255,255,0.08)' }} />
+                </motion.button>
+              ))}
+            </div>
+          </div>
+        )}
+
       </motion.div>
+
+      {/* Lightbox */}
+      {lightboxIndex !== null && p.telegram_images && (
+        <ImageLightbox
+          images={p.telegram_images}
+          index={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+          onPrev={() => setLightboxIndex(i => i !== null && i > 0 ? i - 1 : (p.telegram_images!.length - 1))}
+          onNext={() => setLightboxIndex(i => i !== null && i < p.telegram_images!.length - 1 ? i + 1 : 0)}
+        />
+      )}
     </div>
   )
 }
