@@ -545,7 +545,7 @@ export function Dashboard() {
           </div>
           <p className="text-2xl font-black text-white leading-none">{stats?.totalFreebets ?? 0}</p>
           {(stats?.totalFreebetsValor ?? 0) > 0 ? (
-            <span className="text-[10px] font-semibold mt-0.5" style={{ color: '#c4b5fd' }}>
+            <span className="text-sm font-bold mt-0.5" style={{ color: '#c4b5fd' }}>
               R${(stats?.totalFreebetsValor ?? 0).toFixed(2)} em FB
             </span>
           ) : <span className="text-[10px] mt-0.5" style={{ color: 'rgba(255,255,255,0.25)' }}>—</span>}
