@@ -111,7 +111,15 @@ const MENU_BUTTONS = [
   { id: "opt_both",     label: "🎯 Os Dois" },
 ];
 
+const SAVE_CONTACT_MSG =
+  `Antes de continuar, *salva nosso contato* no seu celular com o nome *Shark Green* 📱\n\n` +
+  `É por aqui que você recebe suporte, sinais e atualizações durante todo o seu trial!\n\n` +
+  `_(Se já salvou, pode ignorar essa mensagem)_ 😊`;
+
 async function sendMenu(phone: string): Promise<void> {
+  // Pede pra salvar o contato antes de mostrar o menu
+  await sendZApiText({ phone, message: SAVE_CONTACT_MSG });
+  await sleep(2500);
   await sendZApiButtonList({
     phone,
     message: randomWelcome(),
