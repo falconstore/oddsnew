@@ -26,9 +26,10 @@ function useDuploGreenProcedures() {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function lucroEfetivo(p: Procedure): number {
-  if (p.duplo_green_lucro !== null && p.duplo_green_lucro !== undefined) return Number(p.duplo_green_lucro)
-  if (p.resultado_lucro !== null && p.resultado_lucro !== undefined) return Number(p.resultado_lucro)
-  return Number(p.profit_loss ?? 0)
+  if (p.duplo_green_confirmado && p.duplo_green_lucro != null) return Number(p.duplo_green_lucro)
+  if (p.resultado_lucro != null && p.resultado_lucro !== 0) return Number(p.resultado_lucro)
+  if (p.profit_loss != null && p.profit_loss !== 0) return Number(p.profit_loss)
+  return Number(p.lucro_prejuizo_previsto ?? 0)
 }
 
 // ─── KPI Card ────────────────────────────────────────────────────────────────
