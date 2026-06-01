@@ -50,16 +50,24 @@ export function usePeriodStats(period: PeriodKey) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('procedures')
-        .select('profit_loss, tipo, freebet_value, status, tachado, archived')
+        .select('profit_loss, resultado_lucro, lucro_prejuizo_previsto, duplo_green_lucro, duplo_green_confirmado, tipo, freebet_value, status, tachado, archived')
         .gte('date', start)
         .lte('date', end)
         .eq('archived', false)
         .eq('tachado', false)
       if (error) throw error
 
+      // Hierarquia L/P: DG confirmado > resultado_lucro > profit_loss (≠0) > lucro_prejuizo_previsto
+      const getLucroEfetivo = (p: any): number => {
+        if (p.duplo_green_confirmado && p.duplo_green_lucro != null) return Number(p.duplo_green_lucro)
+        if (p.resultado_lucro != null) return Number(p.resultado_lucro)
+        if (Number(p.profit_loss) !== 0) return Number(p.profit_loss)
+        return Number(p.lucro_prejuizo_previsto ?? 0)
+      }
+
       const procs = (data ?? []) as any[]
       const fbProcs = procs.filter(p => p.tipo === 'GANHAR_FB' || p.tipo === 'QUEIMAR_FB')
-      const encerradas = procs.filter(p => p.profit_loss !== null && Number(p.profit_loss) !== 0).length
+      const encerradas = procs.filter(p => p.resultado_lucro != null || (p.profit_loss !== null && Number(p.profit_loss) !== 0)).length
       const potencialFreebet = period === 'today'
         ? procs.filter(p => OPEN_STATUSES.includes(p.status) && (p.tipo === 'GANHAR_FB' || p.tipo === 'QUEIMAR_FB') && Number(p.freebet_value) > 0)
                .reduce((s: number, p: any) => s + Number(p.freebet_value), 0)
@@ -72,7 +80,7 @@ export function usePeriodStats(period: PeriodKey) {
         totalFreebets: fbProcs.length,
         totalFreebetsValor: fbProcs.reduce((s: number, p: any) => s + (Number(p.freebet_value) || 0), 0),
         totalSemFb: procs.filter(p => p.tipo === 'SEM_FB').length,
-        lucroBruto: procs.reduce((s: number, p: any) => s + (Number(p.profit_loss) || 0), 0),
+        lucroBruto: procs.reduce((s: number, p: any) => s + getLucroEfetivo(p), 0),
         potencialFreebet,
       }
     },
@@ -90,12 +98,19 @@ export function useLast90DaysStats() {
       const start = subDays(end, 89)
       const { data, error } = await supabase
         .from('procedures')
-        .select('date, profit_loss, tachado, archived')
+        .select('date, profit_loss, resultado_lucro, lucro_prejuizo_previsto, duplo_green_lucro, duplo_green_confirmado, tachado, archived')
         .gte('date', format(start, 'yyyy-MM-dd'))
         .lte('date', format(end, 'yyyy-MM-dd'))
         .eq('archived', false)
         .eq('tachado', false)
       if (error) throw error
+
+      const getLucroEfetivo = (p: any): number => {
+        if (p.duplo_green_confirmado && p.duplo_green_lucro != null) return Number(p.duplo_green_lucro)
+        if (p.resultado_lucro != null) return Number(p.resultado_lucro)
+        if (Number(p.profit_loss) !== 0) return Number(p.profit_loss)
+        return Number(p.lucro_prejuizo_previsto ?? 0)
+      }
 
       const map = new Map<string, DayPoint>()
       for (let i = 0; i < 90; i++) {
@@ -106,7 +121,7 @@ export function useLast90DaysStats() {
         const s = map.get(p.date)
         if (!s) continue
         s.total++
-        s.lucro += Number(p.profit_loss) || 0
+        s.lucro += getLucroEfetivo(p)
       }
       return Array.from(map.values())
     },
