@@ -441,9 +441,72 @@ async function removeAndNotify(supabase: ReturnType<typeof createClient>, lead: 
   log("day7-removed", { email: lead.email });
 }
 
-// ── Handler de botões do dia 7 (link de pagamento) ────────────────────────
-// Esta lógica fica no zapi-reply — aqui só registramos a referência
-// Os IDs: day7_mensal, day7_trimestre, day7_anual → zapi-reply envia o link
+// ── Blast manual: reengajamento de leads sem resposta ─────────────────────
+
+const BLAST_SAVE_CONTACT_MSG =
+  `Antes de continuar, *salva nosso contato* no seu celular com o nome *Shark Green* 📱\n\n` +
+  `É por aqui que você recebe suporte, sinais e atualizações durante todo o seu trial!\n\n` +
+  `_(Se já salvou, pode ignorar essa mensagem)_ 😊`;
+
+const BLAST_MENU_BUTTONS = [
+  { id: "opt_telegram", label: "📲 Telegram VIP" },
+  { id: "opt_app",      label: "📱 App VIP Shark" },
+  { id: "opt_both",     label: "🎯 Os Dois" },
+];
+
+const BLAST_WELCOME_VARIANTS = [
+  "Oi, tudo bem? 😊\n\nAqui é a equipe do *Shark Green* 🦈\n\nVi que você se cadastrou no nosso trial de 7 dias — seja muito bem-vindo(a)!\n\nVocê tem acesso gratuito e completo ao sistema, sem precisar de cartão. Isso inclui:\n\n🟢 *Grupo Telegram VIP* — onde caem os sinais em tempo real\n📱 *App VIP Shark* — nosso app exclusivo com painel completo\n\nO que você gostaria de acessar agora?",
+  "E aí! Que bom ter você aqui! 🎉\n\nSomos a equipe do *Shark Green* 🦈\n\nSeu acesso de *7 dias grátis* está liberado — sem cartão, sem compromisso.\n\nVocê tem direito a:\n\n📲 *App VIP Shark* — painel completo no celular\n💬 *Grupo Telegram VIP* — sinais em tempo real\n\nPor onde quer começar?",
+  "Olá! Bem-vindo(a) ao trial do *Shark Green* 🦈✅\n\nSeu acesso de *7 dias gratuitos* está ativo agora mesmo — sem cartão e sem burocracia.\n\nVocê pode acessar:\n\n🔥 *Grupo VIP no Telegram* — sinais ao vivo\n🚀 *App VIP Shark* — controle total no celular\n\nEscolhe o que deseja:",
+];
+
+async function processManualBlast(
+  supabase: ReturnType<typeof createClient>,
+  phones: string[],
+  delayMs = 4000,
+): Promise<{ sent: number; failed: number }> {
+  let sent = 0;
+  let failed = 0;
+
+  for (const rawPhone of phones) {
+    const phone = buildPhone55(rawPhone);
+    try {
+      // 1. Salva contato
+      await sendZApiText({ phone, message: BLAST_SAVE_CONTACT_MSG });
+      await sleep(2500);
+
+      // 2. Menu de acesso (variante aleatória)
+      const welcome = BLAST_WELCOME_VARIANTS[Math.floor(Math.random() * BLAST_WELCOME_VARIANTS.length)];
+      await sendZApiButtonList({
+        phone,
+        message: welcome,
+        buttonList: { buttons: BLAST_MENU_BUTTONS },
+      });
+
+      // 3. Upserta estado pra o funil pegar se o lead responder
+      await supabase.from("zapi_conversation_state").upsert({
+        phone,
+        step: "awaiting_choice",
+        nudge_count: 0,
+        nudge_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(), // 1ª cobrança em 10min
+        follow_up_sent: false,
+        welcome_video_sent: false,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "phone", ignoreDuplicates: false });
+
+      log("blast-sent", { phone: phone.slice(0, 6) + "****" });
+      sent++;
+    } catch (e) {
+      log("blast-error", { phone: phone.slice(0, 6) + "****", error: String(e) });
+      failed++;
+    }
+
+    // Cadência entre contatos para não parecer spam
+    if (phones.indexOf(rawPhone) < phones.length - 1) await sleep(delayMs);
+  }
+
+  return { sent, failed };
+}
 
 // ── Serve ──────────────────────────────────────────────────────────────────
 
@@ -464,6 +527,21 @@ Deno.serve(async (req) => {
   const source = String(body.source ?? "cron");
 
   log("start", { source });
+
+  // Blast manual: envia salva-contato + menu pra lista de phones
+  if (source === "manual_blast") {
+    const phones = (body.phones as string[] | undefined) ?? [];
+    if (!Array.isArray(phones) || phones.length === 0) {
+      return new Response(JSON.stringify({ ok: false, error: "phones array required" }), { status: 400 });
+    }
+    const delayMs = typeof body.delay_ms === "number" ? body.delay_ms : 4000;
+    log("blast-start", { count: phones.length, delayMs });
+    const result = await processManualBlast(supabase, phones, delayMs);
+    log("blast-done", result);
+    return new Response(JSON.stringify({ ok: true, ...result }), {
+      headers: { "Content-Type": "application/json" },
+    });
+  }
 
   // Gatilho específico de resultado diário (chamado às 23h)
   if (source === "daily_result") {
