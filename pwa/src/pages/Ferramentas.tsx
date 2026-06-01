@@ -100,7 +100,8 @@ export function Ferramentas() {
   }
 
   return (
-    <div className="page-scroll px-4 pt-6 pb-28">
+    <div className="h-full overflow-y-auto px-4 pt-6 pb-28"
+      style={{ WebkitOverflowScrolling: 'touch' } as React.CSSProperties}>
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -12 }}
