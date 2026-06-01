@@ -562,21 +562,34 @@ export interface DailyStats {
   date: string; // YYYY-MM-DD
 }
 
+// Retorna o melhor valor disponível para o KPI de Lucro Bruto do dia,
+// usando a mesma hierarquia da coluna L/P na tabela de procedimentos:
+// DG confirmado > resultado_lucro > profit_loss (se != 0) > lucro_prejuizo_previsto
+const getLucroEfetivoKpi = (p: Procedure): number => {
+  if (p.duplo_green_confirmado && p.duplo_green_lucro != null) return Number(p.duplo_green_lucro);
+  if (p.resultado_lucro != null) return Number(p.resultado_lucro);
+  if (Number(p.profit_loss) !== 0) return Number(p.profit_loss);
+  return Number(p.lucro_prejuizo_previsto ?? 0);
+};
+
 export const getDailyStats = (procedures: Procedure[], date?: Date): DailyStats => {
   const ref = date ?? new Date();
   const today = format(ref, 'yyyy-MM-dd');
 
   const todayProcs = getCountableProcedures(procedures).filter(p => {
     const d = p.date ? parseDate(p.date) : null;
-    return d && format(d, 'yyyy-MM-dd') === today;
+    return d && format(d, 'yyyy-MM-dd') === today && !p.archived && !p.tachado;
   });
 
   const fbProcs = todayProcs.filter(p => p.tipo === 'GANHAR_FB' || p.tipo === 'QUEIMAR_FB');
   const totalFreebets = fbProcs.length;
   const totalFreebetsValor = fbProcs.reduce((s, p) => s + (Number(p.freebet_value) || 0), 0);
   const totalSemFb = todayProcs.filter(p => p.tipo === 'SEM_FB').length;
-  const lucroBruto = todayProcs.reduce((s, p) => s + (p.profit_loss || 0), 0);
-  const operacoesEncerradas = todayProcs.filter(p => p.profit_loss !== 0).length;
+  // Usa hierarquia completa: DG > resultado_lucro > profit_loss > lucro_prejuizo_previsto
+  const lucroBruto = todayProcs.reduce((s, p) => s + getLucroEfetivoKpi(p), 0);
+  const operacoesEncerradas = todayProcs.filter(p =>
+    p.resultado_lucro != null || Number(p.profit_loss) !== 0
+  ).length;
 
   return {
     totalOperacoes: todayProcs.length,
