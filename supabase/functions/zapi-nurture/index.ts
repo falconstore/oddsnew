@@ -528,6 +528,43 @@ Deno.serve(async (req) => {
 
   log("start", { source });
 
+  // Notice blast: envia mensagem de aviso/correção pra lista específica de phones
+  if (source === "notice_blast") {
+    const phones = (body.phones as string[] | undefined) ?? [];
+    if (!Array.isArray(phones) || phones.length === 0) {
+      return new Response(JSON.stringify({ ok: false, error: "phones array required" }), { status: 400 });
+    }
+    const message = (body.message as string | undefined) ?? "";
+    if (!message) {
+      return new Response(JSON.stringify({ ok: false, error: "message required" }), { status: 400 });
+    }
+    let sent = 0; let failed = 0; const errors: string[] = [];
+    for (let i = 0; i < phones.length; i++) {
+      const phone = buildPhone55(phones[i]);
+      try {
+        const result = await sendZApiText({ phone, message });
+        if (result.ok) {
+          log("notice-blast-sent", { phone: phone.slice(0, 6) + "****" });
+          sent++;
+        } else {
+          log("notice-blast-fail", { phone: phone.slice(0, 6) + "****", error: result.error });
+          errors.push(`${phone.slice(0, 6)}****: ${result.error}`);
+          failed++;
+        }
+      } catch (e) {
+        log("notice-blast-error", { phone: phone.slice(0, 6) + "****", error: String(e) });
+        errors.push(`${phone.slice(0, 6)}****: ${String(e)}`);
+        failed++;
+      }
+      // Delay aleatório 8–15s entre mensagens (exceto após o último)
+      if (i < phones.length - 1) await sleep(8000 + Math.floor(Math.random() * 7000));
+    }
+    log("notice-blast-done", { sent, failed });
+    return new Response(JSON.stringify({ ok: true, sent, failed, errors }), {
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   // Blast de vídeo: envia vídeo de boas-vindas pra lista específica de phones
   if (source === "video_blast") {
     const phones = (body.phones as string[] | undefined) ?? [];
