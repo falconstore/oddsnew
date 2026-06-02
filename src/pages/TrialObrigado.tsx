@@ -46,6 +46,8 @@ declare global {
     t4y?: Track4YouFn;
     track4you?: Track4YouFn;
     T4Y?: { track?: Track4YouFn } | Track4YouFn;
+    adscala_sendConversion?: (pedidoId: string | number, valor: number) => void;
+    multiads_sendConversion?: (pedidoId: string | number, valor: number) => void;
   }
 }
 
@@ -155,7 +157,15 @@ export default function TrialObrigado() {
     }
     document.title = 'Obrigado — Shark 100% Green';
     initPixel();
-    const run = () => trackPixelLead(trialData?.leadEventId);
+    const run = () => {
+      trackPixelLead(trialData?.leadEventId);
+      // AdScala: dispara conversão server-side quando lead confirma cadastro
+      try {
+        const pedidoId = trialData?.leadEventId ?? Date.now();
+        window.adscala_sendConversion?.(pedidoId, 0);
+        window.multiads_sendConversion?.(pedidoId, 0);
+      } catch { /* nunca propaga — adblock ou cookie bloqueado */ }
+    };
     if (typeof requestIdleCallback !== 'undefined') {
       requestIdleCallback(run, { timeout: 1500 });
     } else {
