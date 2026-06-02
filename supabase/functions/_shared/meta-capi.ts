@@ -9,7 +9,7 @@
 // deno-lint-ignore-file
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const META_PIXEL_ID = "1295449168383975";
+const META_PIXEL_ID = "1672225667108236";
 const META_GRAPH_VERSION = "v19.0";
 
 export type CapiEventName = "Lead" | "PageView" | "ViewContent";
