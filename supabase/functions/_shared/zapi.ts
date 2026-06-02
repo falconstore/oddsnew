@@ -148,23 +148,32 @@ export async function sendZApiVideo(payload: ZApiVideoPayload): Promise<ZApiResu
   const base = zapiBaseUrl();
   if (!base) return { ok: false, error: "ZAPI secrets não configurados" };
 
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 20_000); // 20s timeout
+
   try {
     const res = await fetch(`${base}/send-video`, {
       method: "POST",
       headers: zapiHeaders(),
+      signal: controller.signal,
       body: JSON.stringify({
         phone: normalizePhone(payload.phone),
         video: payload.videoUrl,
         caption: payload.caption ?? "",
       }),
     });
+    clearTimeout(timer);
     if (!res.ok) {
       const body = await res.text().catch(() => "");
       return { ok: false, error: `Z-API HTTP ${res.status}: ${body.slice(0, 200)}` };
     }
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: String(e) };
+    clearTimeout(timer);
+    const err = e instanceof Error && e.name === "AbortError"
+      ? "Z-API send-video timeout (>20s)"
+      : String(e);
+    return { ok: false, error: err };
   }
 }
 

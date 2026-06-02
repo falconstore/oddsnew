@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
       .eq("welcome_video_sent", false)
       .not("welcome_video_at", "is", null)
       .lte("welcome_video_at", now)
-      .limit(20);
+      .limit(2); // 2 por execução: cada vídeo pode levar até 20s (timeout) → máx 40s
 
     if (pendingVideo?.length) {
       log("video-processing", { count: pendingVideo.length });
