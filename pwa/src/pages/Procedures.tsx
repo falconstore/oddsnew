@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useNavigate, NavLink } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, Clock, TrendingUp, Zap, Star, ChevronRight, User, CheckCircle2, Circle } from 'lucide-react'
-import { format, parseISO, differenceInMinutes, isFuture } from 'date-fns'
+import { Search, TrendingUp, Zap, Star, ChevronRight, User, CheckCircle2, Circle, CalendarDays } from 'lucide-react'
+import { format, parseISO, differenceInMinutes, isFuture, isToday, isYesterday } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { useProceduresList } from '@/hooks/useProcedures'
 import { useProcedureChecks, useToggleProcedureCheck } from '@/hooks/useProcedureChecks'
@@ -38,14 +38,21 @@ function tipoIcon(tipo: string | null) {
 
 function tipoLabel(tipo: string | null) {
   switch (tipo) {
-    case 'SUPER_ODD':   return 'SUPER ODD'
-    case 'GANHAR_FB':   return 'GANHAR FB'
-    case 'QUEIMAR_FB':  return 'QUEIMAR FB'
-    case 'ASR':         return 'ASR'
-    case 'SEM_FB':      return 'SEM FB'
-    case 'TENTATIVA_DG':return 'TENTATIVA DG'
-    default:            return tipo ?? null
+    case 'SUPER_ODD':    return 'Super Odd'
+    case 'GANHAR_FB':    return 'Ganhar Freebet'
+    case 'QUEIMAR_FB':   return 'Usar Freebet'
+    case 'ASR':          return 'ASR'
+    case 'SEM_FB':       return 'Sem Freebet'
+    case 'TENTATIVA_DG': return 'Tentativa DG'
+    default:             return tipo ?? null
   }
+}
+
+function dayLabel(dateStr: string): string {
+  const d = parseISO(dateStr)
+  if (isToday(d))     return 'Hoje'
+  if (isYesterday(d)) return 'Ontem'
+  return format(d, "dd 'de' MMMM", { locale: ptBR })
 }
 
 function tipoColor(tipo: string | null): { color: string; bg: string } {
@@ -284,19 +291,51 @@ export function Procedures() {
         </div>
       ) : (
         <AnimatePresence mode="popLayout">
-          <div className="flex flex-col gap-2">
-            {filtered.map((p, idx) => (
-              <motion.div key={p.id}
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.03, duration: 0.2 }}>
-                <ProcedureCard p={p}
-                  onClick={() => navigate(`/procedimentos/${p.id}`)}
-                  isChecked={checks.has(p.id)}
-                  onToggleCheck={e => { e.stopPropagation(); toggleCheck.mutate({ procedureId: p.id, checked: !checks.has(p.id) }) }}
-                />
-              </motion.div>
-            ))}
+          <div className="flex flex-col gap-2 pb-4">
+            {filtered.reduce<{ date: string; items: Procedure[] }[]>((groups, p) => {
+              const last = groups[groups.length - 1]
+              if (last && last.date === p.date) { last.items.push(p); return groups }
+              return [...groups, { date: p.date, items: [p] }]
+            }, []).map((group, gIdx) => {
+              // running card index for stagger delay
+              const prevCount = filtered.slice(0, filtered.indexOf(group.items[0])).length
+              return (
+                <div key={group.date}>
+                  {/* Day separator */}
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: prevCount * 0.03, duration: 0.2 }}
+                    className="flex items-center gap-2 px-1 py-2"
+                    style={{ marginTop: gIdx > 0 ? 8 : 0 }}>
+                    <CalendarDays size={13} style={{ color: 'rgba(255,255,255,0.25)', flexShrink: 0 }} />
+                    <span className="text-xs font-semibold" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                      {dayLabel(group.date)}
+                    </span>
+                    <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.07)' }} />
+                    <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.2)' }}>
+                      {group.items.length} proc.
+                    </span>
+                  </motion.div>
+
+                  {/* Cards for this day */}
+                  <div className="flex flex-col gap-2">
+                    {group.items.map((p, idx) => (
+                      <motion.div key={p.id}
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: (prevCount + idx) * 0.03, duration: 0.2 }}>
+                        <ProcedureCard p={p}
+                          onClick={() => navigate(`/procedimentos/${p.id}`)}
+                          isChecked={checks.has(p.id)}
+                          onToggleCheck={e => { e.stopPropagation(); toggleCheck.mutate({ procedureId: p.id, checked: !checks.has(p.id) }) }}
+                        />
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </AnimatePresence>
       )}
