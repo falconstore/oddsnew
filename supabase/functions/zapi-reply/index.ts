@@ -306,6 +306,99 @@ Deno.serve(async (req) => {
     log("confirmation-freetext", { phone: phone.slice(0, 6) + "****", text: text.slice(0, 30) });
   }
 
+  // ── Lookup por email (lead não encontrado pelo telefone) ──────────────────
+  if (step === "awaiting_email_lookup") {
+    // Trata qualquer texto como candidato a email
+    const emailCandidate = text.trim().toLowerCase();
+    const looksLikeEmail = emailCandidate.includes("@") && emailCandidate.includes(".");
+
+    if (!looksLikeEmail) {
+      // Não parece um email — pede de novo
+      const trialUrl = Deno.env.get("ZAPI_TRIAL_URL") || "https://sharkgreen.com.br/trial";
+      await sendZApiText({
+        phone,
+        message: `Hmm, esse não parece um email válido 😅\n\nMe manda o email que você usou no cadastro, tipo: *seunome@gmail.com*\n\n_(Ainda não tem cadastro? É só acessar:_ 👉 ${trialUrl}_)_`,
+      });
+      return new Response(JSON.stringify({ ok: true, action: "email-invalid" }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // Busca no banco pelo email
+    const { data: foundLead } = await supabase
+      .from("trial_leads")
+      .select("id, email, whatsapp, invite_link, status")
+      .ilike("email", emailCandidate)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!foundLead) {
+      const trialUrl = Deno.env.get("ZAPI_TRIAL_URL") || "https://sharkgreen.com.br/trial";
+      await sendZApiText({
+        phone,
+        message: `Não encontrei nenhum cadastro com esse email 🤔\n\nVerifica se digitou certinho, ou faz o cadastro gratuito aqui (menos de 1 min):\n\n👉 ${trialUrl}`,
+      });
+      return new Response(JSON.stringify({ ok: true, action: "email-not-found" }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // Lead encontrado! Atualiza o whatsapp no banco e envia credenciais
+    await supabase.from("trial_leads")
+      .update({ whatsapp: phone.replace(/^\+?55/, "") })
+      .eq("id", foundLead.id);
+
+    // Vincula estado ao lead
+    await supabase.from("zapi_conversation_state").upsert({
+      phone,
+      step: "done",
+      lead_id: foundLead.id,
+      follow_up_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+      follow_up_sent: false,
+      welcome_video_sent: false,
+      nudge_at: null,
+      nudge_count: 3,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "phone" });
+
+    // Gera invite_link se não tiver
+    let inviteLink = foundLead.invite_link ?? null;
+    if (!inviteLink) {
+      const botToken = Deno.env.get("TELEGRAM_TRIAL_BOT_TOKEN");
+      const chatId   = Deno.env.get("TELEGRAM_TRIAL_CHAT_ID");
+      if (botToken && chatId) {
+        try {
+          const tgRes  = await fetch(`https://api.telegram.org/bot${botToken}/createChatInviteLink`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ chat_id: Number(chatId), member_limit: 1 }),
+          });
+          const tgData = await tgRes.json().catch(() => ({}));
+          inviteLink = tgData?.result?.invite_link ?? null;
+          if (inviteLink) {
+            await supabase.from("trial_leads").update({ invite_link: inviteLink }).eq("id", foundLead.id);
+          }
+        } catch { /* silencioso */ }
+      }
+    }
+
+    // Envia Telegram
+    if (inviteLink) {
+      await sendZApiText({ phone, message: buildTelegramMessage(inviteLink) });
+    }
+    await sleep(4000);
+
+    // Envia App
+    const appPassword = foundLead.whatsapp ?? phone.replace(/^\+?55/, "");
+    await sendZApiText({ phone, message: buildAppMessage(foundLead.email, appPassword) });
+
+    log("email-lookup-success", { phone: phone.slice(0, 6) + "****", email: emailCandidate });
+    return new Response(JSON.stringify({ ok: true, action: "email-lookup-success" }), {
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   // ── Tipo de ajuda (Telegram ou App) ──────────────────────────────────────
   // Mesmo padrão: cada case retorna; texto livre cai no Claude abaixo.
   if (step === "awaiting_help_type") {
@@ -488,6 +581,28 @@ Deno.serve(async (req) => {
           log("invite-link-gen-error", { error: String(e) });
         }
       }
+    }
+
+    // Lead não encontrado no banco — pede email ou direciona ao cadastro
+    if (!effectiveLeadId) {
+      const trialUrl = Deno.env.get("ZAPI_TRIAL_URL") || "https://sharkgreen.com.br/trial";
+      const notFoundMsg = [
+        `Hmm, não encontrei seu cadastro aqui 🤔`,
+        ``,
+        `Para liberar seu acesso gratuito, é só se cadastrar — leva menos de 1 minuto:`,
+        ``,
+        `👉 ${trialUrl}`,
+        ``,
+        `_Se já se cadastrou, me manda seu *e-mail de cadastro* que eu localizo aqui!_ 📧`,
+      ].join("\n");
+      await sendZApiText({ phone, message: notFoundMsg });
+      await supabase.from("zapi_conversation_state")
+        .update({ step: "awaiting_email_lookup", updated_at: new Date().toISOString() })
+        .eq("phone", phone);
+      log("lead-not-found", { phone: phone.slice(0, 6) + "****", choice });
+      return new Response(JSON.stringify({ ok: true, action: "lead-not-found" }), {
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     if (choice === "opt_telegram" || choice === "opt_both") {
