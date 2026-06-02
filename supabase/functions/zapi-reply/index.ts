@@ -622,6 +622,30 @@ Deno.serve(async (req) => {
       } else {
         await sendZApiText({ phone, message: "📱 *App VIP Shark*\n\nSuas credenciais estão sendo processadas! Em instantes você recebe aqui. 🦈" });
       }
+
+      // Garante que o trial começa quando as credenciais são entregues,
+      // mesmo que o usuário nunca entre no grupo do Telegram.
+      // Só atualiza se expires_at ainda está NULL (não sobrescreve trial já iniciado).
+      if (effectiveLeadId) {
+        const { data: leadCheck } = await supabase
+          .from("trial_leads")
+          .select("expires_at, entered_at")
+          .eq("id", effectiveLeadId)
+          .maybeSingle();
+        if (leadCheck && !leadCheck.expires_at) {
+          const trialStart = new Date();
+          const trialEnd   = new Date(trialStart.getTime() + 7 * 24 * 60 * 60 * 1000);
+          await supabase
+            .from("trial_leads")
+            .update({
+              entered_at: leadCheck.entered_at ?? trialStart.toISOString(),
+              expires_at: trialEnd.toISOString(),
+              status: "active",
+            })
+            .eq("id", effectiveLeadId);
+          log("trial-started-via-app", { lead_id: effectiveLeadId });
+        }
+      }
     }
 
     if (choice !== "opt_telegram" && choice !== "opt_app" && choice !== "opt_both") {
