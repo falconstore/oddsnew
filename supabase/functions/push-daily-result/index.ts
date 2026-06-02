@@ -99,7 +99,7 @@ Deno.serve(async (req: Request) => {
         title,
         body_text: bodyText,
         tag: 'daily_result',
-        url: '/',
+        url: '/app/',
         triggered_by: 'cron_daily_result',
       }),
     })

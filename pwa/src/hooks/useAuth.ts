@@ -67,7 +67,10 @@ export function useAuth(): AuthState {
 
         if (isSubscriber) {
           setStatus('active_subscriber')
-        } else if (trialExpires && trialExpires > now) {
+        } else if (!trialExpires) {
+          // expires_at não definido → trial ainda não expirou, tratar como ativo
+          setStatus('active_trial')
+        } else if (trialExpires > now) {
           setStatus('active_trial')
         } else {
           setStatus('expired')

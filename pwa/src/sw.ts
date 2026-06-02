@@ -67,7 +67,7 @@ self.addEventListener('push', (event: PushEvent) => {
           tag: 'sg-group',
           renotify: true,
           vibrate: [150, 80, 150],
-          data: { url: '/procedures' },
+          data: { url: '/app/procedimentos' },
         } as NotificationOptions)
       }
 
@@ -88,7 +88,7 @@ self.addEventListener('push', (event: PushEvent) => {
 // ─── Notification click — open or focus app ──────────────────────────────────
 self.addEventListener('notificationclick', (event: NotificationEvent) => {
   event.notification.close()
-  const url: string = (event.notification.data as any)?.url ?? '/'
+  const url: string = (event.notification.data as any)?.url ?? '/app/'
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clients => {
       const existing = clients.find(c => c.url.startsWith(self.registration.scope))

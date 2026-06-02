@@ -224,7 +224,7 @@ function buildPayload(body: PushBody): { title: string; body: string; tag: strin
         title: `🦈 Novo procedimento${n}`,
         body: `${body.tipo ?? 'Procedimento'} adicionado${platform}`,
         tag: 'new_procedure',
-        data: { url: '/procedures' },
+        data: { url: '/app/procedimentos' },
       }
     }
     case 'daily_summary': {
@@ -233,15 +233,15 @@ function buildPayload(body: PushBody): { title: string; body: string; tag: strin
         title: '📊 Resumo do dia',
         body: `${body.count ?? 0} procedimentos hoje${profit}`,
         tag: 'daily_summary',
-        data: { url: '/' },
+        data: { url: '/app/' },
       }
     }
     case 'subscription_pending':
-      return { title: '⚠️ Pagamento pendente', body: 'Confirme o pagamento para manter seu acesso ativo.', tag: 'sub_pending', data: { url: '/assinatura' } }
+      return { title: '⚠️ Pagamento pendente', body: 'Confirme o pagamento para manter seu acesso ativo.', tag: 'sub_pending', data: { url: '/app/assinatura' } }
     case 'subscription_canceled':
-      return { title: '❌ Assinatura cancelada', body: 'Seu acesso foi encerrado. Renove para continuar.', tag: 'sub_canceled', data: { url: '/assinatura' } }
+      return { title: '❌ Assinatura cancelada', body: 'Seu acesso foi encerrado. Renove para continuar.', tag: 'sub_canceled', data: { url: '/app/assinatura' } }
     case 'subscription_expired':
-      return { title: '⏰ Acesso expirado', body: 'Seu trial/assinatura expirou. Renove agora.', tag: 'sub_expired', data: { url: '/assinatura' } }
+      return { title: '⏰ Acesso expirado', body: 'Seu trial/assinatura expirou. Renove agora.', tag: 'sub_expired', data: { url: '/app/assinatura' } }
     case 'custom':
     default:
       return {
