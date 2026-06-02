@@ -829,7 +829,34 @@ serve(async (req) => {
       }
 
       // 1c) Se o lead já foi removido/bloqueado/expirado → re-kick imediato
+      // EXCEÇÃO: se status="removed" mas o trial ainda está válido (expires_at no futuro),
+      // re-ativa o lead ao invés de kickar. Isso cobre casos onde o usuário foi kickado
+      // acidentalmente (Telegram anti-spam, admin humano, outro bot) e tenta re-entrar.
       if (BLOCKED_LEAD_STATUSES.has(lead.status)) {
+        const isJustRemoved = lead.status === "removed";
+        const hasValidTrial = !!lead.expires_at && new Date(lead.expires_at) > new Date();
+
+        if (isJustRemoved && hasValidTrial) {
+          // Trial ainda válido → re-ativa o lead
+          await supabase
+            .from("trial_leads")
+            .update({
+              status: "active",
+              telegram_user_id: userId,
+              removed_at: null,
+              entered_at: new Date().toISOString(),
+            })
+            .eq("id", lead.id);
+          log("reactivated-valid-trial", {
+            update_id: updateId,
+            lead_id: lead.id,
+            expires_at: lead.expires_at,
+            found_via: foundVia,
+            user_id: userId,
+          });
+          return json({ ok: true, action: "reactivated-valid-trial", lead_id: lead.id });
+        }
+
         if (botToken && expectedChatId) {
           // Revoga ANTES do ban+unban para quebrar o loop de re-entrada.
           if (lead.invite_link) {
