@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { User, LogOut, Clock, Crown, Send, AlertCircle, Bell, BellOff, CreditCard, ChevronRight, X, Settings } from 'lucide-react'
+import { User, LogOut, Clock, Crown, Send, AlertCircle, Bell, BellOff, CreditCard, ChevronRight, X, Settings, Lock, CheckCircle } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { format, parseISO, differenceInDays } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -59,6 +59,27 @@ export function Profile() {
   function handlePushClick() {
     if (push.state === 'denied') { setShowDeniedHelp(true); return }
     if (canTogglePush) push.toggle()
+  }
+
+  const [showChangePw, setShowChangePw] = useState(false)
+  const [newPw, setNewPw] = useState('')
+  const [confirmPw, setConfirmPw] = useState('')
+  const [showPw, setShowPw] = useState(false)
+  const [pwLoading, setPwLoading] = useState(false)
+  const [pwError, setPwError] = useState('')
+  const [pwDone, setPwDone] = useState(false)
+
+  async function handleChangePassword(e: React.FormEvent) {
+    e.preventDefault()
+    if (newPw.length < 6) { setPwError('Mínimo 6 caracteres.'); return }
+    if (newPw !== confirmPw) { setPwError('As senhas não coincidem.'); return }
+    setPwLoading(true); setPwError('')
+    const { supabase: sb } = await import('@/lib/supabase')
+    const { error: err } = await sb.auth.updateUser({ password: newPw, data: { needs_password_change: false } })
+    setPwLoading(false)
+    if (err) { setPwError('Erro ao salvar. Tente novamente.'); return }
+    setPwDone(true)
+    setTimeout(() => { setShowChangePw(false); setPwDone(false); setNewPw(''); setConfirmPw('') }, 2000)
   }
 
   const [refreshDone, setRefreshDone] = useState(false)
@@ -148,6 +169,21 @@ export function Profile() {
           <div className="flex-1">
             <p className="text-sm font-semibold text-white">Minha Assinatura</p>
             <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>Status, histórico e faturas</p>
+          </div>
+          <ChevronRight size={16} style={{ color: 'rgba(255,255,255,0.3)' }} />
+        </button>
+
+        {/* Trocar senha */}
+        <button onClick={() => { setShowChangePw(true); setPwError(''); setPwDone(false) }}
+          className="glass flex items-center gap-3 p-4 w-full text-left active:scale-[0.98] transition-transform"
+          style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+               style={{ background: 'rgba(255,255,255,0.05)' }}>
+            <Lock size={18} style={{ color: 'rgba(255,255,255,0.5)' }} />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-white">Trocar senha</p>
+            <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>Defina uma senha pessoal para sua conta</p>
           </div>
           <ChevronRight size={16} style={{ color: 'rgba(255,255,255,0.3)' }} />
         </button>
@@ -248,6 +284,90 @@ export function Profile() {
         </button>
 
       </motion.div>
+
+      {/* Modal: trocar senha */}
+      <AnimatePresence>
+        {showChangePw && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setShowChangePw(false)}
+              className="fixed inset-0 z-40"
+              style={{ background: 'rgba(0,0,0,0.7)' }}
+            />
+            <motion.div
+              initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+              className="fixed bottom-0 left-0 right-0 z-50 rounded-t-3xl p-6"
+              style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div className="flex items-center justify-between mb-5">
+                <div className="flex items-center gap-2">
+                  <Lock size={18} style={{ color: 'hsl(145 80% 48%)' }} />
+                  <h2 className="text-base font-bold text-white">Trocar senha</h2>
+                </div>
+                <button onClick={() => setShowChangePw(false)}
+                  className="w-8 h-8 rounded-full flex items-center justify-center"
+                  style={{ background: 'rgba(255,255,255,0.08)' }}>
+                  <X size={16} style={{ color: 'rgba(255,255,255,0.6)' }} />
+                </button>
+              </div>
+
+              {pwDone ? (
+                <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+                  className="flex flex-col items-center gap-3 py-6">
+                  <CheckCircle size={40} style={{ color: 'hsl(145 80% 48%)' }} />
+                  <p className="text-white font-semibold">Senha alterada com sucesso!</p>
+                </motion.div>
+              ) : (
+                <form onSubmit={handleChangePassword} className="flex flex-col gap-3">
+                  <div className="glass p-4 flex items-center gap-3">
+                    <Lock size={16} style={{ color: 'rgba(255,255,255,0.35)', flexShrink: 0 }} />
+                    <input
+                      type={showPw ? 'text' : 'password'}
+                      placeholder="Nova senha (mín. 6 caracteres)"
+                      value={newPw}
+                      onChange={e => setNewPw(e.target.value)}
+                      required
+                      className="flex-1 bg-transparent text-white text-sm outline-none placeholder-white/30"
+                      autoComplete="new-password"
+                    />
+                    <button type="button" onClick={() => setShowPw(v => !v)} className="flex-shrink-0 p-1">
+                      <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13 }}>{showPw ? 'ocultar' : 'ver'}</span>
+                    </button>
+                  </div>
+                  <div className="glass p-4 flex items-center gap-3">
+                    <Lock size={16} style={{ color: 'rgba(255,255,255,0.35)', flexShrink: 0 }} />
+                    <input
+                      type={showPw ? 'text' : 'password'}
+                      placeholder="Confirmar nova senha"
+                      value={confirmPw}
+                      onChange={e => setConfirmPw(e.target.value)}
+                      required
+                      className="flex-1 bg-transparent text-white text-sm outline-none placeholder-white/30"
+                      autoComplete="new-password"
+                    />
+                  </div>
+                  {pwError && (
+                    <p className="text-xs text-center px-2" style={{ color: '#f87171' }}>{pwError}</p>
+                  )}
+                  <button type="submit" disabled={pwLoading || !newPw || !confirmPw}
+                    className="flex items-center justify-center gap-2 w-full py-4 rounded-2xl font-semibold text-sm transition-all active:scale-95 disabled:opacity-50 mt-1"
+                    style={{ background: 'hsl(145 80% 48%)', color: '#0b1120' }}>
+                    {pwLoading ? (
+                      <span className="flex gap-1">
+                        {[0,1,2].map(i => (
+                          <span key={i} className="w-1.5 h-1.5 rounded-full bg-current animate-bounce"
+                                style={{ animationDelay: `${i * 0.15}s` }} />
+                        ))}
+                      </span>
+                    ) : 'Salvar nova senha'}
+                  </button>
+                </form>
+              )}
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* Modal: como desbloquear notificações */}
       <AnimatePresence>

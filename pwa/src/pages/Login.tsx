@@ -39,11 +39,7 @@ export function Login() {
       }
       return
     }
-    // Primeiro acesso: redireciona para trocar a senha temporária (WhatsApp)
-    if (data?.user?.user_metadata?.needs_password_change) {
-      window.location.replace('/app/set-password')
-    }
-    // Caso contrário onAuthStateChange no useAuth redireciona automaticamente
+    // onAuthStateChange no useAuth redireciona automaticamente
   }
 
   async function handleForgot(e: React.FormEvent) {
