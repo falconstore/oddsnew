@@ -9,7 +9,7 @@
 //
 // deno-lint-ignore-file
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { sendZApiText, sendZApiButtonList, sendZApiImage } from "../_shared/zapi.ts";
+import { sendZApiText, sendZApiButtonList, sendZApiImage, sendZApiVideo } from "../_shared/zapi.ts";
 
 const log = (event: string, data: Record<string, unknown> = {}) =>
   console.log(JSON.stringify({ tag: "zapi-nurture", event, ts: new Date().toISOString(), ...data }));
@@ -527,6 +527,42 @@ Deno.serve(async (req) => {
   const source = String(body.source ?? "cron");
 
   log("start", { source });
+
+  // Blast de vídeo: envia vídeo de boas-vindas pra lista específica de phones
+  if (source === "video_blast") {
+    const phones = (body.phones as string[] | undefined) ?? [];
+    if (!Array.isArray(phones) || phones.length === 0) {
+      return new Response(JSON.stringify({ ok: false, error: "phones array required" }), { status: 400 });
+    }
+    const videoUrl = Deno.env.get("ZAPI_WELCOME_VIDEO_URL") ?? "";
+    if (!videoUrl) {
+      return new Response(JSON.stringify({ ok: false, error: "ZAPI_WELCOME_VIDEO_URL not set" }), { status: 400 });
+    }
+    let sent = 0; let failed = 0;
+    for (const rawPhone of phones) {
+      const phone = buildPhone55(rawPhone);
+      try {
+        await sendZApiVideo({
+          phone,
+          videoUrl,
+          caption: "🎥 Assista esse vídeo para aproveitar ao máximo seu trial no *Shark Green* 🦈",
+        });
+        await supabase.from("zapi_conversation_state")
+          .update({ welcome_video_sent: true, updated_at: new Date().toISOString() })
+          .eq("phone", phone);
+        log("video-blast-sent", { phone: phone.slice(0, 6) + "****" });
+        sent++;
+      } catch (e) {
+        log("video-blast-error", { phone: phone.slice(0, 6) + "****", error: String(e) });
+        failed++;
+      }
+      if (phones.indexOf(rawPhone) < phones.length - 1) await sleep(2500);
+    }
+    log("video-blast-done", { sent, failed });
+    return new Response(JSON.stringify({ ok: true, sent, failed }), {
+      headers: { "Content-Type": "application/json" },
+    });
+  }
 
   // Blast manual: envia salva-contato + menu pra lista de phones
   if (source === "manual_blast") {
