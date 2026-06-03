@@ -3,6 +3,7 @@ import { supabaseProcedures, isProceduresSupabaseConfigured } from '@/lib/supaba
 import { Procedure, FreebetCreditada } from '@/types/procedures';
 import { toast } from '@/hooks/use-toast';
 import { syncProcedureBestEffort } from '@/lib/freebetproSync';
+import { normalizePlatformName } from '@/lib/procedureUtils';
 
 const PROCEDURES_KEY = ['procedures'];
 
@@ -48,9 +49,14 @@ export function useCreateProcedure() {
         throw new Error('Procedures Supabase not configured');
       }
 
+      const normalized = {
+        ...procedure,
+        platform: normalizePlatformName(procedure.platform ?? ''),
+      };
+
       const { data, error } = await supabaseProcedures
         .from('procedures')
-        .insert([procedure])
+        .insert([normalized])
         .select()
         .single();
 
@@ -84,6 +90,10 @@ export function useUpdateProcedure() {
     mutationFn: async ({ id, ...updates }: Partial<Procedure> & { id: string }) => {
       if (!isProceduresSupabaseConfigured()) {
         throw new Error('Procedures Supabase not configured');
+      }
+
+      if (updates.platform !== undefined) {
+        updates = { ...updates, platform: normalizePlatformName(updates.platform ?? '') };
       }
 
       const { data, error } = await supabaseProcedures
