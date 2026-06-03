@@ -50,7 +50,7 @@ export default function ProcedureControl() {
   const [editingProcedure, setEditingProcedure] = useState<Procedure | null>(null);
   const [resultProcedure, setResultProcedure] = useState<Procedure | null>(null);
   // selectedMonth shared via localStorage with Dashboard (same key)
-  const [selectedMonth] = usePersistedState('proc_month', new Date());
+  const [selectedMonth, setSelectedMonth] = usePersistedState('proc_month', new Date());
   const [showImportModal, setShowImportModal] = useState(false);
   const [showRelatorioModal, setShowRelatorioModal] = useState(false);
   const [showColumnCustomizer, setShowColumnCustomizer] = useState(false);
@@ -292,6 +292,8 @@ export default function ProcedureControl() {
           platforms={getAllPlatforms(procedures)}
           statuses={getAllStatuses(procedures)}
           availableTags={getAllTags(procedures)}
+          selectedMonth={selectedMonth}
+          onMonthChange={setSelectedMonth}
         />
 
         {/* ── Lista de Procedimentos ── */}

@@ -1,9 +1,11 @@
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { ProcedureFilters as FiltersType, PROCEDURE_CATEGORIES, PROCEDURE_STATUSES } from '@/types/procedures';
-import { Search, Building2, Tag, Activity, TrendingUp, AlertCircle, Ticket, Star, Archive, Clock } from 'lucide-react';
+import { addMonths, subMonths } from 'date-fns';
+import { Search, Building2, Tag, Activity, TrendingUp, AlertCircle, Ticket, Star, Archive, Clock, ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
 
 interface ProcedureFiltersProps {
   filters: FiltersType;
@@ -11,12 +13,21 @@ interface ProcedureFiltersProps {
   platforms: string[];
   statuses: string[];
   availableTags: string[];
+  selectedMonth: Date;
+  onMonthChange: (month: Date) => void;
 }
 
-export function ProcedureFilters({ filters, onFilterChange, platforms, availableTags }: ProcedureFiltersProps) {
+const MONTH_NAMES_PT = [
+  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+];
+
+export function ProcedureFilters({ filters, onFilterChange, platforms, availableTags, selectedMonth, onMonthChange }: ProcedureFiltersProps) {
   const updateFilter = <K extends keyof FiltersType>(key: K, value: FiltersType[K]) => {
     onFilterChange({ ...filters, [key]: value });
   };
+
+  const monthLabel = `${MONTH_NAMES_PT[selectedMonth.getMonth()]} ${selectedMonth.getFullYear()}`;
 
   return (
     <div className="glass rounded-2xl border border-white/5 p-4">
@@ -27,6 +38,39 @@ export function ProcedureFilters({ filters, onFilterChange, platforms, available
         <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Filtros</span>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+
+        {/* ── Seletor de Mês ── */}
+        <div>
+          <Label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 mb-1.5">
+            <CalendarDays className="w-3 h-3" /> Mês
+          </Label>
+          <div className="flex items-center gap-1 h-8 rounded-md bg-white/5 border border-white/10 px-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 text-muted-foreground hover:text-primary hover:bg-primary/10 flex-shrink-0"
+              onClick={() => onMonthChange(subMonths(selectedMonth, 1))}
+              data-testid="button-prev-month"
+              aria-label="Mês anterior"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </Button>
+            <span className="flex-1 text-center text-xs font-semibold text-foreground truncate" data-testid="label-selected-month">
+              {monthLabel}
+            </span>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 text-muted-foreground hover:text-primary hover:bg-primary/10 flex-shrink-0"
+              onClick={() => onMonthChange(addMonths(selectedMonth, 1))}
+              data-testid="button-next-month"
+              aria-label="Próximo mês"
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+        </div>
+
         <div>
           <Label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 mb-1.5">
             <Search className="w-3 h-3" /> Nº Procedimento
