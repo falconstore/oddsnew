@@ -102,7 +102,7 @@ export const getCurrentMonthProfit = (procedures: Procedure[], selectedMonth: Da
       const procDate = proc.date ? parseDate(proc.date) : null;
       return procDate && !isNaN(procDate.getTime()) && procDate >= monthStart && procDate <= monthEnd;
     })
-    .reduce((sum, proc) => sum + (proc.profit_loss || 0), 0);
+    .reduce((sum, proc) => sum + calcLucroEfetivo(proc), 0);
 };
 
 export const getAverageDailyProfit = (procedures: Procedure[], selectedMonth: Date): number => {
@@ -191,7 +191,7 @@ export const getBestPlatform = (procedures: Procedure[], selectedMonth: Date) =>
       if (!platformStats[proc.platform]) {
         platformStats[proc.platform] = { profit: 0, count: 0 };
       }
-      platformStats[proc.platform].profit += proc.profit_loss || 0;
+      platformStats[proc.platform].profit += calcLucroEfetivo(proc);
       platformStats[proc.platform].count += 1;
     }
   });
@@ -219,7 +219,7 @@ export const getDayWithMostProfit = (procedures: Procedure[], selectedMonth: Dat
     const procDate = parseDate(proc.date);
     if (procDate) {
       const dateKey = format(procDate, 'dd/MM', { locale: ptBR });
-      dailyProfits[dateKey] = (dailyProfits[dateKey] || 0) + (proc.profit_loss || 0);
+      dailyProfits[dateKey] = (dailyProfits[dateKey] || 0) + calcLucroEfetivo(proc);
     }
   });
 
@@ -282,7 +282,7 @@ export const getMountainChartData = (procedures: Procedure[], selectedMonth: Dat
   monthProcs.forEach(proc => {
     const procDate = parseDate(proc.date);
     if (procDate && !isNaN(procDate.getTime())) {
-      balance += proc.profit_loss || 0;
+      balance += calcLucroEfetivo(proc);
       data.push({
         date: format(procDate, 'dd/MM', { locale: ptBR }),
         balance: balance
@@ -293,10 +293,16 @@ export const getMountainChartData = (procedures: Procedure[], selectedMonth: Dat
   return data;
 };
 
-// lucro_efetivo: usa duplo_green_lucro para DG confirmado, senão profit_loss
-const getLucroEfetivo = (proc: Procedure): number => {
+/**
+ * Hierarquia canônica para valor efetivo de lucro de um procedimento:
+ * DG confirmado → resultado_lucro → profit_loss (se ≠ 0) → lucro_prejuizo_previsto
+ * Usada em TODOS os cálculos de lucro (gráfico, total mensal, card hoje, KPIs).
+ */
+export const calcLucroEfetivo = (proc: Procedure): number => {
   if (proc.duplo_green_confirmado && proc.duplo_green_lucro != null) return Number(proc.duplo_green_lucro);
-  return Number(proc.profit_loss ?? 0);
+  if (proc.resultado_lucro != null) return Number(proc.resultado_lucro);
+  if (Number(proc.profit_loss) !== 0) return Number(proc.profit_loss);
+  return Number(proc.lucro_prejuizo_previsto ?? 0);
 };
 
 export const getDailyProfitData = (procedures: Procedure[], selectedMonth: Date) => {
@@ -316,7 +322,7 @@ export const getDailyProfitData = (procedures: Procedure[], selectedMonth: Date)
         if (!dailyData[dateKey]) {
           dailyData[dateKey] = { profit: 0, count: 0, fbCount: 0, fbTotal: 0, dgCount: 0 };
         }
-        dailyData[dateKey].profit += getLucroEfetivo(proc);
+        dailyData[dateKey].profit += calcLucroEfetivo(proc);
         dailyData[dateKey].count += 1;
         // Freebets ganhas no dia (resultado_freebet_ganha > 0)
         const fbGanha = proc.resultado_freebet_ganha ?? 0;
@@ -563,16 +569,6 @@ export interface DailyStats {
   date: string; // YYYY-MM-DD
 }
 
-// Retorna o melhor valor disponível para o KPI de Lucro Bruto do dia,
-// usando a mesma hierarquia da coluna L/P na tabela de procedimentos:
-// DG confirmado > resultado_lucro > profit_loss (se != 0) > lucro_prejuizo_previsto
-const getLucroEfetivoKpi = (p: Procedure): number => {
-  if (p.duplo_green_confirmado && p.duplo_green_lucro != null) return Number(p.duplo_green_lucro);
-  if (p.resultado_lucro != null) return Number(p.resultado_lucro);
-  if (Number(p.profit_loss) !== 0) return Number(p.profit_loss);
-  return Number(p.lucro_prejuizo_previsto ?? 0);
-};
-
 export const getDailyStats = (procedures: Procedure[], date?: Date): DailyStats => {
   const ref = date ?? new Date();
   const today = format(ref, 'yyyy-MM-dd');
@@ -586,8 +582,7 @@ export const getDailyStats = (procedures: Procedure[], date?: Date): DailyStats 
   const totalFreebets = fbProcs.length;
   const totalFreebetsValor = fbProcs.reduce((s, p) => s + (Number(p.freebet_value) || 0), 0);
   const totalSemFb = todayProcs.filter(p => p.tipo === 'SEM_FB').length;
-  // Usa hierarquia completa: DG > resultado_lucro > profit_loss > lucro_prejuizo_previsto
-  const lucroBruto = todayProcs.reduce((s, p) => s + getLucroEfetivoKpi(p), 0);
+  const lucroBruto = todayProcs.reduce((s, p) => s + calcLucroEfetivo(p), 0);
   const operacoesEncerradas = todayProcs.filter(p =>
     p.resultado_lucro != null || Number(p.profit_loss) !== 0
   ).length;
