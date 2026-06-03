@@ -485,13 +485,14 @@ export const getCategoryBadgeClass = (category: string): string => {
 
 export const getAllPlatforms = (procedures: Procedure[]): string[] => {
   if (!procedures || !Array.isArray(procedures)) return [];
-  // Normaliza para UPPERCASE antes de deduplicar — evita "Betfusion" e "BETFUSION"
-  // aparecerem como casas distintas.
+  // Normaliza para Title Case usando normalizePlatformName — deduplica variações
+  // de capitalização (ex: "NOVIBET", "Novibet", "novibet" → "Novibet").
   const seen = new Set<string>();
   const platforms: string[] = [];
   for (const proc of procedures) {
     if (!proc.platform) continue;
-    const normalized = proc.platform.trim().toUpperCase();
+    const normalized = normalizePlatformName(proc.platform);
+    if (!normalized) continue;
     if (!seen.has(normalized)) { seen.add(normalized); platforms.push(normalized); }
   }
   return platforms.sort();

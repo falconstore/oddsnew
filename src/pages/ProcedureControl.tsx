@@ -15,6 +15,7 @@ import {
   getAllPlatforms,
   getAllStatuses,
   getAllTags,
+  normalizePlatformName,
 } from '@/lib/procedureUtils';
 
 import { ProcedureFilters } from '@/components/procedures/ProcedureFilters';
@@ -116,7 +117,7 @@ export default function ProcedureControl() {
       if (filters.searchPromotion && proc.promotion_name && !proc.promotion_name.toLowerCase().includes(filters.searchPromotion.toLowerCase())) return false;
       if (filters.searchTags !== 'all' && !proc.tags?.includes(filters.searchTags)) return false;
       if (filters.onlyFavorites && !proc.is_favorite) return false;
-      if (filters.platform !== 'all' && proc.platform?.trim().toUpperCase() !== filters.platform) return false;
+      if (filters.platform !== 'all' && normalizePlatformName(proc.platform) !== filters.platform) return false;
       if (filters.category !== 'all' && proc.category !== filters.category) return false;
       if (filters.status !== 'all' && proc.status !== filters.status) return false;
 
