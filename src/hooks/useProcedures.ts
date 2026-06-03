@@ -19,7 +19,8 @@ export function useProcedures() {
       const { data, error } = await supabaseProcedures
         .from('procedures')
         .select('*')
-        .order('date', { ascending: false });
+        .order('date', { ascending: false })
+        .limit(10000);
 
       if (error) {
         console.error('Error fetching procedures:', error);
