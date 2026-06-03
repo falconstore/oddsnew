@@ -780,17 +780,39 @@ Deno.serve(async (req) => {
   // ── Primeira mensagem (contato novo, step = initial) ──────────────────────
   // Tenta casar o lead pelo número de WhatsApp (todas as variantes BR)
   let resolvedLeadId = leadId;
+  let resolvedCt: string | null = null;
   if (!resolvedLeadId) {
     for (const variant of buildPhoneVariants(phone)) {
       const { data: lead } = await supabase
         .from("trial_leads")
-        .select("id")
+        .select("id, ct")
         .eq("whatsapp", variant)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
-      if (lead) { resolvedLeadId = lead.id; break; }
+      if (lead) {
+        resolvedLeadId = lead.id;
+        resolvedCt = (lead as any).ct ?? null;
+        break;
+      }
     }
+  }
+
+  // Dispara conversão AdScala server-side na primeira mensagem (step=initial)
+  // Motivo: mais confiável que pixel cliente — não é bloqueado por adblock/iOS.
+  // Só dispara uma vez (step=initial) e só quando o lead veio de anúncio com ?ct=.
+  if (step === "initial" && resolvedCt) {
+    fetch("https://adscala.com.br/api/webhook/venda", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        trackingCode: resolvedCt,
+        pedidoId: resolvedLeadId ?? `wa-${phone.slice(-8)}-${Date.now()}`,
+        valor: 0,
+      }),
+    })
+      .then(() => log("adscala-conversion-sent", { lead_id: resolvedLeadId, ct_prefix: resolvedCt!.slice(0, 8) }))
+      .catch((e) => log("adscala-conversion-error", { error: String(e) }));
   }
 
   // Envia o menu
