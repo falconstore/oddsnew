@@ -1,7 +1,9 @@
 import { useState, useMemo } from 'react';
 import { usePersistedState } from '@/hooks/usePersistedState';
 import { startOfMonth, endOfMonth, endOfDay, differenceInDays } from 'date-fns';
-import { Plus, FileText, Columns, Upload, List, Bot } from 'lucide-react';
+import { Plus, FileText, Columns, Upload, List, Bot, Wand2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { supabaseProcedures } from '@/lib/supabaseProcedures';
 
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
@@ -53,6 +55,8 @@ export default function ProcedureControl() {
   const [showRelatorioModal, setShowRelatorioModal] = useState(false);
   const [showColumnCustomizer, setShowColumnCustomizer] = useState(false);
   const [showRegisterBotModal, setShowRegisterBotModal] = useState(false);
+  const [isNormalizingPlatforms, setIsNormalizingPlatforms] = useState(false);
+  const { toast } = useToast();
 
   const [filters, setFilters] = usePersistedState<FiltersType>('proc_filters', {
     searchNumber: '',
@@ -79,6 +83,27 @@ export default function ProcedureControl() {
   const handleAdd = () => {
     setEditingProcedure(null);
     setShowModal(true);
+  };
+
+  const handleNormalizePlatforms = async () => {
+    setIsNormalizingPlatforms(true);
+    try {
+      const { data, error } = await supabaseProcedures.rpc('normalize_procedure_platforms');
+      if (error) throw error;
+      const count = data as number;
+      await refetch();
+      toast({
+        title: 'Plataformas normalizadas',
+        description: count > 0
+          ? `${count} registro${count !== 1 ? 's' : ''} corrigido${count !== 1 ? 's' : ''} com sucesso.`
+          : 'Nenhum registro precisava de correção.',
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Erro desconhecido';
+      toast({ title: 'Erro ao normalizar', description: msg, variant: 'destructive' });
+    } finally {
+      setIsNormalizingPlatforms(false);
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -218,6 +243,18 @@ export default function ProcedureControl() {
               >
                 <FileText className="w-3.5 h-3.5 mr-1.5" />
                 Gerar Relatório
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleNormalizePlatforms}
+                disabled={isNormalizingPlatforms}
+                size="sm"
+                className="border-white/10 hover:bg-white/5 h-9"
+                data-testid="button-normalizar-plataformas"
+                title="Corrige capitalização dos nomes de plataforma já salvos no banco"
+              >
+                <Wand2 className="w-3.5 h-3.5 mr-1.5" />
+                {isNormalizingPlatforms ? 'Normalizando...' : 'Normalizar Plataformas'}
               </Button>
               <Button
                 variant="outline"
