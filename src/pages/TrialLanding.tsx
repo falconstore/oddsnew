@@ -803,6 +803,7 @@ function FreeGroupModal({ open, onClose }: { open: boolean; onClose: () => void 
   const [errors, setErrors] = useState<Partial<Record<'name' | 'whatsapp', string>>>({});
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
   const utmRef = useRef<UtmParams>({
     utm_source: null, utm_medium: null, utm_campaign: null,
     utm_content: null, utm_term: null, fbclid: null, ct: null,
@@ -831,6 +832,7 @@ function FreeGroupModal({ open, onClose }: { open: boolean; onClose: () => void 
     setForm({ name: '', whatsapp: '', email: '' });
     setErrors({});
     setServerError(null);
+    setSuccess(false);
     onClose();
   };
 
@@ -879,8 +881,9 @@ function FreeGroupModal({ open, onClose }: { open: boolean; onClose: () => void 
         url: FREE_GROUPS_URL,
       });
       trackPixel('Lead', { content_name: 'free-group' });
-      handleClose();
       window.open(FREE_GROUPS_URL, '_blank', 'noopener,noreferrer');
+      setSuccess(true);
+      setTimeout(() => handleClose(), 2000);
     } catch {
       setServerError('Erro de conexão. Verifique sua internet e tente novamente.');
     } finally {
@@ -894,6 +897,23 @@ function FreeGroupModal({ open, onClose }: { open: boolean; onClose: () => void 
         className="bg-[hsl(150_30%_5%)] border border-emerald-500/30 text-white max-w-md"
         data-testid="modal-free-group"
       >
+        {success ? (
+          <div
+            className="flex flex-col items-center justify-center gap-4 py-8 text-center"
+            data-testid="modal-free-group-success"
+          >
+            <div className="w-16 h-16 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center animate-pulse">
+              <span className="text-3xl">✅</span>
+            </div>
+            <div>
+              <p className="text-lg font-bold text-emerald-400">Link aberto!</p>
+              <p className="text-sm text-white/70 mt-1 leading-relaxed">
+                Clique em <span className="text-white font-semibold">"Aceitar convite"</span> no Telegram para entrar no grupo.
+              </p>
+            </div>
+          </div>
+        ) : (
+        <>
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-white">
             Quase lá! 🦈 Informe seus dados para entrar
@@ -976,6 +996,8 @@ function FreeGroupModal({ open, onClose }: { open: boolean; onClose: () => void 
             Ao entrar, você concorda em receber sinais e comunicados do grupo.
           </p>
         </form>
+        </>
+        )}
       </DialogContent>
     </Dialog>
   );
