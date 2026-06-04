@@ -181,6 +181,7 @@ export const getBestPlatform = (procedures: Procedure[], selectedMonth: Date) =>
   const monthStart = startOfMonth(selectedMonth);
   const monthEnd = endOfDay(endOfMonth(selectedMonth));
   const monthProcs = getCountableProcedures(procedures).filter(proc => {
+    if (proc.tipo === 'GANHAR_FB') return false;
     const procDate = parseDate(proc.date);
     return procDate && procDate >= monthStart && procDate <= monthEnd;
   });
@@ -210,6 +211,7 @@ export const getDayWithMostProfit = (procedures: Procedure[], selectedMonth: Dat
   const monthStart = startOfMonth(selectedMonth);
   const monthEnd = endOfDay(endOfMonth(selectedMonth));
   const monthProcs = getCountableProcedures(procedures).filter(proc => {
+    if (proc.tipo === 'GANHAR_FB') return false;
     const procDate = parseDate(proc.date);
     return procDate && procDate >= monthStart && procDate <= monthEnd;
   });
