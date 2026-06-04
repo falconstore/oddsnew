@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { computeDeviceFingerprint } from '@/lib/deviceFingerprint';
 import { z } from 'zod';
 import {
   CheckCircle2, AlertCircle, Clock,
-  Star, ChevronDown, MessageCircle, Target, TrendingUp,
+  Star, ChevronDown, MessageCircle, Target, TrendingUp, Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+} from '@/components/ui/dialog';
 import proof1 from '@assets/WhatsApp_Image_2026-05-07_at_20.43.24_(3)_1778197516426.jpeg';
 import proof2 from '@assets/WhatsApp_Image_2026-05-07_at_20.43.24_(2)_1778197516427.jpeg';
 import proof3 from '@assets/WhatsApp_Image_2026-05-07_at_20.43.24_(1)_1778197516427.jpeg';
@@ -23,9 +24,8 @@ const HERO_WEBP_URL = '/images/hero.webp';
 const SUPABASE_URL = import.meta.env.VITE_MAIN_SUPABASE_URL as string;
 const SUPABASE_ANON = import.meta.env.VITE_MAIN_SUPABASE_ANON_KEY as string;
 
-const FREE_GROUPS_URL =
-  (import.meta.env.VITE_FREE_GROUPS_URL as string | undefined) ||
-  'https://t.me/+uxaDoyMx845kMGUx';
+const FREE_GROUPS_URL = 'https://t.me/sharkgreenfree2';
+const SUPPORT_URL = 'https://t.me/SuporteSharkGreen_financeiro';
 
 const PIXEL_ID = '1672225667108236';
 const PIXEL_SCRIPT_SRC = 'https://connect.facebook.net/en_US/fbevents.js';
@@ -49,6 +49,8 @@ declare global {
     t4y?: Track4YouFn;
     track4you?: Track4YouFn;
     T4Y?: { track?: Track4YouFn } | Track4YouFn;
+    adscala_sendConversion?: (opts: { trackingCode: string; pedidoId: string; valor: number }) => void;
+    multiads_sendConversion?: (opts: { trackingCode: string; pedidoId: string; valor: number }) => void;
   }
 }
 
@@ -169,7 +171,7 @@ function trackCapi(
   }
 }
 
-type TrackEvent = 'view' | 'cta_focus_form' | 'cta_free_group' | 'cta_checkout';
+type TrackEvent = 'view' | 'cta_free_group' | 'cta_free_group_modal_open' | 'cta_free_group_submitted' | 'cta_checkout';
 
 function track(event_type: TrackEvent, meta: Record<string, unknown> = {}) {
   if (!SUPABASE_URL || !SUPABASE_ANON) return;
@@ -193,24 +195,6 @@ function track(event_type: TrackEvent, meta: Record<string, unknown> = {}) {
   }
 }
 
-const schema = z.object({
-  name: z.string().trim().min(2, 'Informe seu nome completo'),
-  email: z.string().trim().toLowerCase().email('E-mail inválido'),
-  whatsapp: z.string().refine(v => v.replace(/\D/g, '').length >= 10, 'WhatsApp inválido (mín. 10 dígitos com DDD)'),
-  telegram_username: z.string()
-    .trim()
-    .min(3, '@ do Telegram muito curto')
-    .transform(v => v.replace(/^@/, '').toLowerCase())
-    .refine(v => /^[a-z0-9_]{3,32}$/.test(v), 'Use apenas letras, números e _'),
-});
-
-type FormState = {
-  name: string;
-  email: string;
-  whatsapp: string;
-  telegram_username: string;
-};
-
 const fmtWhatsapp = (raw: string) => {
   const d = raw.replace(/\D/g, '').slice(0, 11);
   if (d.length <= 2) return d;
@@ -219,18 +203,23 @@ const fmtWhatsapp = (raw: string) => {
   return d;
 };
 
+const modalSchema = z.object({
+  name: z.string().trim().min(2, 'Informe seu nome completo'),
+  whatsapp: z.string().refine(v => v.replace(/\D/g, '').length >= 10, 'WhatsApp inválido (mín. 10 dígitos com DDD)'),
+});
+
 const FAQ_ITEMS = [
   {
     q: 'Funciona de verdade? Não é mais um grupo de palpite?',
-    a: 'Não. O Shark 100% Green usa um método matemático de sinais antecipados — não palpites. Cada operação passa por filtro de valor, leitura de mercado e checagem de viabilidade antes de chegar pra você. E temos uma garantia de 7 dias: se não gostar, devolvemos 100% do valor, sem perguntas.',
+    a: 'Não. O Shark 100% Green usa um método matemático de sinais antecipados — não palpites. Cada operação passa por filtro de valor, leitura de mercado e checagem de viabilidade antes de chegar pra você.',
   },
   {
     q: 'Não entendo nada de apostas esportivas. Consigo usar?',
     a: 'Sim. O procedimento chega mastigado: qual casa, quanto colocar, qual odd mínima e qual prazo. Em média 3 minutos de execução. Se você sabe mexer em um app de banco, consegue operar aqui.',
   },
   {
-    q: 'R$ 148 é muito caro para testar',
-    a: 'Um green médio no Shark cobre o valor do acesso inteiro. Você tem 7 dias completos para validar isso na prática, e se não acontecer, devolvemos tudo. O risco real de testar é zero.',
+    q: 'É realmente gratuito? Tem algum custo?',
+    a: 'Sim, o Grupo Free é 100% gratuito, sem cartão e sem mensalidade. Você recebe os sinais e o passo a passo pelo grupo no Telegram. Se quiser acesso ao grupo VIP com cobertura completa e suporte individualizado, existe o plano pago — mas sem nenhuma obrigação.',
   },
   {
     q: 'Vou conseguir executar sozinho, sem ajuda?',
@@ -242,32 +231,33 @@ const FAQ_ITEMS = [
   },
   {
     q: 'Posso confiar em quem criou isso?',
-    a: 'O método tem histórico documentado, membros com resultados reais e uma política de devolução incondicional em 7 dias. Se não entregar o que promete, você sai com o dinheiro de volta. Simples assim.',
+    a: 'O método tem histórico documentado e membros com resultados reais — você verá os prints de comprovação na própria página. O Grupo Free existe exatamente para você validar o método antes de qualquer decisão.',
   },
 ];
 
 const TICKER_ITEMS = [
-  'Lucas M. fez R$312 em 5 dias de trial — São Paulo/SP',
+  'Lucas M. fez R$312 em 5 dias — São Paulo/SP',
   'Carla S.: R$487 na primeira semana, sem experiência',
   'Rafael O.: R$219 em 4 dias — Curitiba/PR',
   'Ana P.: R$380 em 7 dias — Rio de Janeiro/RJ',
-  'Rodrigo T.: primeiro green na manhã do dia 1',
+  'Rodrigo T.: primeiro green na manhã do primeiro dia',
   '+500 alunos ativos em todo o Brasil',
-  '7 dias grátis · acesso imediato · sem cartão',
+  'Grupo Free · acesso imediato · sem cartão',
   'Fernanda G.: R$290 trabalhando 1h por dia',
   'Marcos V.: sacou R$430 via PIX na primeira semana',
   'Juliana C.: zero experiência → R$260 em 6 dias',
   'Thiago B.: operou no intervalo do almoço e saiu positivo',
-  'Beatriz L.: R$195 no dia 2 de trial — Fortaleza/CE',
+  'Beatriz L.: R$195 no segundo dia — Fortaleza/CE',
 ];
 
 export default function TrialLanding() {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
-  const [formInView, setFormInView] = useState(true);
-  const formRef = useRef<HTMLDivElement | null>(null);
+  const [ctaInView, setCtaInView] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const ctaRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    document.title = 'Shark 100% Green — 7 Dias Grátis';
+    document.title = 'Shark 100% Green — Grupo Free de Sinais';
     let meta = document.querySelector('meta[name="description"]');
     if (!meta) {
       meta = document.createElement('meta');
@@ -276,7 +266,7 @@ export default function TrialLanding() {
     }
     meta.setAttribute(
       'content',
-      '7 dias grátis no grupo VIP Shark 100% Green: +500 alunos lucrando R$200/dia com promoções esportivas. Sem cartão. Acesso imediato.',
+      'Entre no Grupo Free Shark 100% Green: +500 alunos lucrando R$200/dia com promoções esportivas. 100% gratuito. Acesso imediato.',
     );
   }, []);
 
@@ -374,35 +364,19 @@ export default function TrialLanding() {
   }, []);
 
   useEffect(() => {
-    const el = formRef.current;
+    const el = ctaRef.current;
     if (!el) return;
     const observer = new IntersectionObserver(
-      ([entry]) => setFormInView(entry.isIntersecting),
+      ([entry]) => setCtaInView(entry.isIntersecting),
       { threshold: 0.1 },
     );
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
 
-  const scrollToForm = (_where: string) => {
-    const el = document.getElementById('form-hero');
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      setTimeout(() => {
-        const input = el.querySelector('input') as HTMLInputElement | null;
-        if (input) input.focus();
-      }, 600);
-    }
-  };
-
-  const onFreeGroups = (where: string) => {
-    track('cta_free_group', { button: where });
-    trackT4Y('cta_telegram', {
-      button: where,
-      destination: 'free_groups',
-      url: FREE_GROUPS_URL,
-    });
-    window.open(FREE_GROUPS_URL, '_blank', 'noopener,noreferrer');
+  const openFreeGroupModal = (where: string) => {
+    track('cta_free_group_modal_open', { button: where });
+    setShowModal(true);
   };
 
   return (
@@ -420,7 +394,6 @@ export default function TrialLanding() {
       data-testid="bg-shark-wallpaper"
     >
       {/* Overlays */}
-      {/* Camada base: escurece top→bottom progressivamente */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
@@ -429,7 +402,6 @@ export default function TrialLanding() {
         }}
         aria-hidden="true"
       />
-      {/* Camada lateral esquerda: garante leitura do copy no desktop */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
@@ -438,7 +410,6 @@ export default function TrialLanding() {
         }}
         aria-hidden="true"
       />
-      {/* Vinheta radial: suaviza bordas e centro brilhante */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
@@ -460,7 +431,7 @@ export default function TrialLanding() {
             <SharkLogo />
             <div className="hidden sm:inline-flex items-center gap-2 px-3 py-1 rounded-full bg-black/50 backdrop-blur border border-emerald-500/30 text-emerald-300 text-xs font-semibold">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              Acesso VIP · vagas limitadas
+              Grupo Free · vagas abertas
             </div>
           </div>
         </header>
@@ -468,85 +439,84 @@ export default function TrialLanding() {
         {/* ── URGENCY BAR ── */}
         <UrgencyBar />
 
-        {/* ── HERO 2 COLUNAS ── */}
-        <section className="relative max-w-6xl mx-auto px-4 pt-8 pb-10 md:pt-12 md:pb-14">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-start">
-
-            {/* Coluna esquerda: copy */}
-            <div className="space-y-5">
-              <div className="flex flex-wrap gap-2">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500 text-white text-xs font-bold uppercase tracking-wider">
-                  🎯 7 DIAS GRÁTIS · SEM CARTÃO
-                </span>
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/50 border border-emerald-500/30 text-emerald-300 text-xs font-semibold uppercase tracking-wider">
-                  ● Promoções Esportivas
-                </span>
-              </div>
-
-              <h1
-                className="text-[1.65rem] sm:text-[2rem] md:text-[2.25rem] font-bold leading-[1.28] tracking-tight drop-shadow-[0_4px_24px_rgba(0,0,0,0.85)]"
-                data-testid="text-hero-title"
-              >
-                Nossos{' '}
-                <span className="bg-gradient-to-r from-emerald-300 via-green-400 to-emerald-500 bg-clip-text text-transparent">
-                  +de 500 alunos
-                </span>{' '}
-                estão Lucrando{' '}
-                <span className="bg-gradient-to-r from-emerald-300 via-green-400 to-emerald-500 bg-clip-text text-transparent">
-                  +R$200 por dia
-                </span>{' '}
-                gastando em média 1 a 2h com Promoções Esportivas Bonificadas.
-              </h1>
-
-              {/* Trial callout */}
-              <div className="rounded-xl border border-emerald-500/40 border-l-[3px] border-l-emerald-400 bg-gradient-to-r from-emerald-500/14 to-emerald-500/5 p-4">
-                <p className="font-semibold text-white leading-snug text-sm md:text-base">
-                  Entre em nosso Grupo VIP por{' '}
-                  <span className="text-emerald-400">7 dias Grátis</span>, comprove com seus olhos e comece a faturar hoje!
-                </p>
-              </div>
-
-              {/* Mini stats */}
-              <div className="grid grid-cols-3 gap-2">
-                <StatMini value="+500" label="Alunos ativos" />
-                <StatMini value="1 a 2h" label="Tempo médio" />
-                <StatMini value="R$200" label="Lucro/dia" />
-              </div>
-
-              <p className="text-white/70 text-sm leading-relaxed">
-                Não precisa de experiência. Você só precisa seguir o que enviamos no grupo.{' '}
-                <strong className="text-white">Teste grátis por 7 dias</strong> e veja o resultado na sua conta.
-              </p>
-
-              <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-white/60">
-                <span className="inline-flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Sem cartão
-                </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Acesso imediato
-                </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Cancele quando quiser
-                </span>
-              </div>
-
-              {/* CTA — mobile: botão explícito; desktop: rola para o form ao lado */}
-              <Button
-                onClick={() => scrollToForm('hero-primary')}
-                className="w-full md:w-auto h-13 bg-gradient-to-r from-emerald-400 to-green-500 hover:from-emerald-300 hover:to-green-400 text-black font-bold text-base border-0 shadow-xl shadow-emerald-500/50 transition-transform hover:scale-[1.02]"
-                data-testid="button-hero-primary-cta"
-              >
-                QUERO MEUS 7 DIAS GRÁTIS
-              </Button>
+        {/* ── HERO ── */}
+        <section className="relative max-w-3xl mx-auto px-4 pt-8 pb-10 md:pt-14 md:pb-16">
+          <div className="space-y-5">
+            <div className="flex flex-wrap gap-2">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500 text-white text-xs font-bold uppercase tracking-wider">
+                🦈 GRUPO FREE · ACESSO IMEDIATO
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/50 border border-emerald-500/30 text-emerald-300 text-xs font-semibold uppercase tracking-wider">
+                ● Promoções Esportivas
+              </span>
             </div>
 
-            {/* Coluna direita: formulário inline */}
-            <div ref={formRef} id="form-hero">
-              <InlineSignupForm
-                onFocusTrack={() => track('cta_focus_form', { button: 'form-hero' })}
-                onSuccessTrack={(eventId) => trackPixel('Lead', { content_name: 'trial-7d' }, eventId)}
-                onT4YTrack={(event, params) => trackT4Y(event, params)}
-              />
+            <h1
+              className="text-[1.65rem] sm:text-[2rem] md:text-[2.5rem] font-bold leading-[1.28] tracking-tight drop-shadow-[0_4px_24px_rgba(0,0,0,0.85)]"
+              data-testid="text-hero-title"
+            >
+              Nossos{' '}
+              <span className="bg-gradient-to-r from-emerald-300 via-green-400 to-emerald-500 bg-clip-text text-transparent">
+                +de 500 alunos
+              </span>{' '}
+              estão Lucrando{' '}
+              <span className="bg-gradient-to-r from-emerald-300 via-green-400 to-emerald-500 bg-clip-text text-transparent">
+                +R$200 por dia
+              </span>{' '}
+              gastando em média 1 a 2h com Promoções Esportivas Bonificadas.
+            </h1>
+
+            {/* Callout */}
+            <div className="rounded-xl border border-emerald-500/40 border-l-[3px] border-l-emerald-400 bg-gradient-to-r from-emerald-500/14 to-emerald-500/5 p-4">
+              <p className="font-semibold text-white leading-snug text-sm md:text-base">
+                Entre no nosso{' '}
+                <span className="text-emerald-400">Grupo Free</span> e comece a acompanhar os sinais agora — sem pagar nada, sem compromisso.
+              </p>
+            </div>
+
+            {/* Mini stats */}
+            <div className="grid grid-cols-3 gap-2">
+              <StatMini value="+500" label="Alunos ativos" />
+              <StatMini value="1 a 2h" label="Tempo médio" />
+              <StatMini value="R$200" label="Lucro/dia" />
+            </div>
+
+            <p className="text-white/70 text-sm leading-relaxed">
+              Não precisa de experiência. Você só precisa seguir o que enviamos no grupo.{' '}
+              <strong className="text-white">100% gratuito, acesso imediato.</strong>
+            </p>
+
+            <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-white/60">
+              <span className="inline-flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Sem cartão
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Acesso imediato
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> 100% gratuito
+              </span>
+            </div>
+
+            {/* CTAs */}
+            <div ref={ctaRef} className="flex flex-col sm:flex-row gap-3">
+              <Button
+                onClick={() => openFreeGroupModal('hero-primary')}
+                className="w-full sm:w-auto h-13 bg-gradient-to-r from-emerald-400 to-green-500 hover:from-emerald-300 hover:to-green-400 text-black font-bold text-base border-0 shadow-xl shadow-emerald-500/50 transition-transform hover:scale-[1.02]"
+                data-testid="button-hero-primary-cta"
+              >
+                ENTRAR NO GRUPO FREE AGORA
+              </Button>
+              <a
+                href={SUPPORT_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 h-13 px-5 rounded-md border border-emerald-500/30 bg-transparent text-emerald-300 text-sm font-medium hover:bg-emerald-500/10 transition-colors"
+                data-testid="button-hero-support"
+              >
+                <MessageCircle className="w-4 h-4" />
+                Falar com Suporte
+              </a>
             </div>
           </div>
         </section>
@@ -617,11 +587,11 @@ export default function TrialLanding() {
           </div>
 
           <Button
-            onClick={() => scrollToForm('how-section')}
+            onClick={() => openFreeGroupModal('how-section')}
             className="h-12 px-8 bg-gradient-to-r from-emerald-400 to-green-500 hover:from-emerald-300 hover:to-green-400 text-black font-bold border-0 shadow-lg shadow-emerald-500/40"
             data-testid="button-how-cta"
           >
-            Quero testar 7 Dias Grátis
+            ENTRAR NO GRUPO FREE
           </Button>
         </section>
 
@@ -642,7 +612,7 @@ export default function TrialLanding() {
             </p>
           </div>
 
-          {/* Grade de prints reais dos membros */}
+          {/* Grade de prints reais */}
           <div className="columns-2 md:columns-3 lg:columns-4 gap-3 space-y-3" data-testid="section-proof-grid">
             {[
               { src: proof1, alt: 'Print R$1.050 — Everton vs Manchester City' },
@@ -677,8 +647,8 @@ export default function TrialLanding() {
             <TestimonialCard
               name="Lucas M."
               city="São Paulo – SP"
-              result="R$ 312 em 5 dias de trial"
-              text="Entrei sem saber nada de apostas. O procedimento chegou no grupo às 10h, fiz em 3 minutos no Bet365 e saí verde. Repeti isso 8 vezes no trial e fechei R$ 312 limpos."
+              result="R$ 312 em 5 dias"
+              text="Entrei sem saber nada de apostas. O procedimento chegou no grupo às 10h, fiz em 3 minutos no Bet365 e saí verde. Repeti isso 8 vezes e fechei R$ 312 limpos."
               stars={5}
               testId="card-full-testimonial-1"
             />
@@ -694,7 +664,7 @@ export default function TrialLanding() {
               name="Rafael O."
               city="Curitiba – PR"
               result="R$ 219 em 4 dias, sem experiência"
-              text="Opero no intervalo do trabalho. Em 4 dias de trial fechei R$ 219 positivo. Nunca tinha apostado em nada na vida. O grupo responde rápido quando trava alguma coisa na plataforma."
+              text="Opero no intervalo do trabalho. Em 4 dias fechei R$ 219 positivo. Nunca tinha apostado em nada na vida. O grupo responde rápido quando trava alguma coisa na plataforma."
               stars={5}
               testId="card-full-testimonial-3"
             />
@@ -747,28 +717,39 @@ export default function TrialLanding() {
               </span>
             </h2>
             <Button
-              onClick={() => scrollToForm('final-cta')}
+              onClick={() => openFreeGroupModal('final-cta')}
               className="w-full sm:w-auto h-14 px-10 bg-gradient-to-r from-emerald-400 to-green-500 hover:from-emerald-300 hover:to-green-400 text-black font-bold text-base border-0 shadow-xl shadow-emerald-500/50 transition-transform hover:scale-[1.02]"
               data-testid="button-final-cta"
             >
-              COMEÇAR TESTE GRÁTIS AGORA →
+              ENTRAR NO GRUPO FREE AGORA →
             </Button>
             <p className="text-white/35 text-xs mt-5">
-              🛡️ Garantia de 7 dias · Acesso imediato · Sem cartão
+              🦈 100% Gratuito · Acesso imediato · Sem compromisso
             </p>
+            <a
+              href={SUPPORT_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block mt-3 text-white/40 hover:text-emerald-400 text-xs underline underline-offset-2 transition-colors"
+              data-testid="button-final-support"
+            >
+              Falar com Suporte
+            </a>
           </div>
         </section>
 
         {/* ── FOOTER ── */}
         <footer className="relative max-w-7xl mx-auto px-4 py-10 text-center text-xs text-white/40 border-t border-emerald-500/15">
           <div className="mb-3">
-            <button
-              onClick={() => onFreeGroups('footer')}
+            <a
+              href={SUPPORT_URL}
+              target="_blank"
+              rel="noopener noreferrer"
               className="text-white/40 hover:text-emerald-400 underline underline-offset-2 transition-colors text-xs"
-              data-testid="button-footer-free-groups"
+              data-testid="button-footer-support"
             >
-              Prefere só os grupos gratuitos? Acesse aqui
-            </button>
+              Precisa de ajuda? Fale com o suporte
+            </a>
           </div>
           © {new Date().getFullYear()} Shark 100% Green · Aposte com responsabilidade.
         </footer>
@@ -776,20 +757,23 @@ export default function TrialLanding() {
       </div>
 
       {/* ── STICKY BAR MOBILE ── */}
-      {!formInView && (
+      {!ctaInView && (
         <div
           className="sm:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-emerald-500/30 bg-[hsl(150_35%_3%/0.97)] px-4 py-3"
           data-testid="sticky-bar-mobile"
         >
           <button
-            onClick={() => scrollToForm('sticky-bar')}
+            onClick={() => openFreeGroupModal('sticky-bar')}
             className="w-full rounded-lg bg-emerald-500 text-white font-bold text-sm py-3 tracking-wide"
             data-testid="button-sticky-bar"
           >
-            QUERO MEUS 7 DIAS GRÁTIS →
+            ENTRAR NO GRUPO FREE →
           </button>
         </div>
       )}
+
+      {/* ── MODAL GRUPO FREE ── */}
+      <FreeGroupModal open={showModal} onClose={() => setShowModal(false)} />
 
       {/* Ticker keyframe */}
       <style>{`
@@ -813,6 +797,214 @@ export default function TrialLanding() {
   );
 }
 
+/* ── FreeGroupModal ── */
+function FreeGroupModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [form, setForm] = useState({ name: '', whatsapp: '', email: '' });
+  const [errors, setErrors] = useState<Partial<Record<'name' | 'whatsapp', string>>>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [serverError, setServerError] = useState<string | null>(null);
+  const utmRef = useRef<UtmParams>({
+    utm_source: null, utm_medium: null, utm_campaign: null,
+    utm_content: null, utm_term: null, fbclid: null, ct: null,
+  });
+
+  useEffect(() => {
+    if (!open) return;
+    const params = readUtmParams();
+    utmRef.current = params;
+    try {
+      const saved = sessionStorage.getItem(TRIAL_UTM_KEY);
+      if (!params.utm_source && !params.fbclid && saved) {
+        utmRef.current = JSON.parse(saved);
+      }
+    } catch { /* ignore */ }
+  }, [open]);
+
+  const update = (k: 'name' | 'whatsapp' | 'email', v: string) => {
+    setForm(prev => ({ ...prev, [k]: v }));
+    if (errors[k as 'name' | 'whatsapp']) {
+      setErrors(prev => ({ ...prev, [k]: undefined }));
+    }
+  };
+
+  const handleClose = () => {
+    setForm({ name: '', whatsapp: '', email: '' });
+    setErrors({});
+    setServerError(null);
+    onClose();
+  };
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setServerError(null);
+    const parsed = modalSchema.safeParse({ name: form.name, whatsapp: form.whatsapp });
+    if (!parsed.success) {
+      const fe: Partial<Record<'name' | 'whatsapp', string>> = {};
+      for (const issue of parsed.error.issues) {
+        const k = issue.path[0] as 'name' | 'whatsapp';
+        if (!fe[k]) fe[k] = issue.message;
+      }
+      setErrors(fe);
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const utms = utmRef.current;
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/free-group-signup`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: SUPABASE_ANON,
+        },
+        body: JSON.stringify({
+          name: parsed.data.name,
+          whatsapp: parsed.data.whatsapp.replace(/\D/g, ''),
+          email: form.email.trim() || undefined,
+          utm_source:   utms.utm_source,
+          utm_medium:   utms.utm_medium,
+          utm_campaign: utms.utm_campaign,
+          ct:           utms.ct,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok && res.status !== 409) {
+        setServerError(data?.error || 'Não foi possível processar. Tente novamente.');
+        return;
+      }
+      track('cta_free_group_submitted', { name: parsed.data.name });
+      trackT4Y('cta_telegram', {
+        button: 'modal-submit',
+        destination: 'free_groups',
+        url: FREE_GROUPS_URL,
+      });
+      trackPixel('Lead', { content_name: 'free-group' });
+      handleClose();
+      window.open(FREE_GROUPS_URL, '_blank', 'noopener,noreferrer');
+    } catch {
+      setServerError('Erro de conexão. Verifique sua internet e tente novamente.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
+      <DialogContent
+        className="bg-[hsl(150_30%_5%)] border border-emerald-500/30 text-white max-w-md"
+        data-testid="modal-free-group"
+      >
+        <DialogHeader>
+          <DialogTitle className="text-xl font-bold text-white">
+            Quase lá! 🦈 Informe seus dados para entrar
+          </DialogTitle>
+          <DialogDescription className="text-white/60 text-sm">
+            Acesso 100% gratuito — sem cartão, sem compromisso
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={submit} className="space-y-4 mt-2" data-testid="form-free-group">
+          <ModalField
+            label="Nome completo"
+            error={errors.name}
+            input={
+              <Input
+                value={form.name}
+                onChange={e => update('name', e.target.value)}
+                placeholder="Seu nome"
+                className="bg-white/5 border-white/10 focus:border-emerald-500/60 h-11 text-white"
+                data-testid="input-modal-name"
+                autoFocus
+              />
+            }
+          />
+          <ModalField
+            label="WhatsApp com DDD"
+            error={errors.whatsapp}
+            input={
+              <Input
+                inputMode="tel"
+                value={fmtWhatsapp(form.whatsapp)}
+                onChange={e => update('whatsapp', e.target.value)}
+                placeholder="(11) 91234-5678"
+                className="bg-white/5 border-white/10 focus:border-emerald-500/60 h-11 text-white"
+                data-testid="input-modal-whatsapp"
+              />
+            }
+          />
+          <ModalField
+            label="E-mail (opcional)"
+            input={
+              <Input
+                type="email"
+                value={form.email}
+                onChange={e => update('email', e.target.value)}
+                placeholder="seu@email.com"
+                className="bg-white/5 border-white/10 focus:border-emerald-500/60 h-11 text-white"
+                data-testid="input-modal-email"
+              />
+            }
+          />
+
+          {serverError && (
+            <div
+              className="flex items-start gap-2 rounded-xl bg-red-500/10 border border-red-500/25 p-3 text-sm text-red-300"
+              data-testid="text-modal-error"
+            >
+              <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+              <span>{serverError}</span>
+            </div>
+          )}
+
+          <Button
+            type="submit"
+            disabled={submitting}
+            className="w-full h-12 bg-gradient-to-r from-emerald-400 to-green-500 hover:from-emerald-300 hover:to-green-400 text-black font-bold text-base border-0 shadow-lg shadow-emerald-500/40 disabled:opacity-60"
+            data-testid="button-modal-submit"
+          >
+            {submitting ? (
+              <span className="flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Entrando…
+              </span>
+            ) : (
+              'ENTRAR NO GRUPO AGORA →'
+            )}
+          </Button>
+
+          <p className="text-[10px] text-center text-white/50 leading-relaxed">
+            Ao entrar, você concorda em receber sinais e comunicados do grupo.
+          </p>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ── ModalField ── */
+function ModalField({
+  label, error, input,
+}: {
+  label: string;
+  error?: string;
+  input: React.ReactNode;
+}) {
+  return (
+    <div>
+      <Label className="text-[10px] font-semibold uppercase tracking-wider text-white/60 mb-1.5 block">
+        {label}
+      </Label>
+      {input}
+      {error && (
+        <p className="text-[11px] text-red-400 mt-1 flex items-center gap-1">
+          <AlertCircle className="w-3 h-3" />
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
 /* ── SharkLogo ── */
 function SharkLogo() {
   return (
@@ -831,7 +1023,6 @@ function SharkLogo() {
             <stop offset="100%" stopColor="#10b981" />
           </linearGradient>
         </defs>
-        {/* Shark fin shape */}
         <path
           d="M4 26 C4 26 8 10 16 6 C16 6 13 16 20 20 C20 20 14 22 12 26 Z"
           fill="url(#sharkGrad)"
@@ -896,251 +1087,6 @@ function ProofNum({ value, label }: { value: string; label: string }) {
         {value}
       </div>
       <div className="text-white/50 text-[0.65rem] uppercase tracking-wide mt-0.5">{label}</div>
-    </div>
-  );
-}
-
-/* ── InlineSignupForm ── */
-function InlineSignupForm({
-  onFocusTrack,
-  onSuccessTrack,
-}: {
-  onFocusTrack: () => void;
-  onSuccessTrack: (eventId: string) => void;
-  onT4YTrack: (event: string, params: Record<string, unknown>) => void;
-}) {
-  const navigate = useNavigate();
-  const [form, setForm] = useState<FormState>({
-    name: '', email: '', whatsapp: '', telegram_username: '',
-  });
-  const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
-  const [submitting, setSubmitting] = useState(false);
-  const [serverError, setServerError] = useState<string | null>(null);
-  const [focusTracked, setFocusTracked] = useState(false);
-  const firstInputRef = useRef<HTMLInputElement | null>(null);
-  const utmParamsRef = useRef<UtmParams>({ utm_source: null, utm_medium: null, utm_campaign: null, utm_content: null, utm_term: null, fbclid: null, ct: null });
-  const fingerprintRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    const params = readUtmParams();
-    utmParamsRef.current = params;
-    // persiste em sessionStorage para sobreviver a reloads da mesma sessão
-    try { sessionStorage.setItem(TRIAL_UTM_KEY, JSON.stringify(params)); } catch { /* ignore */ }
-    // tenta recuperar UTMs persistidos (caso venha de redirect)
-    if (!params.utm_source && !params.fbclid) {
-      try {
-        const saved = sessionStorage.getItem(TRIAL_UTM_KEY);
-        if (saved) utmParamsRef.current = JSON.parse(saved);
-      } catch { /* ignore */ }
-    }
-  }, []);
-
-  useEffect(() => {
-    computeDeviceFingerprint()
-      .then(fp => { fingerprintRef.current = fp; })
-      .catch(() => { /* noop — fingerprint é melhor-esforço */ });
-  }, []);
-
-  const update = (k: keyof FormState, v: string) => {
-    setForm(prev => ({ ...prev, [k]: v }));
-    if (errors[k]) setErrors(prev => ({ ...prev, [k]: undefined }));
-  };
-
-  const handleFirstFocus = () => {
-    if (!focusTracked) {
-      setFocusTracked(true);
-      onFocusTrack();
-    }
-  };
-
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setServerError(null);
-    const parsed = schema.safeParse(form);
-    if (!parsed.success) {
-      const fe: Partial<Record<keyof FormState, string>> = {};
-      for (const issue of parsed.error.issues) {
-        const k = issue.path[0] as keyof FormState;
-        if (!fe[k]) fe[k] = issue.message;
-      }
-      setErrors(fe);
-      return;
-    }
-
-    setSubmitting(true);
-    const leadEventId = makeEventId();
-    try {
-      const url = `${SUPABASE_URL}/functions/v1/trial-signup`;
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          apikey: SUPABASE_ANON,
-        },
-        body: JSON.stringify({
-          name: parsed.data.name,
-          email: parsed.data.email,
-          whatsapp: parsed.data.whatsapp.replace(/\D/g, ''),
-          telegram_username: parsed.data.telegram_username,
-          event_id: leadEventId,
-          event_source_url: typeof window !== 'undefined' ? window.location.href : null,
-          fbp: readCookie('_fbp'),
-          fbc: readCookie('_fbc'),
-          signup_fingerprint: fingerprintRef.current,
-          ...utmParamsRef.current,
-        }),
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        if (json?.error === 'already_used_trial') {
-          setServerError('Este dispositivo já utilizou o período de teste. Acesse o link de assinatura para continuar.');
-        } else {
-          setServerError(json?.error || 'Não foi possível processar sua solicitação. Tente novamente.');
-        }
-        return;
-      }
-      onSuccessTrack(leadEventId);
-      try {
-        sessionStorage.setItem(
-          'trial_success',
-          JSON.stringify({
-            botStartUrl: json.bot_start_url,
-            inviteLink: json.invite_link,
-            leadEventId,
-            email: parsed.data.email,
-            initialPassword: parsed.data.whatsapp.replace(/\D/g, ''),
-          }),
-        );
-      } catch {
-        /* sessionStorage indisponível */
-      }
-      navigate('/obrigado');
-    } catch {
-      setServerError('Erro de conexão. Verifique sua internet e tente novamente.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <div
-      className="rounded-2xl border border-emerald-500/30 bg-[hsl(150_30%_5%/0.95)] p-5 md:p-6 backdrop-blur shadow-2xl shadow-emerald-500/10"
-      data-testid="card-inline-signup"
-    >
-      <>
-          <h3 className="font-bold text-white text-base mb-4">Garantir meu acesso grátis</h3>
-          <form onSubmit={submit} className="space-y-3" data-testid="form-trial-signup">
-            <Field
-              label="Seu Nome"
-              error={errors.name}
-              input={
-                <Input
-                  ref={firstInputRef}
-                  value={form.name}
-                  onChange={e => update('name', e.target.value)}
-                  onFocus={handleFirstFocus}
-                  placeholder="Seu nome"
-                  className="bg-white/5 border-white/10 focus:border-emerald-500/60 h-11 text-white"
-                  data-testid="input-trial-name"
-                />
-              }
-            />
-            <Field
-              label="Seu E-mail"
-              error={errors.email}
-              input={
-                <Input
-                  type="email"
-                  value={form.email}
-                  onChange={e => update('email', e.target.value)}
-                  onFocus={handleFirstFocus}
-                  placeholder="seu@email.com"
-                  className="bg-white/5 border-white/10 focus:border-emerald-500/60 h-11 text-white"
-                  data-testid="input-trial-email"
-                />
-              }
-            />
-            <Field
-              label="Seu WhatsApp"
-              error={errors.whatsapp}
-              input={
-                <Input
-                  inputMode="tel"
-                  value={fmtWhatsapp(form.whatsapp)}
-                  onChange={e => update('whatsapp', e.target.value)}
-                  onFocus={handleFirstFocus}
-                  placeholder="(11) 91234-5678"
-                  className="bg-white/5 border-white/10 focus:border-emerald-500/60 h-11 text-white"
-                  data-testid="input-trial-whatsapp"
-                />
-              }
-            />
-            <Field
-              label="@ do Telegram"
-              error={errors.telegram_username}
-              hint="Sem o @ — ex: joao_silva"
-              input={
-                <Input
-                  value={form.telegram_username}
-                  onChange={e => update('telegram_username', e.target.value.replace(/\s/g, ''))}
-                  onFocus={handleFirstFocus}
-                  placeholder="seu_usuario"
-                  className="bg-white/5 border-white/10 focus:border-emerald-500/60 h-11 text-white"
-                  data-testid="input-trial-telegram"
-                />
-              }
-            />
-
-            {serverError && (
-              <div
-                className="flex items-start gap-2 rounded-xl bg-red-500/10 border border-red-500/25 p-3 text-sm text-red-300"
-                data-testid="text-trial-error"
-              >
-                <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                <span>{serverError}</span>
-              </div>
-            )}
-
-            <Button
-              type="submit"
-              disabled={submitting}
-              className="w-full h-12 bg-gradient-to-r from-emerald-400 to-green-500 hover:from-emerald-300 hover:to-green-400 text-black font-bold text-base border-0 shadow-lg shadow-emerald-500/40 disabled:opacity-60"
-              data-testid="button-trial-submit"
-            >
-              {submitting ? 'Processando…' : 'QUERO MEUS 7 DIAS GRÁTIS'}
-            </Button>
-
-            <p className="text-[10px] text-center text-white/50 leading-relaxed">
-              Acesso liberado na hora · Sem cartão · Cada pessoa usa o trial apenas uma vez.
-            </p>
-          </form>
-        </>
-    </div>
-  );
-}
-
-/* ── Field ── */
-function Field({
-  label, error, input, hint,
-}: {
-  label: string;
-  error?: string;
-  input: React.ReactNode;
-  hint?: string;
-}) {
-  return (
-    <div>
-      <Label className="text-[10px] font-semibold uppercase tracking-wider text-white/60 mb-1.5 block">
-        {label}
-      </Label>
-      {input}
-      {hint && !error && <p className="text-[10px] text-white/50 mt-1">{hint}</p>}
-      {error && (
-        <p className="text-[11px] text-red-400 mt-1 flex items-center gap-1">
-          <AlertCircle className="w-3 h-3" />
-          {error}
-        </p>
-      )}
     </div>
   );
 }
