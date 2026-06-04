@@ -44,7 +44,7 @@ export interface TrialLead {
   last_recall_at: string | null;
   recall_count: number | null;
   previous_lead_id: string | null;
-  cohort: 'v1' | 'v2' | 'direct' | 'ads';
+  cohort: 'v1' | 'v2' | 'direct' | 'ads' | 'free_group';
 
   // Rastreio de anúncios (cohort='ads' ou UTMs presentes)
   utm_source: string | null;

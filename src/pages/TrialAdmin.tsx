@@ -106,7 +106,7 @@ export default function TrialAdmin() {
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | TrialStatus>('all');
-  const [cohortFilter, setCohortFilter] = useState<'all' | 'v1' | 'v2' | 'ads'>('all');
+  const [cohortFilter, setCohortFilter] = useState<'all' | 'v1' | 'v2' | 'ads' | 'free_group'>('all');
   const [monthFilter, setMonthFilter] = useState<string>(() => format(new Date(), 'yyyy-MM'));
   const [activityFilter, setActivityFilter] = useState<'all' | ActivityLevel>('all');
 
@@ -130,7 +130,7 @@ export default function TrialAdmin() {
   const { data: capiStats, isLoading: capiLoading } = useTrialCapiStats();
 
   const stats = useMemo(() => {
-    const s = { total: leads.length, active: 0, expired: 0, blocked: 0, pending: 0, removed: 0, blockedRepeat: 0, converted: 0, v1: 0, v2: 0, ads: 0 };
+    const s = { total: leads.length, active: 0, expired: 0, blocked: 0, pending: 0, removed: 0, blockedRepeat: 0, converted: 0, v1: 0, v2: 0, ads: 0, freeGroup: 0 };
     for (const l of leads) {
       if (l.status === 'active') s.active++;
       else if (l.status === 'expired') s.expired++;
@@ -142,6 +142,7 @@ export default function TrialAdmin() {
       if (l.cohort === 'v1') s.v1++;
       else if (l.cohort === 'v2') s.v2++;
       else if (l.cohort === 'ads') s.ads++;
+      else if (l.cohort === 'free_group') s.freeGroup++;
     }
     return s;
   }, [leads]);
@@ -801,6 +802,7 @@ export default function TrialAdmin() {
           <StatCard icon={<ShieldAlert className="w-5 h-5" />} label="Repetidores bloqueados" value={stats.blockedRepeat} accent="from-orange-500/20 to-orange-500/5 border-orange-500/25 text-orange-300" />
           <StatCard icon={<CheckCircle2 className="w-5 h-5" />} label="Convertidos (pagos)" value={stats.converted} accent="from-emerald-600/25 to-emerald-600/5 border-emerald-500/30 text-emerald-200" />
           <StatCard icon={<Ban className="w-5 h-5" />} label="Removidos" value={stats.removed} accent="from-red-500/20 to-red-500/5 border-red-500/25 text-red-300" />
+          <StatCard icon={<Users2 className="w-5 h-5" />} label="Grupo Free" value={stats.freeGroup} accent="from-teal-500/20 to-teal-500/5 border-teal-500/25 text-teal-300" />
         </div>
 
         {/* Filters */}
@@ -840,7 +842,7 @@ export default function TrialAdmin() {
               <SelectItem value="converted">Convertidos (pagos)</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={cohortFilter} onValueChange={v => setCohortFilter(v as 'all' | 'v1' | 'v2' | 'ads')}>
+          <Select value={cohortFilter} onValueChange={v => setCohortFilter(v as 'all' | 'v1' | 'v2' | 'ads' | 'free_group')}>
             <SelectTrigger className="bg-white/5 border-white/10 h-9 text-sm w-[180px]" data-testid="select-trial-cohort-filter">
               <SelectValue />
             </SelectTrigger>
@@ -849,6 +851,7 @@ export default function TrialAdmin() {
               <SelectItem value="v2">v2 — grupo atual ({stats.v2})</SelectItem>
               <SelectItem value="v1">v1 — grupo antigo ({stats.v1})</SelectItem>
               <SelectItem value="ads">Ads — tráfego pago ({stats.ads})</SelectItem>
+              <SelectItem value="free_group">Free — grupo grátis ({stats.freeGroup})</SelectItem>
             </SelectContent>
           </Select>
           <Select value={recallFilter} onValueChange={v => setRecallFilter(v as 'all' | 'never' | 'sent')}>
@@ -994,6 +997,15 @@ export default function TrialAdmin() {
                             title={lead.utm_campaign ? `Campanha: ${lead.utm_campaign}` : 'Lead captado via tráfego pago'}
                           >
                             ADS{lead.utm_campaign ? ` · ${lead.utm_campaign}` : ''}
+                          </Badge>
+                        )}
+                        {lead.cohort === 'free_group' && (
+                          <Badge
+                            className="text-[10px] bg-teal-500/15 text-teal-300 border-teal-500/35"
+                            data-testid={`badge-cohort-free-group-${lead.id}`}
+                            title="Lead do Grupo Free (grupo gratuito)"
+                          >
+                            FREE
                           </Badge>
                         )}
                         {lead.previous_lead_id && (
