@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { z } from 'zod';
+import { createClient } from '@supabase/supabase-js';
 import {
   CheckCircle2, AlertCircle, Clock,
   Star, ChevronDown, MessageCircle, Target, TrendingUp, Loader2,
@@ -21,8 +22,12 @@ import proof8 from '@assets/WhatsApp_Image_2026-05-04_at_18.43.57_1778197516429.
 
 const HERO_WEBP_URL = '/images/hero.webp';
 
-const SUPABASE_URL = import.meta.env.VITE_MAIN_SUPABASE_URL as string;
-const SUPABASE_ANON = import.meta.env.VITE_MAIN_SUPABASE_ANON_KEY as string;
+// Cliente Supabase dedicado para inserção de leads do Grupo Free (sem edge function).
+const _sbLeads = createClient(
+  import.meta.env.VITE_PROCEDURES_SUPABASE_URL as string,
+  import.meta.env.VITE_PROCEDURES_SUPABASE_ANON_KEY as string,
+  { auth: { persistSession: false } },
+);
 
 const FREE_GROUPS_URL = 'https://t.me/sharkgreenfree2';
 const SUPPORT_URL = 'https://t.me/SuporteSharkGreen_financeiro';
@@ -853,27 +858,38 @@ function FreeGroupModal({ open, onClose }: { open: boolean; onClose: () => void 
     setSubmitting(true);
     try {
       const utms = utmRef.current;
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/free-group-signup`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          apikey: SUPABASE_ANON,
-        },
-        body: JSON.stringify({
+      const whatsapp = parsed.data.whatsapp.replace(/\D/g, '');
+      const emailRaw = form.email.trim().toLowerCase();
+      const email = emailRaw && emailRaw.includes('@') && emailRaw.length > 5
+        ? emailRaw
+        : `free_${whatsapp}@placeholder.betshark`;
+
+      const expiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
+
+      const { error: insertErr } = await _sbLeads
+        .from('trial_leads')
+        .insert({
           name: parsed.data.name,
-          whatsapp: parsed.data.whatsapp.replace(/\D/g, ''),
-          email: form.email.trim() || undefined,
-          utm_source:   utms.utm_source,
-          utm_medium:   utms.utm_medium,
-          utm_campaign: utms.utm_campaign,
-          ct:           utms.ct,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok && res.status !== 409) {
-        setServerError(data?.error || 'Não foi possível processar. Tente novamente.');
+          whatsapp,
+          email,
+          telegram_username: `free_${whatsapp}`,
+          status: 'active',
+          cohort: 'free_group',
+          expires_at: expiresAt,
+          utm_source:   utms.utm_source   || null,
+          utm_medium:   utms.utm_medium   || null,
+          utm_campaign: utms.utm_campaign || null,
+          ct:           utms.ct           || null,
+        });
+
+      // 23505 = whatsapp duplicado — tudo bem, deixa entrar no grupo mesmo assim
+      const pgCode = (insertErr as { code?: string } | null)?.code;
+      if (insertErr && pgCode !== '23505') {
+        console.error('free-group-signup insert error', insertErr);
+        setServerError('Não foi possível salvar seu cadastro. Tente novamente.');
         return;
       }
+
       track('cta_free_group_submitted', { name: parsed.data.name });
       trackT4Y('cta_telegram', {
         button: 'modal-submit',
