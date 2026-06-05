@@ -29,6 +29,10 @@ const _sbLeads = createClient(
   { auth: { persistSession: false } },
 );
 
+// Usado pelas funções de tracking (CAPI + trial-upgrade-track)
+const SUPABASE_URL  = import.meta.env.VITE_MAIN_SUPABASE_URL  as string | undefined;
+const SUPABASE_ANON = import.meta.env.VITE_MAIN_SUPABASE_ANON_KEY as string | undefined;
+
 const FREE_GROUPS_URL = 'https://t.me/sharkgreenfree2';
 const SUPPORT_URL = 'https://t.me/SuporteSharkGreen_financeiro';
 
