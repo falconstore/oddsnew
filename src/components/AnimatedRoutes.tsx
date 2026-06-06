@@ -28,6 +28,7 @@ import TrialUpgrade from '@/pages/TrialUpgrade';
 import TrialAdmin from '@/pages/TrialAdmin';
 import AdsLanding from '@/pages/AdsLanding';
 import AdsObrigado from '@/pages/AdsObrigado';
+import FreeGroupObrigado from '@/pages/FreeGroupObrigado';
 import AdsAdmin from '@/pages/AdsAdmin';
 import LastlinkAdmin from '@/pages/LastlinkAdmin';
 import WatermarkStudio from '@/pages/WatermarkStudio';
@@ -126,6 +127,11 @@ export function AnimatedRoutes() {
           <Route path="/ads/obrigado" element={
             <PageTransition>
               <AdsObrigado />
+            </PageTransition>
+          } />
+          <Route path="/grupo-free/obrigado" element={
+            <PageTransition>
+              <FreeGroupObrigado />
             </PageTransition>
           } />
           <Route path="*" element={<Navigate to="/" replace />} />

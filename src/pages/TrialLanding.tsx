@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import { createClient } from '@supabase/supabase-js';
+import { FREE_GROUP_SESSION_KEY } from '@/pages/FreeGroupObrigado';
+import type { FreeGroupSuccess } from '@/pages/FreeGroupObrigado';
 import {
   CheckCircle2, AlertCircle, Clock,
   Star, ChevronDown, MessageCircle, Target, TrendingUp, Loader2,
@@ -808,6 +811,7 @@ export default function TrialLanding() {
 
 /* ── FreeGroupModal ── */
 function FreeGroupModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const navigate = useNavigate();
   const [form, setForm] = useState({ name: '', whatsapp: '', email: '' });
   const [errors, setErrors] = useState<Partial<Record<'name' | 'whatsapp', string>>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -894,6 +898,10 @@ function FreeGroupModal({ open, onClose }: { open: boolean; onClose: () => void 
         return;
       }
 
+      const eventId = (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
+        ? crypto.randomUUID()
+        : `evt-${Date.now().toString(36)}`;
+
       track('cta_free_group_submitted', { name: parsed.data.name });
       trackT4Y('cta_telegram', {
         button: 'modal-submit',
@@ -901,9 +909,14 @@ function FreeGroupModal({ open, onClose }: { open: boolean; onClose: () => void 
         url: FREE_GROUPS_URL,
       });
       trackPixel('Lead', { content_name: 'free-group' });
-      window.open(FREE_GROUPS_URL, '_blank', 'noopener,noreferrer');
-      setSuccess(true);
-      setTimeout(() => handleClose(), 2000);
+
+      // Salva dados para a página de obrigado e redireciona
+      try {
+        const sessionData: FreeGroupSuccess = { name: parsed.data.name, eventId };
+        sessionStorage.setItem(FREE_GROUP_SESSION_KEY, JSON.stringify(sessionData));
+      } catch { /* sessionStorage indisponível */ }
+
+      navigate('/grupo-free/obrigado');
     } catch {
       setServerError('Erro de conexão. Verifique sua internet e tente novamente.');
     } finally {
