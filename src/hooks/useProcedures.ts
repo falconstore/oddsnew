@@ -216,8 +216,8 @@ export function useArchiveProcedure() {
 
 // Definir resultados pós-jogo (paridade com §8.4 do FreeBet Pro)
 // Auto-decide status_operacao:
-//   - LUCRO_DIRETO  se freebet_valor_previsto = 0/null OU freebet_creditada = 'NAO'
-//   - FALTA_GIRAR_FB se freebet_valor_previsto > 0 E freebet_creditada = 'SIM'
+//   - Concluído      se freebet_valor_previsto = 0/null OU freebet_creditada = 'NAO'
+//   - Falta Girar FB se freebet_valor_previsto > 0 E freebet_creditada = 'SIM'
 export function useSetProcedureResult() {
   const queryClient = useQueryClient();
 
@@ -247,9 +247,11 @@ export function useSetProcedureResult() {
             : 'NAO';
 
       const hasFB = fbValor > 0;
+      // Status final padrão = 'Concluído'. ('Lucro Direto' fica reservado pra
+      // marcação manual em Cashback / Aposta Sem Risco.)
       const auto_status = hasFB && fbCreditadaAuto === 'SIM'
         ? 'Falta Girar Freebet'
-        : 'Lucro Direto';
+        : 'Concluído';
 
       const updatePayload: Record<string, unknown> = {
         resultado_lucro: input.resultado_lucro,

@@ -212,7 +212,7 @@ function buildInsertRow(
     created_date: parsed.date,
     platform: parsed.platform ? normalizePlatformName(parsed.platform) : "—",
     category: parsed.category,
-    status: parsed.tipo === "ASR" ? "Aposta Sem Risco" : "Enviada Partida em Aberto",
+    status: "Enviada Partida em Aberto",
     tipo: parsed.tipo,
     partida_descricao: parsed.partida_descricao,
     kickoff_at: parsed.kickoff_at,

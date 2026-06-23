@@ -1,19 +1,19 @@
-export type ProcedureCategory = 
-  | 'Promoção' 
-  | 'Cashback' 
-  | 'Freebet' 
-  | 'Superodd' 
-  | 'Extra' 
+export type ProcedureCategory =
+  | 'Promoção'
+  | 'Cashback'
+  | 'Freebet'
+  | 'Superodd'
+  | 'Aposta Sem Risco'
+  | 'Extra'
   | 'Ganhar Giros Gratis';
 
-export type ProcedureStatus = 
+export type ProcedureStatus =
   | 'Enviado'
   | 'Enviada partida em Aberto'
   | 'Aguardando Resultado'
   | 'Concluído'
   | 'Lucro Direto'
   | 'Freebet Pendente'
-  | 'Aposta Sem Risco'
   | 'Referência Faltando'
   | 'Falta Girar Freebet';
 
@@ -145,6 +145,7 @@ export const PROCEDURE_CATEGORIES: ProcedureCategory[] = [
   'Cashback',
   'Freebet',
   'Superodd',
+  'Aposta Sem Risco',
   'Extra',
   'Ganhar Giros Gratis'
 ];
@@ -156,7 +157,6 @@ export const PROCEDURE_STATUSES: ProcedureStatus[] = [
   'Concluído',
   'Lucro Direto',
   'Freebet Pendente',
-  'Aposta Sem Risco',
   'Referência Faltando',
   'Falta Girar Freebet'
 ];

@@ -399,6 +399,8 @@ function detectCategory(text: string, tipo: ProcedureTipo): string {
   const explicit = text.match(/^📋?\s*CATEGORIA:\s*(.+?)(?:\s*[\n\r]|$)/im);
   if (explicit && explicit[1].trim()) return explicit[1].trim();
   // 2. Fallback por keyword
+  // ASR (Aposta Sem Risco) agora é CATEGORIA (não status).
+  if (tipo === "ASR") return "Aposta Sem Risco";
   if (/\bSUPERODD\b/i.test(text)) return "Superodd";
   if (/\bMISS[ÃA]O\b/i.test(text)) return "Extra";
   // Categoria Freebet só quando o procedimento de fato GANHA uma freebet
