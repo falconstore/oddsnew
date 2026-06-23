@@ -41,10 +41,22 @@ export function getGameTimeBucket(
 // também em procedimentos sem partida agendada (legado ou casos sem horário) — a
 // FreeBet Pro pediu que o modal "Definir Resultados" possa ser usado em qualquer
 // procedimento, não só nos com kickoff conhecido.
+// Status que indicam procedimento já finalizado — não precisa definir resultado.
+const FINALIZED_STATUSES = ['Concluído', 'Lucro Direto'];
+
 export function canCheckResult(
-  proc: Pick<Procedure, 'data_partida' | 'horario_partida'> & { kickoff_at?: string | null },
+  proc: Pick<Procedure, 'data_partida' | 'horario_partida'> & {
+    kickoff_at?: string | null;
+    status?: string | null;
+    resultado_lucro?: number | null;
+  },
   now: Date = new Date(),
 ): boolean {
+  // Já finalizado (status concluído OU resultado já registrado): não mostra o
+  // troféu — o resultado já está definido.
+  if (proc.status && FINALIZED_STATUSES.includes(proc.status)) return false;
+  if (proc.resultado_lucro != null) return false;
+
   const bucket = getGameTimeBucket(proc, now);
   return bucket === 'ended' || bucket === 'none';
 }
