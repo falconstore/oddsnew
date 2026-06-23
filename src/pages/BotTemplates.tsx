@@ -1355,7 +1355,32 @@ export default function BotTemplates() {
 
   const preview = activeCustomId ? customEditText : template.generate(enrichedFields).toUpperCase();
 
+  // Placeholders que indicam campo NÃO preenchido. Se aparecerem no preview, a
+  // mensagem está incompleta — não deve ir pro grupo (o bot/IA recusa criar o
+  // procedimento). Cobre os fallbacks de buildPartidas e campos de exemplo.
+  const PLACEHOLDER_PATTERNS = [
+    'TIME A X TIME B',
+    'DD/MM/AAAA',
+    'HH:MM',
+    'CASA DE APOSTA',
+    'NOME DA MISSÃO',
+    'NNN',
+  ];
+  const placeholdersPresentes = PLACEHOLDER_PATTERNS.filter((p) =>
+    preview.toUpperCase().includes(p),
+  );
+  const temPlaceholder = placeholdersPresentes.length > 0;
+
   const handleCopy = async () => {
+    // Bloqueio: se ainda há placeholder, confirma antes de copiar (evita mandar
+    // template vazio no grupo, que o bot não consegue processar).
+    if (temPlaceholder) {
+      const ok = window.confirm(
+        `⚠ A mensagem ainda tem campo(s) sem preencher:\n\n${placeholdersPresentes.join('\n')}\n\n` +
+        `Se enviar assim no grupo, o bot NÃO vai criar o procedimento. Copiar mesmo assim?`,
+      );
+      if (!ok) return;
+    }
     try {
       await navigator.clipboard.writeText(preview);
     } catch {
@@ -1910,13 +1935,26 @@ export default function BotTemplates() {
                   {preview}
                 </div>
 
+                {temPlaceholder && (
+                  <div className="flex items-start gap-2 rounded-xl border border-warning/40 bg-warning/10 p-3" data-testid="aviso-placeholder">
+                    <AlertTriangle className="h-4 w-4 text-warning mt-0.5 shrink-0" />
+                    <div className="text-[12px] text-warning/90">
+                      <span className="font-semibold">Faltam campos:</span> {placeholdersPresentes.join(', ')}.
+                      <br />
+                      Se enviar assim, o bot não consegue criar o procedimento (chega como exemplo vazio).
+                    </div>
+                  </div>
+                )}
+
                 <Button
                   onClick={handleCopy}
                   className={cn(
                     'w-full h-11 font-semibold gap-2 transition-all duration-300',
                     copied
                       ? 'bg-primary/20 text-primary border border-primary/30 hover:bg-primary/25'
-                      : 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg',
+                      : temPlaceholder
+                        ? 'bg-warning/80 hover:bg-warning text-background shadow-lg'
+                        : 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg',
                   )}
                   data-testid="btn-copy-template"
                 >
