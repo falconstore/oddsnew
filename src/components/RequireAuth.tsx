@@ -1,33 +1,32 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { PageKey, PAGE_KEY_TO_COLUMN, UserPermissionRow } from '@/types/auth';
+import { PageKey, UserPermissionRow } from '@/types/auth';
+import { PAGES } from '@/config/pages';
 
 interface RequireAuthProps {
   children: React.ReactNode;
   pageKey?: PageKey;
 }
 
-const REDIRECT_ORDER: { pageKey: PageKey; path: string }[] = [
-  { pageKey: 'dashboard', path: '/' },
-  { pageKey: 'procedure_control', path: '/procedure-control' },
-  { pageKey: 'subscriptions', path: '/subscriptions' },
-  { pageKey: 'betbra_affiliate', path: '/betbra-affiliate' },
-  { pageKey: 'sharkodds', path: '/match' },
-  { pageKey: 'freebet_calculator', path: '/surebet-calculator' },
-  { pageKey: 'admin', path: '/admin/users' },
-];
-
+// Primeira rota que o usuário pode acessar — usado como fallback quando ele
+// cai numa página sem permissão. Deriva do registro de páginas: percorre as
+// páginas liberadas (allowed_pages) na ordem do menu e devolve o href da
+// primeira utilizável.
 const getFirstPermittedPath = (
   permissions: UserPermissionRow | null,
   isAdmin: boolean
 ): string => {
   if (isAdmin) return '/';
   if (!permissions) return '/login';
-  for (const { pageKey, path } of REDIRECT_ORDER) {
-    const col = PAGE_KEY_TO_COLUMN[pageKey];
-    if (col && (permissions as any)[col] === true) return path;
+  const allowed = Array.isArray(permissions.allowed_pages) ? permissions.allowed_pages : [];
+  for (const page of PAGES) {
+    if (page.alwaysVisible) continue; // não é destino "próprio" do usuário
+    if (page.adminOnly) continue;
+    if (allowed.includes(page.key)) return page.href;
   }
-  return '/login';
+  // fallback: alguma página alwaysVisible (ex.: settings)
+  const util = PAGES.find((p) => p.alwaysVisible);
+  return util ? util.href : '/login';
 };
 
 export const RequireAuth = ({ children, pageKey }: RequireAuthProps) => {

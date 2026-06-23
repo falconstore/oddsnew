@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { UserPermissionRow, PERMISSION_COLUMNS } from '@/types/auth';
+import { UserPermissionRow } from '@/types/auth';
 import { useToast } from '@/hooks/use-toast';
 
 export interface UserWithPermissions {
@@ -41,14 +41,11 @@ export function useUserManagement() {
     }
   };
 
-  const updatePermissionsByEmail = async (
-    userEmail: string, 
-    permUpdates: Partial<UserPermissionRow>
-  ) => {
+  const updateAllowedPages = async (userEmail: string, allowedPages: string[]) => {
     try {
       const { error } = await supabase
         .from('user_permissions')
-        .update(permUpdates)
+        .update({ allowed_pages: allowedPages } as any)
         .eq('user_email', userEmail);
 
       if (error) throw error;
@@ -127,7 +124,7 @@ export function useUserManagement() {
     users,
     loading,
     fetchUsers,
-    updatePermissionsByEmail,
+    updateAllowedPages,
     toggleSuperAdmin,
     deleteUserByEmail,
   };

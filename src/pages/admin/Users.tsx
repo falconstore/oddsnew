@@ -1,70 +1,74 @@
 import { useState, useMemo } from 'react';
 import { Layout } from '@/components/Layout';
 import { useUserManagement, UserWithPermissions } from '@/hooks/useUserManagement';
-import { PERMISSION_COLUMNS, UserPermissionRow } from '@/types/auth';
+import { UserPermissionRow } from '@/types/auth';
+import { PERMISSION_PAGES, PERMISSION_PAGES_BY_SECTION } from '@/config/pages';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ActionButton, ActionGroup } from '@/components/ui/action-button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
-import { 
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow 
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from '@/components/ui/table';
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
-import { Shield, Settings, Trash2, Loader2, Eye, Save, Users, Clock, UserCog } from 'lucide-react';
+import { Shield, Settings, Trash2, Loader2, Save, Users, Clock, UserCog } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 
-type PermissionState = Record<string, boolean>;
+// Total de páginas liberáveis (não-admin, não-utilitárias).
+const TOTAL_PERMISSION_PAGES = PERMISSION_PAGES.length;
 
 const AdminUsers = () => {
-  const { 
-    users, loading, updatePermissionsByEmail, toggleSuperAdmin, deleteUserByEmail,
+  const {
+    users, loading, updateAllowedPages, toggleSuperAdmin, deleteUserByEmail,
   } = useUserManagement();
-  
+
   const [selectedUser, setSelectedUser] = useState<UserWithPermissions | null>(null);
   const [permissionsOpen, setPermissionsOpen] = useState(false);
-  const [permissionState, setPermissionState] = useState<PermissionState>({});
+  // Conjunto de keys de páginas liberadas pro usuário em edição.
+  const [allowed, setAllowed] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
 
   const openPermissions = (user: UserWithPermissions) => {
     setSelectedUser(user);
-    const initialState: PermissionState = {};
-    PERMISSION_COLUMNS.forEach(({ column }) => {
-      initialState[column] = (user.permissions as any)[column] === true;
-    });
-    setPermissionState(initialState);
+    const current = Array.isArray(user.permissions.allowed_pages) ? user.permissions.allowed_pages : [];
+    setAllowed(new Set(current));
     setPermissionsOpen(true);
   };
 
-  const handlePermissionChange = (column: string, value: boolean) => {
-    setPermissionState(prev => ({ ...prev, [column]: value }));
+  const togglePage = (key: string, value: boolean) => {
+    setAllowed(prev => {
+      const next = new Set(prev);
+      if (value) next.add(key); else next.delete(key);
+      return next;
+    });
   };
 
   const handleSelectAll = (checked: boolean) => {
-    const updated: PermissionState = {};
-    PERMISSION_COLUMNS.forEach(({ column }) => { updated[column] = checked; });
-    setPermissionState(updated);
+    setAllowed(checked ? new Set(PERMISSION_PAGES.map(p => p.key)) : new Set());
   };
 
   const handleSavePermissions = async () => {
     if (!selectedUser) return;
     setSaving(true);
-    await updatePermissionsByEmail(selectedUser.email, permissionState as any);
+    await updateAllowedPages(selectedUser.email, Array.from(allowed));
     setSaving(false);
     setPermissionsOpen(false);
   };
 
-  const allChecked = useMemo(() => 
-    PERMISSION_COLUMNS.every(({ column }) => permissionState[column]),
-    [permissionState]
+  const allChecked = useMemo(
+    () => PERMISSION_PAGES.every(p => allowed.has(p.key)),
+    [allowed]
   );
 
   const superAdminCount = users.filter(u => u.permissions.is_super_admin).length;
-  const activePermCount = (perms: UserPermissionRow) => 
-    PERMISSION_COLUMNS.filter(({ column }) => (perms as any)[column] === true).length;
+  const activePermCount = (perms: UserPermissionRow) =>
+    Array.isArray(perms.allowed_pages)
+      ? perms.allowed_pages.filter(k => PERMISSION_PAGES.some(p => p.key === k)).length
+      : 0;
   const isPending = (perms: UserPermissionRow) => activePermCount(perms) === 0 && !perms.is_super_admin;
   const pendingCount = users.filter(u => isPending(u.permissions)).length;
 
@@ -157,7 +161,7 @@ const AdminUsers = () => {
                             </Badge>
                           ) : (
                             <Badge variant="secondary">
-                              {activePermCount(user.permissions)}/{PERMISSION_COLUMNS.length}
+                              {activePermCount(user.permissions)}/{TOTAL_PERMISSION_PAGES}
                             </Badge>
                           )}
                         </TableCell>
@@ -214,44 +218,41 @@ const AdminUsers = () => {
             </DialogDescription>
           </DialogHeader>
           
-          <div className="border rounded-lg overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/50">
-                  <TableHead className="w-[70%]">Página</TableHead>
-                  <TableHead className="w-[30%] text-center">
-                    <div className="flex items-center justify-center gap-2">
-                      <Eye className="h-4 w-4" />
-                      <span>Acesso</span>
-                    </div>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <TableRow className="bg-primary/5 font-medium">
-                  <TableCell>Selecionar Todos</TableCell>
-                  <TableCell className="text-center">
-                    <Checkbox checked={allChecked} onCheckedChange={(checked) => handleSelectAll(!!checked)} />
-                  </TableCell>
-                </TableRow>
-                {PERMISSION_COLUMNS.map(({ column, label, description }) => (
-                  <TableRow key={column}>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium text-sm">{label}</p>
-                        <p className="text-xs text-muted-foreground">{description}</p>
+          <div className="space-y-4">
+            {/* Selecionar todos */}
+            <label className="flex items-center justify-between gap-3 border bg-primary/5 px-3 py-2 rounded-lg cursor-pointer">
+              <span className="font-medium text-sm">Selecionar todas as abas</span>
+              <Checkbox checked={allChecked} onCheckedChange={(checked) => handleSelectAll(!!checked)} />
+            </label>
+
+            {/* Abas agrupadas por seção (igual ao menu lateral) */}
+            {PERMISSION_PAGES_BY_SECTION.map((group) => (
+              <div key={group.section} className="border rounded-lg overflow-hidden">
+                <div className="bg-muted/50 px-3 py-1.5 text-xs font-semibold tracking-wide text-muted-foreground">
+                  {group.section}
+                </div>
+                <div className="divide-y">
+                  {group.pages.map((page) => (
+                    <label
+                      key={page.key}
+                      className="flex items-center justify-between gap-3 px-3 py-2 cursor-pointer hover:bg-accent/40 transition-colors"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <page.icon className="h-4 w-4 text-muted-foreground/60 flex-shrink-0" />
+                        <div className="min-w-0">
+                          <p className="font-medium text-sm truncate">{page.label}</p>
+                          <p className="text-xs text-muted-foreground truncate">{page.description}</p>
+                        </div>
                       </div>
-                    </TableCell>
-                    <TableCell className="text-center">
                       <Checkbox
-                        checked={permissionState[column] ?? false}
-                        onCheckedChange={(checked) => handlePermissionChange(column, !!checked)}
+                        checked={allowed.has(page.key)}
+                        onCheckedChange={(checked) => togglePage(page.key, !!checked)}
                       />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
 
           <DialogFooter className="flex-col sm:flex-row gap-2">

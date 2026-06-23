@@ -1,7 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
-import { UserPermissionRow, PageKey, PAGE_KEY_TO_COLUMN } from '@/types/auth';
+import { UserPermissionRow, PageKey, PAGE_KEY_TO_PAGE } from '@/types/auth';
+import { PAGE_BY_KEY } from '@/config/pages';
 
 interface AuthContextType {
   user: User | null;
@@ -80,7 +81,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return permTyped;
       });
 
-      const nextIsAdmin = !!permTyped?.can_view_admin || !!permTyped?.is_super_admin;
+      const nextIsAdmin = !!permTyped?.is_super_admin || !!permTyped?.can_view_admin
+        || !!permTyped?.allowed_pages?.includes('admin_users');
       const nextIsApproved = !!permData;
       setIsAdmin((prev) => (prev === nextIsAdmin ? prev : nextIsAdmin));
       setIsApproved((prev) => (prev === nextIsApproved ? prev : nextIsApproved));
@@ -178,22 +180,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [loadUserData]);
 
   const canViewPage = useCallback((pageKey: PageKey): boolean => {
-    const column = PAGE_KEY_TO_COLUMN[pageKey];
-    if (!column) return false;
-
-    const STRICT_PAGES: string[] = ['can_view_trial'];
-    const isStrict = STRICT_PAGES.includes(column as string);
-
     if (!userPermissions) return false;
 
-    if (isStrict) {
-      const hasSpecific = userPermissions[column] === true;
-      const isSuper = userPermissions.is_super_admin === true;
-      return hasSpecific || isSuper;
-    }
+    // Super admin vê tudo.
+    if (userPermissions.is_super_admin === true) return true;
 
+    // Traduz a PageKey legada -> key do registro de páginas.
+    const pageId = PAGE_KEY_TO_PAGE[pageKey] ?? pageKey;
+    const page = PAGE_BY_KEY[pageId];
+
+    // Páginas utilitárias (alwaysVisible) liberadas pra qualquer logado.
+    if (page?.alwaysVisible) return true;
+
+    // Páginas adminOnly: só admin/super-admin.
+    if (page?.adminOnly) return isAdmin;
+
+    // Demais páginas: precisa estar em allowed_pages. Admin também vê tudo.
     if (isAdmin) return true;
-    return userPermissions[column] === true;
+    return Array.isArray(userPermissions.allowed_pages)
+      && userPermissions.allowed_pages.includes(pageId);
   }, [userPermissions, isAdmin]);
 
   const canEditPage = useCallback((pageKey: PageKey): boolean => {
@@ -222,20 +227,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (error) return { error: error as Error | null };
 
     try {
+      // Novo usuário nasce sem acesso a nenhuma aba — admin libera depois em
+      // Usuários. allowed_pages vazio = pendente.
       await supabase
         .from('user_permissions')
         .upsert({
           user_email: email,
-          can_view_dashboard: false,
-          can_view_payment_control: false,
-          can_view_procedure_control: false,
-          can_view_freebet_calculator: false,
-          can_view_admin: false,
-          can_view_sharkodds: false,
-          can_view_conta_corrente: false,
-          can_view_plataformas: false,
-          can_view_betbra: false,
-          can_view_watermark: false,
+          allowed_pages: [],
           is_super_admin: false,
         } as any, { onConflict: 'user_email' });
     } catch (e) {
