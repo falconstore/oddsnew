@@ -958,8 +958,8 @@ function FreebetSelectField({ value, onChange }: { value: string; onChange: (v: 
             </div>
           ))}
           {selectedFbs.length > 1 && (
-            <p className="text-[11px] text-warning/90 px-1">
-              ⚠ Vínculo automático será feito apenas com a 1ª (#{selectedFbs[0].procedure_number}). Os demais nºs aparecerão no texto da mensagem.
+            <p className="text-[11px] text-primary/90 px-1">
+              ✓ Todas as {selectedFbs.length} freebets serão vinculadas (#{selectedNums.join(', #')}). O cálculo soma o déficit de todas.
             </p>
           )}
         </div>
