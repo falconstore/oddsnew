@@ -14,18 +14,21 @@ import { useSetProcedureResult } from '@/hooks/useProcedures';
 
 interface DefinirResultadosModalProps {
   procedure: Procedure;
-  /** Procedimento GANHAR_FB que originou a freebet (quando tipo=QUEIMAR_FB). */
-  originProcedure?: Procedure | null;
+  /** Procedimento(s) GANHAR_FB que originaram a(s) freebet(s) — quando tipo=QUEIMAR_FB.
+   *  Multi-origem: pode haver mais de uma (REF N° 469, 472). O primeiro = primário. */
+  originProcedures?: Procedure[] | null;
   onClose: () => void;
 }
 
 const fmt = (n: number) =>
   n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-export function DefinirResultadosModal({ procedure, originProcedure, onClose }: DefinirResultadosModalProps) {
+export function DefinirResultadosModal({ procedure, originProcedures, onClose }: DefinirResultadosModalProps) {
   const setResult = useSetProcedureResult();
 
   const isQueima = procedure.tipo === 'QUEIMAR_FB';
+  // Lista de origens (sempre array). Primeiro = primário.
+  const origins = useMemo(() => (originProcedures ?? []).filter(Boolean) as Procedure[], [originProcedures]);
 
   // Pré-preenchimento (paridade doc 06 §2-§4)
   const previstoLucro = procedure.lucro_prejuizo_previsto ?? procedure.profit_loss ?? null;
@@ -114,17 +117,21 @@ export function DefinirResultadosModal({ procedure, originProcedure, onClose }: 
   const showEsperado = previstoLucro != null && Math.abs(previstoLucro) > 0.001;
   const sinalEsperado = (previstoLucro ?? 0) >= 0 ? '+' : '−';
 
-  // Bloco D — Resumo do Par (só QUEIMAR_FB). Etapa 1 = L/P da origem (resultado_lucro
-  // ou lucro_prejuizo se ainda não fechado). Etapa 2 = L/P em digitação (esta queima).
+  // Bloco D — Resumo do Par (só QUEIMAR_FB). Uma etapa por origem (L/P da origem:
+  // resultado_lucro, ou profit_loss/previsto se ainda não fechado) + a etapa desta
+  // queima (L/P em digitação). Líquido = soma de todas.
   const resumoPar = useMemo(() => {
     if (!isQueima) return null;
-    const etapa1 =
-      Number(originProcedure?.resultado_lucro ?? originProcedure?.profit_loss ?? 0) || 0;
+    const etapasOrigem = origins.map((o) => ({
+      number: o.procedure_number,
+      valor: Number(o.resultado_lucro ?? o.profit_loss ?? o.lucro_prejuizo_previsto ?? 0) || 0,
+    }));
     const etapa2Num = lucroStr.trim() === '' ? 0 : Number(lucroStr);
-    const etapa2 = Number.isFinite(etapa2Num) ? etapa2Num : 0;
-    const liquido = etapa1 + etapa2;
-    return { etapa1, etapa2, liquido };
-  }, [isQueima, originProcedure, lucroStr]);
+    const etapaQueima = Number.isFinite(etapa2Num) ? etapa2Num : 0;
+    const somaOrigens = etapasOrigem.reduce((acc, e) => acc + e.valor, 0);
+    const liquido = somaOrigens + etapaQueima;
+    return { etapasOrigem, etapaQueima, liquido };
+  }, [isQueima, origins, lucroStr]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -212,32 +219,36 @@ export function DefinirResultadosModal({ procedure, originProcedure, onClose }: 
                     FreeBet Queimada
                   </span>
                 </div>
-                {originProcedure ? (
-                  <div className="rounded-lg bg-muted border border-border p-2.5 space-y-1">
-                    <div className="flex items-center gap-2 text-sm">
-                      <Ticket className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                      <span className="font-mono font-semibold text-foreground">
-                        REF #{originProcedure.procedure_number}
-                      </span>
-                      <span className="text-foreground">·</span>
-                      <span className="text-primary font-mono">
-                        R$ {fmt(Number(
-                          originProcedure.resultado_freebet_ganha ??
-                            originProcedure.freebet_valor_previsto ??
-                            originProcedure.freebet_value ??
-                            0,
-                        ))}
-                      </span>
-                      <span className="text-foreground">·</span>
-                      <span className="text-foreground font-semibold">
-                        {originProcedure.platform}
-                      </span>
-                    </div>
-                    {originProcedure.partida_descricao && (
-                      <p className="text-[11px] text-muted-foreground ml-5 truncate">
-                        {originProcedure.partida_descricao}
-                      </p>
-                    )}
+                {origins.length > 0 ? (
+                  <div className="space-y-1.5">
+                    {origins.map((o) => (
+                      <div key={o.id} className="rounded-lg bg-muted border border-border p-2.5 space-y-1">
+                        <div className="flex items-center gap-2 text-sm flex-wrap">
+                          <Ticket className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                          <span className="font-mono font-semibold text-foreground">
+                            REF #{o.procedure_number}
+                          </span>
+                          <span className="text-foreground">·</span>
+                          <span className="text-primary font-mono">
+                            R$ {fmt(Number(
+                              o.resultado_freebet_ganha ??
+                                o.freebet_valor_previsto ??
+                                o.freebet_value ??
+                                0,
+                            ))}
+                          </span>
+                          <span className="text-foreground">·</span>
+                          <span className="text-foreground font-semibold">
+                            {o.platform}
+                          </span>
+                        </div>
+                        {o.partida_descricao && (
+                          <p className="text-[11px] text-muted-foreground ml-5 truncate">
+                            {o.partida_descricao}
+                          </p>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 ) : (
                   <div className="rounded-lg bg-warning/5 border border-warning/20 p-2.5 flex items-start gap-2">
@@ -356,20 +367,22 @@ export function DefinirResultadosModal({ procedure, originProcedure, onClose }: 
                   </span>
                 </div>
                 <div className="space-y-1 font-mono text-[12px]">
+                  {resumoPar.etapasOrigem.map((et, i) => (
+                    <div key={`${et.number}-${i}`} className="flex items-center justify-between">
+                      <span className="text-muted-foreground">
+                        Etapa {i + 1} (#{et.number})
+                      </span>
+                      <span className={et.valor >= 0 ? 'text-primary' : 'text-destructive'}>
+                        {et.valor >= 0 ? '+' : '−'}R$ {fmt(Math.abs(et.valor))}
+                      </span>
+                    </div>
+                  ))}
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">
-                      Etapa 1{originProcedure ? ` (#${originProcedure.procedure_number})` : ''}
+                      Etapa {resumoPar.etapasOrigem.length + 1} (#{procedure.procedure_number})
                     </span>
-                    <span className={resumoPar.etapa1 >= 0 ? 'text-primary' : 'text-destructive'}>
-                      {resumoPar.etapa1 >= 0 ? '+' : '−'}R$ {fmt(Math.abs(resumoPar.etapa1))}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">
-                      Etapa 2 (#{procedure.procedure_number})
-                    </span>
-                    <span className={resumoPar.etapa2 >= 0 ? 'text-primary' : 'text-destructive'}>
-                      {resumoPar.etapa2 >= 0 ? '+' : '−'}R$ {fmt(Math.abs(resumoPar.etapa2))}
+                    <span className={resumoPar.etapaQueima >= 0 ? 'text-primary' : 'text-destructive'}>
+                      {resumoPar.etapaQueima >= 0 ? '+' : '−'}R$ {fmt(Math.abs(resumoPar.etapaQueima))}
                     </span>
                   </div>
                   <div className="border-t border-border pt-1.5 mt-1.5 flex items-center justify-between">

@@ -366,9 +366,18 @@ export default function ProcedureControl() {
       {resultProcedure && (
         <DefinirResultadosModal
           procedure={resultProcedure}
-          originProcedure={
-            resultProcedure.tipo === 'QUEIMAR_FB' && resultProcedure.freebet_reference_id
-              ? procedures.find((p) => p.id === resultProcedure.freebet_reference_id) ?? null
+          originProcedures={
+            resultProcedure.tipo === 'QUEIMAR_FB'
+              ? (() => {
+                  // Multi-origem: resolve TODAS as origens (array), com fallback
+                  // pro singular legado. Ordem preservada; primeiro = primário.
+                  const ids = resultProcedure.freebet_reference_ids?.length
+                    ? resultProcedure.freebet_reference_ids
+                    : (resultProcedure.freebet_reference_id ? [resultProcedure.freebet_reference_id] : []);
+                  return ids
+                    .map((id) => procedures.find((p) => p.id === id))
+                    .filter(Boolean) as typeof procedures;
+                })()
               : null
           }
           onClose={() => setResultProcedure(null)}
