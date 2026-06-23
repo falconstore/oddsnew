@@ -187,6 +187,8 @@ serve(async (req) => {
       ok: res.ok,
       requestId: res.requestId,
       errorCode: res.errorCode,
+      // DEBUG: corpo completo da resposta quando NÃO ok (motivo real do 400/422)
+      body: res.ok ? undefined : res.body,
     });
 
     // Persiste o resultado na row
@@ -199,9 +201,17 @@ serve(async (req) => {
       updates.freebetpro_last_error = null;
       if (res.numero != null) updates.freebetpro_numero = res.numero;
     } else {
-      const errMsg = res.body?.error
-        ? `${res.status} ${res.errorCode ?? ""} ${res.body.error.message ?? ""}`.trim()
-        : `${res.status} ${JSON.stringify(res.body).slice(0, 200)}`;
+      // Captura o motivo de forma robusta — a API pode devolver o erro em
+      // formatos diferentes (error.message, error.details, message, ou cru).
+      const e = res.body?.error;
+      const detalhe =
+        e?.message ??
+        (e?.details ? JSON.stringify(e.details) : null) ??
+        res.body?.message ??
+        (res.body ? JSON.stringify(res.body) : "");
+      const errMsg = `${res.status} ${res.errorCode ?? ""} ${detalhe ?? ""}`
+        .trim()
+        .slice(0, 300);
       updates.freebetpro_last_error = errMsg;
     }
 
