@@ -47,10 +47,10 @@ const FINALIZED_STATUSES = ['Concluído', 'Lucro Direto'];
 // Decide se o troféu "Definir Resultado" deve aparecer.
 //
 // Regras (acordadas com o operador):
-//  1. Já conferido (resultado_lucro registrado) → NÃO mostra (já definido).
-//  2. Status finalizado (Concluído / Lucro Direto) → NÃO mostra.
-//  3. SUPERODD com lucro previsto = 0 → MOSTRA (precisa definir o valor real),
-//     mesmo que o jogo ainda não tenha "acabado" pela regra de horário.
+//  1. Já conferido de verdade (resultado_lucro registrado) → NÃO mostra.
+//  2. SUPERODD com lucro previsto = 0 → MOSTRA, mesmo se status Concluído —
+//     ainda precisa definir o valor real (essa exceção vence o "Concluído").
+//  3. Status finalizado (Concluído / Lucro Direto) → NÃO mostra.
 //  4. Caso geral (Promoção, Freebet, etc.) → MOSTRA quando o jogo já acabou
 //     ou não tem horário definido (bucket 'ended' | 'none').
 export function canCheckResult(
@@ -64,13 +64,17 @@ export function canCheckResult(
   },
   now: Date = new Date(),
 ): boolean {
-  // 1 + 2 — já definido / finalizado: não precisa do troféu.
+  // 1 — já conferido (resultado registrado de fato): não precisa do troféu.
   if (proc.resultado_lucro != null) return false;
-  if (proc.status && FINALIZED_STATUSES.includes(proc.status)) return false;
 
-  // 3 — Superodd com lucro previsto zerado precisa de conferência sempre.
+  // 2 — Superodd com lucro previsto zerado precisa de conferência SEMPRE,
+  // inclusive quando o status já está Concluído (caixa da categoria ignorada).
   const lucroPrevisto = proc.lucro_prejuizo_previsto ?? proc.profit_loss ?? 0;
-  if (proc.category === 'Superodd' && Number(lucroPrevisto) === 0) return true;
+  const isSuperodd = (proc.category ?? '').trim().toLowerCase() === 'superodd';
+  if (isSuperodd && Number(lucroPrevisto) === 0) return true;
+
+  // 3 — finalizado: não precisa do troféu.
+  if (proc.status && FINALIZED_STATUSES.includes(proc.status)) return false;
 
   // 4 — regra geral pelo tempo de jogo.
   const bucket = getGameTimeBucket(proc, now);
