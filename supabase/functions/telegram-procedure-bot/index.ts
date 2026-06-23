@@ -242,6 +242,24 @@ function buildInsertRow(
   };
 }
 
+// Resolve uma lista de procedure_number (REF N° 469, 472) nos UUIDs das origens,
+// preservando a ordem e ignorando os que não existem. Primeiro = primário.
+async function resolveRefIds(supa: any, numbers: string[]): Promise<string[]> {
+  const ids: string[] = [];
+  for (const num of numbers) {
+    if (!num) continue;
+    const { data: refProc } = await supa
+      .from("procedures")
+      .select("id")
+      .eq("procedure_number", num)
+      .order("created_date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (refProc?.id && !ids.includes(refProc.id)) ids.push(refProc.id);
+  }
+  return ids;
+}
+
 // Contexto opcional pro fallback de IA + registro em parser_misses.
 interface AiFallbackCtx {
   apiKey: string | undefined;
@@ -331,17 +349,16 @@ async function parseAndInsertProcedure(
     parsed = (parseResult as any).data;
   }
 
-  let freebetReferenceId: string | null = null;
-  if (parsed.tipo === "QUEIMAR_FB" && parsed.ref_procedure_number) {
-    const { data: refProc } = await supa
-      .from("procedures")
-      .select("id")
-      .eq("procedure_number", parsed.ref_procedure_number)
-      .order("created_date", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (refProc) freebetReferenceId = refProc.id;
+  // Resolve TODAS as origens (REF N° 469, 472) — primeiro = primário.
+  // Compat: usa ref_procedure_numbers (novo) e cai pro singular se vier vazio.
+  let refIds: string[] = [];
+  if (parsed.tipo === "QUEIMAR_FB") {
+    const nums = (parsed.ref_procedure_numbers && parsed.ref_procedure_numbers.length > 0)
+      ? parsed.ref_procedure_numbers
+      : (parsed.ref_procedure_number ? [parsed.ref_procedure_number] : []);
+    refIds = await resolveRefIds(supa, nums);
   }
+  const freebetReferenceId: string | null = refIds[0] ?? null;
 
   const missingFields = isPartial ? (parsed as PartialParsedProcedure).missingFields : [];
   const insertRow = {
@@ -354,6 +371,16 @@ async function parseAndInsertProcedure(
 
   if (insertErr || !inserted) {
     return { ok: false, error: insertErr?.message ?? "insert failed" };
+  }
+
+  // Múltiplas origens: a RPC só grava o singular. Espelha TODAS no array
+  // freebet_reference_ids (o trigger de normalização dedup e mantém ordem).
+  if (refIds.length > 1 && inserted.id) {
+    const { error: refErr } = await supa
+      .from("procedures")
+      .update({ freebet_reference_ids: refIds })
+      .eq("id", inserted.id);
+    if (refErr) log("queimar_fb_multi_ref_update_failed", { id: inserted.id, error: refErr.message });
   }
 
   if (isPartial) {
@@ -1016,16 +1043,17 @@ serve(async (req) => {
         ...(editTelegramLink ? { telegram_link: editTelegramLink } : {}),
       };
 
-      // Resolve freebet_reference_id para QUEIMAR_FB
-      if (parsed.tipo === "QUEIMAR_FB" && parsed.ref_procedure_number) {
-        const { data: refProc } = await supa
-          .from("procedures")
-          .select("id")
-          .eq("procedure_number", parsed.ref_procedure_number)
-          .order("created_date", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (refProc) updateFields.freebet_reference_id = refProc.id;
+      // Resolve TODAS as origens (REF N° 469, 472) para QUEIMAR_FB.
+      // Grava o array completo; o trigger espelha o singular = primeiro.
+      if (parsed.tipo === "QUEIMAR_FB") {
+        const nums = (parsed.ref_procedure_numbers && parsed.ref_procedure_numbers.length > 0)
+          ? parsed.ref_procedure_numbers
+          : (parsed.ref_procedure_number ? [parsed.ref_procedure_number] : []);
+        const editRefIds = await resolveRefIds(supa, nums);
+        if (editRefIds.length > 0) {
+          updateFields.freebet_reference_id = editRefIds[0];
+          updateFields.freebet_reference_ids = editRefIds;
+        }
       }
 
       await supa.from("procedures").update(updateFields).eq("id", existing.id);

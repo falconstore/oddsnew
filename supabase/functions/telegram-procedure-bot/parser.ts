@@ -20,7 +20,8 @@ export interface ParsedProcedure {
   horario_partida: string | null; // HH:MM
   lucro_prejuizo_previsto: number | null;
   freebet_valor_previsto: number | null;
-  ref_procedure_number: string | null; // número do proc de referência (QUEIMAR_FB)
+  ref_procedure_number: string | null; // número do proc de referência (QUEIMAR_FB) — primeiro/primário
+  ref_procedure_numbers: string[];      // TODOS os nºs de referência (REF N° 469, 472 → ["469","472"])
   is_duplo_green: boolean;
   is_extra: boolean;            // procedimento extra/reenvio (PROCEDIMENTO EXTRA N ou N EXTRA)
   dp: boolean;
@@ -45,6 +46,7 @@ export interface PartialParsedProcedure {
   lucro_prejuizo_previsto: number | null;
   freebet_valor_previsto: number | null;
   ref_procedure_number: string | null;
+  ref_procedure_numbers: string[];
   is_duplo_green: boolean;
   is_extra: boolean;
   dp: boolean;
@@ -199,14 +201,34 @@ function extractTitulo(text: string): string {
   return "";
 }
 
-/** Número do procedimento de referência (QUEIMAR_FB) */
+/** Números de procedimento de referência (QUEIMAR_FB) — suporta múltiplos.
+ *  Ex: "REF N° 469, 472" → ["469", "472"]; "REF N° 469 e 472" → ["469","472"].
+ *  Retorna lista deduplicada preservando ordem (primeiro = primário). */
+function extractRefProcedureNumbers(text: string): string[] {
+  // Captura a "cauda" de números logo após o marcador de referência, que pode
+  // conter vários nºs separados por vírgula / "e" / "+". Ex: "REF N° 469, 472 e 480".
+  let tail: string | null = null;
+  const m1 = text.match(/REFERENTE\s+[AÀ][OS]?\s+FREEBETS?\s*(?:—|-|DO\s+PROCEDIMENTO)?\s*(?:REF\s+N[°º]?)?\s*#?([\d\s,e+/]+)/i);
+  if (m1) tail = m1[1];
+  if (!tail) {
+    const m2 = text.match(/\bREF\s+N[°º]?\s*#?([\d\s,e+/]+)/i);
+    if (m2) tail = m2[1];
+  }
+  if (!tail) return [];
+  // Extrai todos os grupos de dígitos da cauda e dedup preservando ordem.
+  const nums = tail.match(/\d+/g) ?? [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const n of nums) {
+    if (!seen.has(n)) { seen.add(n); out.push(n); }
+  }
+  return out;
+}
+
+/** Compat: primeiro número de referência (ou null). */
 function extractRefProcedureNumber(text: string): string | null {
-  // Formato longo: "REFERENTE ÀS FREEBETS DO PROCEDIMENTO 145"
-  const m1 = text.match(/REFERENTE\s+[AÀ][OS]?\s+FREEBETS?\s+DO\s+PROCEDIMENTO\s+#?(\d+)/i);
-  if (m1) return m1[1];
-  // Formato abreviado: "REF N° 145" / "REF Nº 145" / "REF N 145"
-  const m2 = text.match(/\bREF\s+N[°º]?\s*#?(\d+)/i);
-  return m2 ? m2[1] : null;
+  const all = extractRefProcedureNumbers(text);
+  return all.length > 0 ? all[0] : null;
 }
 
 /** Extrai linha "📝 OBS: ..." — usada para Opção 2 da Aposta Protegida e outros comentários */
@@ -451,8 +473,9 @@ export function parseMessage(text: string): ParseResult {
     missing.push("recompensa em freebet (RECOMPENSA: 🎁 X,XX EM FREEBET)");
   }
 
-  // 9. Referência QUEIMAR_FB
-  const refProcNumber = tipo === "QUEIMAR_FB" ? extractRefProcedureNumber(text) : null;
+  // 9. Referência QUEIMAR_FB — suporta múltiplos (REF N° 469, 472)
+  const refProcNumbers = tipo === "QUEIMAR_FB" ? extractRefProcedureNumbers(text) : [];
+  const refProcNumber = refProcNumbers.length > 0 ? refProcNumbers[0] : null;
   if (tipo === "QUEIMAR_FB" && !refProcNumber) {
     missing.push("número do procedimento de referência (REFERENTE ÀS FREEBETS DO PROCEDIMENTO N)");
   }
@@ -499,6 +522,7 @@ export function parseMessage(text: string): ParseResult {
         lucro_prejuizo_previsto: lucroPrevistoFinal,
         freebet_valor_previsto: freebetValor,
         ref_procedure_number: refProcNumber,
+        ref_procedure_numbers: refProcNumbers,
         is_duplo_green: false,
         is_extra: isExtra,
         dp: false,
@@ -527,6 +551,7 @@ export function parseMessage(text: string): ParseResult {
       lucro_prejuizo_previsto: lucroPrevistoFinal,
       freebet_valor_previsto: freebetValor,
       ref_procedure_number: refProcNumber,
+      ref_procedure_numbers: refProcNumbers,
       is_duplo_green: false,
       is_extra: isExtra,
       dp: false,

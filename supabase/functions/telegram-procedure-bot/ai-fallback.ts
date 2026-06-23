@@ -292,6 +292,9 @@ export async function aiExtractProcedure(
       freebet_valor_previsto:
         typeof ai.freebet_valor_previsto === "number" ? ai.freebet_valor_previsto : null,
       ref_procedure_number: ai.ref_procedure_number ? String(ai.ref_procedure_number).replace(/\D/g, "") : null,
+      ref_procedure_numbers: ai.ref_procedure_number
+        ? [String(ai.ref_procedure_number).replace(/\D/g, "")].filter(Boolean)
+        : [],
       is_duplo_green: false, // confirmação de DG é sempre manual no painel
       is_extra: isExtra,
       dp: false,
