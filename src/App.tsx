@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { AnimatedRoutes } from "@/components/AnimatedRoutes";
+import { UpdateBanner } from "@/components/UpdateBanner";
 import { ThemeProvider } from "next-themes";
 
 const queryClient = new QueryClient({
@@ -31,6 +32,7 @@ const App = () => (
         <AuthProvider>
           <Toaster />
           <Sonner />
+          <UpdateBanner />
           <BrowserRouter>
             <AnimatedRoutes />
           </BrowserRouter>

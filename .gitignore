@@ -26,3 +26,6 @@ dist-ssr
 .env
 .env.*
 .local/
+
+# Gerado a cada build pelo vite.config (emit-version-file)
+public/version.json
