@@ -1,7 +1,8 @@
 import { Button } from '@/components/ui/button';
+import { ActionButton } from '@/components/ui/action-button';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Star, Pencil, Trash2, ExternalLink, Tag, Calendar, Building2, Archive, ArchiveRestore, Trophy, Clock, CheckCircle2, AlertCircle, ShieldCheck, AlertTriangle, ShieldAlert, Timer } from 'lucide-react';
+import { Star, Pencil, Trash2, ExternalLink, Tag, Calendar, Building2, Archive, ArchiveRestore, Trophy, Clock, CheckCircle2, AlertCircle, AlertTriangle, ShieldAlert, Timer } from 'lucide-react';
 import { Procedure } from '@/types/procedures';
 import { formatProcedureDate, translateCategory, getDisplayProfitLoss, getCategoryBadgeClass } from '@/lib/procedureUtils';
 import { canCheckResult } from '@/lib/procedureGameTime';
@@ -18,16 +19,15 @@ interface ProcedureMobileCardsProps {
   onToggleFavorite: (proc: Procedure) => void;
   onArchive?: (proc: Procedure) => void;
   onCheckResult?: (proc: Procedure) => void;
-  onConfirmBot?: (id: string) => void;
 }
 
-export function ProcedureMobileCards({ procedures, proceduresById, onEdit, onDelete, onToggleFavorite, onArchive, onCheckResult, onConfirmBot }: ProcedureMobileCardsProps) {
+export function ProcedureMobileCards({ procedures, proceduresById, onEdit, onDelete, onToggleFavorite, onArchive, onCheckResult }: ProcedureMobileCardsProps) {
   const getStatusBadge = (status: string) => {
     if (status === 'Concluído' || status === 'Lucro Direto') {
-      return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
+      return 'bg-primary/20 text-primary border-primary/30';
     }
     if (status === 'Aguardando Resultado') {
-      return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
+      return 'bg-warning/20 text-warning border-warning/30';
     }
     if (
       status === 'Enviada partida em Aberto' ||
@@ -36,9 +36,9 @@ export function ProcedureMobileCards({ procedures, proceduresById, onEdit, onDel
       status === 'Falta Girar Freebet' ||
       status === 'Falta Girar Freeebet'
     ) {
-      return 'bg-amber-500/20 text-amber-400 border-amber-500/30';
+      return 'bg-warning/20 text-warning border-warning/30';
     }
-    return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
+    return 'bg-muted text-muted-foreground border-border';
   };
 
   return (
@@ -52,7 +52,7 @@ export function ProcedureMobileCards({ procedures, proceduresById, onEdit, onDel
         <div
           key={proc.id}
           data-testid={`card-procedure-${proc.id}`}
-          className={`glass rounded-2xl border p-4 card-hover overflow-hidden ${proc.archived ? 'border-white/5 opacity-60' : hasIncomplete ? 'border-orange-500/30' : needsReviewOnly ? 'border-yellow-500/20' : 'border-white/5'} ${proc.tachado ? 'opacity-50 grayscale' : ''}`}
+          className={`glass rounded-2xl border p-4 card-hover overflow-hidden ${proc.archived ? 'border-white/5 opacity-60' : hasIncomplete ? 'border-warning/30' : needsReviewOnly ? 'border-warning/20' : 'border-white/5'} ${proc.tachado ? 'opacity-50 grayscale' : ''}`}
         >
           <div className="flex justify-between items-start mb-3">
             <div className="flex items-start gap-3">
@@ -60,20 +60,20 @@ export function ProcedureMobileCards({ procedures, proceduresById, onEdit, onDel
                 variant="ghost"
                 size="sm"
                 onClick={() => onToggleFavorite(proc)}
-                className={`p-1 h-auto ${proc.is_favorite ? 'text-yellow-400' : 'text-muted-foreground/40'}`}
+                className={`p-1 h-auto ${proc.is_favorite ? 'text-warning' : 'text-muted-foreground/40'}`}
               >
-                <Star className={`w-4 h-4 ${proc.is_favorite ? 'fill-yellow-400' : ''}`} />
+                <Star className={`w-4 h-4 ${proc.is_favorite ? 'fill-warning' : ''}`} />
               </Button>
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-base font-bold gradient-text">#{proc.procedure_number}</span>
+                  <span className="text-base font-bold text-foreground">#{proc.procedure_number}</span>
                   <Badge variant="outline" className={`${getCategoryBadgeClass(proc.category)} text-[10px] px-1.5 py-0`}>
                     {translateCategory(proc.category)}
                   </Badge>
                   {proc.is_extra && (
                     <Badge
                       data-testid={`badge-extra-mobile-${proc.id}`}
-                      className="bg-amber-500/15 text-amber-400 border border-amber-500/30 text-[10px] px-1.5 py-0 font-bold uppercase tracking-wide"
+                      className="bg-warning/15 text-warning border border-warning/30 text-[10px] px-1.5 py-0 font-bold uppercase tracking-wide"
                     >
                       EXTRA
                     </Badge>
@@ -88,14 +88,14 @@ export function ProcedureMobileCards({ procedures, proceduresById, onEdit, onDel
                       <TooltipTrigger asChild>
                         <Badge
                           data-testid={`badge-bot-incomplete-${proc.id}`}
-                          className="bg-orange-500/15 text-orange-400 border border-orange-500/30 text-[10px] px-1.5 py-0 cursor-help gap-1"
+                          className="bg-warning/15 text-warning border border-warning/30 text-[10px] px-1.5 py-0 cursor-help gap-1"
                         >
                           <AlertTriangle className="w-2.5 h-2.5" />
                           INCOMPLETO
                         </Badge>
                       </TooltipTrigger>
                       <TooltipContent side="top" className="max-w-xs">
-                        <p className="text-orange-300 font-semibold text-[11px] mb-0.5">Campos em falta:</p>
+                        <p className="text-warning font-semibold text-[11px] mb-0.5">Campos em falta:</p>
                         <p className="text-[11px]">{proc.bot_missing_fields!.join(', ')}</p>
                       </TooltipContent>
                     </Tooltip>
@@ -105,14 +105,14 @@ export function ProcedureMobileCards({ procedures, proceduresById, onEdit, onDel
                       <TooltipTrigger asChild>
                         <Badge
                           data-testid={`badge-bot-review-${proc.id}`}
-                          className="bg-yellow-500/15 text-yellow-400 border border-yellow-500/30 text-[10px] px-1.5 py-0 cursor-help gap-1"
+                          className="bg-warning/15 text-warning border border-warning/30 text-[10px] px-1.5 py-0 cursor-help gap-1"
                         >
                           <ShieldAlert className="w-2.5 h-2.5" />
                           VERIFICAR
                         </Badge>
                       </TooltipTrigger>
                       <TooltipContent side="top" className="max-w-xs">
-                        <p className="text-yellow-300 font-semibold text-[11px] mb-0.5">Registrado pelo bot</p>
+                        <p className="text-warning font-semibold text-[11px] mb-0.5">Registrado pelo bot</p>
                         <p className="text-[11px]">Confirme se os dados (jogo, data, casa) estão corretos.</p>
                       </TooltipContent>
                     </Tooltip>
@@ -121,7 +121,7 @@ export function ProcedureMobileCards({ procedures, proceduresById, onEdit, onDel
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <span data-testid={`icon-fbp-synced-mobile-${proc.id}`} tabIndex={0} className="inline-flex cursor-help">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400/70" />
+                          <CheckCircle2 className="w-3.5 h-3.5 text-primary/70" />
                         </span>
                       </TooltipTrigger>
                       <TooltipContent side="top">
@@ -133,11 +133,11 @@ export function ProcedureMobileCards({ procedures, proceduresById, onEdit, onDel
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <span data-testid={`icon-fbp-error-mobile-${proc.id}`} tabIndex={0} className="inline-flex cursor-help">
-                          <AlertCircle className="w-3.5 h-3.5 text-amber-400/80" />
+                          <AlertCircle className="w-3.5 h-3.5 text-warning/80" />
                         </span>
                       </TooltipTrigger>
                       <TooltipContent side="top" className="max-w-xs">
-                        <p className="text-amber-300">Erro FreeBet Pro: {proc.freebetpro_last_error}</p>
+                        <p className="text-warning">Erro FreeBet Pro: {proc.freebetpro_last_error}</p>
                       </TooltipContent>
                     </Tooltip>
                   )}
@@ -159,7 +159,7 @@ export function ProcedureMobileCards({ procedures, proceduresById, onEdit, onDel
               </div>
             </div>
             {proc.telegram_link && (
-              <a href={proc.telegram_link} target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:text-cyan-300 transition-colors">
+              <a href={proc.telegram_link} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">
                 <ExternalLink className="w-4 h-4" />
               </a>
             )}
@@ -187,11 +187,11 @@ export function ProcedureMobileCards({ procedures, proceduresById, onEdit, onDel
                 <div className="bg-white/[0.03] rounded-xl p-2.5 border border-white/5">
                   <p className="text-muted-foreground mb-1">
                     Lucro/Prejuízo
-                    {dpl.isGross && <span className="ml-1 text-[9px] text-emerald-400/70">(máx)</span>}
+                    {dpl.isGross && <span className="ml-1 text-[9px] text-primary/70">(máx)</span>}
                   </p>
                   {showEffective ? (
                     <LucroMaximoTooltip dpl={dpl} liquid={dpl.liquidEffective} total={dpl.effective}>
-                      <span className={`font-bold text-sm ${dpl.effective >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                      <span className={`font-bold text-sm ${dpl.effective >= 0 ? 'text-primary' : 'text-destructive'}`}>
                         {dpl.effective >= 0 ? '+' : ''}R$ {dpl.effective.toFixed(2)}
                       </span>
                     </LucroMaximoTooltip>
@@ -202,7 +202,7 @@ export function ProcedureMobileCards({ procedures, proceduresById, onEdit, onDel
                       </span>
                     </LucroMaximoTooltip>
                   ) : (
-                    <span className="font-bold text-sm text-emerald-400">+R$ 0.00</span>
+                    <span className="font-bold text-sm text-primary">+R$ 0.00</span>
                   )}
                 </div>
               );
@@ -210,13 +210,13 @@ export function ProcedureMobileCards({ procedures, proceduresById, onEdit, onDel
             {proc.freebet_value && (
               <div className="bg-white/[0.03] rounded-xl p-2.5 border border-white/5">
                 <p className="text-muted-foreground mb-1">Freebet</p>
-                <span className="text-purple-400 font-bold text-sm">R$ {proc.freebet_value.toFixed(2)}</span>
+                <span className="text-foreground font-bold text-sm">R$ {proc.freebet_value.toFixed(2)}</span>
               </div>
             )}
             {proc.dp && (
-              <div className="bg-white/[0.03] rounded-xl p-2.5 border border-emerald-500/20">
+              <div className="bg-white/[0.03] rounded-xl p-2.5 border border-primary/20">
                 <p className="text-muted-foreground mb-1">DP</p>
-                <Badge className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] px-1.5 py-0">✓ Duplo Green</Badge>
+                <Badge className="bg-primary/20 text-primary border border-primary/30 text-[10px] px-1.5 py-0">✓ Duplo Green</Badge>
               </div>
             )}
             {proc.promotion_name && (
@@ -237,66 +237,51 @@ export function ProcedureMobileCards({ procedures, proceduresById, onEdit, onDel
             </div>
           )}
 
-          {(onEdit || onDelete || onArchive || showCheck || (proc.bot_needs_review && onConfirmBot)) && (
-            <div className="flex gap-2 pt-3 border-t border-white/5 flex-wrap">
-              {proc.bot_needs_review && !proc.archived && onConfirmBot && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onConfirmBot(proc.id)}
-                  data-testid={`button-confirm-bot-mobile-${proc.id}`}
-                  className={`flex-1 h-8 ${hasIncomplete ? 'border-orange-500/30 text-orange-400 hover:bg-orange-500/10 hover:text-orange-300' : 'border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10 hover:text-yellow-300'}`}
-                >
-                  <ShieldCheck className="w-3.5 h-3.5 mr-1.5" />
-                  {hasIncomplete ? 'Confirmar (incompleto)' : 'Confirmar dados'}
-                </Button>
-              )}
+          {(onEdit || onDelete || onArchive || showCheck) && (
+            <div className="flex gap-2 pt-3 border-t border-border flex-wrap">
               {showCheck && (
-                <Button
-                  variant="outline"
-                  size="sm"
+                <ActionButton
+                  showLabel
+                  block
+                  icon={Trophy}
+                  intent="confirm"
+                  label="Conferir"
                   onClick={() => onCheckResult!(proc)}
                   data-testid={`button-conferir-mobile-${proc.id}`}
-                  className="flex-1 h-8 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300"
-                >
-                  <Trophy className="w-3.5 h-3.5 mr-1.5" />
-                  Conferir
-                </Button>
+                />
               )}
               {onEdit && (
-                <Button
-                  variant="outline"
-                  size="sm"
+                <ActionButton
+                  showLabel
+                  block
+                  icon={Pencil}
+                  intent="edit"
+                  label="Editar"
                   onClick={() => onEdit(proc)}
                   data-testid={`button-edit-mobile-${proc.id}`}
-                  className="flex-1 h-8 border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10 hover:text-cyan-300"
-                >
-                  <Pencil className="w-3.5 h-3.5 mr-1.5" />
-                  Editar
-                </Button>
+                />
               )}
               {onArchive && (
-                <Button
-                  variant="outline"
-                  size="sm"
+                <ActionButton
+                  showLabel
+                  block
+                  icon={proc.archived ? ArchiveRestore : Archive}
+                  intent="archive"
+                  label={proc.archived ? 'Restaurar' : 'Arquivar'}
                   onClick={() => onArchive(proc)}
                   data-testid={`button-archive-mobile-${proc.id}`}
-                  className="flex-1 h-8 border-amber-500/30 text-amber-400 hover:bg-amber-500/10 hover:text-amber-300"
-                >
-                  {proc.archived ? <><ArchiveRestore className="w-3.5 h-3.5 mr-1.5" />Restaurar</> : <><Archive className="w-3.5 h-3.5 mr-1.5" />Arquivar</>}
-                </Button>
+                />
               )}
               {onDelete && (
-                <Button
-                  variant="outline"
-                  size="sm"
+                <ActionButton
+                  showLabel
+                  block
+                  icon={Trash2}
+                  intent="delete"
+                  label="Excluir"
                   onClick={() => onDelete(proc.id)}
                   data-testid={`button-delete-mobile-${proc.id}`}
-                  className="flex-1 h-8 border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300"
-                >
-                  <Trash2 className="w-3.5 h-3.5 mr-1.5" />
-                  Excluir
-                </Button>
+                />
               )}
             </div>
           )}

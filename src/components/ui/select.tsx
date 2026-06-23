@@ -19,7 +19,7 @@ const SelectTrigger = React.forwardRef<
     className={cn(
       // Base
       "flex h-11 w-full items-center justify-between",
-      "rounded-xl border bg-background px-4 py-2 text-sm",
+      "rounded-none border bg-background px-4 py-2 text-sm",
       // Border
       "border-input",
       // Placeholder
@@ -87,7 +87,7 @@ const SelectContent = React.forwardRef<
       className={cn(
         // Base
         "relative z-50 max-h-96 min-w-[8rem] overflow-hidden",
-        "rounded-xl border bg-popover text-popover-foreground",
+        "rounded-none border bg-popover text-popover-foreground",
         // Shadow/glow
         "shadow-lg",
         "dark:border-border/50 dark:shadow-[0_0_20px_hsl(0_0%_0%_/_0.4)]",

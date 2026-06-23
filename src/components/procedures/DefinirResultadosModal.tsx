@@ -137,8 +137,8 @@ export function DefinirResultadosModal({ procedure, originProcedure, onClose }: 
         {/* Header (doc 06 §1) */}
         <div className="flex-shrink-0 px-5 py-4 border-b border-[#333C43] flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center">
-              <Trophy className="w-4 h-4 text-emerald-400" />
+            <div className="w-9 h-9 rounded-xl bg-primary/15 border border-primary/30 flex items-center justify-center">
+              <Trophy className="w-4 h-4 text-primary" />
             </div>
             <div>
               <h2 className="text-base font-bold tracking-tight">
@@ -167,13 +167,13 @@ export function DefinirResultadosModal({ procedure, originProcedure, onClose }: 
         <div className="flex-1 overflow-y-auto px-5 py-4">
           <form onSubmit={handleSubmit} id="resultado-form" className="space-y-3">
             {/* Bloco A — LUCRO / PREJUÍZO (sempre visível) — doc 06 §2 */}
-            <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/[0.04] p-3.5">
+            <div className="rounded-xl border border-primary/25 bg-primary/[0.04] p-3.5">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <span className="w-5 h-5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[10px] font-bold flex items-center justify-center">
+                  <span className="w-5 h-5 rounded-full bg-primary/20 border border-primary/40 text-primary text-[10px] font-bold flex items-center justify-center">
                     A
                   </span>
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-300">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-primary">
                     Lucro / Prejuízo
                   </span>
                 </div>
@@ -190,7 +190,7 @@ export function DefinirResultadosModal({ procedure, originProcedure, onClose }: 
                 onChange={(e) => setLucroStr(e.target.value)}
                 data-testid="input-resultado-lucro"
                 placeholder="Ex: 30,00 (negativo = prejuízo)"
-                className="bg-emerald-500/[0.06] border-emerald-500/30 focus:border-emerald-500/60 h-9 text-sm font-mono"
+                className="bg-primary/[0.06] border-primary/30 focus:border-primary/60 h-9 text-sm font-mono"
               />
               <p className="text-[10px] text-muted-foreground mt-1.5">
                 Positivo = lucro · negativo = prejuízo · 0 = empate · em branco = não se aplica.
@@ -201,26 +201,26 @@ export function DefinirResultadosModal({ procedure, originProcedure, onClose }: 
             {isQueima ? (
               // QUEIMAR_FB: read-only "FB QUEIMADA" (doc §4.2 / checklist 5)
               <div
-                className="rounded-xl border border-purple-500/25 bg-purple-500/[0.04] p-3.5"
+                className="rounded-xl border border-border bg-muted/30 p-3.5"
                 data-testid="bloco-fb-queimada"
               >
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="w-5 h-5 rounded-full bg-purple-500/20 border border-purple-500/40 text-purple-300 text-[10px] font-bold flex items-center justify-center">
+                  <span className="w-5 h-5 rounded-full border border-border text-muted-foreground text-[10px] font-bold flex items-center justify-center">
                     B
                   </span>
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-purple-300">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                     FreeBet Queimada
                   </span>
                 </div>
                 {originProcedure ? (
-                  <div className="rounded-lg bg-purple-500/[0.06] border border-purple-500/20 p-2.5 space-y-1">
+                  <div className="rounded-lg bg-muted border border-border p-2.5 space-y-1">
                     <div className="flex items-center gap-2 text-sm">
-                      <Ticket className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                      <span className="font-mono font-semibold text-purple-200">
+                      <Ticket className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                      <span className="font-mono font-semibold text-foreground">
                         REF #{originProcedure.procedure_number}
                       </span>
                       <span className="text-foreground">·</span>
-                      <span className="text-emerald-300 font-mono">
+                      <span className="text-primary font-mono">
                         R$ {fmt(Number(
                           originProcedure.resultado_freebet_ganha ??
                             originProcedure.freebet_valor_previsto ??
@@ -240,9 +240,9 @@ export function DefinirResultadosModal({ procedure, originProcedure, onClose }: 
                     )}
                   </div>
                 ) : (
-                  <div className="rounded-lg bg-amber-500/5 border border-amber-500/20 p-2.5 flex items-start gap-2">
-                    <AlertCircle className="w-3.5 h-3.5 text-amber-400 mt-0.5 shrink-0" />
-                    <p className="text-[11px] text-amber-300">
+                  <div className="rounded-lg bg-warning/5 border border-warning/20 p-2.5 flex items-start gap-2">
+                    <AlertCircle className="w-3.5 h-3.5 text-warning mt-0.5 shrink-0" />
+                    <p className="text-[11px] text-warning/90">
                       Origem não vinculada — abra o procedimento e selecione uma FB no
                       autocomplete pra fechar o ciclo automaticamente.
                     </p>
@@ -255,13 +255,13 @@ export function DefinirResultadosModal({ procedure, originProcedure, onClose }: 
               </div>
             ) : (
               // SEM_FB / GANHAR_FB: toggle "Ganhei FB" (doc 06 §3)
-              <div className="rounded-xl border border-purple-500/25 bg-purple-500/[0.04] p-3.5">
+              <div className="rounded-xl border border-border bg-muted/30 p-3.5">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
-                    <span className="w-5 h-5 rounded-full bg-purple-500/20 border border-purple-500/40 text-purple-300 text-[10px] font-bold flex items-center justify-center">
+                    <span className="w-5 h-5 rounded-full border border-border text-muted-foreground text-[10px] font-bold flex items-center justify-center">
                       B
                     </span>
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-purple-300">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                       Ganhar Freebet
                     </span>
                   </div>
@@ -270,9 +270,9 @@ export function DefinirResultadosModal({ procedure, originProcedure, onClose }: 
                       checked={ganheiFB}
                       onCheckedChange={(v) => handleGanheiFBToggle(!!v)}
                       data-testid="checkbox-ganhei-fb"
-                      className="border-purple-500/40 data-[state=checked]:bg-purple-500 data-[state=checked]:border-purple-500"
+                      className="border-border data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                     />
-                    <span className="text-[11px] font-semibold text-purple-200">Ganhei FB</span>
+                    <span className="text-[11px] font-semibold text-foreground">Ganhei FB</span>
                   </label>
                 </div>
                 {ganheiFB ? (
@@ -288,7 +288,7 @@ export function DefinirResultadosModal({ procedure, originProcedure, onClose }: 
                       onChange={(e) => setFbStr(e.target.value)}
                       data-testid="input-resultado-freebet-ganha"
                       placeholder={previstoFB > 0 ? `Ex: ${previstoFB.toFixed(2)}` : 'Ex: 20,00'}
-                      className="bg-purple-500/[0.06] border-purple-500/30 focus:border-purple-500/60 h-9 text-sm font-mono"
+                      className="bg-muted border-border focus:border-primary/60 h-9 text-sm font-mono"
                     />
                     <p className="text-[10px] text-muted-foreground mt-1.5">
                       A freebet será registrada como REF #{procedure.procedure_number} para queima futura.
@@ -303,11 +303,11 @@ export function DefinirResultadosModal({ procedure, originProcedure, onClose }: 
             )}
 
             {/* Bloco DG — DUPLO GREEN (sempre visível, com toggle) — doc 06 §4 */}
-            <div className="rounded-xl border border-amber-500/25 bg-amber-500/[0.04] p-3.5">
+            <div className="rounded-xl border border-warning/25 bg-warning/[0.04] p-3.5">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <span className="text-base">🎯</span>
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-amber-300">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-warning">
                     Duplo Green
                   </span>
                 </div>
@@ -316,9 +316,9 @@ export function DefinirResultadosModal({ procedure, originProcedure, onClose }: 
                     checked={dgConfirmado}
                     onCheckedChange={(v) => handleDgToggle(!!v)}
                     data-testid="checkbox-duplo-green"
-                    className="border-amber-500/40 data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500"
+                    className="border-warning/40 data-[state=checked]:bg-warning data-[state=checked]:border-warning"
                   />
-                  <span className="text-[11px] font-semibold text-amber-200">Confirmado</span>
+                  <span className="text-[11px] font-semibold text-warning/90">Confirmado</span>
                 </label>
               </div>
               {dgConfirmado ? (
@@ -333,7 +333,7 @@ export function DefinirResultadosModal({ procedure, originProcedure, onClose }: 
                     onChange={(e) => setDgLucroStr(e.target.value)}
                     data-testid="input-duplo-green-lucro"
                     placeholder="Ex: 45,00"
-                    className="bg-amber-500/[0.06] border-amber-500/30 focus:border-amber-500/60 h-9 text-sm font-mono"
+                    className="bg-warning/[0.06] border-warning/30 focus:border-warning/60 h-9 text-sm font-mono"
                   />
                 </>
               ) : (
@@ -346,12 +346,12 @@ export function DefinirResultadosModal({ procedure, originProcedure, onClose }: 
             {/* Bloco D — RESUMO DO PAR (só QUEIMAR_FB) — doc §4.2 */}
             {isQueima && resumoPar && (
               <div
-                className="rounded-xl border border-cyan-500/25 bg-cyan-500/[0.04] p-3.5"
+                className="rounded-xl border border-border bg-muted/20 p-3.5"
                 data-testid="bloco-resumo-par"
               >
                 <div className="flex items-center gap-2 mb-2">
-                  <Link2 className="w-3.5 h-3.5 text-cyan-400" />
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-cyan-300">
+                  <Link2 className="w-3.5 h-3.5 text-muted-foreground" />
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                     Resumo do Par
                   </span>
                 </div>
@@ -360,7 +360,7 @@ export function DefinirResultadosModal({ procedure, originProcedure, onClose }: 
                     <span className="text-muted-foreground">
                       Etapa 1{originProcedure ? ` (#${originProcedure.procedure_number})` : ''}
                     </span>
-                    <span className={resumoPar.etapa1 >= 0 ? 'text-emerald-300' : 'text-red-300'}>
+                    <span className={resumoPar.etapa1 >= 0 ? 'text-primary' : 'text-destructive'}>
                       {resumoPar.etapa1 >= 0 ? '+' : '−'}R$ {fmt(Math.abs(resumoPar.etapa1))}
                     </span>
                   </div>
@@ -368,17 +368,17 @@ export function DefinirResultadosModal({ procedure, originProcedure, onClose }: 
                     <span className="text-muted-foreground">
                       Etapa 2 (#{procedure.procedure_number})
                     </span>
-                    <span className={resumoPar.etapa2 >= 0 ? 'text-emerald-300' : 'text-red-300'}>
+                    <span className={resumoPar.etapa2 >= 0 ? 'text-primary' : 'text-destructive'}>
                       {resumoPar.etapa2 >= 0 ? '+' : '−'}R$ {fmt(Math.abs(resumoPar.etapa2))}
                     </span>
                   </div>
-                  <div className="border-t border-cyan-500/20 pt-1.5 mt-1.5 flex items-center justify-between">
-                    <span className="text-cyan-200 font-semibold">LÍQUIDO DO PAR</span>
+                  <div className="border-t border-border pt-1.5 mt-1.5 flex items-center justify-between">
+                    <span className="text-foreground font-semibold">LÍQUIDO DO PAR</span>
                     <span
                       className={
                         resumoPar.liquido >= 0
-                          ? 'text-emerald-300 font-bold'
-                          : 'text-red-300 font-bold'
+                          ? 'text-primary font-bold'
+                          : 'text-destructive font-bold'
                       }
                       data-testid="text-resumo-par-liquido"
                     >
@@ -404,15 +404,15 @@ export function DefinirResultadosModal({ procedure, originProcedure, onClose }: 
                 data-testid="input-resultado-observacao"
                 placeholder="Ex: jogo cancelado, cashout antecipado..."
                 rows={2}
-                className="bg-white/[0.03] border-white/10 focus:border-cyan-500/40 text-xs"
+                className="bg-white/[0.03] border-white/10 focus:border-border text-xs"
               />
             </div>
 
             {/* Avisos */}
             {!validation.canSubmit && (lucroStr || ganheiFB) && (
-              <div className="rounded-lg bg-amber-500/5 border border-amber-500/20 p-2.5 flex items-start gap-2">
-                <AlertCircle className="w-3.5 h-3.5 text-amber-400 mt-0.5 flex-shrink-0" />
-                <p className="text-[11px] text-amber-300">
+              <div className="rounded-lg bg-warning/5 border border-warning/20 p-2.5 flex items-start gap-2">
+                <AlertCircle className="w-3.5 h-3.5 text-warning mt-0.5 flex-shrink-0" />
+                <p className="text-[11px] text-warning/90">
                   {validation.fbInvalidoNeg
                     ? 'Valor da Freebet não pode ser negativo.'
                     : isQueima
@@ -443,7 +443,7 @@ export function DefinirResultadosModal({ procedure, originProcedure, onClose }: 
             form="resultado-form"
             disabled={isLoading || !validation.canSubmit}
             data-testid="button-salvar-resultados"
-            className="bg-emerald-600 hover:bg-emerald-600/90 text-white h-9 text-sm px-5 font-semibold"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground h-9 text-sm px-5 font-semibold"
           >
             {isLoading ? (
               <span className="flex items-center gap-2">

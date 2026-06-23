@@ -61,10 +61,10 @@ const TIPO_LABELS: Record<string, string> = {
 };
 
 const TIPO_COLORS: Record<string, string> = {
-  SEM_FB: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-  GANHAR_FB: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-  QUEIMAR_FB: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
-  TENTATIVA_DG: 'bg-teal-500/20 text-teal-400 border-teal-500/30',
+  SEM_FB: 'bg-primary/20 text-primary border-primary/30',
+  GANHAR_FB: 'border border-border text-muted-foreground',
+  QUEIMAR_FB: 'bg-warning/20 text-warning border-warning/30',
+  TENTATIVA_DG: 'border border-border text-muted-foreground',
 };
 
 export function RegisterBotMessageModal({ open, onClose }: Props) {
@@ -187,16 +187,16 @@ export function RegisterBotMessageModal({ open, onClose }: Props) {
           {parsed && !isInvalid && (
             <div className={`rounded-xl border p-3 space-y-2 text-sm ${
               isOk
-                ? 'border-emerald-500/30 bg-emerald-500/5'
-                : 'border-yellow-500/30 bg-yellow-500/5'
+                ? 'border-primary/30 bg-primary/5'
+                : 'border-warning/30 bg-warning/5'
             }`}>
               <div className="flex items-center gap-2 mb-1">
                 {isOk ? (
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                  <CheckCircle2 className="w-3.5 h-3.5 text-primary flex-shrink-0" />
                 ) : (
-                  <AlertTriangle className="w-3.5 h-3.5 text-yellow-400 flex-shrink-0" />
+                  <AlertTriangle className="w-3.5 h-3.5 text-warning flex-shrink-0" />
                 )}
-                <span className={`text-xs font-semibold ${isOk ? 'text-emerald-400' : 'text-yellow-400'}`}>
+                <span className={`text-xs font-semibold ${isOk ? 'text-primary' : 'text-warning'}`}>
                   {isOk ? 'Parse completo' : 'Parse parcial — campos faltando'}
                 </span>
               </div>
@@ -213,7 +213,7 @@ export function RegisterBotMessageModal({ open, onClose }: Props) {
                 </div>
 
                 <div className="text-muted-foreground">Plataforma</div>
-                <div className="text-white">{parsed.data.platform ?? <span className="text-yellow-400/70">—</span>}</div>
+                <div className="text-white">{parsed.data.platform ?? <span className="text-warning/70">—</span>}</div>
 
                 {parsed.data.partida_descricao && (
                   <>
@@ -225,24 +225,24 @@ export function RegisterBotMessageModal({ open, onClose }: Props) {
                 {parsed.data.lucro_prejuizo_previsto != null && (
                   <>
                     <div className="text-muted-foreground">Lucro previsto</div>
-                    <div className="text-emerald-400 font-semibold">R$ {parsed.data.lucro_prejuizo_previsto.toFixed(2)}</div>
+                    <div className="text-primary font-semibold">R$ {parsed.data.lucro_prejuizo_previsto.toFixed(2)}</div>
                   </>
                 )}
 
                 {parsed.data.freebet_valor_previsto != null && (
                   <>
                     <div className="text-muted-foreground">Freebet</div>
-                    <div className="text-blue-400 font-semibold">R$ {parsed.data.freebet_valor_previsto.toFixed(2)}</div>
+                    <div className="text-muted-foreground font-semibold">R$ {parsed.data.freebet_valor_previsto.toFixed(2)}</div>
                   </>
                 )}
               </div>
 
               {isPartial && (parsed.data as any).missingFields?.length > 0 && (
-                <div className="mt-2 pt-2 border-t border-yellow-500/20">
-                  <p className="text-[10px] text-yellow-400/80 font-semibold uppercase tracking-wide mb-1">Campos faltando:</p>
+                <div className="mt-2 pt-2 border-t border-warning/20">
+                  <p className="text-[10px] text-warning/80 font-semibold uppercase tracking-wide mb-1">Campos faltando:</p>
                   <ul className="space-y-0.5">
                     {(parsed.data as any).missingFields.map((f: string) => (
-                      <li key={f} className="text-[11px] text-yellow-300/70">• {f}</li>
+                      <li key={f} className="text-[11px] text-warning/70">• {f}</li>
                     ))}
                   </ul>
                 </div>
@@ -251,11 +251,11 @@ export function RegisterBotMessageModal({ open, onClose }: Props) {
           )}
 
           {isInvalid && text.trim().length > 10 && (
-            <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-3 flex items-start gap-2">
-              <X className="w-3.5 h-3.5 text-red-400 mt-0.5 flex-shrink-0" />
+            <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 flex items-start gap-2">
+              <X className="w-3.5 h-3.5 text-destructive mt-0.5 flex-shrink-0" />
               <div>
-                <p className="text-xs font-semibold text-red-400">Mensagem não reconhecida</p>
-                <p className="text-[11px] text-red-300/70 mt-0.5">
+                <p className="text-xs font-semibold text-destructive">Mensagem não reconhecida</p>
+                <p className="text-[11px] text-destructive/70 mt-0.5">
                   {parsed?.missingFields?.[0] ?? 'Verifique se é uma mensagem de procedimento válida.'}
                 </p>
               </div>
@@ -277,7 +277,7 @@ export function RegisterBotMessageModal({ open, onClose }: Props) {
               onClick={handleRegister}
               disabled={!parsed || parsed.ok === false || loading}
               size="sm"
-              className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground shadow-md shadow-primary/20 font-semibold"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-md shadow-primary/20 font-semibold"
               data-testid="button-register-bot"
             >
               {loading ? (

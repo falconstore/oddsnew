@@ -1,5 +1,5 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
+import { ActionButton, ActionGroup } from '@/components/ui/action-button';
 import { Pencil, Trash2 } from 'lucide-react';
 import { BetbraEntry } from '@/types/betbra';
 import { formatBetbraDate, formatCurrency } from '@/lib/betbraUtils';
@@ -43,47 +43,43 @@ export function BetbraTable({ entries, onEdit, onDelete }: BetbraTableProps) {
                 <TableCell className="text-xs py-1 px-3 font-semibold text-foreground">
                   {formatBetbraDate(entry.date)}
                 </TableCell>
-                <TableCell className="text-xs py-1 px-3 text-cyan-400 font-semibold">
+                <TableCell className="text-xs py-1 px-3 text-muted-foreground font-semibold">
                   {entry.registros}
                 </TableCell>
                 <TableCell className="text-xs py-1 px-3 text-muted-foreground">
                   {entry.numero_de_apostas}
                 </TableCell>
-                <TableCell className={`text-xs py-1 px-3 font-bold ${Number(entry.ngr) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                <TableCell className={`text-xs py-1 px-3 font-bold ${Number(entry.ngr) >= 0 ? 'text-primary' : 'text-destructive'}`}>
                   {formatCurrency(Number(entry.ngr))}
                 </TableCell>
-                <TableCell className="text-xs py-1 px-3 text-purple-400 font-semibold">
+                <TableCell className="text-xs py-1 px-3 text-muted-foreground font-semibold">
                   {formatCurrency(Number(entry.turnover))}
                 </TableCell>
-                <TableCell className="text-xs py-1 px-3 text-amber-400 font-bold">
+                <TableCell className="text-xs py-1 px-3 text-foreground font-bold">
                   {entry.cpa}
                 </TableCell>
                 {(onEdit || onDelete) && (
                   <TableCell className="py-1 px-3">
-                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <ActionGroup>
                       {onEdit && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
+                        <ActionButton
+                          icon={Pencil}
+                          intent="edit"
+                          label="Editar"
                           onClick={() => onEdit(entry)}
-                          className="h-7 w-7 text-primary hover:text-primary/80 hover:bg-primary/10"
                           data-testid={`button-edit-${entry.id}`}
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                        </Button>
+                        />
                       )}
                       {onDelete && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
+                        <ActionButton
+                          icon={Trash2}
+                          intent="delete"
+                          label="Excluir"
                           onClick={() => onDelete(entry.id)}
-                          className="h-7 w-7 text-red-400 hover:text-red-300 hover:bg-red-500/10"
                           data-testid={`button-delete-${entry.id}`}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
+                        />
                       )}
-                    </div>
+                    </ActionGroup>
                   </TableCell>
                 )}
               </TableRow>
@@ -114,28 +110,24 @@ export function BetbraMobileCards({ entries, onEdit, onDelete }: BetbraMobileCar
       ) : (
         entries.map((entry) => (
           <div key={entry.id} className="relative rounded-2xl border border-white/8 bg-white/3 backdrop-blur-sm p-4 space-y-3 overflow-hidden card-hover">
-            <div className="absolute top-0 left-0 w-full h-0.5 bg-gradient-to-r from-amber-400/50 via-amber-400/20 to-transparent" />
+            <div className="absolute top-0 left-0 w-full h-0.5 bg-gradient-to-r from-primary/50 via-primary/20 to-transparent" />
             <div className="flex justify-between items-center">
-              <span className="text-sm font-bold text-amber-400">{formatBetbraDate(entry.date)}</span>
-              <div className="flex gap-1">
+              <span className="text-sm font-bold text-foreground">{formatBetbraDate(entry.date)}</span>
+              <ActionGroup>
                 {onEdit && (
-                  <Button variant="ghost" size="icon" onClick={() => onEdit(entry)}
-                    className="h-7 w-7 text-primary hover:bg-primary/10" data-testid={`button-edit-mobile-${entry.id}`}>
-                    <Pencil className="w-3.5 h-3.5" />
-                  </Button>
+                  <ActionButton icon={Pencil} intent="edit" label="Editar" onClick={() => onEdit(entry)}
+                    data-testid={`button-edit-mobile-${entry.id}`} />
                 )}
                 {onDelete && (
-                  <Button variant="ghost" size="icon" onClick={() => onDelete(entry.id)}
-                    className="h-7 w-7 text-red-400 hover:bg-red-500/10" data-testid={`button-delete-mobile-${entry.id}`}>
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </Button>
+                  <ActionButton icon={Trash2} intent="delete" label="Excluir" onClick={() => onDelete(entry.id)}
+                    data-testid={`button-delete-mobile-${entry.id}`} />
                 )}
-              </div>
+              </ActionGroup>
             </div>
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div className="bg-white/3 rounded-xl p-2 border border-white/5">
                 <span className="text-muted-foreground block mb-0.5">Registros</span>
-                <span className="font-bold text-cyan-400">{entry.registros}</span>
+                <span className="font-bold text-muted-foreground">{entry.registros}</span>
               </div>
               <div className="bg-white/3 rounded-xl p-2 border border-white/5">
                 <span className="text-muted-foreground block mb-0.5">Apostas</span>
@@ -143,17 +135,17 @@ export function BetbraMobileCards({ entries, onEdit, onDelete }: BetbraMobileCar
               </div>
               <div className="bg-white/3 rounded-xl p-2 border border-white/5">
                 <span className="text-muted-foreground block mb-0.5">NGR</span>
-                <span className={`font-bold ${Number(entry.ngr) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                <span className={`font-bold ${Number(entry.ngr) >= 0 ? 'text-primary' : 'text-destructive'}`}>
                   {formatCurrency(Number(entry.ngr))}
                 </span>
               </div>
               <div className="bg-white/3 rounded-xl p-2 border border-white/5">
                 <span className="text-muted-foreground block mb-0.5">Turnover</span>
-                <span className="font-semibold text-purple-400">{formatCurrency(Number(entry.turnover))}</span>
+                <span className="font-semibold text-muted-foreground">{formatCurrency(Number(entry.turnover))}</span>
               </div>
               <div className="bg-white/3 rounded-xl p-2 border border-white/5 col-span-2">
                 <span className="text-muted-foreground block mb-0.5">CPA</span>
-                <span className="font-bold text-amber-400">{entry.cpa}</span>
+                <span className="font-bold text-foreground">{entry.cpa}</span>
               </div>
             </div>
           </div>

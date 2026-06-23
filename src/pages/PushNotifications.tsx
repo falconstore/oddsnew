@@ -5,6 +5,8 @@ import { ptBR } from 'date-fns/locale';
 import { Bell, BellOff, Send, Users, CheckCircle, AlertCircle, Clock, Zap, RefreshCw, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
 import { supabaseProcedures } from '@/lib/supabaseProcedures';
 import { toast } from '@/hooks/use-toast';
+import { Layout } from '@/components/Layout';
+import { PageHeader } from '@/components/PageHeader';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 type PushSub = {
@@ -45,12 +47,12 @@ function fmtDate(iso: string) {
 }
 
 const TYPE_LABELS: Record<string, { label: string; color: string }> = {
-  new_procedure:        { label: 'Novo Procedimento',    color: 'text-green-400' },
-  daily_summary:        { label: 'Resumo Diário',         color: 'text-blue-400' },
-  subscription_pending: { label: 'Assin. Pendente',       color: 'text-amber-400' },
-  subscription_canceled:{ label: 'Assin. Cancelada',      color: 'text-red-400' },
-  subscription_expired: { label: 'Pedido Expirado',       color: 'text-orange-400' },
-  custom:               { label: 'Mensagem Manual',        color: 'text-violet-400' },
+  new_procedure:        { label: 'Novo Procedimento',    color: 'text-primary' },
+  daily_summary:        { label: 'Resumo Diário',         color: 'text-muted-foreground' },
+  subscription_pending: { label: 'Assin. Pendente',       color: 'text-warning' },
+  subscription_canceled:{ label: 'Assin. Cancelada',      color: 'text-destructive' },
+  subscription_expired: { label: 'Pedido Expirado',       color: 'text-warning' },
+  custom:               { label: 'Mensagem Manual',        color: 'text-muted-foreground' },
 };
 
 // ─── Hooks ───────────────────────────────────────────────────────────────────
@@ -187,39 +189,40 @@ export function PushNotifications() {
   const totalSent = logs.reduce((s, l) => s + (l.sent_count ?? 0), 0);
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <Bell size={20} className="text-violet-400" />
-            <h1 className="text-xl font-bold">Push Notifications</h1>
-          </div>
-          <p className="text-sm text-muted-foreground">Gerencie e dispare notificações para os usuários do app</p>
-        </div>
-        <button onClick={() => { qc.invalidateQueries({ queryKey: ['push_subscriptions'] }); qc.invalidateQueries({ queryKey: ['push_notification_logs'] }); }}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-sm hover:bg-muted transition-colors">
-          <RefreshCw size={13} /> Atualizar
-        </button>
-      </div>
+    <Layout>
+      <div className="animate-fade-in">
+        <PageHeader
+          eyebrow="PUSH"
+          title="Push Notifications"
+          subtitle="GERENCIE E DISPARE NOTIFICAÇÕES PARA OS USUÁRIOS DO APP"
+          icon={Bell}
+          actions={
+            <button onClick={() => { qc.invalidateQueries({ queryKey: ['push_subscriptions'] }); qc.invalidateQueries({ queryKey: ['push_notification_logs'] }); }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-sm hover:bg-muted transition-colors">
+              <RefreshCw size={13} /> Atualizar
+            </button>
+          }
+        />
+
+        <div className="space-y-6">
 
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KpiCard label="Dispositivos ativos" value={subsLoading ? '…' : totalSubs} icon={Bell} color="text-violet-400" />
-        <KpiCard label="Notif. hoje" value={logsLoading ? '…' : todayLogs.length} icon={Send} color="text-blue-400" />
-        <KpiCard label="Total envios" value={logsLoading ? '…' : totalSent} icon={CheckCircle} color="text-green-400" />
-        <KpiCard label="Histór. (50 ult.)" value={logsLoading ? '…' : logs.length} icon={Clock} color="text-slate-400" />
+        <KpiCard label="Dispositivos ativos" value={subsLoading ? '…' : totalSubs} icon={Bell} color="text-muted-foreground" />
+        <KpiCard label="Notif. hoje" value={logsLoading ? '…' : todayLogs.length} icon={Send} color="text-muted-foreground" />
+        <KpiCard label="Total envios" value={logsLoading ? '…' : totalSent} icon={CheckCircle} color="text-primary" />
+        <KpiCard label="Histór. (50 ult.)" value={logsLoading ? '…' : logs.length} icon={Clock} color="text-muted-foreground" />
       </div>
 
       {/* Quick actions */}
       <div className="bg-card border border-border rounded-xl p-4">
         <p className="text-sm font-semibold mb-3 text-muted-foreground uppercase tracking-wide">Ações Rápidas</p>
         <div className="flex flex-wrap gap-2">
-          <QuickBtn label="Resumo do Dia" icon={Zap} color="text-blue-400"
+          <QuickBtn label="Resumo do Dia" icon={Zap} color="text-muted-foreground"
             loading={sending === 'daily_summary'} onClick={() => quickSend('daily_summary', 'Resumo do dia')} />
-          <QuickBtn label="Assinatura Pendente (teste)" icon={AlertCircle} color="text-amber-400"
+          <QuickBtn label="Assinatura Pendente (teste)" icon={AlertCircle} color="text-warning"
             loading={sending === 'subscription_pending'} onClick={() => quickSend('subscription_pending', 'Assinatura pendente')} />
-          <QuickBtn label="Assinatura Cancelada (teste)" icon={BellOff} color="text-red-400"
+          <QuickBtn label="Assinatura Cancelada (teste)" icon={BellOff} color="text-destructive"
             loading={sending === 'subscription_canceled'} onClick={() => quickSend('subscription_canceled', 'Assinatura cancelada')} />
         </div>
       </div>
@@ -294,7 +297,7 @@ export function PushNotifications() {
         ) : (
           <div className="divide-y divide-border">
             {logs.map(log => {
-              const t = TYPE_LABELS[log.type] ?? { label: log.type, color: 'text-slate-400' };
+              const t = TYPE_LABELS[log.type] ?? { label: log.type, color: 'text-muted-foreground' };
               return (
                 <div key={log.id} className="flex items-center gap-4 px-5 py-3 hover:bg-muted/40 transition-colors">
                   <div className="flex-1 min-w-0">
@@ -308,7 +311,7 @@ export function PushNotifications() {
                     {log.body && <p className="text-xs text-muted-foreground truncate">{log.body}</p>}
                   </div>
                   <div className="text-right flex-shrink-0">
-                    <p className="text-sm font-bold text-green-400">{log.sent_count} enviados</p>
+                    <p className="text-sm font-bold text-primary">{log.sent_count} enviados</p>
                     <p className="text-xs text-muted-foreground">{log.target === 'all' ? 'Todos' : log.target}</p>
                     <p className="text-[10px] text-muted-foreground mt-0.5">{fmtDate(log.created_at)}</p>
                   </div>
@@ -325,7 +328,7 @@ export function PushNotifications() {
           className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-muted/40 transition-colors">
           <div>
             <p className="text-sm font-semibold text-left flex items-center gap-2">
-              <Users size={14} className="text-violet-400" />
+              <Users size={14} className="text-muted-foreground" />
               Dispositivos Inscritos ({totalSubs})
             </p>
             <p className="text-xs text-muted-foreground mt-0.5 text-left">Endpoints ativos de push notification</p>
@@ -345,16 +348,16 @@ export function PushNotifications() {
               <div className="divide-y divide-border">
                 {subs.map(sub => (
                   <div key={sub.id} className="flex items-center gap-3 px-5 py-2.5">
-                    <Bell size={13} className="text-violet-400 flex-shrink-0" />
+                    <Bell size={13} className="text-muted-foreground flex-shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-mono truncate text-muted-foreground">{sub.endpoint.slice(0, 60)}…</p>
                       <p className="text-[10px] text-muted-foreground mt-0.5">
                         Inscrito em {fmtDate(sub.created_at)}
-                        {sub.lead_id && <span className="ml-2 text-blue-400">lead: {sub.lead_id.slice(0, 8)}…</span>}
+                        {sub.lead_id && <span className="ml-2 text-muted-foreground">lead: {sub.lead_id.slice(0, 8)}…</span>}
                       </p>
                     </div>
                     <button onClick={() => deleteSub(sub.id)}
-                      className="p-1.5 rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-colors flex-shrink-0">
+                      className="p-1.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors flex-shrink-0">
                       <Trash2 size={13} />
                     </button>
                   </div>
@@ -364,6 +367,8 @@ export function PushNotifications() {
           </div>
         )}
       </div>
-    </div>
+        </div>
+      </div>
+    </Layout>
   );
 }

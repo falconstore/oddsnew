@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Bot, Send, Settings2, History, TrendingUp, DollarSign, Clock, Percent, Activity } from "lucide-react";
+import { PageHeader } from "@/components/PageHeader";
 import {
   useTelegramBotConfig,
   useUpdateTelegramConfig,
@@ -81,41 +82,34 @@ export default function TelegramBot() {
       title: "Total Enviados",
       icon: History,
       value: stats?.totalEnviados || 0,
-      color: "stat-cyan",
-      iconColor: "text-cyan-400",
+      color: "stat-green",
+      iconColor: "text-muted-foreground",
     },
     {
       title: "ROI Médio",
       icon: Percent,
       value: stats?.roiMedio ? `${stats.roiMedio >= 0 ? "+" : ""}${stats.roiMedio.toFixed(2)}%` : "0%",
       color: "stat-amber",
-      iconColor: "text-amber-400",
+      iconColor: "text-warning",
     },
     {
       title: "Lucro Potencial",
       icon: DollarSign,
       value: `R$ ${(stats?.lucroTotalPotencial || 0).toFixed(2)}`,
-      color: (stats?.lucroTotalPotencial || 0) >= 0 ? "stat-green" : "stat-pink",
-      iconColor: (stats?.lucroTotalPotencial || 0) >= 0 ? "text-primary" : "text-pink-400",
+      color: (stats?.lucroTotalPotencial || 0) >= 0 ? "stat-green" : "stat-green",
+      iconColor: (stats?.lucroTotalPotencial || 0) >= 0 ? "text-primary" : "text-destructive",
     },
   ];
 
   return (
     <Layout>
       <div className="space-y-6 animate-fade-in">
-        {/* Page Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-pink-500/20 to-pink-500/5 border border-pink-500/20 flex items-center justify-center">
-              <Bot className="h-5 w-5 text-pink-400" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">Bot Telegram</h1>
-              <p className="text-sm text-muted-foreground">Alertas automáticos de Duplo Green</p>
-            </div>
-          </div>
-
-          {config && canEdit && (
+        <PageHeader
+          eyebrow="BOT"
+          title="Bot Telegram"
+          subtitle="Alertas automáticos de Duplo Green"
+          icon={Bot}
+          actions={config && canEdit ? (
             <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-muted/40 dark:bg-white/[0.03] border border-border/50">
               <div className={`w-2 h-2 rounded-full ${config.enabled ? 'bg-primary animate-pulse' : 'bg-muted-foreground/40'}`} />
               <span className="text-sm font-medium">{config.enabled ? "Ativo" : "Desativado"}</span>
@@ -125,8 +119,8 @@ export default function TelegramBot() {
                 disabled={updateConfig.isPending}
               />
             </div>
-          )}
-        </div>
+          ) : undefined}
+        />
 
         {/* Stats Cards */}
         <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
@@ -158,7 +152,7 @@ export default function TelegramBot() {
           <Card className="md:col-span-1 border-border/50">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
-                <Settings2 className="h-4 w-4 text-pink-400" />
+                <Settings2 className="h-4 w-4 text-muted-foreground" />
                 Configurações
               </CardTitle>
               <CardDescription>Ajuste os parâmetros de detecção</CardDescription>
@@ -334,9 +328,9 @@ export default function TelegramBot() {
                             <div className="text-muted-foreground text-[10px] truncate">{dg.casa_bookmaker || "-"}</div>
                             <div className="text-muted-foreground text-[10px]">R$ {(dg.stake_casa || 0).toFixed(2)}</div>
                           </div>
-                          <div className="bg-amber-500/10 rounded-lg p-2">
+                          <div className="bg-warning/10 rounded-lg p-2">
                             <div className="text-muted-foreground text-[10px]">Empate (SO)</div>
-                            <div className="font-mono font-bold text-amber-400">{dg.empate_odd?.toFixed(2) || "-"}</div>
+                            <div className="font-mono font-bold text-warning">{dg.empate_odd?.toFixed(2) || "-"}</div>
                             <div className="text-muted-foreground text-[10px] truncate">{dg.empate_bookmaker || "-"}</div>
                             <div className="text-muted-foreground text-[10px]">R$ {(dg.stake_empate || 0).toFixed(2)}</div>
                           </div>

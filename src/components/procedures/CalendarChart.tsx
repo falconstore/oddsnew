@@ -24,46 +24,47 @@ export function CalendarChart({ data, title, selectedMonth }: CalendarChartProps
     return data.find(d => d.date === dateKey) || { date: dateKey, profit: 0, count: 0, fbCount: 0, fbTotal: 0, dgCount: 0 };
   };
 
-  const getColorIntensity = (profit: number) => {
+  // Tint do heatmap usa tokens (verde=lucro, vermelho=prejuízo) com opacidade
+  // proporcional à magnitude. Sem cantos/sombras — só intensidade.
+  const getCell = (profit: number) => {
     if (profit > 0) {
-      const intensity = Math.min((profit / maxProfit) * 100, 100);
-      const opacity = (intensity / 100) * 0.65 + 0.25;
-      return { colorClass: 'bg-success', borderClass: 'border-success', opacity, textClass: 'text-white', isProfit: true, isLoss: false };
-    } else if (profit < 0) {
-      const intensity = Math.min((Math.abs(profit) / Math.abs(maxLoss)) * 100, 100);
-      const opacity = (intensity / 100) * 0.65 + 0.25;
-      return { colorClass: 'bg-destructive', borderClass: 'border-destructive', opacity, textClass: 'text-white', isProfit: false, isLoss: true };
+      const intensity = Math.min((profit / maxProfit), 1);
+      return { token: 'primary', opacity: intensity * 0.55 + 0.15, value: 'text-primary', isData: true };
     }
-    return { colorClass: 'bg-muted', borderClass: 'border-border', opacity: 0.15, textClass: 'text-muted-foreground', isProfit: false, isLoss: false };
+    if (profit < 0) {
+      const intensity = Math.min(Math.abs(profit) / Math.abs(maxLoss), 1);
+      return { token: 'destructive', opacity: intensity * 0.55 + 0.15, value: 'text-destructive', isData: true };
+    }
+    return { token: 'card', opacity: 1, value: 'text-muted-foreground', isData: false };
   };
 
   const firstDayOfWeek = monthStart.getDay();
-  const weekDays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+  const weekDays = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
 
   return (
     <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base">{title}</CardTitle>
+      <CardHeader className="pb-3">
+        <CardTitle className="telemetry-label text-foreground">{title}</CardTitle>
       </CardHeader>
       <CardContent>
         {/* Cabeçalho dos dias da semana */}
-        <div className="grid grid-cols-7 gap-1.5 mb-1.5">
+        <div className="grid grid-cols-7 gap-px mb-px">
           {weekDays.map(day => (
-            <div key={day} className="text-center text-xs sm:text-sm font-semibold text-muted-foreground pb-1">
+            <div key={day} className="text-center telemetry-label text-muted-foreground/60 pb-1.5">
               {day}
             </div>
           ))}
         </div>
 
-        {/* Grid do calendário */}
-        <div className="grid grid-cols-7 gap-1.5">
+        {/* Grid do calendário — hairline grid (gap-px sobre bg-border) */}
+        <div className="grid grid-cols-7 gap-px bg-border border border-border">
           {[...Array(firstDayOfWeek)].map((_, index) => (
-            <div key={`empty-${index}`} className="aspect-[4/3]" />
+            <div key={`empty-${index}`} className="aspect-[4/3] min-h-[92px] bg-card" />
           ))}
 
           {daysInMonth.map((day) => {
             const dayData = getDayData(day);
-            const colors = getColorIntensity(dayData.profit);
+            const cell = getCell(dayData.profit);
             const isToday = isSameDay(day, new Date());
             const fbCount = dayData.fbCount ?? 0;
             const fbTotal = dayData.fbTotal ?? 0;
@@ -74,91 +75,61 @@ export function CalendarChart({ data, title, selectedMonth }: CalendarChartProps
               <div
                 key={day.toString()}
                 className={cn(
-                  "aspect-[4/3] min-h-[100px] rounded-xl border flex flex-col items-stretch justify-between transition-all hover:scale-[1.03] group relative overflow-hidden",
-                  colors.borderClass,
-                  isToday && 'ring-2 ring-primary ring-offset-1 ring-offset-background'
+                  'aspect-[4/3] min-h-[92px] bg-card flex flex-col items-stretch justify-between transition-colors group relative',
+                  isToday && 'outline outline-1 outline-primary -outline-offset-1'
                 )}
-                style={{
-                  backgroundColor: `hsl(var(--${colors.colorClass.replace('bg-', '')}) / ${colors.opacity})`
-                }}
+                style={cell.isData ? { backgroundColor: `hsl(var(--${cell.token}) / ${cell.opacity})` } : undefined}
                 data-testid={`calendar-day-${dayData.date}`}
               >
                 {/* Número do dia */}
                 <div className={cn(
-                  "px-2 pt-1.5 text-sm sm:text-base md:text-lg font-bold leading-none",
-                  hasData ? colors.textClass : 'text-muted-foreground/60'
+                  'px-2 pt-1.5 font-mono text-sm tabular-nums leading-none',
+                  hasData ? 'text-foreground' : 'text-muted-foreground/50'
                 )}>
                   {format(day, 'd')}
                 </div>
 
                 {hasData ? (
                   <div className="px-2 pb-2 flex flex-col gap-1 w-full">
-                    {/* LUCRO — número principal grande */}
+                    {/* LUCRO — número principal mono */}
                     <div className={cn(
-                      "font-black leading-none tabular-nums",
-                      "text-sm sm:text-lg md:text-xl lg:text-2xl",
-                      colors.isProfit ? 'text-white drop-shadow-sm' : colors.isLoss ? 'text-white drop-shadow-sm' : colors.textClass
+                      'kpi font-semibold leading-none text-base sm:text-lg md:text-xl',
+                      'text-foreground'
                     )}>
-                      {colors.isProfit ? '+' : ''}R${dayData.profit >= 0
-                        ? dayData.profit.toFixed(0)
-                        : dayData.profit.toFixed(0)}
+                      {dayData.profit >= 0 ? '+' : ''}R${dayData.profit.toFixed(0)}
                     </div>
 
-                    {/* 🏆 Duplo Green */}
                     {dgCount > 0 && (
                       <div className="flex items-center gap-1 leading-tight">
-                        <span className="text-[10px] sm:text-xs leading-none">🏆</span>
-                        <span className={cn(
-                          "text-[10px] sm:text-[11px] md:text-xs font-bold leading-tight",
-                          colors.isProfit || colors.isLoss ? 'text-white/95' : 'text-muted-foreground'
-                        )}>
-                          {dgCount} DUPLO GREEN
-                        </span>
+                        <span className="text-[10px] leading-none">🏆</span>
+                        <span className="telemetry-label text-foreground/80">{dgCount} DUPLO GREEN</span>
                       </div>
                     )}
 
-                    {/* 🎁 FreeBets GANHAS */}
                     {fbCount > 0 && (
                       <div className="flex items-center gap-1 leading-tight">
-                        <span className="text-[10px] sm:text-xs leading-none">🎁</span>
-                        <span className={cn(
-                          "text-[10px] sm:text-[11px] md:text-xs font-bold leading-tight",
-                          colors.isProfit || colors.isLoss ? 'text-white/90' : 'text-muted-foreground'
-                        )}>
-                          {fbCount} FreeBet{fbCount > 1 ? 's' : ''} GANHAS
-                        </span>
+                        <span className="text-[10px] leading-none">🎁</span>
+                        <span className="telemetry-label text-foreground/80">{fbCount} FREEBET{fbCount > 1 ? 'S' : ''}</span>
                       </div>
                     )}
 
-                    {/* Procedimentos */}
-                    <div className={cn(
-                      "text-[10px] sm:text-[11px] md:text-xs font-semibold leading-none",
-                      colors.isProfit || colors.isLoss ? 'text-white/80' : 'text-muted-foreground/70'
-                    )}>
-                      {dayData.count} proc.
-                    </div>
+                    <div className="telemetry-label text-foreground/60">{dayData.count} PROC</div>
                   </div>
                 ) : (
-                  <div className="px-2 pb-2 text-[9px] sm:text-[10px] md:text-[11px] text-muted-foreground/40 leading-none">
-                    Sem dados
-                  </div>
+                  <div className="px-2 pb-2 telemetry-label text-muted-foreground/30">—</div>
                 )}
 
                 {/* Tooltip */}
                 {hasData && (
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2.5 bg-popover border border-border rounded-xl shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 whitespace-nowrap text-left">
-                    <p className="text-sm font-black text-foreground tabular-nums">
-                      {colors.isProfit ? '+' : ''}R$ {dayData.profit.toFixed(2)}
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-3 py-2 bg-popover border border-border opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 whitespace-nowrap text-left">
+                    <p className={cn('kpi text-sm font-semibold tabular-nums', cell.value)}>
+                      {dayData.profit >= 0 ? '+' : ''}R$ {dayData.profit.toFixed(2)}
                     </p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">{dayData.count} procedimentos</p>
-                    {dgCount > 0 && (
-                      <p className="text-[11px] text-yellow-400 mt-0.5">
-                        🏆 {dgCount} Duplo Green
-                      </p>
-                    )}
+                    <p className="telemetry-label text-muted-foreground mt-0.5">{dayData.count} PROCEDIMENTOS</p>
+                    {dgCount > 0 && <p className="telemetry-label text-primary mt-0.5">🏆 {dgCount} DUPLO GREEN</p>}
                     {fbCount > 0 && (
-                      <p className="text-[11px] text-emerald-400 mt-0.5">
-                        🎁 {fbCount} FreeBet{fbCount > 1 ? 's' : ''} GANHAS • R$ {fbTotal.toFixed(2)}
+                      <p className="telemetry-label text-primary mt-0.5">
+                        🎁 {fbCount} FREEBET{fbCount > 1 ? 'S' : ''} · R$ {fbTotal.toFixed(2)}
                       </p>
                     )}
                   </div>
@@ -169,27 +140,21 @@ export function CalendarChart({ data, title, selectedMonth }: CalendarChartProps
         </div>
 
         {/* Legenda */}
-        <div className="mt-4 flex flex-wrap items-center justify-center gap-4 text-xs text-muted-foreground">
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-4 telemetry-label text-muted-foreground">
           <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded border bg-destructive/70 border-destructive" />
-            <span>Prejuízo</span>
+            <div className="w-3 h-3 bg-destructive/60 border border-border" />
+            <span>PREJUÍZO</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded bg-muted/30 border border-border" />
-            <span>Sem movimentação</span>
+            <div className="w-3 h-3 bg-card border border-border" />
+            <span>SEM MOVIMENTAÇÃO</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded border bg-success/70 border-success" />
-            <span>Lucro</span>
+            <div className="w-3 h-3 bg-primary/60 border border-border" />
+            <span>LUCRO</span>
           </div>
-          <div className="flex items-center gap-1.5">
-            <span>🏆</span>
-            <span>Duplo Green</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span>🎁</span>
-            <span>FreeBets GANHAS</span>
-          </div>
+          <div className="flex items-center gap-1.5"><span>🏆</span><span>DUPLO GREEN</span></div>
+          <div className="flex items-center gap-1.5"><span>🎁</span><span>FREEBETS</span></div>
         </div>
       </CardContent>
     </Card>

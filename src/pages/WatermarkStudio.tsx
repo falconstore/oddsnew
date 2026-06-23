@@ -18,6 +18,7 @@ import {
   Upload, Copy, Download, RotateCcw, Image as ImageIcon, Stamp,
   Loader2, Sparkles, ZoomIn, ZoomOut, Maximize2,
 } from 'lucide-react';
+import { PageHeader } from '@/components/PageHeader';
 import {
   DEFAULT_CONFIG, WatermarkConfig, WatermarkPosition, WatermarkFillMode,
   loadImage, fileToDataURL, renderWatermarkedCanvas, canvasToBlob,
@@ -234,25 +235,19 @@ export default function WatermarkStudio() {
     <Layout>
       <TooltipProvider>
         <div className="space-y-6">
-          {/* Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight flex items-center gap-2">
-                <Stamp className="h-7 w-7 text-primary" />
-                <span className="bg-gradient-to-r from-primary to-emerald-400 bg-clip-text text-transparent">
-                  Marca d'Água
-                </span>
-              </h1>
-              <p className="text-sm text-muted-foreground mt-1">
-                Aplique a logo Shark sobre prints e imagens. Tudo no navegador, nada vai pro servidor.
-              </p>
-            </div>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <kbd className="px-1.5 py-0.5 rounded bg-muted border text-[10px]">Ctrl+V</kbd> colar ·
-              <kbd className="px-1.5 py-0.5 rounded bg-muted border text-[10px]">Ctrl+C</kbd> copiar ·
-              <kbd className="px-1.5 py-0.5 rounded bg-muted border text-[10px]">Ctrl+S</kbd> baixar
-            </div>
-          </div>
+          <PageHeader
+            eyebrow="WMARK"
+            title="Marca d'Água"
+            subtitle="Aplique a logo Shark sobre prints e imagens. Tudo no navegador, nada vai pro servidor."
+            icon={Stamp}
+            actions={
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <kbd className="px-1.5 py-0.5 rounded bg-muted border text-[10px]">Ctrl+V</kbd> colar ·
+                <kbd className="px-1.5 py-0.5 rounded bg-muted border text-[10px]">Ctrl+C</kbd> copiar ·
+                <kbd className="px-1.5 py-0.5 rounded bg-muted border text-[10px]">Ctrl+S</kbd> baixar
+              </div>
+            }
+          />
 
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
             {/* Preview */}
@@ -270,7 +265,7 @@ export default function WatermarkStudio() {
                           disabled={busy !== null}
                           onClick={doCopy}
                           data-testid="button-copy-top"
-                          className="bg-amber-400 hover:bg-amber-300 text-black font-semibold shadow-[0_0_14px_rgba(251,191,36,0.55)] hover:shadow-[0_0_22px_rgba(251,191,36,0.75)] transition-all border-0"
+                          className="bg-warning hover:bg-warning/90 text-warning-foreground font-semibold transition-all border-0"
                         >
                           {busy === 'copy'
                             ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />

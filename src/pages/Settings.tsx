@@ -1,4 +1,5 @@
 import { Layout } from '@/components/Layout';
+import { PageHeader } from '@/components/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,16 +17,12 @@ const Settings = () => {
   return (
     <Layout>
       <div className="space-y-8 animate-fade-in">
-        {/* Page Header */}
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-slate-500/20 to-slate-500/5 border border-slate-500/20 flex items-center justify-center">
-            <SettingsIcon className="h-5 w-5 text-slate-400" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Configurações</h1>
-            <p className="text-sm text-muted-foreground">Gerencie sua conta e preferências</p>
-          </div>
-        </div>
+        <PageHeader
+          eyebrow="CFG"
+          title="Configurações"
+          subtitle="GERENCIE SUA CONTA E PREFERÊNCIAS"
+          icon={SettingsIcon}
+        />
 
         <div className="max-w-xl space-y-4">
           {/* Notificações */}

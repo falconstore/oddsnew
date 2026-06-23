@@ -4,6 +4,7 @@ import { useUserManagement, UserWithPermissions } from '@/hooks/useUserManagemen
 import { PERMISSION_COLUMNS, UserPermissionRow } from '@/types/auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { ActionButton, ActionGroup } from '@/components/ui/action-button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
@@ -14,6 +15,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
 import { Shield, Settings, Trash2, Loader2, Eye, Save, Users, Clock, UserCog } from 'lucide-react';
+import { PageHeader } from '@/components/PageHeader';
 
 type PermissionState = Record<string, boolean>;
 
@@ -79,15 +81,12 @@ const AdminUsers = () => {
   return (
     <Layout>
       <div className="space-y-6 animate-fade-in">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-red-500/20 to-red-500/5 border border-red-500/20 flex items-center justify-center">
-            <UserCog className="h-5 w-5 text-red-400" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Gerenciar Usuários</h1>
-            <p className="text-muted-foreground text-sm">Gerencie permissões e Super Admins do sistema.</p>
-          </div>
-        </div>
+        <PageHeader
+          eyebrow="USERS"
+          title="Usuários"
+          subtitle="GERENCIE PERMISSÕES E SUPER ADMINS DO SISTEMA"
+          icon={UserCog}
+        />
 
         <div className="grid grid-cols-3 gap-3 sm:gap-4">
           <Card>
@@ -107,8 +106,8 @@ const AdminUsers = () => {
             </CardHeader>
             <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
               <div className="text-xl sm:text-2xl font-bold flex items-center gap-2">
-                <Clock className="h-5 w-5 text-yellow-500" />
-                <span className={pendingCount > 0 ? 'text-yellow-500' : ''}>{pendingCount}</span>
+                <Clock className="h-5 w-5 text-warning" />
+                <span className={pendingCount > 0 ? 'text-warning' : ''}>{pendingCount}</span>
               </div>
             </CardContent>
           </Card>
@@ -153,7 +152,7 @@ const AdminUsers = () => {
                         </TableCell>
                         <TableCell>
                           {isPending(user.permissions) ? (
-                            <Badge variant="outline" className="border-yellow-500 text-yellow-500">
+                            <Badge variant="outline" className="border-warning text-warning">
                               Pendente
                             </Badge>
                           ) : (
@@ -169,20 +168,21 @@ const AdminUsers = () => {
                           />
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex justify-end gap-1 sm:gap-2">
-                            <Button size="sm" variant="outline" onClick={() => openPermissions(user)}>
-                              <Settings className="h-4 w-4 mr-1" />
-                              Permissões
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="text-destructive hover:text-destructive"
+                          <ActionGroup className="justify-end">
+                            <ActionButton
+                              showLabel
+                              icon={Settings}
+                              intent="neutral"
+                              label="Permissões"
+                              onClick={() => openPermissions(user)}
+                            />
+                            <ActionButton
+                              icon={Trash2}
+                              intent="delete"
+                              label="Excluir"
                               onClick={() => deleteUserByEmail(user.email)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
+                            />
+                          </ActionGroup>
                         </TableCell>
                       </TableRow>
                     ))}

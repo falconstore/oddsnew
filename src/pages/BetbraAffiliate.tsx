@@ -2,7 +2,8 @@ import { useState, useMemo } from 'react';
 import { usePersistedState } from '@/hooks/usePersistedState';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Plus, Calendar, RefreshCw, Download, TrendingUp, Zap, Bot, Clock, AlertTriangle, Settings2, Cookie, CheckCircle2, ChevronUp, Eye, EyeOff } from 'lucide-react';
+import { Plus, Calendar, RefreshCw, Download, TrendingUp, Bot, Clock, AlertTriangle, Settings2, Cookie, CheckCircle2, ChevronUp, Eye, EyeOff } from 'lucide-react';
+import { PageHeader } from '@/components/PageHeader';
 
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
@@ -140,7 +141,7 @@ export default function BetbraAffiliate() {
 
         {/* Background glow + grid effect */}
         <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[600px] rounded-full bg-amber-500/5 blur-[140px]" />
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[600px] rounded-full bg-primary/5 blur-[140px]" />
           <div className="absolute top-1/3 right-0 w-[500px] h-[500px] rounded-full bg-primary/4 blur-[120px]" />
         </div>
         <div
@@ -153,104 +154,71 @@ export default function BetbraAffiliate() {
           }}
         />
 
-        {/* Hero Header */}
-        <div className="relative rounded-3xl overflow-hidden border border-white/8 glass p-6 md:p-8">
-          <div className="absolute inset-0 pointer-events-none">
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[200px] rounded-full bg-amber-500/8 blur-[80px]" />
-          </div>
-          <div
-            className="absolute inset-0 pointer-events-none opacity-40"
-            style={{
-              backgroundImage: `linear-gradient(hsl(145 80% 48% / 0.05) 1px, transparent 1px), linear-gradient(90deg, hsl(145 80% 48% / 0.05) 1px, transparent 1px)`,
-              backgroundSize: '40px 40px',
-              maskImage: 'radial-gradient(ellipse 100% 100% at 50% 0%, white 20%, transparent 80%)',
-              WebkitMaskImage: 'radial-gradient(ellipse 100% 100% at 50% 0%, white 20%, transparent 80%)',
-            }}
-          />
-
-          <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
-            <div className="space-y-3">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-semibold">
-                <Zap className="w-3 h-3" />
-                Afiliado Betbra
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse-glow" />
+        <PageHeader
+          eyebrow="BETBRA"
+          title="Betbra Affiliate"
+          subtitle="GERENCIAR DADOS DE AFILIAÇÃO BETBRA"
+          icon={TrendingUp}
+          actions={<>
+            <Button variant="glass" size="sm" onClick={handleExportCSV} data-testid="button-export">
+              <Download className="w-4 h-4 mr-1.5" />
+              Exportar
+            </Button>
+            <Button variant="glass" size="sm" onClick={() => refetch()} disabled={isRefetching} data-testid="button-refresh">
+              <RefreshCw className={`w-4 h-4 mr-1.5 ${isRefetching ? 'animate-spin' : ''}`} />
+              Atualizar
+            </Button>
+            {canEdit && !cookieConfigured && (
+              <div
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-destructive/10 border border-destructive/30 text-destructive text-xs cursor-pointer hover:bg-destructive/15 transition-colors"
+                onClick={() => setShowCookiePanel(true)}
+                data-testid="badge-cookie-missing"
+              >
+                <AlertTriangle className="w-3.5 h-3.5" />
+                Cookie não configurado — clique para configurar
               </div>
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500/25 to-amber-600/10 border border-amber-500/25 flex items-center justify-center shadow-lg shadow-amber-500/10 flex-shrink-0">
-                  <TrendingUp className="h-7 w-7 text-amber-400" />
-                </div>
-                <div>
-                  <h1 className="text-2xl md:text-3xl font-bold tracking-tight gradient-text-warm">
-                    Betbra Affiliate
-                  </h1>
-                  <p className="text-muted-foreground text-sm">
-                    Gerenciar dados de afiliação Betbra
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap gap-2 items-center">
-              <Button variant="glass" size="sm" onClick={handleExportCSV} data-testid="button-export">
-                <Download className="w-4 h-4 mr-1.5" />
-                Exportar
+            )}
+            {isAdmin && (
+              <Button
+                variant="glass"
+                size="sm"
+                onClick={() => setShowCookiePanel(v => !v)}
+                data-testid="button-cookie-config"
+                title="Configurações de Integração Betbra"
+              >
+                <Settings2 className="w-4 h-4 mr-1.5" />
+                Integração
               </Button>
-              <Button variant="glass" size="sm" onClick={() => refetch()} disabled={isRefetching} data-testid="button-refresh">
-                <RefreshCw className={`w-4 h-4 mr-1.5 ${isRefetching ? 'animate-spin' : ''}`} />
-                Atualizar
+            )}
+            {canEdit && (
+              <Button
+                size="sm"
+                onClick={handleScrape}
+                disabled={refreshScraper.isPending}
+                title={!cookieConfigured ? 'Cookie não configurado — clique para configurar' : 'Buscar dados automaticamente do painel Betbra'}
+                className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-lg border-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                data-testid="button-scrape"
+              >
+                <Bot className={`w-4 h-4 mr-1.5 ${refreshScraper.isPending ? 'animate-spin' : ''}`} />
+                {refreshScraper.isPending ? 'Buscando...' : 'Atualizar via Scraper'}
               </Button>
-              {canEdit && !cookieConfigured && (
-                <div
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs cursor-pointer hover:bg-red-500/15 transition-colors"
-                  onClick={() => setShowCookiePanel(true)}
-                  data-testid="badge-cookie-missing"
-                >
-                  <AlertTriangle className="w-3.5 h-3.5" />
-                  Cookie não configurado — clique para configurar
-                </div>
-              )}
-              {isAdmin && (
-                <Button
-                  variant="glass"
-                  size="sm"
-                  onClick={() => setShowCookiePanel(v => !v)}
-                  data-testid="button-cookie-config"
-                  title="Configurações de Integração Betbra"
-                >
-                  <Settings2 className="w-4 h-4 mr-1.5" />
-                  Integração
-                </Button>
-              )}
-              {canEdit && (
-                <Button
-                  size="sm"
-                  onClick={handleScrape}
-                  disabled={refreshScraper.isPending}
-                  title={!cookieConfigured ? 'Cookie não configurado — clique para configurar' : 'Buscar dados automaticamente do painel Betbra'}
-                  className="bg-gradient-to-r from-violet-600 to-violet-700 hover:from-violet-500 hover:to-violet-600 text-white font-semibold shadow-lg shadow-violet-500/20 border-0 disabled:opacity-50 disabled:cursor-not-allowed"
-                  data-testid="button-scrape"
-                >
-                  <Bot className={`w-4 h-4 mr-1.5 ${refreshScraper.isPending ? 'animate-spin' : ''}`} />
-                  {refreshScraper.isPending ? 'Buscando...' : 'Atualizar via Scraper'}
-                </Button>
-              )}
-              {canEdit && (
-                <Button size="sm" onClick={handleAdd} className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-semibold shadow-lg shadow-amber-500/20 border-0" data-testid="button-add">
-                  <Plus className="w-4 h-4 mr-1.5" />
-                  Adicionar
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
+            )}
+            {canEdit && (
+              <Button size="sm" onClick={handleAdd} className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-lg border-0" data-testid="button-add">
+                <Plus className="w-4 h-4 mr-1.5" />
+                Adicionar
+              </Button>
+            )}
+          </>}
+        />
 
         {/* Cookie Configuration Panel (admin only, collapsible) */}
         {isAdmin && showCookiePanel && (
-          <div className="glass rounded-2xl border border-amber-500/20 overflow-hidden" data-testid="panel-cookie-config">
+          <div className="glass rounded-2xl border border-border overflow-hidden" data-testid="panel-cookie-config">
             <div className="flex items-center justify-between p-4 border-b border-white/5">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-500/20 to-amber-500/5 border border-amber-500/15 flex items-center justify-center flex-shrink-0">
-                  <Cookie className="w-4 h-4 text-amber-400" />
+                <div className="w-8 h-8 rounded-xl border border-border bg-muted flex items-center justify-center flex-shrink-0">
+                  <Cookie className="w-4 h-4 text-muted-foreground" />
                 </div>
                 <div>
                   <h3 className="text-sm font-semibold">Configurações de Integração</h3>
@@ -274,7 +242,7 @@ export default function BetbraAffiliate() {
                 ) : cookieStatus?.cookie_set ? (
                   <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0" />
                 ) : (
-                  <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0" />
+                  <AlertTriangle className="w-4 h-4 text-destructive flex-shrink-0" />
                 )}
                 <div className="flex-1 min-w-0">
                   {cookieStatusLoading ? (
@@ -292,7 +260,7 @@ export default function BetbraAffiliate() {
                       )}
                     </div>
                   ) : (
-                    <span className="text-xs font-medium text-red-400">Cookie não configurado — o scraper não funcionará</span>
+                    <span className="text-xs font-medium text-destructive">Cookie não configurado — o scraper não funcionará</span>
                   )}
                 </div>
               </div>
@@ -307,7 +275,7 @@ export default function BetbraAffiliate() {
                     value={cookieInput}
                     onChange={e => setCookieInput(e.target.value)}
                     placeholder="Cole aqui o valor completo do cookie (ex: _session=abc123; other=xyz...)"
-                    className={`font-mono text-xs resize-none bg-white/3 border-white/10 focus:border-amber-500/50 ${showCookieText ? '' : 'text-security-disc'}`}
+                    className={`font-mono text-xs resize-none bg-white/3 border-white/10 focus:border-primary/50 ${showCookieText ? '' : 'text-security-disc'}`}
                     rows={3}
                     data-testid="input-cookie-value"
                     style={showCookieText ? {} : { WebkitTextSecurity: 'disc' } as React.CSSProperties}
@@ -340,7 +308,7 @@ export default function BetbraAffiliate() {
                   size="sm"
                   onClick={handleSaveCookie}
                   disabled={!cookieInput.trim() || updateCookie.isPending}
-                  className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-semibold border-0 disabled:opacity-50"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold border-0 disabled:opacity-50"
                   data-testid="button-save-cookie"
                 >
                   {updateCookie.isPending ? 'Salvando...' : 'Salvar cookie'}
@@ -353,30 +321,30 @@ export default function BetbraAffiliate() {
         {/* Banner: cookie expired after scraper run OR cookie missing */}
         {canEdit && (scraperCookieExpired || !cookieConfigured) && !showCookiePanel && (
           <div
-            className={`flex items-start gap-3 p-4 rounded-2xl border transition-colors ${isAdmin ? 'cursor-pointer hover:bg-red-500/12' : ''} bg-red-500/8 border-red-500/20`}
+            className={`flex items-start gap-3 p-4 rounded-2xl border transition-colors ${isAdmin ? 'cursor-pointer hover:bg-destructive/12' : ''} bg-destructive/8 border-destructive/20`}
             onClick={() => isAdmin && setShowCookiePanel(true)}
             data-testid="banner-cookie-expired"
           >
-            <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+            <AlertTriangle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
             <div className="flex-1">
-              <p className="text-sm font-medium text-red-300">
+              <p className="text-sm font-medium text-destructive">
                 {scraperCookieExpired ? 'Cookie do BetBra expirou' : 'Cookie do BetBra não configurado'}
               </p>
-              <p className="text-xs text-red-400/70 mt-0.5">
+              <p className="text-xs text-destructive/70 mt-0.5">
                 {isAdmin
                   ? 'Clique aqui para atualizar o cookie e reativar o scraper automático.'
                   : 'Entre em contato com o administrador para atualizar o cookie de acesso ao BetBra.'}
               </p>
             </div>
-            {isAdmin && <Settings2 className="w-4 h-4 text-red-400/70 flex-shrink-0 mt-0.5" />}
+            {isAdmin && <Settings2 className="w-4 h-4 text-destructive/70 flex-shrink-0 mt-0.5" />}
           </div>
         )}
 
         {/* Month Selector */}
         <div className="glass rounded-2xl border border-white/5 p-4 flex flex-col sm:flex-row items-start sm:items-center gap-4">
           <div className="flex items-center gap-3 flex-1">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/20 to-amber-500/5 border border-amber-500/15 flex items-center justify-center flex-shrink-0">
-              <Calendar className="w-5 h-5 text-amber-400" />
+            <div className="w-10 h-10 rounded-xl border border-border bg-muted flex items-center justify-center flex-shrink-0">
+              <Calendar className="w-5 h-5 text-muted-foreground" />
             </div>
             <div>
               <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider mb-0.5">Mês Selecionado</p>
@@ -384,7 +352,7 @@ export default function BetbraAffiliate() {
                 value={selectedMonth.toISOString()}
                 onValueChange={(value) => setSelectedMonth(new Date(value))}
               >
-                <SelectTrigger className="bg-transparent border-none text-lg font-bold p-0 h-auto hover:text-amber-400 transition-colors w-auto min-w-[180px]" data-testid="select-month">
+                <SelectTrigger className="bg-transparent border-none text-lg font-bold p-0 h-auto hover:text-primary transition-colors w-auto min-w-[180px]" data-testid="select-month">
                   <SelectValue>
                     {capitalizeMonth(format(selectedMonth, 'MMMM yyyy', { locale: ptBR }))}
                   </SelectValue>
@@ -401,9 +369,9 @@ export default function BetbraAffiliate() {
           </div>
           <div className="flex items-center gap-3 flex-wrap">
             {lastUpdatedLabel && (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-violet-500/10 border border-violet-500/20" data-testid="badge-last-updated">
-                <Clock className="w-3.5 h-3.5 text-violet-400" />
-                <span className="text-xs text-violet-300">Scraper: {lastUpdatedLabel}</span>
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border" data-testid="badge-last-updated">
+                <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">Scraper: {lastUpdatedLabel}</span>
               </div>
             )}
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/3 border border-white/5">
@@ -426,7 +394,7 @@ export default function BetbraAffiliate() {
         <div className="glass rounded-2xl border border-white/5 overflow-hidden">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 p-4 border-b border-white/5">
             <div className="flex items-center gap-2">
-              <div className="w-1.5 h-5 rounded-full bg-gradient-to-b from-amber-400 to-amber-600" />
+              <div className="w-1.5 h-5 rounded-full bg-primary/60" />
               <h2 className="text-base font-semibold">Lista de Registros</h2>
             </div>
             <span className="text-xs text-muted-foreground">

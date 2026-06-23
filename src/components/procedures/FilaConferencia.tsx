@@ -108,8 +108,8 @@ function buildFila(procedures: Procedure[]): FilaItem[] {
 }
 
 const urgencyStyle: Record<Urgency, { border: string; bg: string; iconCls: string; badge: string }> = {
-  high:   { border: 'border-red-500/30',   bg: 'bg-red-500/8',   iconCls: 'text-red-400',   badge: 'bg-red-500/20 text-red-300 border-red-500/30' },
-  medium: { border: 'border-amber-500/25', bg: 'bg-amber-500/6', iconCls: 'text-amber-400', badge: 'bg-amber-500/20 text-amber-300 border-amber-500/30' },
+  high:   { border: 'border-destructive/30',   bg: 'bg-destructive/8',   iconCls: 'text-destructive',   badge: 'bg-destructive/20 text-destructive border-destructive/30' },
+  medium: { border: 'border-warning/25', bg: 'bg-warning/6', iconCls: 'text-warning', badge: 'bg-warning/20 text-warning border-warning/30' },
   low:    { border: 'border-primary/20',   bg: 'bg-primary/5',   iconCls: 'text-primary',   badge: 'bg-primary/15 text-primary border-primary/25' },
 };
 
@@ -129,24 +129,24 @@ export function FilaConferencia({ procedures, onCheckResult }: FilaConferenciaPr
   const totalCount = fila.length;
 
   return (
-    <div className="rounded-2xl border border-amber-500/20 overflow-hidden">
+    <div className="rounded-2xl border border-warning/20 overflow-hidden">
       {/* ── Header colapsável ── */}
       <button
         onClick={() => setCollapsed(c => !c)}
-        className="w-full text-left bg-gradient-to-r from-amber-500/10 via-orange-500/6 to-transparent p-4 flex justify-between items-center border-b border-amber-500/15 hover:bg-amber-500/5 transition-colors"
+        className="w-full text-left bg-card p-4 flex justify-between items-center border-b border-warning/15 hover:bg-muted/30 transition-colors"
       >
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-amber-500/20 rounded-xl flex items-center justify-center shadow-lg shadow-amber-500/15">
-            <ClipboardCheck className="w-4.5 h-4.5 text-amber-400" />
+          <div className="w-9 h-9 bg-warning/20 rounded-xl flex items-center justify-center shadow-lg shadow-warning/15">
+            <ClipboardCheck className="w-4.5 h-4.5 text-warning" />
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="font-bold text-sm text-foreground">Fila de Conferência</h3>
-              <Badge className="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] px-1.5 py-0 font-bold">
+              <Badge className="bg-warning/20 text-warning border border-warning/30 text-[10px] px-1.5 py-0 font-bold">
                 {totalCount}
               </Badge>
               {highCount > 0 && (
-                <Badge className="bg-red-500/20 text-red-300 border border-red-500/30 text-[10px] px-1.5 py-0 font-bold flex items-center gap-1">
+                <Badge className="bg-destructive/20 text-destructive border border-destructive/30 text-[10px] px-1.5 py-0 font-bold flex items-center gap-1">
                   <AlertCircle className="w-2.5 h-2.5" />
                   {highCount} urgente{highCount > 1 ? 's' : ''}
                 </Badge>
@@ -189,7 +189,7 @@ export function FilaConferencia({ procedures, onCheckResult }: FilaConferenciaPr
                       {proc.platform}
                     </Badge>
                     {proc.freebet_value != null && Number(proc.freebet_value) > 0 && (
-                      <span className="text-[10px] text-purple-400 font-semibold flex items-center gap-0.5">
+                      <span className="text-[10px] text-muted-foreground font-semibold flex items-center gap-0.5">
                         <Gift className="w-2.5 h-2.5" />
                         R${Number(proc.freebet_value).toFixed(2)}
                       </span>
@@ -221,7 +221,7 @@ export function FilaConferencia({ procedures, onCheckResult }: FilaConferenciaPr
                       rel="noopener noreferrer"
                       onClick={e => e.stopPropagation()}
                       title="Ver post no Telegram"
-                      className="text-cyan-400 hover:text-cyan-300 transition-colors p-1"
+                      className="text-muted-foreground hover:text-foreground transition-colors p-1"
                     >
                       <ExternalLink className="w-3.5 h-3.5" />
                     </a>
@@ -230,13 +230,13 @@ export function FilaConferencia({ procedures, onCheckResult }: FilaConferenciaPr
                     <Button
                       size="sm"
                       onClick={() => onCheckResult(proc)}
-                      className="h-7 px-3 text-[11px] font-semibold bg-amber-500/20 hover:bg-amber-500/35 text-amber-300 border border-amber-500/30 hover:border-amber-500/50"
+                      className="h-7 px-3 text-[11px] font-semibold bg-warning/20 hover:bg-warning/35 text-warning border border-warning/30 hover:border-warning/50"
                     >
                       <Zap className="w-3 h-3 mr-1" />
                       Conferir
                     </Button>
                   ) : (
-                    <Badge className="bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] px-2 py-0.5">
+                    <Badge className="border border-border text-muted-foreground text-[10px] px-2 py-0.5">
                       Queimar FB
                     </Badge>
                   )}

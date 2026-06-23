@@ -30,7 +30,7 @@ export function LucroMaximoTooltip({ dpl, liquid, total, isPrevisto, children }:
 
           <div className="flex justify-between gap-4">
             <span className="text-muted-foreground">Líquido recebido</span>
-            <span className={`font-mono font-medium ${liquid >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+            <span className={`font-mono font-medium ${liquid >= 0 ? 'text-primary' : 'text-destructive'}`}>
               {fmtSigned(liquid)}
             </span>
           </div>
@@ -48,7 +48,7 @@ export function LucroMaximoTooltip({ dpl, liquid, total, isPrevisto, children }:
                       <span className="text-muted-foreground/70 text-[10px] truncate">{o.promotion_name}</span>
                     )}
                   </div>
-                  <span className="font-mono font-medium text-emerald-400 whitespace-nowrap">
+                  <span className="font-mono font-medium text-primary whitespace-nowrap">
                     {o.deficitAbs > 0 ? `+${fmt(o.deficitAbs)}` : fmt(0)}
                   </span>
                 </div>
@@ -60,7 +60,7 @@ export function LucroMaximoTooltip({ dpl, liquid, total, isPrevisto, children }:
             <span className="font-semibold text-foreground">
               = Lucro {isPrevisto ? 'previsto ' : ''}máximo
             </span>
-            <span className={`font-mono font-bold ${total >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+            <span className={`font-mono font-bold ${total >= 0 ? 'text-primary' : 'text-destructive'}`}>
               {fmtSigned(total)}
             </span>
           </div>

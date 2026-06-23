@@ -8,6 +8,7 @@ import {
   Filter, ChevronDown, ChevronUp, Copy, Check, Send, Bot,
 } from 'lucide-react';
 import { Layout } from '@/components/Layout';
+import { PageHeader } from '@/components/PageHeader';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -18,13 +19,13 @@ import type { TrialLead, TrialStatus } from '@/types/trial';
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 const STATUS_META: Record<TrialStatus, { label: string; cls: string }> = {
-  pending:        { label: 'Aguardando',     cls: 'bg-amber-500/15 text-amber-300 border-amber-500/30' },
-  active:         { label: 'Ativo',          cls: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' },
+  pending:        { label: 'Aguardando',     cls: 'bg-warning/15 text-warning border-warning/30' },
+  active:         { label: 'Ativo',          cls: 'bg-primary/15 text-primary border-primary/30' },
   expired:        { label: 'Expirado',       cls: 'bg-zinc-500/15 text-zinc-300 border-zinc-500/30' },
-  removed:        { label: 'Removido',       cls: 'bg-red-500/15 text-red-300 border-red-500/30' },
-  blocked:        { label: 'Bloqueado',      cls: 'bg-purple-500/15 text-purple-300 border-purple-500/30' },
-  blocked_repeat: { label: 'Repetidor',      cls: 'bg-orange-500/15 text-orange-300 border-orange-500/30' },
-  converted:      { label: 'Convertido ✓',   cls: 'bg-emerald-600/20 text-emerald-200 border-emerald-500/40' },
+  removed:        { label: 'Removido',       cls: 'bg-destructive/15 text-destructive border-destructive/30' },
+  blocked:        { label: 'Bloqueado',      cls: 'bg-muted text-muted-foreground border-border' },
+  blocked_repeat: { label: 'Repetidor',      cls: 'bg-warning/15 text-warning border-warning/30' },
+  converted:      { label: 'Convertido ✓',   cls: 'bg-primary/20 text-primary border-primary/40' },
 };
 
 const fmtDate = (iso: string | null) =>
@@ -39,14 +40,14 @@ const fmtWhatsapp = (raw: string) => {
 
 // Paleta determinística por string — colorir campanhas / UTM values
 const UTM_PALETTE = [
-  'bg-cyan-500/20 text-cyan-300 border-cyan-500/35',
-  'bg-violet-500/20 text-violet-300 border-violet-500/35',
-  'bg-amber-500/20 text-amber-300 border-amber-500/35',
-  'bg-pink-500/20 text-pink-300 border-pink-500/35',
-  'bg-lime-500/20 text-lime-300 border-lime-500/35',
-  'bg-sky-500/20 text-sky-300 border-sky-500/35',
-  'bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-500/35',
-  'bg-orange-500/20 text-orange-300 border-orange-500/35',
+  'bg-muted text-muted-foreground border-border',
+  'bg-muted text-muted-foreground border-border',
+  'bg-muted text-muted-foreground border-border',
+  'bg-muted text-muted-foreground border-border',
+  'bg-muted text-muted-foreground border-border',
+  'bg-muted text-muted-foreground border-border',
+  'bg-muted text-muted-foreground border-border',
+  'bg-muted text-muted-foreground border-border',
 ];
 
 const colorFor = (() => {
@@ -164,70 +165,41 @@ export default function AdsAdmin() {
   return (
     <Layout>
       <div className="relative space-y-4 md:space-y-6 animate-fade-in">
-
-        {/* Glows */}
-        <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
-          <div className="absolute top-0 left-1/3 -translate-x-1/2 w-[700px] h-[400px] rounded-full bg-cyan-500/6 blur-[120px]" />
-          <div className="absolute bottom-0 right-0 w-[350px] h-[350px] rounded-full bg-blue-500/5 blur-[90px]" />
-        </div>
-
-        {/* Hero */}
-        <div className="relative rounded-3xl overflow-hidden border border-white/8 glass p-6 md:p-8">
-          <div className="absolute inset-0 pointer-events-none">
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[180px] rounded-full bg-cyan-500/10 blur-[70px]" />
-          </div>
-          <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
-            <div className="space-y-3">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/25 text-cyan-300 text-xs font-semibold">
-                <Megaphone className="w-3 h-3" />
-                Tráfego Pago
-                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-              </div>
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500/30 to-blue-600/10 border border-cyan-500/30 flex items-center justify-center shadow-lg shadow-cyan-500/15 flex-shrink-0">
-                  <Megaphone className="h-7 w-7 text-cyan-300" />
-                </div>
-                <div>
-                  <h1 className="text-2xl md:text-3xl font-bold tracking-tight bg-gradient-to-r from-cyan-400 via-sky-400 to-blue-400 bg-clip-text text-transparent">
-                    Leads de Anúncios
-                  </h1>
-                  <p className="text-muted-foreground text-sm">
-                    {stats.total} leads · {stats.active} ativos · {stats.converted} convertidos
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                className="border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/10"
-                onClick={() => refetch()}
-                disabled={isFetching}
-                data-testid="button-ads-admin-refresh"
-              >
-                {isFetching
-                  ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
-                  : <RefreshCw className="w-4 h-4 mr-1.5" />}
-                Atualizar
+        <PageHeader
+          eyebrow="ADS"
+          title="Leads de Anúncios"
+          subtitle="TRÁFEGO PAGO"
+          icon={Megaphone}
+          actions={<>
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-border text-muted-foreground hover:bg-muted"
+              onClick={() => refetch()}
+              disabled={isFetching}
+              data-testid="button-ads-admin-refresh"
+            >
+              {isFetching
+                ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+                : <RefreshCw className="w-4 h-4 mr-1.5" />}
+              Atualizar
+            </Button>
+            <a href="/ads" target="_blank" rel="noopener noreferrer">
+              <Button size="sm" variant="outline" className="border-primary/30 text-primary hover:bg-primary/10" data-testid="link-ads-landing">
+                <ExternalLink className="w-4 h-4 mr-1.5" />
+                Abrir landing /ads
               </Button>
-              <a href="/ads" target="_blank" rel="noopener noreferrer">
-                <Button size="sm" variant="outline" className="border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10" data-testid="link-ads-landing">
-                  <ExternalLink className="w-4 h-4 mr-1.5" />
-                  Abrir landing /ads
-                </Button>
-              </a>
-            </div>
-          </div>
-        </div>
+            </a>
+          </>}
+        />
 
         {/* KPIs */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[
-            { icon: <Users className="w-5 h-5" />, label: 'Total de leads', value: stats.total, cls: 'from-cyan-500/20 to-cyan-500/5 border-cyan-500/25 text-cyan-300' },
-            { icon: <CheckCircle2 className="w-5 h-5" />, label: 'Ativos no grupo', value: stats.active, cls: 'from-emerald-500/20 to-emerald-500/5 border-emerald-500/25 text-emerald-300' },
-            { icon: <Clock className="w-5 h-5" />, label: 'Aguardando bot', value: stats.pending, cls: 'from-amber-500/20 to-amber-500/5 border-amber-500/25 text-amber-300' },
-            { icon: <TrendingUp className="w-5 h-5" />, label: 'Convertidos', value: stats.converted, cls: 'from-violet-500/20 to-violet-500/5 border-violet-500/25 text-violet-300' },
+            { icon: <Users className="w-5 h-5" />, label: 'Total de leads', value: stats.total, cls: 'from-muted to-muted/50 border-border text-muted-foreground' },
+            { icon: <CheckCircle2 className="w-5 h-5" />, label: 'Ativos no grupo', value: stats.active, cls: 'from-primary/20 to-primary/5 border-primary/25 text-primary' },
+            { icon: <Clock className="w-5 h-5" />, label: 'Aguardando bot', value: stats.pending, cls: 'from-warning/20 to-warning/5 border-warning/25 text-warning' },
+            { icon: <TrendingUp className="w-5 h-5" />, label: 'Convertidos', value: stats.converted, cls: 'from-muted to-muted/50 border-border text-muted-foreground' },
           ].map(({ icon, label, value, cls }) => (
             <div key={label} className={`glass rounded-2xl border bg-gradient-to-br p-4 ${cls}`}>
               <div className="flex items-start justify-between gap-2">
@@ -243,7 +215,7 @@ export default function AdsAdmin() {
         {byCampaign.length > 0 && (
           <div className="glass rounded-3xl border border-white/8 p-5 md:p-6">
             <h2 className="text-base font-bold flex items-center gap-2 mb-4">
-              <Megaphone className="w-4 h-4 text-cyan-400" />
+              <Megaphone className="w-4 h-4 text-muted-foreground" />
               Leads por campanha
             </h2>
             <div className="flex flex-wrap gap-2">
@@ -254,7 +226,7 @@ export default function AdsAdmin() {
                   onClick={() => setCampaignFilter(campaignFilter === campaign ? 'all' : campaign)}
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-semibold transition-all hover:opacity-90 ${
                     campaignFilter === campaign
-                      ? colorFor(campaign) + ' ring-1 ring-cyan-400/40'
+                      ? colorFor(campaign) + ' ring-1 ring-border'
                       : colorFor(campaign) + ' opacity-75'
                   }`}
                   data-testid={`button-campaign-filter-${campaign}`}
@@ -269,7 +241,7 @@ export default function AdsAdmin() {
 
         {/* Filtros */}
         <div className="flex flex-wrap gap-2 items-center">
-          <div className="relative flex-1 min-w-[180px]">
+          <div className="relative flex-1 min-w-[140px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               value={search}
@@ -281,7 +253,7 @@ export default function AdsAdmin() {
           </div>
 
           <Select value={monthFilter} onValueChange={setMonthFilter}>
-            <SelectTrigger className="bg-white/5 border-white/10 h-9 text-sm w-[170px]" data-testid="select-ads-month">
+            <SelectTrigger className="bg-white/5 border-white/10 h-9 text-sm w-full sm:w-[170px]" data-testid="select-ads-month">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -292,7 +264,7 @@ export default function AdsAdmin() {
           </Select>
 
           <Select value={statusFilter} onValueChange={v => setStatusFilter(v as 'all' | TrialStatus)}>
-            <SelectTrigger className="bg-white/5 border-white/10 h-9 text-sm w-[150px]" data-testid="select-ads-status">
+            <SelectTrigger className="bg-white/5 border-white/10 h-9 text-sm w-full sm:w-[150px]" data-testid="select-ads-status">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
@@ -307,7 +279,7 @@ export default function AdsAdmin() {
 
           {sources.length > 0 && (
             <Select value={sourceFilter} onValueChange={setSourceFilter}>
-              <SelectTrigger className="bg-white/5 border-white/10 h-9 text-sm w-[140px]" data-testid="select-ads-source">
+              <SelectTrigger className="bg-white/5 border-white/10 h-9 text-sm w-full sm:w-[140px]" data-testid="select-ads-source">
                 <SelectValue placeholder="Source" />
               </SelectTrigger>
               <SelectContent>
@@ -351,7 +323,7 @@ export default function AdsAdmin() {
             </p>
             {adsLeads.length === 0 && (
               <a href="/ads" target="_blank" rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-300 underline underline-offset-2 mt-2">
+                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 mt-2">
                 <ExternalLink className="w-3 h-3" /> Abrir /ads
               </a>
             )}
@@ -437,7 +409,7 @@ function LeadCard({ lead, expanded, onToggle }: {
 
   return (
     <div
-      className={`glass rounded-2xl border p-4 transition-all duration-200 ${isPending ? 'border-amber-500/30 hover:border-amber-500/50' : 'border-white/8 hover:border-cyan-500/25'}`}
+      className={`glass rounded-2xl border p-4 transition-all duration-200 ${isPending ? 'border-warning/30 hover:border-warning/50' : 'border-white/8 hover:border-border'}`}
       data-testid={`card-ads-lead-${lead.id}`}
     >
       <div className="flex flex-col sm:flex-row sm:items-start gap-3">
@@ -451,13 +423,13 @@ function LeadCard({ lead, expanded, onToggle }: {
             </span>
           )}
           {lead.ct && (
-            <span className="inline-flex items-center justify-center px-2 py-0.5 rounded border border-violet-500/30 bg-violet-500/10 text-violet-300 text-[10px] font-semibold font-mono"
+            <span className="inline-flex items-center justify-center px-2 py-0.5 rounded border border-border bg-muted text-muted-foreground text-[10px] font-semibold font-mono"
               data-testid={`badge-ct-${lead.id}`} title="AdsScala CT">
               {lead.ct}
             </span>
           )}
           {lead.fbclid && (
-            <span className="inline-flex items-center justify-center px-2 py-0.5 rounded border border-blue-500/30 bg-blue-500/10 text-blue-300 text-[10px] font-semibold">
+            <span className="inline-flex items-center justify-center px-2 py-0.5 rounded border border-border bg-muted text-muted-foreground text-[10px] font-semibold">
               fbclid ✓
             </span>
           )}
@@ -472,7 +444,7 @@ function LeadCard({ lead, expanded, onToggle }: {
               {meta.label}
             </Badge>
             {isPending && (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-amber-500/40 bg-amber-500/10 text-amber-300 text-[10px] font-medium"
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-warning/40 bg-warning/10 text-warning text-[10px] font-medium"
                 title="Usuário não iniciou o bot do Telegram — clique em expandir para recuperar">
                 <Bot className="w-3 h-3" /> Não iniciou bot
               </span>
@@ -480,7 +452,7 @@ function LeadCard({ lead, expanded, onToggle }: {
             {lead.status === 'converted' && (
               <RouterLink
                 to={`/trial-admin`}
-                className="text-[10px] text-emerald-300 hover:text-emerald-200 underline underline-offset-2"
+                className="text-[10px] text-primary hover:text-primary/80 underline underline-offset-2"
                 data-testid={`link-ads-trial-admin-${lead.id}`}
               >
                 Ver no CRM
@@ -535,32 +507,32 @@ function LeadCard({ lead, expanded, onToggle }: {
 
           {/* Bloco de recuperação — só para leads Aguardando */}
           {isPending && (
-            <div className="rounded-xl border border-amber-500/30 bg-amber-500/8 p-3 space-y-2"
+            <div className="rounded-xl border border-warning/30 bg-warning/8 p-3 space-y-2"
               data-testid={`block-bot-recovery-${lead.id}`}>
-              <p className="text-[11px] font-semibold text-amber-300 flex items-center gap-1.5">
+              <p className="text-[11px] font-semibold text-warning flex items-center gap-1.5">
                 <Bot className="w-3.5 h-3.5" />
                 Usuário não iniciou o bot — envie o link abaixo para ativar o trial
               </p>
               <div className="flex items-center gap-2 bg-black/30 rounded-lg px-3 py-1.5 border border-white/8">
-                <code className="text-[10px] text-cyan-300 font-mono flex-1 break-all select-all"
+                <code className="text-[10px] text-muted-foreground font-mono flex-1 break-all select-all"
                   data-testid={`text-bot-link-${lead.id}`}>
                   {botStartUrl(lead.id)}
                 </code>
                 <button
                   type="button"
                   onClick={copyBotLink}
-                  className="flex-shrink-0 p-1 rounded hover:bg-white/10 text-muted-foreground hover:text-amber-300 transition-colors"
+                  className="flex-shrink-0 p-1 rounded hover:bg-white/10 text-muted-foreground hover:text-warning transition-colors"
                   title="Copiar link do bot"
                   data-testid={`button-copy-bot-link-${lead.id}`}
                 >
-                  {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copied ? <Check className="w-3.5 h-3.5 text-primary" /> : <Copy className="w-3.5 h-3.5" />}
                 </button>
               </div>
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={copyBotLink}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 text-[11px] font-medium transition-colors"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-warning/30 bg-warning/10 text-warning hover:bg-warning/20 text-[11px] font-medium transition-colors"
                   data-testid={`button-copy-bot-link-action-${lead.id}`}
                 >
                   {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
@@ -569,7 +541,7 @@ function LeadCard({ lead, expanded, onToggle }: {
                 <a
                   href={waBotMsg(lead)}
                   target="_blank" rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 text-[11px] font-medium transition-colors"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 text-[11px] font-medium transition-colors"
                   data-testid={`link-wa-bot-msg-${lead.id}`}
                   title="Mensagem para quem já tem Telegram instalado"
                 >
@@ -579,7 +551,7 @@ function LeadCard({ lead, expanded, onToggle }: {
                 <a
                   href={waNoTelegramMsg(lead)}
                   target="_blank" rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20 text-[11px] font-medium transition-colors"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-muted text-muted-foreground hover:bg-muted/80 text-[11px] font-medium transition-colors"
                   data-testid={`link-wa-no-telegram-msg-${lead.id}`}
                   title="Mensagem com passo a passo para baixar o Telegram"
                 >
@@ -613,14 +585,14 @@ function LeadCard({ lead, expanded, onToggle }: {
             <a
               href={`https://wa.me/55${lead.whatsapp.replace(/\D/g, '')}`}
               target="_blank" rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-[11px] text-emerald-400 hover:text-emerald-300 underline underline-offset-2"
+              className="inline-flex items-center gap-1 text-[11px] text-primary hover:text-primary/80 underline underline-offset-2"
               data-testid={`link-ads-whatsapp-${lead.id}`}
             >
               <Phone className="w-3 h-3" /> Abrir no WhatsApp
             </a>
             <RouterLink
               to="/trial-admin"
-              className="inline-flex items-center gap-1 text-[11px] text-cyan-400 hover:text-cyan-300 underline underline-offset-2"
+              className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground underline underline-offset-2"
               data-testid={`link-ads-full-crm-${lead.id}`}
             >
               <Filter className="w-3 h-3" /> Ver no CRM Trial

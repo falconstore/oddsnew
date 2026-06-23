@@ -99,12 +99,3 @@ export const useRealtimeSubscription = ({
     };
   }, [tableName, event, enabled, debounceMs, queryClient, JSON.stringify(queryKeys)]);
 };
-
-// Hook to subscribe to odds_history changes
-export const useOddsRealtimeSubscription = () => {
-  useRealtimeSubscription({
-    tableName: 'odds_history',
-    queryKeys: [['odds_comparison']],
-    event: 'INSERT',
-  });
-};

@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Trophy, CheckCircle2, Loader2 } from 'lucide-react';
 import { useEventsSearch, EventSuggestion } from '@/hooks/useEventsSearch';
+import { traduzirEvento, traduzirCampeonato } from '@/lib/traduzirEvento';
 
 interface EventoAutocompleteProps {
   partidaDescricao: string;
@@ -60,7 +61,8 @@ export function EventoAutocomplete({
 
   function selecionar(s: EventSuggestion) {
     onChange({
-      partida_descricao: s.nome,
+      // Grava já em PT — fixture_id/kickoff continuam vindo da API (imutáveis).
+      partida_descricao: traduzirEvento(s.nome),
       fixture_id: s.fixture_id,
       kickoff_at: s.kickoff_at,
       esporte: s.esporte || 'futebol',
@@ -82,23 +84,23 @@ export function EventoAutocomplete({
           className={inputClassName}
         />
         <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 text-xs">
-          {loading && <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" />}
+          {loading && <Loader2 className="w-3.5 h-3.5 animate-spin text-warning" />}
           {linked && !loading && (
-            <span className="flex items-center gap-1 text-emerald-400" title={`Vinculado ao fixture ${fixtureId}`}>
+            <span className="flex items-center gap-1 text-primary" title={`Vinculado ao fixture ${fixtureId}`}>
               <CheckCircle2 className="w-3.5 h-3.5" />
             </span>
           )}
         </div>
       </div>
       {linked && kickoffAt && (
-        <p className="text-[10px] text-emerald-400/80 mt-1 flex items-center gap-1">
+        <p className="text-[10px] text-primary/80 mt-1 flex items-center gap-1">
           <Trophy className="w-3 h-3" />
           Vinculado · kickoff {new Date(kickoffAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
         </p>
       )}
       {open && partidaDescricao.trim().length >= 2 && (
         <div
-          className="absolute z-50 left-0 right-0 mt-1 max-h-72 overflow-auto rounded-xl border border-amber-500/30 bg-background/98 backdrop-blur shadow-2xl shadow-black/60"
+          className="absolute z-50 left-0 right-0 mt-1 max-h-72 overflow-auto rounded-xl border border-border bg-background/98 backdrop-blur shadow-2xl shadow-black/60"
           data-testid="dropdown-evento-sugestoes"
         >
           {loading && items.length === 0 && (
@@ -115,12 +117,12 @@ export function EventoAutocomplete({
               type="button"
               onClick={() => selecionar(s)}
               data-testid={`sugestao-evento-${s.fixture_id}`}
-              className="w-full text-left p-2.5 hover:bg-amber-500/10 border-b border-white/5 last:border-0 transition-colors"
+              className="w-full text-left p-2.5 hover:bg-primary/10 border-b border-white/5 last:border-0 transition-colors"
             >
-              <div className="text-sm font-medium text-foreground">{s.nome}</div>
+              <div className="text-sm font-medium text-foreground">{traduzirEvento(s.nome)}</div>
               <div className="flex items-center justify-between mt-0.5">
-                <span className="text-[11px] text-muted-foreground truncate pr-2">{s.campeonato}</span>
-                <span className="text-[11px] text-amber-300 font-mono shrink-0">
+                <span className="text-[11px] text-muted-foreground truncate pr-2">{traduzirCampeonato(s.campeonato)}</span>
+                <span className="text-[11px] text-warning font-mono shrink-0">
                   {new Date(s.data_hora).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
                 </span>
               </div>

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
+import { ActionButton, ActionGroup } from '@/components/ui/action-button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Subscriber } from '@/types/subscriptions';
@@ -84,14 +85,10 @@ export function SubscriptionTable({ subscribers, onEdit, onDelete }: Subscriptio
                       </a>
                     )}
                   </div>
-                  <div className="flex gap-1">
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(subscriber)}>
-                      <Pencil className="h-3 w-3" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => onDelete(subscriber.id)}>
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
+                  <ActionGroup>
+                    <ActionButton icon={Pencil} intent="edit" label="Editar" onClick={() => onEdit(subscriber)} />
+                    <ActionButton icon={Trash2} intent="delete" label="Excluir" onClick={() => onDelete(subscriber.id)} />
+                  </ActionGroup>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 text-xs">
@@ -221,14 +218,10 @@ export function SubscriptionTable({ subscribers, onEdit, onDelete }: Subscriptio
                     {subscriber.situation}
                   </TableCell>
                   <TableCell className="py-1 px-1.5">
-                    <div className="flex gap-0.5">
-                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onEdit(subscriber)}>
-                        <Pencil className="h-3 w-3" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => onDelete(subscriber.id)}>
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
+                    <ActionGroup>
+                      <ActionButton icon={Pencil} intent="edit" label="Editar" onClick={() => onEdit(subscriber)} />
+                      <ActionButton icon={Trash2} intent="delete" label="Excluir" onClick={() => onDelete(subscriber.id)} />
+                    </ActionGroup>
                   </TableCell>
                 </TableRow>
               );

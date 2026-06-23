@@ -7,15 +7,13 @@ import { useLastlinkAlerts } from '@/hooks/useLastlinkAlerts';
 
 // Pages
 import Dashboard from '@/pages/Dashboard';
-import MatchDetails from '@/pages/MatchDetails';
 import EntityManagement from '@/pages/EntityManagement';
 import Settings from '@/pages/Settings';
 import Login from '@/pages/Login';
 import ResetPassword from '@/pages/ResetPassword';
 import AdminUsers from '@/pages/admin/Users';
-import AdminLogs from '@/pages/admin/Logs';
-import ScraperStatus from '@/pages/admin/ScraperStatus';
 import BotLogs from '@/pages/admin/BotLogs';
+import ParserMisses from '@/pages/admin/ParserMisses';
 import ProcedureControl from '@/pages/ProcedureControl';
 import FreebetsGanhas from '@/pages/FreebetsGanhas';
 import BetbraAffiliate from '@/pages/BetbraAffiliate';
@@ -31,32 +29,13 @@ import AdsObrigado from '@/pages/AdsObrigado';
 import FreeGroupObrigado from '@/pages/FreeGroupObrigado';
 import AdsAdmin from '@/pages/AdsAdmin';
 import LastlinkAdmin from '@/pages/LastlinkAdmin';
+import LastlinkDashboard from '@/pages/LastlinkDashboard';
 import WatermarkStudio from '@/pages/WatermarkStudio';
 import { PushNotifications } from '@/pages/PushNotifications';
 import { AppStats } from '@/pages/AppStats';
 import BotTemplates from '@/pages/BotTemplates';
 import BioLinks from '@/pages/BioLinks';
 import NotFound from '@/pages/NotFound';
-
-// Componente para redirect que preserva query params
-function RedirectWithParams({ 
-  to, 
-  params = {} 
-}: { 
-  to: string; 
-  params?: Record<string, string> 
-}) {
-  const location = useLocation();
-  const currentParams = new URLSearchParams(location.search);
-  
-  // Merge current params with new params
-  Object.entries(params).forEach(([key, value]) => {
-    currentParams.set(key, value);
-  });
-  
-  const search = currentParams.toString();
-  return <Navigate to={`${to}${search ? `?${search}` : ''}`} replace />;
-}
 
 // URL pública do subdomínio do trial. Usada para CTAs e redirects do admin.
 export const TRIAL_PUBLIC_URL = 'https://trial.sharkgreen.com.br';
@@ -181,13 +160,6 @@ export function AnimatedRoutes() {
             </PageTransition>
           </RequireAuth>
         } />
-        <Route path="/match/:matchId" element={
-          <RequireAuth>
-            <PageTransition>
-              <MatchDetails />
-            </PageTransition>
-          </RequireAuth>
-        } />
         <Route path="/settings" element={
           <RequireAuth pageKey={PAGE_KEYS.SETTINGS}>
             <PageTransition>
@@ -208,20 +180,6 @@ export function AnimatedRoutes() {
           <RequireAuth pageKey={PAGE_KEYS.ADMIN_USERS}>
             <PageTransition>
               <AdminUsers />
-            </PageTransition>
-          </RequireAuth>
-        } />
-        <Route path="/admin/logs" element={
-          <RequireAuth pageKey={PAGE_KEYS.ADMIN_LOGS}>
-            <PageTransition>
-              <AdminLogs />
-            </PageTransition>
-          </RequireAuth>
-        } />
-        <Route path="/admin/scraper-status" element={
-          <RequireAuth pageKey={PAGE_KEYS.SCRAPER_STATUS}>
-            <PageTransition>
-              <ScraperStatus />
             </PageTransition>
           </RequireAuth>
         } />
@@ -281,6 +239,13 @@ export function AnimatedRoutes() {
             </PageTransition>
           </RequireAuth>
         } />
+        <Route path="/lastlink-dashboard" element={
+          <RequireAuth pageKey={PAGE_KEYS.LASTLINK}>
+            <PageTransition>
+              <LastlinkDashboard />
+            </PageTransition>
+          </RequireAuth>
+        } />
         <Route path="/app-stats" element={
           <RequireAuth pageKey={PAGE_KEYS.APP_STATS}>
             <PageTransition>
@@ -316,12 +281,14 @@ export function AnimatedRoutes() {
             </PageTransition>
           </RequireAuth>
         } />
-        
-        {/* Legacy route redirects for backward compatibility - preserves query params */}
-        <Route path="/teams" element={<RedirectWithParams to="/cadastros" params={{ tab: 'teams' }} />} />
-        <Route path="/leagues" element={<RedirectWithParams to="/cadastros" params={{ tab: 'leagues' }} />} />
-        <Route path="/bookmakers" element={<RedirectWithParams to="/cadastros" params={{ tab: 'bookmakers' }} />} />
-        
+        <Route path="/admin/parser-ia" element={
+          <RequireAuth pageKey={PAGE_KEYS.ADMIN_USERS}>
+            <PageTransition>
+              <ParserMisses />
+            </PageTransition>
+          </RequireAuth>
+        } />
+
         <Route path="*" element={
           <PageTransition>
             <NotFound />

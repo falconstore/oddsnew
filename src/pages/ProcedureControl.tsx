@@ -6,9 +6,10 @@ import { useToast } from '@/hooks/use-toast';
 import { supabaseProcedures } from '@/lib/supabaseProcedures';
 
 import { Layout } from '@/components/Layout';
+import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 
-import { useProcedures, useDeleteProcedure, useToggleFavorite, useArchiveProcedure, useConfirmBotProcedure } from '@/hooks/useProcedures';
+import { useProcedures, useDeleteProcedure, useToggleFavorite, useArchiveProcedure } from '@/hooks/useProcedures';
 import { Procedure, ProcedureFilters as FiltersType, AVAILABLE_COLUMNS } from '@/types/procedures';
 import { getGameTimeBucket } from '@/lib/procedureGameTime';
 import { DefinirResultadosModal } from '@/components/procedures/DefinirResultadosModal';
@@ -44,7 +45,6 @@ export default function ProcedureControl() {
   const deleteProcedure = useDeleteProcedure();
   const toggleFavorite = useToggleFavorite();
   const archiveProcedure = useArchiveProcedure();
-  const confirmBotProcedure = useConfirmBotProcedure();
 
   const [showModal, setShowModal] = useState(false);
   const [editingProcedure, setEditingProcedure] = useState<Procedure | null>(null);
@@ -122,10 +122,6 @@ export default function ProcedureControl() {
 
   const handleToggleFavorite = (proc: Procedure) => {
     toggleFavorite.mutate({ id: proc.id, is_favorite: !proc.is_favorite });
-  };
-
-  const handleConfirmBot = (id: string) => {
-    confirmBotProcedure.mutate(id);
   };
 
   const filteredProcedures = useMemo(() => {
@@ -208,22 +204,13 @@ export default function ProcedureControl() {
       <div className="space-y-5 animate-fade-in">
 
         {/* ── Header ── */}
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-500/25 to-cyan-500/5 border border-cyan-500/25 flex items-center justify-center shadow-lg shadow-cyan-500/10 flex-shrink-0">
-              <FileText className="h-5 w-5 text-cyan-400" />
-            </div>
-            <div>
-              <h1 className="text-xl md:text-2xl font-bold tracking-tight gradient-text">
-                Controle de Procedimentos
-              </h1>
-              <p className="text-muted-foreground text-xs md:text-sm mt-0.5">
-                Rastreie e gerencie procedimentos de apostas
-              </p>
-            </div>
-          </div>
-          {canEdit && (
-            <div className="flex gap-2 flex-shrink-0">
+        <PageHeader
+          eyebrow="PROC"
+          title="Controle de Procedimentos"
+          subtitle="RASTREIE E GERENCIE PROCEDIMENTOS DE APOSTAS"
+          icon={FileText}
+          actions={canEdit ? (
+            <>
               <Button
                 variant="outline"
                 onClick={() => setShowRegisterBotModal(true)}
@@ -273,9 +260,9 @@ export default function ProcedureControl() {
                 <Plus className="w-3.5 h-3.5 mr-1.5" />
                 Adicionar
               </Button>
-            </div>
-          )}
-        </div>
+            </>
+          ) : undefined}
+        />
 
         {/* ── Fila de Conferência ── */}
         {canEdit && (
@@ -327,10 +314,8 @@ export default function ProcedureControl() {
               visibleColumns={visibleColumns}
               onEdit={canEdit ? handleEdit : undefined}
               onDelete={canEdit ? handleDelete : undefined}
-              onArchive={canEdit ? handleArchive : undefined}
               onCheckResult={canEdit ? handleCheckResult : undefined}
               onToggleFavorite={handleToggleFavorite}
-              onConfirmBot={canEdit ? handleConfirmBot : undefined}
             />
           </div>
           <div className="p-3">
@@ -339,10 +324,8 @@ export default function ProcedureControl() {
               proceduresById={proceduresById}
               onEdit={canEdit ? handleEdit : undefined}
               onDelete={canEdit ? handleDelete : undefined}
-              onArchive={canEdit ? handleArchive : undefined}
               onCheckResult={canEdit ? handleCheckResult : undefined}
               onToggleFavorite={handleToggleFavorite}
-              onConfirmBot={canEdit ? handleConfirmBot : undefined}
             />
           </div>
         </div>

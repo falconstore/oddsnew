@@ -2,9 +2,11 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format, parseISO, subDays, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { BarChart3, Users, Smartphone, Bell, TrendingUp, Eye, RefreshCw, Activity, UserCheck, UserX, Crown, Search } from 'lucide-react';
+import { BarChart3, Users, Smartphone, Bell, Eye, Activity, UserCheck, UserX, Crown, Search } from 'lucide-react';
 import { getActivityInfo } from '@/hooks/useTrialPwaStats';
 import { supabaseProcedures } from '@/lib/supabaseProcedures';
+import { Layout } from '@/components/Layout';
+import { PageHeader } from '@/components/PageHeader';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type DailyCount = { day: string; count: number };
@@ -195,17 +197,16 @@ export function AppStats() {
   }
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <BarChart3 size={20} className="text-green-400" />
-            <h1 className="text-xl font-bold">Estatísticas App</h1>
-          </div>
-          <p className="text-sm text-muted-foreground">Métricas de uso do Shark Green App · últimos 30 dias</p>
-        </div>
-      </div>
+    <Layout>
+      <div className="animate-fade-in">
+        <PageHeader
+          eyebrow="STATS"
+          title="Estatísticas do App"
+          subtitle="MÉTRICAS DE USO DO SHARK GREEN APP · ÚLTIMOS 30 DIAS"
+          icon={BarChart3}
+        />
+
+        <div className="space-y-6">
 
       {/* Tabs */}
       <div className="flex gap-1 p-1 bg-muted rounded-lg w-fit">
@@ -225,10 +226,10 @@ export function AppStats() {
           <div>
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">App (últimos 30 dias)</p>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <KpiCard label="DAU (hoje)" value={dau} sub={`${dauYest} ontem`} icon={Activity} color="text-green-400" loading={eventsLoading} />
-              <KpiCard label="MAU (30d)" value={mau} sub="usuários únicos" icon={Users} color="text-blue-400" loading={eventsLoading} />
-              <KpiCard label="Sessões (30d)" value={sessions.length} sub={`${pageViews.length} page views`} icon={Smartphone} color="text-violet-400" loading={eventsLoading} />
-              <KpiCard label="Push inscritos" value={pushSubs} sub="dispositivos ativos" icon={Bell} color="text-amber-400" />
+              <KpiCard label="DAU (hoje)" value={dau} sub={`${dauYest} ontem`} icon={Activity} color="text-primary" loading={eventsLoading} />
+              <KpiCard label="MAU (30d)" value={mau} sub="usuários únicos" icon={Users} color="text-muted-foreground" loading={eventsLoading} />
+              <KpiCard label="Sessões (30d)" value={sessions.length} sub={`${pageViews.length} page views`} icon={Smartphone} color="text-muted-foreground" loading={eventsLoading} />
+              <KpiCard label="Push inscritos" value={pushSubs} sub="dispositivos ativos" icon={Bell} color="text-warning" />
             </div>
           </div>
 
@@ -246,7 +247,7 @@ export function AppStats() {
                       <div className="absolute -top-6 left-1/2 -translate-x-1/2 hidden group-hover:block bg-background border border-border rounded px-2 py-1 text-[10px] whitespace-nowrap z-10">
                         {fmtDay(d.day)}: {d.count}
                       </div>
-                      <div className="w-full bg-green-500/80 rounded-t transition-all" style={{ height: `${h}%` }} />
+                      <div className="w-full bg-primary/80 rounded-t transition-all" style={{ height: `${h}%` }} />
                       <span className="text-[9px] text-muted-foreground">{fmtDay(d.day)}</span>
                     </div>
                   );
@@ -259,10 +260,10 @@ export function AppStats() {
           <div>
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Funil de Leads</p>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <KpiCard label="Total leads" value={totalLeads} icon={Users} color="text-slate-400" loading={leadsLoading} />
-              <KpiCard label="Trial ativo" value={activeTrials} sub="no período de teste" icon={UserCheck} color="text-blue-400" loading={leadsLoading} />
-              <KpiCard label="Assinantes" value={subscribers} sub={`Taxa: ${convRate}%`} icon={Crown} color="text-amber-400" loading={leadsLoading} />
-              <KpiCard label="Expirados" value={expired} sub={`${directLeads} diretos`} icon={UserX} color="text-red-400" loading={leadsLoading} />
+              <KpiCard label="Total leads" value={totalLeads} icon={Users} color="text-muted-foreground" loading={leadsLoading} />
+              <KpiCard label="Trial ativo" value={activeTrials} sub="no período de teste" icon={UserCheck} color="text-muted-foreground" loading={leadsLoading} />
+              <KpiCard label="Assinantes" value={subscribers} sub={`Taxa: ${convRate}%`} icon={Crown} color="text-warning" loading={leadsLoading} />
+              <KpiCard label="Expirados" value={expired} sub={`${directLeads} diretos`} icon={UserX} color="text-destructive" loading={leadsLoading} />
             </div>
           </div>
 
@@ -280,7 +281,7 @@ export function AppStats() {
                       <div className="absolute -top-6 left-1/2 -translate-x-1/2 hidden group-hover:block bg-background border border-border rounded px-2 py-1 text-[10px] whitespace-nowrap z-10">
                         {fmtDay(d.day)}: {d.count}
                       </div>
-                      <div className="w-full bg-blue-500/70 rounded-t transition-all" style={{ height: `${h}%` }} />
+                      <div className="w-full bg-muted-foreground/50 rounded-t transition-all" style={{ height: `${h}%` }} />
                       <span className="text-[9px] text-muted-foreground">{fmtDay(d.day)}</span>
                     </div>
                   );
@@ -296,7 +297,7 @@ export function AppStats() {
               {Object.entries(cohortCounts).sort((a, b) => b[1] - a[1]).map(([cohort, count]) => (
                 <div key={cohort} className="flex items-center gap-3">
                   <span className="text-xs font-mono w-24 text-muted-foreground truncate">{cohort}</span>
-                  <MiniBar value={count} max={totalLeads} color="bg-green-500" />
+                  <MiniBar value={count} max={totalLeads} color="bg-primary" />
                   <span className="text-xs font-bold w-8 text-right">{count}</span>
                   <span className="text-xs text-muted-foreground w-10 text-right">
                     {totalLeads > 0 ? `${((count / totalLeads) * 100).toFixed(0)}%` : '0%'}
@@ -329,7 +330,7 @@ export function AppStats() {
                 <div key={pv.page} className="flex items-center gap-4 px-5 py-3">
                   <span className="text-xs text-muted-foreground w-4">{i + 1}</span>
                   <span className="text-sm font-medium flex-1">{pv.page}</span>
-                  <MiniBar value={pv.count} max={maxPv} color="bg-violet-500" />
+                  <MiniBar value={pv.count} max={maxPv} color="bg-muted-foreground" />
                   <span className="text-sm font-bold w-12 text-right">{pv.count}</span>
                   <span className="text-xs text-muted-foreground w-10 text-right">
                     {pageViews.length > 0 ? `${((pv.count / pageViews.length) * 100).toFixed(0)}%` : '0%'}
@@ -345,9 +346,9 @@ export function AppStats() {
         <div className="space-y-4">
           {/* KPIs */}
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            <KpiCard label="Usuários únicos (30d)" value={uniqueUsers} icon={Smartphone} color="text-green-400" loading={eventsLoading} />
-            <KpiCard label="Leads com acesso app" value={uniqueLeadsInApp} sub="que abriram o app" icon={UserCheck} color="text-blue-400" loading={eventsLoading} />
-            <KpiCard label="Push inscritos" value={pushSubs} sub={`${uniqueUsers > 0 ? ((pushSubs / uniqueUsers) * 100).toFixed(0) : 0}% dos usuários`} icon={Bell} color="text-amber-400" />
+            <KpiCard label="Usuários únicos (30d)" value={uniqueUsers} icon={Smartphone} color="text-primary" loading={eventsLoading} />
+            <KpiCard label="Leads com acesso app" value={uniqueLeadsInApp} sub="que abriram o app" icon={UserCheck} color="text-muted-foreground" loading={eventsLoading} />
+            <KpiCard label="Push inscritos" value={pushSubs} sub={`${uniqueUsers > 0 ? ((pushSubs / uniqueUsers) * 100).toFixed(0) : 0}% dos usuários`} icon={Bell} color="text-warning" />
           </div>
 
           {/* Funnel */}
@@ -355,10 +356,10 @@ export function AppStats() {
             <p className="text-sm font-semibold mb-3">Funil de Ativação</p>
             <div className="space-y-3">
               {[
-                { label: 'Total de leads cadastrados', value: totalLeads, color: 'bg-slate-500', pct: 100 },
-                { label: 'Que acessaram o app', value: uniqueLeadsInApp, color: 'bg-blue-500', pct: totalLeads > 0 ? (uniqueLeadsInApp / totalLeads) * 100 : 0 },
-                { label: 'Com push ativo', value: pushSubs, color: 'bg-violet-500', pct: totalLeads > 0 ? (pushSubs / totalLeads) * 100 : 0 },
-                { label: 'Convertidos (assinantes)', value: subscribers, color: 'bg-amber-500', pct: totalLeads > 0 ? (subscribers / totalLeads) * 100 : 0 },
+                { label: 'Total de leads cadastrados', value: totalLeads, color: 'bg-muted-foreground', pct: 100 },
+                { label: 'Que acessaram o app', value: uniqueLeadsInApp, color: 'bg-muted-foreground/70', pct: totalLeads > 0 ? (uniqueLeadsInApp / totalLeads) * 100 : 0 },
+                { label: 'Com push ativo', value: pushSubs, color: 'bg-muted-foreground/50', pct: totalLeads > 0 ? (pushSubs / totalLeads) * 100 : 0 },
+                { label: 'Convertidos (assinantes)', value: subscribers, color: 'bg-warning', pct: totalLeads > 0 ? (subscribers / totalLeads) * 100 : 0 },
               ].map(step => (
                 <div key={step.label}>
                   <div className="flex items-center justify-between mb-1">
@@ -438,9 +439,9 @@ export function AppStats() {
                         </div>
                         <div>
                           <span className={`text-[10px] font-medium ${
-                            row.subscription_status === 'active' ? 'text-amber-400' :
-                            row.status === 'active' ? 'text-emerald-400' :
-                            row.status === 'expired' ? 'text-zinc-400' : 'text-muted-foreground'
+                            row.subscription_status === 'active' ? 'text-warning' :
+                            row.status === 'active' ? 'text-primary' :
+                            row.status === 'expired' ? 'text-muted-foreground' : 'text-muted-foreground'
                           }`}>
                             {row.subscription_status === 'active' ? '👑 Assinante' :
                              row.status === 'active' ? 'Trial' :
@@ -464,6 +465,8 @@ export function AppStats() {
           </div>
         </div>
       )}
-    </div>
+        </div>
+      </div>
+    </Layout>
   );
 }

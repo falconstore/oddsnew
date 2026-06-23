@@ -19,7 +19,7 @@ import {
 } from '@/types/procedures';
 import { useCreateProcedure, useUpdateProcedure, useProcedures } from '@/hooks/useProcedures';
 import { getAllTags, getAllPlatforms, normalizePlatformName } from '@/lib/procedureUtils';
-import { useBookmakers } from '@/hooks/useOddsData';
+import { useBookmakers } from '@/hooks/useBookmakers';
 
 interface ProcedureModalProps {
   procedure: Procedure | null;
@@ -246,12 +246,12 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
 
       <div className="relative w-full max-w-4xl max-h-[90vh] flex flex-col rounded-3xl overflow-hidden border border-white/10 shadow-2xl shadow-black/50 animate-fade-in-up">
         {/* Header */}
-        <div className="relative flex-shrink-0 bg-gradient-to-r from-cyan-500/10 via-primary/5 to-transparent border-b border-white/10 p-5">
-          <div className="absolute inset-0 bg-gradient-to-b from-background/95 to-background/80" />
+        <div className="relative flex-shrink-0 bg-card border-b border-white/10 p-5">
+          <div className="absolute inset-0 bg-background/95" />
           <div className="relative flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-cyan-500/25 to-cyan-500/5 border border-cyan-500/30 flex items-center justify-center shadow-lg shadow-cyan-500/10">
-                <FileText className="w-5 h-5 text-cyan-400" />
+              <div className="w-11 h-11 rounded-2xl border border-border flex items-center justify-center">
+                <FileText className="w-5 h-5 text-muted-foreground" />
               </div>
               <div>
                 <h2 className="text-lg font-bold tracking-tight">
@@ -269,9 +269,9 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
                 size="sm"
                 onClick={() => setFormData({ ...formData, is_favorite: !formData.is_favorite })}
                 data-testid="button-toggle-favorite-modal"
-                className={`h-9 w-9 rounded-xl transition-all ${formData.is_favorite ? 'text-yellow-400 bg-yellow-400/10 hover:bg-yellow-400/20' : 'text-muted-foreground hover:text-yellow-400 hover:bg-yellow-400/10'}`}
+                className={`h-9 w-9 rounded-xl transition-all ${formData.is_favorite ? 'text-warning bg-warning/10 hover:bg-warning/20' : 'text-muted-foreground hover:text-warning hover:bg-warning/10'}`}
               >
-                <Star className={`w-4.5 h-4.5 ${formData.is_favorite ? 'fill-yellow-400' : ''}`} />
+                <Star className={`w-4.5 h-4.5 ${formData.is_favorite ? 'fill-warning' : ''}`} />
               </Button>
               <Button
                 variant="ghost"
@@ -293,8 +293,8 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
             {/* Section: Identificação */}
             <div>
               <div className="flex items-center gap-2 mb-3">
-                <div className="w-1 h-4 rounded-full bg-cyan-400" />
-                <span className="text-xs font-semibold uppercase tracking-widest text-cyan-400">Identificação</span>
+                <div className="w-1 h-4 rounded-full bg-border" />
+                <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Identificação</span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 <div>
@@ -305,7 +305,7 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
                     onChange={(e) => setFormData({ ...formData, date: e.target.value })}
                     required
                     data-testid="input-date"
-                    className="bg-white/5 border-white/10 focus:border-cyan-500/50 focus:ring-cyan-500/20 h-9 text-sm"
+                    className="bg-white/5 border-white/10 focus:border-border h-9 text-sm"
                   />
                 </div>
                 <div>
@@ -316,16 +316,16 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
                     required
                     data-testid="input-procedure-number"
                     placeholder={`Próximo livre: ${suggestedNextNumber}`}
-                    className="bg-white/5 border-white/10 focus:border-cyan-500/50 h-9 text-sm"
+                    className="bg-white/5 border-white/10 focus:border-border h-9 text-sm"
                   />
-                  <div className="mt-2 flex items-center gap-2 h-8 px-2.5 rounded-lg bg-amber-500/8 border border-amber-500/20">
+                  <div className="mt-2 flex items-center gap-2 h-8 px-2.5 rounded-lg bg-warning/8 border border-warning/20">
                     <Switch
                       id="is-extra"
                       checked={formData.is_extra}
                       onCheckedChange={(checked) => setFormData({ ...formData, is_extra: checked })}
                       data-testid="switch-is-extra"
                     />
-                    <Label htmlFor="is-extra" className="text-[11px] cursor-pointer text-amber-300/90 font-medium uppercase tracking-wide">
+                    <Label htmlFor="is-extra" className="text-[11px] cursor-pointer text-warning font-medium uppercase tracking-wide">
                       Extra / Reenvio
                     </Label>
                   </div>
@@ -336,7 +336,7 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
                     value={selectPlatformValue}
                     onValueChange={(v) => setFormData({ ...formData, platform: v })}
                   >
-                    <SelectTrigger className="bg-white/5 border-white/10 focus:border-cyan-500/50 h-9 text-sm" data-testid="select-platform">
+                    <SelectTrigger className="bg-white/5 border-white/10 focus:border-border h-9 text-sm" data-testid="select-platform">
                       <SelectValue placeholder="Selecione..." />
                     </SelectTrigger>
                     <SelectContent>
@@ -350,8 +350,8 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
             {/* Section: Jogo / Evento (paridade FULL FreeBet Pro doc 02 — autocomplete API-Football) */}
             <div>
               <div className="flex items-center gap-2 mb-3">
-                <div className="w-1 h-4 rounded-full bg-amber-400" />
-                <span className="text-xs font-semibold uppercase tracking-widest text-amber-400">Jogo / Evento</span>
+                <div className="w-1 h-4 rounded-full bg-warning" />
+                <span className="text-xs font-semibold uppercase tracking-widest text-warning">Jogo / Evento</span>
                 <span className="text-[10px] text-muted-foreground ml-2">(autocomplete via API-Football)</span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -368,14 +368,14 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
                       kickoff_at: p.kickoff_at,
                       esporte: p.esporte ?? f.esporte,
                     }))}
-                    inputClassName="bg-amber-500/5 border-amber-500/20 focus:border-amber-500/50 h-9 text-sm pr-10"
+                    inputClassName="bg-warning/5 border-warning/20 focus:border-warning/50 h-9 text-sm pr-10"
                   />
                 </div>
                 <div>
                   <FieldLabel icon={Activity} label="Esporte" />
                   <Select value={formData.esporte} onValueChange={(v) => setFormData({ ...formData, esporte: v })}>
                     <SelectTrigger
-                      className="bg-amber-500/5 border-amber-500/20 focus:border-amber-500/50 h-9 text-sm"
+                      className="bg-warning/5 border-warning/20 focus:border-warning/50 h-9 text-sm"
                       data-testid="select-esporte"
                     >
                       <SelectValue />
@@ -401,7 +401,7 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
                     }
                     onChange={(e) => setFormData({ ...formData, data_partida: e.target.value, kickoff_at: null, fixture_id: null })}
                     data-testid="input-data-partida"
-                    className="bg-amber-500/5 border-amber-500/20 focus:border-amber-500/50 h-9 text-sm"
+                    className="bg-warning/5 border-warning/20 focus:border-warning/50 h-9 text-sm"
                   />
                 </div>
                 <div>
@@ -415,7 +415,7 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
                     }
                     onChange={(e) => setFormData({ ...formData, horario_partida: e.target.value, kickoff_at: null, fixture_id: null })}
                     data-testid="input-horario-partida"
-                    className="bg-amber-500/5 border-amber-500/20 focus:border-amber-500/50 h-9 text-sm"
+                    className="bg-warning/5 border-warning/20 focus:border-warning/50 h-9 text-sm"
                   />
                 </div>
               </div>
@@ -466,8 +466,8 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
             {/* Section: Tipo de Freebet (paridade FreeBet Pro §8.2) */}
             <div>
               <div className="flex items-center gap-2 mb-3">
-                <div className="w-1 h-4 rounded-full bg-purple-400" />
-                <span className="text-xs font-semibold uppercase tracking-widest text-purple-400">Tipo de Freebet</span>
+                <div className="w-1 h-4 rounded-full bg-border" />
+                <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Tipo de Freebet</span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 {PROCEDURE_TYPES.map(({ value, label, description }) => {
@@ -480,7 +480,7 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
                       data-testid={`button-tipo-${value.toLowerCase()}`}
                       className={`text-left p-3 rounded-xl border transition-all ${
                         selected
-                          ? 'bg-purple-500/15 border-purple-500/50 text-purple-200'
+                          ? 'bg-muted border-border text-foreground'
                           : 'bg-white/[0.03] border-white/10 text-muted-foreground hover:bg-white/[0.06]'
                       }`}
                     >
@@ -517,7 +517,7 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
                             ? next.primaryPlatform
                             : formData.platform,
                         })}
-                        inputClassName="bg-purple-500/5 border-purple-500/20 focus:border-purple-500/50 h-9 text-sm pr-8"
+                        inputClassName="bg-muted/30 border-border focus:border-border h-9 text-sm pr-8"
                       />
                     </div>
                   )}
@@ -530,7 +530,7 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
                       onChange={(e) => setFormData({ ...formData, freebet_value: e.target.value })}
                       data-testid="input-freebet-value"
                       placeholder="0.00"
-                      className="bg-purple-500/5 border-purple-500/20 focus:border-purple-500/50 h-9 text-sm"
+                      className="bg-muted/30 border-border focus:border-border h-9 text-sm"
                     />
                   </div>
                 </div>
@@ -540,8 +540,8 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
             {/* Section: Previsão (resultado real entra no modal "Definir Resultados") */}
             <div>
               <div className="flex items-center gap-2 mb-3">
-                <div className="w-1 h-4 rounded-full bg-emerald-400" />
-                <span className="text-xs font-semibold uppercase tracking-widest text-emerald-400">Previsão</span>
+                <div className="w-1 h-4 rounded-full bg-primary" />
+                <span className="text-xs font-semibold uppercase tracking-widest text-primary">Previsão</span>
                 <span className="text-[10px] text-muted-foreground ml-2">(o resultado real é registrado pelo botão "Conferir")</span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -555,7 +555,7 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
                     required
                     data-testid="input-profit-loss"
                     placeholder="0.00"
-                    className="bg-emerald-500/5 border-emerald-500/20 focus:border-emerald-500/50 h-9 text-sm font-mono"
+                    className="bg-primary/5 border-primary/20 focus:border-primary/50 h-9 text-sm font-mono"
                   />
                 </div>
                 <div>
@@ -565,11 +565,11 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
                     onChange={(e) => setFormData({ ...formData, telegram_link: e.target.value })}
                     data-testid="input-telegram-link"
                     placeholder="https://t.me/..."
-                    className="bg-white/5 border-white/10 focus:border-cyan-500/50 h-9 text-sm"
+                    className="bg-white/5 border-white/10 focus:border-border h-9 text-sm"
                   />
                 </div>
                 <div className="flex items-end pb-1">
-                  <div className="flex items-center gap-3 h-9 px-3 rounded-xl bg-emerald-500/8 border border-emerald-500/20 w-full">
+                  <div className="flex items-center gap-3 h-9 px-3 rounded-xl bg-primary/8 border border-primary/20 w-full">
                     <Switch
                       id="dp"
                       checked={formData.dp}
@@ -577,7 +577,7 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
                       data-testid="switch-dp"
                     />
                     <Label htmlFor="dp" className="text-sm cursor-pointer flex items-center gap-1.5">
-                      <Zap className="w-3.5 h-3.5 text-emerald-400" />
+                      <Zap className="w-3.5 h-3.5 text-primary" />
                       Duplo Green (DP)
                     </Label>
                   </div>
@@ -588,8 +588,8 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
             {/* Section: Tags */}
             <div>
               <div className="flex items-center gap-2 mb-3">
-                <div className="w-1 h-4 rounded-full bg-indigo-400" />
-                <span className="text-xs font-semibold uppercase tracking-widest text-indigo-400">Tags</span>
+                <div className="w-1 h-4 rounded-full bg-border" />
+                <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Tags</span>
               </div>
               <TagManager
                 tags={formData.tags}
@@ -621,7 +621,7 @@ export function ProcedureModal({ procedure, onClose }: ProcedureModalProps) {
               form="procedure-form"
               disabled={isLoading}
               data-testid="button-save-procedure"
-              className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground shadow-lg shadow-primary/20 glow-primary h-9 text-sm px-6 font-semibold"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 glow-primary h-9 text-sm px-6 font-semibold"
             >
               {isLoading ? (
                 <span className="flex items-center gap-2">

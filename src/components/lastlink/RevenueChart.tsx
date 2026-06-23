@@ -82,17 +82,17 @@ function CustomTooltip({ active, payload }: { active?: boolean; payload?: Toolti
       <div className="space-y-1.5">
         <div className="flex items-center justify-between gap-3">
           <span className="text-[11px] flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-400" />
+            <span className="w-2 h-2 rounded-full bg-primary" />
             Receita
           </span>
-          <span className="text-[12px] font-semibold text-emerald-300">{fmtMoneyDetailed(point.revenue)}</span>
+          <span className="text-[12px] font-semibold text-primary">{fmtMoneyDetailed(point.revenue)}</span>
         </div>
         <div className="flex items-center justify-between gap-3">
           <span className="text-[11px] flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-red-400" />
+            <span className="w-2 h-2 rounded-full bg-destructive" />
             Refunds + chargebacks
           </span>
-          <span className="text-[12px] font-semibold text-red-300">{fmtMoneyDetailed(point.refunds)}</span>
+          <span className="text-[12px] font-semibold text-destructive">{fmtMoneyDetailed(point.refunds)}</span>
         </div>
         <div className="border-t border-white/5 pt-1.5 mt-1.5 grid grid-cols-2 gap-2 text-[10px] text-muted-foreground">
           <span>Conversões: <strong className="text-foreground">{point.conversions}</strong></span>
@@ -180,8 +180,8 @@ export function RevenueChart({ payments, rangeFrom, rangeTo, rangeLabel }: Reven
     >
       <div className="flex items-center justify-between gap-2 p-4 md:p-5 border-b border-white/5">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/25 to-cyan-500/10 border border-emerald-500/30 flex items-center justify-center">
-            <TrendingUp className="w-5 h-5 text-emerald-300" />
+          <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/30 flex items-center justify-center">
+            <TrendingUp className="w-5 h-5 text-primary" />
           </div>
           <div>
             <h3 className="text-sm md:text-base font-semibold">Receita ao longo do tempo</h3>
@@ -203,8 +203,8 @@ export function RevenueChart({ payments, rangeFrom, rangeTo, rangeLabel }: Reven
               <ComposedChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
                 <defs>
                   <linearGradient id="revenueLineGradient" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0%" stopColor="hsl(160 84% 60%)" />
-                    <stop offset="100%" stopColor="hsl(195 90% 60%)" />
+                    <stop offset="0%" stopColor="hsl(var(--primary))" />
+                    <stop offset="100%" stopColor="hsl(var(--primary))" />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.18} vertical={false} />
@@ -238,7 +238,7 @@ export function RevenueChart({ payments, rangeFrom, rangeTo, rangeLabel }: Reven
                   yAxisId="revenue"
                   dataKey="refunds"
                   name="Refunds + chargebacks"
-                  fill="hsl(0 75% 55%)"
+                  fill="hsl(var(--destructive))"
                   opacity={0.7}
                   radius={[3, 3, 0, 0]}
                   maxBarSize={28}
@@ -250,8 +250,8 @@ export function RevenueChart({ payments, rangeFrom, rangeTo, rangeLabel }: Reven
                   name="Receita"
                   stroke="url(#revenueLineGradient)"
                   strokeWidth={2.5}
-                  dot={{ r: 3, fill: 'hsl(160 84% 60%)', strokeWidth: 0 }}
-                  activeDot={{ r: 5, fill: 'hsl(160 84% 60%)', stroke: 'hsl(160 84% 80%)', strokeWidth: 2 }}
+                  dot={{ r: 3, fill: 'hsl(var(--primary))', strokeWidth: 0 }}
+                  activeDot={{ r: 5, fill: 'hsl(var(--primary))', stroke: 'hsl(var(--primary) / 0.5)', strokeWidth: 2 }}
                 />
               </ComposedChart>
             </ResponsiveContainer>

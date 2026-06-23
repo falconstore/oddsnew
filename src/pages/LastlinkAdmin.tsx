@@ -3,12 +3,13 @@ import { useSearchParams } from 'react-router-dom';
 import { format, startOfMonth, endOfMonth, parseISO, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
-  Receipt, Search, Sparkles, Users, CreditCard, RefreshCcw, TrendingUp,
+  Receipt, Search, Users, CreditCard, RefreshCcw, TrendingUp,
   Eye, Filter, Calendar as CalendarIcon, FileText, Globe, ExternalLink,
   Phone, MapPin, IdCard, Tag, Banknote, Mail, Activity, ChevronDown,
-  CheckCircle2, XCircle, AlertCircle, FlaskConical, Loader2, X,
+  CheckCircle2, AlertCircle, FlaskConical, Loader2, X,
   Building2, Clock, ArrowUpRight, Info,
 } from 'lucide-react';
+import { PageHeader } from '@/components/PageHeader';
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -71,13 +72,13 @@ const fmtPhone = (raw: string | null | undefined) => {
 };
 
 const SUB_STATUS_META: Record<string, { label: string; cls: string }> = {
-  active: { label: 'Ativa', cls: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' },
-  pending: { label: 'Aguardando', cls: 'bg-amber-500/15 text-amber-300 border-amber-500/30' },
+  active: { label: 'Ativa', cls: 'bg-primary/15 text-primary border-primary/30' },
+  pending: { label: 'Aguardando', cls: 'bg-warning/15 text-warning border-warning/30' },
   canceled: { label: 'Cancelada', cls: 'bg-zinc-500/15 text-zinc-300 border-zinc-500/30' },
-  expired: { label: 'Expirada', cls: 'bg-orange-500/15 text-orange-300 border-orange-500/30' },
-  refunded: { label: 'Reembolsada', cls: 'bg-red-500/15 text-red-300 border-red-500/30' },
-  refund_requested: { label: 'Reembolso solicitado', cls: 'bg-rose-500/15 text-rose-300 border-rose-500/30' },
-  chargeback: { label: 'Chargeback', cls: 'bg-red-600/20 text-red-200 border-red-600/40' },
+  expired: { label: 'Expirada', cls: 'bg-warning/15 text-warning border-warning/30' },
+  refunded: { label: 'Reembolsada', cls: 'bg-destructive/15 text-destructive border-destructive/30' },
+  refund_requested: { label: 'Reembolso solicitado', cls: 'bg-destructive/15 text-destructive border-destructive/30' },
+  chargeback: { label: 'Chargeback', cls: 'bg-destructive/20 text-destructive border-destructive/40' },
   access_ended: { label: 'Acesso encerrado', cls: 'bg-zinc-500/15 text-zinc-300 border-zinc-500/30' },
 };
 
@@ -101,19 +102,19 @@ const fmtPaymentMethod = (m: string | null | undefined) => {
 };
 
 const EVENT_TYPE_META: Record<string, { color: string; icon: string }> = {
-  Purchase_Order_Confirmed:   { color: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/30', icon: '💚' },
-  Purchase_Request_Confirmed: { color: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/30', icon: '✅' },
-  Recurrent_Payment:          { color: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/30', icon: '🔁' },
-  Subscription_Renewal_Pending: { color: 'text-amber-300 bg-amber-500/10 border-amber-500/30', icon: '⏳' },
+  Purchase_Order_Confirmed:   { color: 'text-primary bg-primary/10 border-primary/30', icon: '💚' },
+  Purchase_Request_Confirmed: { color: 'text-primary bg-primary/10 border-primary/30', icon: '✅' },
+  Recurrent_Payment:          { color: 'text-primary bg-primary/10 border-primary/30', icon: '🔁' },
+  Subscription_Renewal_Pending: { color: 'text-warning bg-warning/10 border-warning/30', icon: '⏳' },
   Subscription_Canceled:      { color: 'text-zinc-300 bg-zinc-500/10 border-zinc-500/30', icon: '🛑' },
-  Subscription_Expired:       { color: 'text-orange-300 bg-orange-500/10 border-orange-500/30', icon: '⌛' },
-  Payment_Refund:             { color: 'text-red-300 bg-red-500/10 border-red-500/30', icon: '↩️' },
-  Payment_Chargeback:         { color: 'text-red-200 bg-red-600/15 border-red-600/40', icon: '⚠️' },
-  Refund_Requested:           { color: 'text-rose-300 bg-rose-500/10 border-rose-500/30', icon: '📩' },
+  Subscription_Expired:       { color: 'text-warning bg-warning/10 border-warning/30', icon: '⌛' },
+  Payment_Refund:             { color: 'text-destructive bg-destructive/10 border-destructive/30', icon: '↩️' },
+  Payment_Chargeback:         { color: 'text-destructive bg-destructive/15 border-destructive/40', icon: '⚠️' },
+  Refund_Requested:           { color: 'text-destructive bg-destructive/10 border-destructive/30', icon: '📩' },
   Refund_Period_Over:         { color: 'text-zinc-300 bg-zinc-500/10 border-zinc-500/30', icon: '⏱️' },
-  Product_Access_Started:     { color: 'text-sky-300 bg-sky-500/10 border-sky-500/30', icon: '🔓' },
+  Product_Access_Started:     { color: 'text-muted-foreground bg-muted border-border', icon: '🔓' },
   Product_Access_Ended:       { color: 'text-zinc-300 bg-zinc-500/10 border-zinc-500/30', icon: '🔒' },
-  Abandoned_Cart:             { color: 'text-purple-300 bg-purple-500/10 border-purple-500/30', icon: '🛒' },
+  Abandoned_Cart:             { color: 'text-muted-foreground bg-muted border-border', icon: '🛒' },
 };
 
 const eventBadge = (type: string | null) => {
@@ -389,38 +390,16 @@ export default function LastlinkAdmin() {
     <Layout>
       <div className="relative space-y-4 md:space-y-6 animate-fade-in">
         <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
-          <div className="absolute top-0 left-1/3 -translate-x-1/2 w-[800px] h-[500px] rounded-full bg-emerald-500/8 blur-[130px]" />
-          <div className="absolute top-1/2 right-0 w-[400px] h-[400px] rounded-full bg-cyan-500/6 blur-[100px]" />
+          <div className="absolute top-0 left-1/3 -translate-x-1/2 w-[800px] h-[500px] rounded-full bg-primary/8 blur-[130px]" />
+          <div className="absolute top-1/2 right-0 w-[400px] h-[400px] rounded-full bg-muted/6 blur-[100px]" />
         </div>
 
-        {/* Hero */}
-        <div className="relative rounded-3xl overflow-hidden border border-white/8 glass p-6 md:p-8">
-          <div className="absolute inset-0 pointer-events-none">
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[180px] rounded-full bg-emerald-500/12 blur-[70px]" />
-          </div>
-          <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
-            <div className="space-y-3">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 text-xs font-semibold">
-                <Sparkles className="w-3 h-3" />
-                Lastlink · Pagamentos
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse-glow" />
-              </div>
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500/30 to-cyan-600/10 border border-emerald-500/30 flex items-center justify-center shadow-lg shadow-emerald-500/15 flex-shrink-0">
-                  <Receipt className="h-7 w-7 text-emerald-300" />
-                </div>
-                <div>
-                  <h1 className="text-2xl md:text-3xl font-bold tracking-tight bg-gradient-to-r from-emerald-400 via-cyan-400 to-sky-400 bg-clip-text text-transparent">
-                    CRM de Pagantes
-                  </h1>
-                  <p className="text-muted-foreground text-sm">
-                    {payments.length} compradores no total · todos os eventos da Lastlink em um só lugar
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <PageHeader
+          eyebrow="PAY"
+          title="Pagamentos Lastlink"
+          subtitle={`${payments.length} COMPRADORES NO TOTAL · TODOS OS EVENTOS DA LASTLINK EM UM SÓ LUGAR`}
+          icon={Receipt}
+        />
 
         {/* KPIs */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -429,7 +408,7 @@ export default function LastlinkAdmin() {
             label="Receita do período"
             value={fmtMoney(kpis.revenue)}
             hint={`${RANGE_LABELS[range]}`}
-            accent="from-emerald-500/20 to-emerald-500/5 border-emerald-500/25 text-emerald-300"
+            accent="from-primary/20 to-primary/5 border-primary/25 text-primary"
             testId="kpi-revenue"
           />
           <KpiCard
@@ -437,7 +416,7 @@ export default function LastlinkAdmin() {
             label="Conversões"
             value={kpis.conversions}
             hint="Pagamentos confirmados"
-            accent="from-cyan-500/20 to-cyan-500/5 border-cyan-500/25 text-cyan-300"
+            accent="from-muted/50 to-muted/20 border-border text-muted-foreground"
             testId="kpi-conversions"
           />
           <KpiCard
@@ -445,7 +424,7 @@ export default function LastlinkAdmin() {
             label="Ticket médio"
             value={fmtMoney(kpis.ticket)}
             hint="Receita ÷ conversões"
-            accent="from-sky-500/20 to-sky-500/5 border-sky-500/25 text-sky-300"
+            accent="from-muted/50 to-muted/20 border-border text-muted-foreground"
             testId="kpi-avg-ticket"
           />
           <KpiCard
@@ -453,21 +432,21 @@ export default function LastlinkAdmin() {
             label="Refunds + chargebacks"
             value={`${kpis.refundCount}`}
             hint={fmtMoney(kpis.refundAmount)}
-            accent="from-red-500/20 to-red-500/5 border-red-500/25 text-red-300"
+            accent="from-destructive/20 to-destructive/5 border-destructive/25 text-destructive"
             testId="kpi-refunds"
           />
           <ListKpiCard
             icon={<Tag className="w-5 h-5" />}
             label="Top cupons"
             items={kpis.topCoupons.map(([k, v]) => ({ label: k, count: `${v}×` }))}
-            accent="from-pink-500/20 to-pink-500/5 border-pink-500/25 text-pink-300"
+            accent="from-muted/50 to-muted/20 border-border text-muted-foreground"
             testId="kpi-top-coupons"
           />
           <ListKpiCard
             icon={<Users className="w-5 h-5" />}
             label="Top afiliados (R$)"
             items={kpis.topAffiliates.map(([k, v]) => ({ label: k, count: fmtMoney(v) }))}
-            accent="from-amber-500/20 to-amber-500/5 border-amber-500/25 text-amber-300"
+            accent="from-warning/20 to-warning/5 border-warning/25 text-warning"
             testId="kpi-top-affiliates"
           />
         </div>
@@ -484,7 +463,7 @@ export default function LastlinkAdmin() {
         <div className="glass rounded-3xl border border-white/8 p-4 md:p-5 space-y-3">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-2 text-sm font-semibold">
-              <Filter className="w-4 h-4 text-emerald-400" />
+              <Filter className="w-4 h-4 text-primary" />
               Filtros
             </div>
             {hasActiveFilters && (
@@ -652,14 +631,14 @@ export default function LastlinkAdmin() {
         {/* Tabs */}
         <Tabs value={tab} onValueChange={v => setTab(v as 'pagantes' | 'eventos')} className="space-y-4">
           <TabsList className="bg-white/5 border border-white/10 p-1 h-11">
-            <TabsTrigger value="pagantes" className="data-[state=active]:bg-emerald-500/15 data-[state=active]:text-emerald-200 px-4" data-testid="tab-pagantes">
+            <TabsTrigger value="pagantes" className="data-[state=active]:bg-primary/15 data-[state=active]:text-primary px-4" data-testid="tab-pagantes">
               <Users className="w-4 h-4 mr-1.5" />
               Pagantes
               <Badge variant="outline" className="ml-2 text-[10px] px-1.5 bg-white/5 border-white/10">
                 {filtered.length}
               </Badge>
             </TabsTrigger>
-            <TabsTrigger value="eventos" className="data-[state=active]:bg-cyan-500/15 data-[state=active]:text-cyan-200 px-4" data-testid="tab-eventos">
+            <TabsTrigger value="eventos" className="data-[state=active]:bg-muted data-[state=active]:text-foreground px-4" data-testid="tab-eventos">
               <Activity className="w-4 h-4 mr-1.5" />
               Eventos brutos
             </TabsTrigger>
@@ -791,7 +770,7 @@ function PaymentsTable({
   if (isLoading) {
     return (
       <div className="glass rounded-3xl border border-white/8 p-12 flex items-center justify-center">
-        <Loader2 className="w-6 h-6 animate-spin text-emerald-400" />
+        <Loader2 className="w-6 h-6 animate-spin text-primary" />
       </div>
     );
   }
@@ -835,7 +814,7 @@ function PaymentsTable({
                 >
                   <TableCell className="py-3">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500/30 to-cyan-500/15 border border-emerald-500/30 flex items-center justify-center text-xs font-semibold text-emerald-200 flex-shrink-0">
+                      <div className="w-8 h-8 rounded-full bg-primary/15 border border-primary/30 flex items-center justify-center text-xs font-semibold text-primary flex-shrink-0">
                         {(p.buyer_name || p.name).charAt(0).toUpperCase()}
                       </div>
                       <div className="min-w-0">
@@ -843,19 +822,19 @@ function PaymentsTable({
                         <p className="text-[11px] text-muted-foreground truncate">{p.email}</p>
                       </div>
                       {p.lastlink_is_test && (
-                        <Badge variant="outline" className="text-[9px] bg-amber-500/10 text-amber-300 border-amber-500/30">TESTE</Badge>
+                        <Badge variant="outline" className="text-[9px] bg-warning/10 text-warning border-warning/30">TESTE</Badge>
                       )}
                       {p.cohort === 'direct' ? (
-                        <Badge variant="outline" className="text-[9px] bg-cyan-500/10 text-cyan-300 border-cyan-500/30" data-testid={`badge-direct-${p.id}`}>DIRETO</Badge>
+                        <Badge variant="outline" className="text-[9px] border-border text-muted-foreground" data-testid={`badge-direct-${p.id}`}>DIRETO</Badge>
                       ) : (
-                        <Badge variant="outline" className="text-[9px] bg-emerald-500/10 text-emerald-300 border-emerald-500/30" data-testid={`badge-trial-${p.id}`}>TRIAL</Badge>
+                        <Badge variant="outline" className="text-[9px] bg-primary/10 text-primary border-primary/30" data-testid={`badge-trial-${p.id}`}>TRIAL</Badge>
                       )}
                     </div>
                   </TableCell>
                   <TableCell className="py-3">
                     <p className="text-sm">{p.plan_name || p.lastlink_offer_name || '—'}</p>
                     {p.coupon_code && (
-                      <Badge variant="outline" className="text-[10px] mt-0.5 bg-pink-500/10 text-pink-300 border-pink-500/30 font-mono">
+                      <Badge variant="outline" className="text-[10px] mt-0.5 border-border text-muted-foreground font-mono">
                         {p.coupon_code}
                       </Badge>
                     )}
@@ -895,7 +874,7 @@ function PaymentsTable({
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="h-8 text-xs text-emerald-300 hover:text-emerald-200 hover:bg-emerald-500/10"
+                      className="h-8 text-xs text-primary hover:text-primary hover:bg-primary/10"
                       onClick={(e) => { e.stopPropagation(); onRowClick(p.id); }}
                       data-testid={`button-view-${p.id}`}
                     >
@@ -915,12 +894,12 @@ function PaymentsTable({
           <button
             key={p.id}
             onClick={() => onRowClick(p.id)}
-            className="block w-full text-left glass rounded-2xl border border-white/8 p-3 hover:border-emerald-500/30 transition-colors"
+            className="block w-full text-left glass rounded-2xl border border-white/8 p-3 hover:border-primary/30 transition-colors"
             data-testid={`card-payment-${p.id}`}
           >
             <div className="flex items-start justify-between gap-3 mb-2">
               <div className="flex items-center gap-2 min-w-0">
-                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-emerald-500/30 to-cyan-500/15 border border-emerald-500/30 flex items-center justify-center text-xs font-semibold text-emerald-200 flex-shrink-0">
+                <div className="w-9 h-9 rounded-full bg-primary/15 border border-primary/30 flex items-center justify-center text-xs font-semibold text-primary flex-shrink-0">
                   {(p.buyer_name || p.name).charAt(0).toUpperCase()}
                 </div>
                 <div className="min-w-0">
@@ -930,9 +909,9 @@ function PaymentsTable({
               </div>
               {subStatusBadge(p.subscription_status)}
               {p.cohort === 'direct' ? (
-                <Badge variant="outline" className="text-[9px] bg-cyan-500/10 text-cyan-300 border-cyan-500/30">DIRETO</Badge>
+                <Badge variant="outline" className="text-[9px] border-border text-muted-foreground">DIRETO</Badge>
               ) : (
-                <Badge variant="outline" className="text-[9px] bg-emerald-500/10 text-emerald-300 border-emerald-500/30">TRIAL</Badge>
+                <Badge variant="outline" className="text-[9px] bg-primary/10 text-primary border-primary/30">TRIAL</Badge>
               )}
             </div>
             <div className="grid grid-cols-2 gap-2 text-xs">
@@ -954,7 +933,7 @@ function PaymentsTable({
               </div>
             </div>
             {p.coupon_code && (
-              <Badge variant="outline" className="text-[10px] mt-2 bg-pink-500/10 text-pink-300 border-pink-500/30 font-mono">
+              <Badge variant="outline" className="text-[10px] mt-2 border-border text-muted-foreground font-mono">
                 {p.coupon_code}
               </Badge>
             )}
@@ -982,25 +961,25 @@ function LeadDetail({ lead }: { lead: TrialLead }) {
   return (
     <div className="space-y-0">
       {/* Header */}
-      <div className="relative p-6 border-b border-white/10 bg-gradient-to-br from-emerald-500/15 to-cyan-500/5">
+      <div className="relative p-6 border-b border-white/10 bg-primary/10">
         <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute -top-10 -right-10 w-[200px] h-[200px] rounded-full bg-emerald-500/20 blur-[80px]" />
+          <div className="absolute -top-10 -right-10 w-[200px] h-[200px] rounded-full bg-primary/20 blur-[80px]" />
         </div>
         <div className="relative">
           <div className="flex items-start gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500/30 to-cyan-500/15 border border-emerald-500/30 flex items-center justify-center text-xl font-bold text-emerald-200 flex-shrink-0">
+            <div className="w-14 h-14 rounded-2xl bg-primary/15 border border-primary/30 flex items-center justify-center text-xl font-bold text-primary flex-shrink-0">
               {(lead.buyer_name || lead.name).charAt(0).toUpperCase()}
             </div>
             <div className="min-w-0 flex-1 pr-8">
               <div className="flex items-center gap-2 flex-wrap mb-1">
                 <h2 className="text-lg font-bold truncate" data-testid="detail-buyer-name">{lead.buyer_name || lead.name}</h2>
                 {lead.lastlink_is_test && (
-                  <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-300 border-amber-500/30">TESTE</Badge>
+                  <Badge variant="outline" className="text-[10px] bg-warning/10 text-warning border-warning/30">TESTE</Badge>
                 )}
                 {lead.cohort === 'direct' ? (
-                  <Badge variant="outline" className="text-[10px] bg-cyan-500/10 text-cyan-300 border-cyan-500/30" data-testid="badge-direct-detail">COMPRA DIRETA</Badge>
+                  <Badge variant="outline" className="text-[10px] border-border text-muted-foreground" data-testid="badge-direct-detail">COMPRA DIRETA</Badge>
                 ) : (
-                  <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-300 border-emerald-500/30" data-testid="badge-trial-detail">VIA TRIAL</Badge>
+                  <Badge variant="outline" className="text-[10px] bg-primary/10 text-primary border-primary/30" data-testid="badge-trial-detail">VIA TRIAL</Badge>
                 )}
               </div>
               <p className="text-sm text-muted-foreground truncate flex items-center gap-1.5">
@@ -1021,7 +1000,7 @@ function LeadDetail({ lead }: { lead: TrialLead }) {
 
       <div className="p-6 space-y-6">
         {/* Contato */}
-        <Section icon={<Phone className="w-4 h-4" />} title="Contato" accent="text-cyan-300">
+        <Section icon={<Phone className="w-4 h-4" />} title="Contato" accent="text-muted-foreground">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Telefone" value={fmtPhone(lead.buyer_phone || lead.whatsapp)} icon={<Phone className="w-3 h-3" />} />
             <Field label="CPF" value={fmtCpf(lead.buyer_document)} icon={<IdCard className="w-3 h-3" />} />
@@ -1047,7 +1026,7 @@ function LeadDetail({ lead }: { lead: TrialLead }) {
         </Section>
 
         {/* Pagamento */}
-        <Section icon={<CreditCard className="w-4 h-4" />} title="Pagamento atual" accent="text-emerald-300">
+        <Section icon={<CreditCard className="w-4 h-4" />} title="Pagamento atual" accent="text-primary">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Plano" value={lead.plan_name || lead.lastlink_offer_name || '—'} />
             <Field label="Oferta (ID)" value={lead.lastlink_offer_id || '—'} mono />
@@ -1073,7 +1052,7 @@ function LeadDetail({ lead }: { lead: TrialLead }) {
               href={lead.lastlink_invoice_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 mt-3 text-xs text-emerald-300 hover:text-emerald-200 underline underline-offset-2"
+              className="inline-flex items-center gap-1.5 mt-3 text-xs text-primary hover:text-primary/80 underline underline-offset-2"
               data-testid="link-invoice"
             >
               <FileText className="w-3.5 h-3.5" /> Abrir fatura na Lastlink <ExternalLink className="w-3 h-3" />
@@ -1082,7 +1061,7 @@ function LeadDetail({ lead }: { lead: TrialLead }) {
         </Section>
 
         {/* IDs Lastlink */}
-        <Section icon={<Tag className="w-4 h-4" />} title="IDs da Lastlink" accent="text-purple-300">
+        <Section icon={<Tag className="w-4 h-4" />} title="IDs da Lastlink" accent="text-muted-foreground">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Order ID" value={lead.lastlink_order_id || '—'} mono />
             <Field label="Subscription ID" value={lead.lastlink_subscription_id || '—'} mono />
@@ -1092,7 +1071,7 @@ function LeadDetail({ lead }: { lead: TrialLead }) {
         </Section>
 
         {/* Marketing */}
-        <Section icon={<Globe className="w-4 h-4" />} title="Marketing & atribuição" accent="text-fuchsia-300">
+        <Section icon={<Globe className="w-4 h-4" />} title="Marketing & atribuição" accent="text-muted-foreground">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="UTM source" value={utm?.source || '—'} />
             <Field label="UTM medium" value={utm?.medium || '—'} />
@@ -1106,7 +1085,7 @@ function LeadDetail({ lead }: { lead: TrialLead }) {
               href={lead.lastlink_origin_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 mt-3 text-xs text-fuchsia-300 hover:text-fuchsia-200 underline underline-offset-2 break-all"
+              className="inline-flex items-center gap-1.5 mt-3 text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 break-all"
             >
               <ArrowUpRight className="w-3.5 h-3.5 flex-shrink-0" />
               <span className="break-all">{lead.lastlink_origin_url}</span>
@@ -1118,7 +1097,7 @@ function LeadDetail({ lead }: { lead: TrialLead }) {
                 href={lead.lastlink_offer_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-xs text-emerald-300 hover:text-emerald-200 underline underline-offset-2"
+                className="inline-flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 underline underline-offset-2"
               >
                 <Building2 className="w-3.5 h-3.5" /> Página da oferta <ExternalLink className="w-3 h-3" />
               </a>
@@ -1127,7 +1106,7 @@ function LeadDetail({ lead }: { lead: TrialLead }) {
         </Section>
 
         {/* Status & datas críticas */}
-        <Section icon={<AlertCircle className="w-4 h-4" />} title="Status & datas" accent="text-amber-300">
+        <Section icon={<AlertCircle className="w-4 h-4" />} title="Status & datas" accent="text-warning">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Pago em" value={fmtDate(lead.paid_at)} />
             <Field label="Cancelada em" value={fmtDate(lead.canceled_at)} />
@@ -1139,7 +1118,7 @@ function LeadDetail({ lead }: { lead: TrialLead }) {
         </Section>
 
         {/* Timeline de eventos */}
-        <Section icon={<Activity className="w-4 h-4" />} title={`Histórico de eventos (${events.length})`} accent="text-sky-300">
+        <Section icon={<Activity className="w-4 h-4" />} title={`Histórico de eventos (${events.length})`} accent="text-muted-foreground">
           {loadingEvents ? (
             <div className="py-4 flex items-center justify-center">
               <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
@@ -1157,7 +1136,7 @@ function LeadDetail({ lead }: { lead: TrialLead }) {
                     <div className="flex items-center gap-2 flex-wrap mb-1">
                       {eventBadge(ev.event_type)}
                       {ev.is_test && (
-                        <Badge variant="outline" className="text-[9px] bg-amber-500/10 text-amber-300 border-amber-500/30">TESTE</Badge>
+                        <Badge variant="outline" className="text-[9px] bg-warning/10 text-warning border-warning/30">TESTE</Badge>
                       )}
                     </div>
                     <p className="text-[11px] text-muted-foreground">{fmtDate(ev.received_at)}</p>
@@ -1223,7 +1202,7 @@ function Field({
       <p className="text-[10px] uppercase tracking-wider text-muted-foreground flex items-center gap-1">
         {icon} {label}
       </p>
-      <p className={`${mono ? 'font-mono text-xs' : 'text-sm'} ${highlight ? 'font-semibold text-emerald-300' : ''} break-all`}>
+      <p className={`${mono ? 'font-mono text-xs' : 'text-sm'} ${highlight ? 'font-semibold text-primary' : ''} break-all`}>
         {value}
       </p>
       {extra}
@@ -1279,7 +1258,7 @@ function EventsPanel({ onLeadClick }: { onLeadClick: (id: string) => void }) {
       {/* Linha 1 — tipo, matched, período próprio */}
       <div className="glass rounded-2xl border border-white/8 p-3 flex items-center gap-2 flex-wrap">
         <Select value={eventTypeFilter} onValueChange={setEventTypeFilter}>
-          <SelectTrigger className="bg-white/5 border-white/10 h-8 text-xs w-[220px]" data-testid="filter-event-type">
+          <SelectTrigger className="bg-white/5 border-white/10 h-8 text-xs w-full sm:w-[220px]" data-testid="filter-event-type">
             <SelectValue placeholder="Tipo de evento" />
           </SelectTrigger>
           <SelectContent>
@@ -1290,7 +1269,7 @@ function EventsPanel({ onLeadClick }: { onLeadClick: (id: string) => void }) {
           </SelectContent>
         </Select>
         <Select value={matchedFilter} onValueChange={v => setMatchedFilter(v as 'all' | 'matched' | 'unmatched')}>
-          <SelectTrigger className="bg-white/5 border-white/10 h-8 text-xs w-[180px]" data-testid="filter-matched">
+          <SelectTrigger className="bg-white/5 border-white/10 h-8 text-xs w-full sm:w-[180px]" data-testid="filter-matched">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -1300,7 +1279,7 @@ function EventsPanel({ onLeadClick }: { onLeadClick: (id: string) => void }) {
           </SelectContent>
         </Select>
         <Select value={evRange} onValueChange={v => setEvRange(v as RangeKey)}>
-          <SelectTrigger className="bg-white/5 border-white/10 h-8 text-xs w-[180px]" data-testid="filter-event-range">
+          <SelectTrigger className="bg-white/5 border-white/10 h-8 text-xs w-full sm:w-[180px]" data-testid="filter-event-range">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -1350,7 +1329,7 @@ function EventsPanel({ onLeadClick }: { onLeadClick: (id: string) => void }) {
 
       {isLoading ? (
         <div className="glass rounded-3xl border border-white/8 p-12 flex items-center justify-center">
-          <Loader2 className="w-6 h-6 animate-spin text-cyan-400" />
+          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
         </div>
       ) : filtered.length === 0 ? (
         <div className="glass rounded-3xl border border-white/8 p-12 text-center text-sm text-muted-foreground">
@@ -1377,7 +1356,7 @@ function EventsPanel({ onLeadClick }: { onLeadClick: (id: string) => void }) {
                     <div className="flex items-center gap-2">
                       {eventBadge(ev.event_type)}
                       {ev.is_test && (
-                        <Badge variant="outline" className="text-[9px] bg-amber-500/10 text-amber-300 border-amber-500/30">TESTE</Badge>
+                        <Badge variant="outline" className="text-[9px] bg-warning/10 text-warning border-warning/30">TESTE</Badge>
                       )}
                     </div>
                   </TableCell>
@@ -1388,7 +1367,7 @@ function EventsPanel({ onLeadClick }: { onLeadClick: (id: string) => void }) {
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="h-7 text-[11px] text-emerald-300 hover:bg-emerald-500/10 px-2"
+                        className="h-7 text-[11px] text-primary hover:bg-primary/10 px-2"
                         onClick={() => onLeadClick(ev.matched_lead!)}
                         data-testid={`button-open-lead-${ev.id}`}
                       >

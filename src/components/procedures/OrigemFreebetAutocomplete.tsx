@@ -154,7 +154,7 @@ export function OrigemFreebetAutocomplete({
               return (
                 <span
                   key={id}
-                  className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs bg-amber-500/15 border border-amber-500/40 text-amber-200"
+                  className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs bg-warning/15 border border-warning/40 text-warning"
                   data-testid={`chip-origem-${id}`}
                 >
                   <AlertCircle className="w-3 h-3" />
@@ -170,8 +170,8 @@ export function OrigemFreebetAutocomplete({
                 key={id}
                 className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs border ${
                   idx === 0
-                    ? 'bg-purple-500/20 border-purple-400/50 text-purple-100'
-                    : 'bg-purple-500/10 border-purple-500/30 text-purple-200'
+                    ? 'bg-muted border-border text-foreground'
+                    : 'bg-muted/50 border-border text-muted-foreground'
                 }`}
                 data-testid={`chip-origem-${p.id}`}
                 title={idx === 0 ? 'Primária — sincroniza com FreeBet PRO' : 'Adicional'}
@@ -210,23 +210,23 @@ export function OrigemFreebetAutocomplete({
           className={inputClassName}
         />
         <div className="absolute right-2 top-1/2 -translate-y-1/2">
-          {hasLink && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />}
-          {orphan && <AlertCircle className="w-3.5 h-3.5 text-amber-400" />}
+          {hasLink && <CheckCircle2 className="w-3.5 h-3.5 text-primary" />}
+          {orphan && <AlertCircle className="w-3.5 h-3.5 text-warning" />}
         </div>
       </div>
       {orphan && (
-        <p className="text-[10px] text-amber-400/90 mt-1">
+        <p className="text-[10px] text-warning/90 mt-1">
           ⚠ Sem vínculo automático — o ciclo da freebet não vai fechar sozinho. Selecione uma origem da lista.
         </p>
       )}
       {selectedIds.length > 1 && (
-        <p className="text-[10px] text-purple-300/80 mt-1">
+        <p className="text-[10px] text-muted-foreground mt-1">
           {selectedIds.length} freebets vinculadas — todas serão fechadas como Concluído quando esta queimadora rodar.
         </p>
       )}
       {open && (
         <div
-          className="absolute z-50 left-0 right-0 mt-1 max-h-72 overflow-auto rounded-xl border border-purple-500/30 bg-background/98 backdrop-blur shadow-2xl shadow-black/60"
+          className="absolute z-50 left-0 right-0 mt-1 max-h-72 overflow-auto rounded-xl border border-border bg-background/98 backdrop-blur shadow-2xl shadow-black/60"
           data-testid="dropdown-origem-fb"
         >
           {filtrados.length === 0 && (
@@ -247,24 +247,24 @@ export function OrigemFreebetAutocomplete({
                 onClick={() => toggle(p)}
                 data-testid={`sugestao-origem-${p.id}`}
                 aria-pressed={checked}
-                className={`w-full text-left p-2.5 hover:bg-purple-500/10 border-b border-white/5 last:border-0 transition-colors ${
-                  checked ? 'bg-purple-500/15' : ''
+                className={`w-full text-left p-2.5 hover:bg-primary/10 border-b border-white/5 last:border-0 transition-colors ${
+                  checked ? 'bg-primary/15' : ''
                 }`}
               >
                 <div className="flex items-center gap-2 text-sm">
                   <span
                     className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 ${
                       checked
-                        ? 'bg-purple-500 border-purple-400'
-                        : 'border-purple-500/40 bg-transparent'
+                        ? 'bg-primary border-primary'
+                        : 'border-border bg-transparent'
                     }`}
                   >
                     {checked && <CheckCircle2 className="w-3 h-3 text-white" />}
                   </span>
-                  <Ticket className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                  <span className="font-mono font-semibold text-purple-200">#{p.procedure_number}</span>
+                  <Ticket className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                  <span className="font-mono font-semibold text-foreground">#{p.procedure_number}</span>
                   <span className="text-foreground truncate">{p.platform}</span>
-                  <span className="ml-auto text-[11px] text-emerald-300 font-mono shrink-0">
+                  <span className="ml-auto text-[11px] text-primary font-mono shrink-0">
                     R$ {Number(p.freebet_valor_previsto ?? p.freebet_value ?? 0).toFixed(2)}
                   </span>
                 </div>

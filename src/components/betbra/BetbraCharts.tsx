@@ -60,8 +60,8 @@ export function BetbraCharts({ turnoverData, ngrData, accumulatedNgrData }: Betb
         <ChartCard
           title="Turnover Diário"
           subtitle="Movimentação por dia"
-          accentColor="bg-gradient-to-b from-purple-400 to-purple-600"
-          barColor="hsl(270 70% 60%)"
+          accentColor="bg-border"
+          barColor="hsl(var(--muted-foreground))"
         >
           <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
@@ -79,10 +79,10 @@ export function BetbraCharts({ turnoverData, ngrData, accumulatedNgrData }: Betb
                   tickLine={false}
                   tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
                 />
-                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(270 70% 60% / 0.08)' }} />
+                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--border) / 0.3)' }} />
                 <Bar
                   dataKey="turnover"
-                  fill="hsl(270 70% 60%)"
+                  fill="hsl(var(--muted-foreground))"
                   radius={[4, 4, 0, 0]}
                   opacity={0.85}
                 />
@@ -95,8 +95,8 @@ export function BetbraCharts({ turnoverData, ngrData, accumulatedNgrData }: Betb
         <ChartCard
           title="NGR Diário"
           subtitle="Net Gaming Revenue por dia"
-          accentColor="bg-gradient-to-b from-emerald-400 to-emerald-600"
-          barColor="hsl(145 80% 48%)"
+          accentColor="bg-primary/60"
+          barColor="hsl(var(--primary))"
         >
           <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
@@ -114,10 +114,10 @@ export function BetbraCharts({ turnoverData, ngrData, accumulatedNgrData }: Betb
                   tickLine={false}
                   tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
                 />
-                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(145 80% 48% / 0.08)' }} />
+                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--primary) / 0.08)' }} />
                 <Bar
                   dataKey="ngr"
-                  fill="hsl(145 80% 48%)"
+                  fill="hsl(var(--primary))"
                   radius={[4, 4, 0, 0]}
                   opacity={0.85}
                 />
@@ -131,16 +131,16 @@ export function BetbraCharts({ turnoverData, ngrData, accumulatedNgrData }: Betb
       <ChartCard
         title="NGR Acumulado Mensal"
         subtitle="Evolução do NGR ao longo do mês"
-        accentColor="bg-gradient-to-b from-amber-400 to-amber-600"
-        barColor="hsl(38 92% 50%)"
+        accentColor="bg-primary/60"
+        barColor="hsl(var(--primary))"
       >
         <div className="h-52">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={accumulatedNgrData}>
               <defs>
                 <linearGradient id="ngrGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="hsl(38 92% 50%)" stopOpacity={0.3} />
-                  <stop offset="100%" stopColor="hsl(38 92% 50%)" stopOpacity={0.02} />
+                  <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                  <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0.02} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.2} />
@@ -156,15 +156,15 @@ export function BetbraCharts({ turnoverData, ngrData, accumulatedNgrData }: Betb
                 tickLine={false}
                 tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
               />
-              <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'hsl(38 92% 50% / 0.3)', strokeWidth: 1 }} />
+              <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'hsl(var(--primary) / 0.3)', strokeWidth: 1 }} />
               <Area
                 type="monotone"
                 dataKey="ngr"
-                stroke="hsl(38 92% 50%)"
+                stroke="hsl(var(--primary))"
                 strokeWidth={2.5}
                 fill="url(#ngrGradient)"
-                dot={{ fill: 'hsl(38 92% 50%)', strokeWidth: 0, r: 3 }}
-                activeDot={{ r: 5, fill: 'hsl(38 92% 50%)', strokeWidth: 2, stroke: 'hsl(38 92% 80%)' }}
+                dot={{ fill: 'hsl(var(--primary))', strokeWidth: 0, r: 3 }}
+                activeDot={{ r: 5, fill: 'hsl(var(--primary))', strokeWidth: 2, stroke: 'hsl(var(--primary) / 0.5)' }}
               />
             </AreaChart>
           </ResponsiveContainer>

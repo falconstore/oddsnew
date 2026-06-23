@@ -2,12 +2,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Star, Pencil, Trash2, ExternalLink, Tag, Archive, ArchiveRestore, Trophy, CheckCircle2, AlertCircle, ShieldCheck, AlertTriangle, ShieldAlert, Timer } from 'lucide-react';
+import { Star, Pencil, Trash2, ExternalLink, Tag, Archive, ArchiveRestore, Trophy, CheckCircle2, AlertCircle, AlertTriangle, ShieldAlert, Timer } from 'lucide-react';
 import { Procedure } from '@/types/procedures';
 import { formatProcedureDate, translateCategory, getDisplayProfitLoss, getCategoryBadgeClass } from '@/lib/procedureUtils';
 import { canCheckResult } from '@/lib/procedureGameTime';
 import { KickoffBadge } from './KickoffBadge';
 import { StatusActionToggles } from './StatusActionToggles';
+import { ActionButton, ActionGroup } from '@/components/ui/action-button';
 import { LucroMaximoTooltip } from './LucroMaximoTooltip';
 
 interface ProcedureTableProps {
@@ -20,16 +21,15 @@ interface ProcedureTableProps {
   onToggleFavorite: (proc: Procedure) => void;
   onArchive?: (proc: Procedure) => void;
   onCheckResult?: (proc: Procedure) => void;
-  onConfirmBot?: (id: string) => void;
 }
 
-export function ProcedureTable({ procedures, proceduresById, visibleColumns, onEdit, onDelete, onToggleFavorite, onArchive, onCheckResult, onConfirmBot }: ProcedureTableProps) {
+export function ProcedureTable({ procedures, proceduresById, visibleColumns, onEdit, onDelete, onToggleFavorite, onArchive, onCheckResult }: ProcedureTableProps) {
   const getStatusBadge = (status: string) => {
     if (status === 'Concluído' || status === 'Lucro Direto') {
-      return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
+      return 'bg-primary/20 text-primary border-primary/30';
     }
     if (status === 'Aguardando Resultado') {
-      return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
+      return 'bg-warning/20 text-warning border-warning/30';
     }
     if (
       status === 'Enviada partida em Aberto' ||
@@ -38,9 +38,9 @@ export function ProcedureTable({ procedures, proceduresById, visibleColumns, onE
       status === 'Falta Girar Freebet' ||
       status === 'Falta Girar Freeebet'
     ) {
-      return 'bg-amber-500/20 text-amber-400 border-amber-500/30';
+      return 'bg-warning/20 text-warning border-warning/30';
     }
-    return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
+    return 'bg-muted text-muted-foreground border-border';
   };
 
   return (
@@ -58,8 +58,8 @@ export function ProcedureTable({ procedures, proceduresById, visibleColumns, onE
             {visibleColumns.includes('category') && <TableHead className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-2">Categoria</TableHead>}
             {visibleColumns.includes('status') && <TableHead className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-2">Status</TableHead>}
             {visibleColumns.includes('freebet_reference') && <TableHead className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-2">Ref. FB</TableHead>}
-            {visibleColumns.includes('freebet_value') && <TableHead className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-2">Freebet</TableHead>}
-            {visibleColumns.includes('profit_loss') && <TableHead className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-2">L/P</TableHead>}
+            {visibleColumns.includes('freebet_value') && <TableHead className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-2 text-right">Freebet</TableHead>}
+            {visibleColumns.includes('profit_loss') && <TableHead className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-2 text-right">L/P</TableHead>}
             {visibleColumns.includes('tags') && <TableHead className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-2">Tags</TableHead>}
             {visibleColumns.includes('telegram_link') && <TableHead className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-2">Link</TableHead>}
             {visibleColumns.includes('dp') && <TableHead className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-2">DP</TableHead>}
@@ -92,7 +92,7 @@ export function ProcedureTable({ procedures, proceduresById, visibleColumns, onE
             <TableRow
               key={proc.id}
               data-testid={`row-procedure-${proc.id}`}
-              className={`border-white/5 ${idx % 2 === 0 ? 'bg-white/[0.025]' : 'bg-transparent'} hover:bg-white/[0.06] transition-colors group ${proc.archived ? 'opacity-50' : ''} ${proc.tachado ? 'opacity-50 grayscale' : ''} ${hasIncomplete ? 'border-l-2 border-l-orange-500/40' : needsReviewOnly ? 'border-l-2 border-l-yellow-500/30' : ''}`}
+              className={`border-white/5 ${idx % 2 === 0 ? 'bg-white/[0.025]' : 'bg-transparent'} hover:bg-white/[0.06] transition-colors group ${proc.archived ? 'opacity-50' : ''} ${proc.tachado ? 'opacity-50 grayscale' : ''} ${hasIncomplete ? 'border-l-2 border-l-warning/40' : needsReviewOnly ? 'border-l-2 border-l-warning/30' : ''}`}
             >
               <TableCell className="w-8 py-2 px-2">
                 <Button
@@ -100,9 +100,9 @@ export function ProcedureTable({ procedures, proceduresById, visibleColumns, onE
                   size="icon"
                   onClick={() => onToggleFavorite(proc)}
                   data-testid={`button-favorite-${proc.id}`}
-                  className={`h-6 w-6 p-0 transition-colors ${proc.is_favorite ? 'text-yellow-400' : 'text-muted-foreground/40 group-hover:text-muted-foreground'}`}
+                  className={`h-6 w-6 p-0 transition-colors ${proc.is_favorite ? 'text-warning' : 'text-muted-foreground/40 group-hover:text-muted-foreground'}`}
                 >
-                  <Star className={`w-3.5 h-3.5 ${proc.is_favorite ? 'fill-yellow-400' : ''}`} />
+                  <Star className={`w-3.5 h-3.5 ${proc.is_favorite ? 'fill-warning' : ''}`} />
                 </Button>
               </TableCell>
               {visibleColumns.includes('date') && (
@@ -110,13 +110,13 @@ export function ProcedureTable({ procedures, proceduresById, visibleColumns, onE
               )}
               {visibleColumns.includes('procedure_number') && (
                 <TableCell className="py-2 px-2">
-                  <span className="text-sm font-bold text-foreground">{proc.procedure_number}</span>
+                  <span className="text-sm font-bold font-mono text-foreground">{proc.procedure_number}</span>
                   {proc.archived && <Archive className="w-3 h-3 inline ml-1 text-muted-foreground/60" />}
                   {proc.freebetpro_synced_at && !proc.freebetpro_last_error && (
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <span data-testid={`icon-fbp-synced-${proc.id}`} tabIndex={0} className="inline-flex ml-1 cursor-help">
-                          <CheckCircle2 className="w-3 h-3 text-emerald-400/70" />
+                          <CheckCircle2 className="w-3 h-3 text-primary/70" />
                         </span>
                       </TooltipTrigger>
                       <TooltipContent side="top">
@@ -128,11 +128,11 @@ export function ProcedureTable({ procedures, proceduresById, visibleColumns, onE
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <span data-testid={`icon-fbp-error-${proc.id}`} tabIndex={0} className="inline-flex ml-1 cursor-help">
-                          <AlertCircle className="w-3 h-3 text-amber-400/80" />
+                          <AlertCircle className="w-3 h-3 text-warning/80" />
                         </span>
                       </TooltipTrigger>
                       <TooltipContent side="top" className="max-w-xs">
-                        <p className="text-amber-300">Erro FreeBet Pro: {proc.freebetpro_last_error}</p>
+                        <p className="text-warning">Erro FreeBet Pro: {proc.freebetpro_last_error}</p>
                       </TooltipContent>
                     </Tooltip>
                   )}
@@ -140,11 +140,11 @@ export function ProcedureTable({ procedures, proceduresById, visibleColumns, onE
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <span data-testid={`icon-bot-incomplete-${proc.id}`} tabIndex={0} className="inline-flex ml-1 cursor-help">
-                          <AlertTriangle className="w-3 h-3 text-orange-400" />
+                          <AlertTriangle className="w-3 h-3 text-warning" />
                         </span>
                       </TooltipTrigger>
                       <TooltipContent side="top" className="max-w-xs">
-                        <p className="text-orange-300 font-semibold text-[11px] mb-0.5">Incompleto (bot)</p>
+                        <p className="text-warning font-semibold text-[11px] mb-0.5">Incompleto (bot)</p>
                         <p className="text-[11px]">Falta: {proc.bot_missing_fields!.join(', ')}</p>
                       </TooltipContent>
                     </Tooltip>
@@ -153,11 +153,11 @@ export function ProcedureTable({ procedures, proceduresById, visibleColumns, onE
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <span data-testid={`icon-bot-review-${proc.id}`} tabIndex={0} className="inline-flex ml-1 cursor-help">
-                          <ShieldAlert className="w-3 h-3 text-yellow-400/90" />
+                          <ShieldAlert className="w-3 h-3 text-warning/90" />
                         </span>
                       </TooltipTrigger>
                       <TooltipContent side="top" className="max-w-xs">
-                        <p className="text-yellow-300 font-semibold text-[11px] mb-0.5">Verificar dados (bot)</p>
+                        <p className="text-warning font-semibold text-[11px] mb-0.5">Verificar dados (bot)</p>
                         <p className="text-[11px]">Registrado pelo bot — confirme se os dados estão corretos.</p>
                       </TooltipContent>
                     </Tooltip>
@@ -191,7 +191,7 @@ export function ProcedureTable({ procedures, proceduresById, visibleColumns, onE
                       {translateCategory(proc.category)}
                     </Badge>
                     {proc.is_extra && (
-                      <span data-testid={`badge-extra-${proc.id}`} className="inline-flex items-center px-1.5 py-0 rounded text-[9px] font-bold uppercase tracking-wide bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                      <span data-testid={`badge-extra-${proc.id}`} className="inline-flex items-center px-1.5 py-0 rounded text-[9px] font-bold uppercase tracking-wide bg-warning/15 text-warning border border-warning/30">
                         EXTRA
                       </span>
                     )}
@@ -205,7 +205,6 @@ export function ProcedureTable({ procedures, proceduresById, visibleColumns, onE
                       {proc.status === 'Aguardando Resultado' && <Timer className="w-2.5 h-2.5 flex-shrink-0" />}
                       {proc.status}
                     </Badge>
-                    <StatusActionToggles procedure={proc} />
                   </div>
                 </TableCell>
               )}
@@ -213,9 +212,9 @@ export function ProcedureTable({ procedures, proceduresById, visibleColumns, onE
                 <TableCell className="text-xs text-muted-foreground py-2 px-2 max-w-[60px] truncate">{proc.freebet_reference || '—'}</TableCell>
               )}
               {visibleColumns.includes('freebet_value') && (
-                <TableCell className="py-2 px-2">
+                <TableCell className="py-2 px-2 text-right">
                   {proc.freebet_value ? (
-                    <span className="text-purple-400 font-semibold text-xs">R$ {proc.freebet_value.toFixed(2)}</span>
+                    <span className="text-foreground font-semibold font-mono tabular-nums text-xs">R$ {proc.freebet_value.toFixed(2)}</span>
                   ) : (
                     <span className="text-muted-foreground/40 text-xs">—</span>
                   )}
@@ -229,24 +228,24 @@ export function ProcedureTable({ procedures, proceduresById, visibleColumns, onE
                 const showEffective = dpl.liquidEffective !== 0;
                 const showPrevisto = !showEffective && dpl.previsto !== 0;
                 return (
-                  <TableCell className="py-2 px-2">
+                  <TableCell className="py-2 px-2 text-right">
                     {showEffective ? (
                       <LucroMaximoTooltip dpl={dpl} liquid={dpl.liquidEffective} total={dpl.effective}>
-                        <span className={`text-xs font-bold ${dpl.effective >= 0 ? 'text-emerald-400' : 'text-red-400'} ${dpl.isGross ? 'underline decoration-dotted decoration-emerald-400/40 underline-offset-2' : ''}`}>
+                        <span className={`text-xs font-bold font-mono tabular-nums ${dpl.effective >= 0 ? 'text-primary' : 'text-destructive'} ${dpl.isGross ? 'underline decoration-dotted decoration-primary/40 underline-offset-2' : ''}`}>
                           {dpl.effective >= 0 ? '+' : ''}R$ {dpl.effective.toFixed(2)}
                         </span>
                       </LucroMaximoTooltip>
                     ) : showPrevisto ? (
                       <LucroMaximoTooltip dpl={dpl} liquid={dpl.liquidPrevisto} total={dpl.previsto} isPrevisto>
                         <span
-                          className={`text-xs text-muted-foreground/50 font-medium ${dpl.isGross ? 'underline decoration-dotted underline-offset-2' : ''}`}
+                          className={`text-xs text-muted-foreground/50 font-medium font-mono tabular-nums ${dpl.isGross ? 'underline decoration-dotted underline-offset-2' : ''}`}
                           title={dpl.isGross ? undefined : 'Lucro previsto (resultado ainda não definido)'}
                         >
                           ~R$ {dpl.previsto.toFixed(2)}
                         </span>
                       </LucroMaximoTooltip>
                     ) : (
-                      <span className="text-xs font-bold text-emerald-400">+R$ 0.00</span>
+                      <span className="text-xs font-bold font-mono tabular-nums text-primary">+R$ 0.00</span>
                     )}
                   </TableCell>
                 );
@@ -272,7 +271,7 @@ export function ProcedureTable({ procedures, proceduresById, visibleColumns, onE
               {visibleColumns.includes('telegram_link') && (
                 <TableCell className="py-2 px-2">
                   {proc.telegram_link ? (
-                    <a href={proc.telegram_link} target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:text-cyan-300 transition-colors">
+                    <a href={proc.telegram_link} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">
                       <ExternalLink className="w-3.5 h-3.5" />
                     </a>
                   ) : (
@@ -283,7 +282,7 @@ export function ProcedureTable({ procedures, proceduresById, visibleColumns, onE
               {visibleColumns.includes('dp') && (
                 <TableCell className="py-2 px-2">
                   {proc.dp ? (
-                    <Badge className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] px-1.5 py-0">✓ DP</Badge>
+                    <Badge className="bg-primary/20 text-primary border border-primary/30 text-[10px] px-1.5 py-0">✓ DP</Badge>
                   ) : (
                     <span className="text-muted-foreground/40 text-xs">—</span>
                   )}
@@ -291,76 +290,46 @@ export function ProcedureTable({ procedures, proceduresById, visibleColumns, onE
               )}
               {visibleColumns.includes('actions') && (
                 <TableCell className="py-2 px-2">
-                  <div className="flex gap-0.5">
-                    {proc.bot_needs_review && !proc.archived && onConfirmBot && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => onConfirmBot(proc.id)}
-                            data-testid={`button-confirm-bot-${proc.id}`}
-                            className={`h-7 w-7 ${hasIncomplete ? 'text-orange-400 hover:text-orange-300 hover:bg-orange-500/10' : 'text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/10'}`}
-                          >
-                            <ShieldCheck className="w-3.5 h-3.5" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="top">
-                          <p>{hasIncomplete ? 'Confirmar após completar os dados' : 'Confirmar dados do bot'}</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    )}
-                    <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <ActionGroup>
+                      {/* Tachar + Reenviar (antes na coluna Status) — agora sempre visíveis aqui */}
+                      <StatusActionToggles procedure={proc} />
                       {showCheck && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
+                        <ActionButton
+                          icon={Trophy}
+                          intent="confirm"
+                          label="Conferir resultado"
                           onClick={() => onCheckResult!(proc)}
-                          title="Conferir resultado"
                           data-testid={`button-conferir-${proc.id}`}
-                          className="h-7 w-7 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10"
-                        >
-                          <Trophy className="w-3.5 h-3.5" />
-                        </Button>
+                        />
                       )}
                       {onEdit && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
+                        <ActionButton
+                          icon={Pencil}
+                          intent="edit"
+                          label="Editar"
                           onClick={() => onEdit(proc)}
-                          title="Editar"
                           data-testid={`button-edit-${proc.id}`}
-                          className="h-7 w-7 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10"
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                        </Button>
+                        />
                       )}
                       {onArchive && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
+                        <ActionButton
+                          icon={proc.archived ? ArchiveRestore : Archive}
+                          intent="archive"
+                          label={proc.archived ? 'Restaurar' : 'Arquivar'}
                           onClick={() => onArchive(proc)}
-                          title={proc.archived ? 'Restaurar' : 'Arquivar'}
                           data-testid={`button-archive-${proc.id}`}
-                          className="h-7 w-7 text-amber-400 hover:text-amber-300 hover:bg-amber-500/10"
-                        >
-                          {proc.archived ? <ArchiveRestore className="w-3.5 h-3.5" /> : <Archive className="w-3.5 h-3.5" />}
-                        </Button>
+                        />
                       )}
                       {onDelete && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
+                        <ActionButton
+                          icon={Trash2}
+                          intent="delete"
+                          label="Excluir"
                           onClick={() => onDelete(proc.id)}
-                          title="Excluir"
                           data-testid={`button-delete-${proc.id}`}
-                          className="h-7 w-7 text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
+                        />
                       )}
-                    </div>
-                  </div>
+                  </ActionGroup>
                 </TableCell>
               )}
             </TableRow>

@@ -12,6 +12,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { json } from "../_shared/cors.ts";
 import { parseMessage, ParsedProcedure, PartialParsedProcedure } from "./parser.ts";
+import { aiExtractProcedure, looksLikeProcedure } from "./ai-fallback.ts";
 import { normalizePlatformName } from "../_shared/platform.ts";
 
 const log = (event: string, data: Record<string, unknown>) => {
@@ -110,6 +111,48 @@ async function logToPanel(
 }
 
 // ──────────────────────────────────────────────────────────
+// Aprendizado do parser: registra cada caso em que a IA precisou entrar
+// ──────────────────────────────────────────────────────────
+async function logParserMiss(
+  supabaseUrl: string,
+  serviceRoleKey: string,
+  row: {
+    miss_type: "no_number" | "partial";
+    procedure_number?: string | null;
+    raw_text: string;
+    regex_missing?: string[] | null;
+    ai_extracted?: Record<string, unknown> | null;
+    ai_reason?: string | null;
+    ai_model?: string | null;
+    ai_tokens_in?: number | null;
+    ai_tokens_out?: number | null;
+    resolved: boolean;
+    procedure_id?: string | null;
+    update_id?: number | null;
+    message_id?: number | null;
+  },
+): Promise<void> {
+  try {
+    const res = await fetch(`${supabaseUrl}/rest/v1/parser_misses`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": serviceRoleKey,
+        "Authorization": `Bearer ${serviceRoleKey}`,
+        "Prefer": "return=minimal",
+      },
+      body: JSON.stringify(row),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      console.error(`[proc-bot] logParserMiss HTTP ${res.status}: ${body}`);
+    }
+  } catch (e: any) {
+    console.error("[proc-bot] logParserMiss exception:", e?.message);
+  }
+}
+
+// ──────────────────────────────────────────────────────────
 // Detecção de comando manual
 // ──────────────────────────────────────────────────────────
 
@@ -132,6 +175,7 @@ interface InsertResult {
   procedureNumber: string;
   parsed: ParsedProcedure;
   isPartial: false;
+  viaAi?: boolean;
 }
 interface PartialInsertResult {
   ok: true;
@@ -198,19 +242,94 @@ function buildInsertRow(
   };
 }
 
+// Contexto opcional pro fallback de IA + registro em parser_misses.
+interface AiFallbackCtx {
+  apiKey: string | undefined;
+  supabaseUrl: string;
+  serviceRoleKey: string;
+  updateId?: number | null;
+  messageId?: number | null;
+}
+
 async function parseAndInsertProcedure(
   supa: any,
   text: string,
   telegramLink?: string,
+  aiCtx?: AiFallbackCtx,
 ): Promise<InsertResult | PartialInsertResult | InsertFailure | { ok: "no_number"; missingFields: string[] }> {
   const parseResult = parseMessage(text);
 
-  if (parseResult.ok === false) {
-    return { ok: "no_number", missingFields: parseResult.missingFields };
-  }
+  let parsed: ParsedProcedure | PartialParsedProcedure;
+  let isPartial: boolean;
+  let viaAi = false;
 
-  const isPartial = parseResult.ok === "partial";
-  const parsed = isPartial ? parseResult.data : parseResult.data;
+  // ── Fallback de IA: regex não reconheceu (no_number) OU veio parcial ──
+  // Só roda se houver chave configurada E a mensagem parecer um procedimento.
+  const regexFailed = parseResult.ok === false;
+  const regexPartial = parseResult.ok === "partial";
+  const shouldTryAi =
+    !!aiCtx?.apiKey && (regexFailed || regexPartial) && looksLikeProcedure(text);
+
+  if (shouldTryAi) {
+    const fallbackDate = new Date().toISOString().slice(0, 10);
+    const regexMissing = regexFailed
+      ? (parseResult as any).missingFields
+      : (parseResult as any).data?.missingFields ?? [];
+    const ai = await aiExtractProcedure(aiCtx!.apiKey!, text, fallbackDate);
+
+    if (ai.ok && ai.data) {
+      parsed = ai.data;
+      isPartial = false; // IA preenche tudo que conseguiu; tratamos como completo
+      viaAi = true;
+      log("ai_fallback_ok", {
+        procedure_number: ai.data.procedure_number,
+        tokens_in: ai.tokensIn,
+        tokens_out: ai.tokensOut,
+        regex_state: regexFailed ? "no_number" : "partial",
+      });
+      await logParserMiss(aiCtx!.supabaseUrl, aiCtx!.serviceRoleKey, {
+        miss_type: regexFailed ? "no_number" : "partial",
+        procedure_number: ai.data.procedure_number,
+        raw_text: text,
+        regex_missing: regexMissing,
+        ai_extracted: ai.data as unknown as Record<string, unknown>,
+        ai_reason: ai.reason ?? null,
+        ai_model: ai.model,
+        ai_tokens_in: ai.tokensIn,
+        ai_tokens_out: ai.tokensOut,
+        resolved: true,
+        update_id: aiCtx!.updateId ?? null,
+        message_id: aiCtx!.messageId ?? null,
+      });
+    } else {
+      // IA não resolveu (classificou como não-procedimento, sem número, ou erro).
+      // Registra o miss não-resolvido e segue o comportamento original do regex.
+      log("ai_fallback_failed", { error: ai.error, reason: ai.reason });
+      await logParserMiss(aiCtx!.supabaseUrl, aiCtx!.serviceRoleKey, {
+        miss_type: regexFailed ? "no_number" : "partial",
+        procedure_number: regexPartial ? (parseResult as any).data?.procedure_number : null,
+        raw_text: text,
+        regex_missing: regexMissing,
+        ai_extracted: null,
+        ai_reason: ai.reason ?? ai.error ?? null,
+        ai_model: ai.model,
+        ai_tokens_in: ai.tokensIn,
+        ai_tokens_out: ai.tokensOut,
+        resolved: false,
+        update_id: aiCtx!.updateId ?? null,
+        message_id: aiCtx!.messageId ?? null,
+      });
+      // Cai pro comportamento padrão do regex abaixo.
+      if (regexFailed) return { ok: "no_number", missingFields: (parseResult as any).missingFields };
+      parsed = (parseResult as any).data;
+      isPartial = true;
+    }
+  } else if (regexFailed) {
+    return { ok: "no_number", missingFields: parseResult.missingFields };
+  } else {
+    isPartial = regexPartial;
+    parsed = (parseResult as any).data;
+  }
 
   let freebetReferenceId: string | null = null;
   if (parsed.tipo === "QUEIMAR_FB" && parsed.ref_procedure_number) {
@@ -224,7 +343,7 @@ async function parseAndInsertProcedure(
     if (refProc) freebetReferenceId = refProc.id;
   }
 
-  const missingFields = isPartial ? (parseResult as any).data.missingFields : [];
+  const missingFields = isPartial ? (parsed as PartialParsedProcedure).missingFields : [];
   const insertRow = {
     ...buildInsertRow(parsed, text, missingFields, telegramLink),
     freebet_reference_id: freebetReferenceId,
@@ -242,7 +361,7 @@ async function parseAndInsertProcedure(
       ok: true,
       procedureId: inserted.id,
       procedureNumber: parsed.procedure_number,
-      parsedPartial: (parseResult as any).data,
+      parsedPartial: parsed as PartialParsedProcedure,
       isPartial: true,
     };
   }
@@ -251,8 +370,9 @@ async function parseAndInsertProcedure(
     ok: true,
     procedureId: inserted.id,
     procedureNumber: parsed.procedure_number,
-    parsed: parseResult.data as ParsedProcedure,
+    parsed: parsed as ParsedProcedure,
     isPartial: false,
+    viaAi,
   };
 }
 
@@ -343,23 +463,9 @@ async function syncWithFreebetPro(
   }
 }
 
-function buildConfirmMsg(parsed: ParsedProcedure): string {
-  const tipoLabel: Record<string, string> = {
-    SEM_FB: "Lucro Direto",
-    GANHAR_FB: "Ganhar Freebet",
-    QUEIMAR_FB: "Queimar Freebet",
-    ASR: "Aposta Sem Risco",
-  };
-  const eventoStr = parsed.partida_descricao
-    ? ` · ${escHtml(parsed.partida_descricao)}`
-    : "";
-  return `✅ Procedimento ${escHtml(parsed.procedure_number)} registrado — ${tipoLabel[parsed.tipo]} · ${escHtml(parsed.platform)}${eventoStr}\n⚠️ <i>Verifique os dados no painel e confirme.</i>`;
-}
-
-function buildPartialConfirmMsg(parsed: PartialParsedProcedure): string {
-  const camposFaltando = parsed.missingFields.join(", ");
-  return `⚠️ Procedimento ${escHtml(parsed.procedure_number)} salvo com campos em falta: <b>${escHtml(camposFaltando)}</b>.\n📋 <i>Acesse o painel para completar e confirmar os dados.</i>`;
-}
+// NOTA: as antigas funções de confirmação (buildConfirmMsg/buildPartialConfirmMsg)
+// foram removidas — o bot NÃO envia nenhuma mensagem ao grupo do Telegram.
+// Sucessos, parciais e resgates via IA ficam só no painel e nos logs.
 
 // ──────────────────────────────────────────────────────────
 // Main handler
@@ -375,6 +481,7 @@ serve(async (req) => {
   const WEBHOOK_SECRET = Deno.env.get("TELEGRAM_PROC_WEBHOOK_SECRET");
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
   const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY"); // opcional: fallback de IA do parser
 
   // ── GET endpoints (admin debug + auto-recovery) ──
   if (req.method === "GET") {
@@ -966,7 +1073,14 @@ serve(async (req) => {
   const telegramLink = messageId
     ? buildTelegramLink(chatId, messageId, msg.chat?.username)
     : undefined;
-  const result = await parseAndInsertProcedure(supa, text, telegramLink);
+  const aiCtx: AiFallbackCtx = {
+    apiKey: ANTHROPIC_API_KEY,
+    supabaseUrl: SUPABASE_URL,
+    serviceRoleKey: SERVICE_ROLE,
+    updateId,
+    messageId: messageId ?? null,
+  };
+  const result = await parseAndInsertProcedure(supa, text, telegramLink, aiCtx);
 
   if (result.ok === "no_number") {
     log("ignored_no_number", { update_id: updateId, missing: result.missingFields });
@@ -1020,21 +1134,26 @@ serve(async (req) => {
     });
   }
 
-  log("inserted", { procedure_id: result.procedureId, procedure_number: result.procedureNumber });
+  const viaAi = result.viaAi === true;
+  log("inserted", { procedure_id: result.procedureId, procedure_number: result.procedureNumber, via_ai: viaAi });
   await logToPanel(SUPABASE_URL, SERVICE_ROLE, {
-    level: "info",
-    event: "inserted",
-    message: `Proc #${result.procedureNumber} registrado a partir do canal do Telegram.`,
+    level: viaAi ? "warning" : "info",
+    event: viaAi ? "inserted_via_ai" : "inserted",
+    message: viaAi
+      ? `Proc #${result.procedureNumber} registrado via IA (o formato fugiu do template — confira os dados no painel).`
+      : `Proc #${result.procedureNumber} registrado a partir do canal do Telegram.`,
     procedureNumber: result.procedureNumber,
     updateId,
     messageId,
-    context: { procedure_id: result.procedureId },
+    context: { procedure_id: result.procedureId, via_ai: viaAi },
   });
+  // NÃO enviamos nada pro grupo do Telegram — o canal não pode ter mensagens do bot.
+  // O resgate via IA fica registrado só no painel (tela Parser IA) e nos logs.
   await syncWithFreebetPro(supa, SUPABASE_URL, SERVICE_ROLE, result.procedureId, result.procedureNumber, updateId, messageId);
 
   return json({
     ok: true,
-    action: "registered",
+    action: viaAi ? "registered_via_ai" : "registered",
     procedure_id: result.procedureId,
     procedure_number: result.procedureNumber,
   });

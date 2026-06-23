@@ -44,18 +44,18 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
       <div className="space-y-1.5">
         <div className="flex items-center justify-between gap-3">
           <span className="text-[11px] flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-400" />
+            <span className="w-2 h-2 rounded-full bg-primary" />
             Pagamentos
           </span>
-          <span className="text-[12px] font-semibold text-emerald-300">{count}</span>
+          <span className="text-[12px] font-semibold text-primary">{count}</span>
         </div>
         {revenue > 0 && (
           <div className="flex items-center justify-between gap-3">
             <span className="text-[11px] flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-amber-400" />
+              <span className="w-2 h-2 rounded-full bg-muted-foreground" />
               Receita do dia
             </span>
-            <span className="text-[12px] font-semibold text-amber-300">{fmtMoney(revenue)}</span>
+            <span className="text-[12px] font-semibold text-muted-foreground">{fmtMoney(revenue)}</span>
           </div>
         )}
       </div>
@@ -130,8 +130,8 @@ export function DailyPaymentsChart({ payments, rangeFrom, rangeTo, rangeLabel, i
     <div className="glass rounded-3xl border border-white/8 overflow-hidden" data-testid="card-daily-payments-chart">
       <div className="flex items-center justify-between gap-2 p-4 md:p-5 border-b border-white/5">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/25 to-amber-500/10 border border-emerald-500/30 flex items-center justify-center">
-            <ShoppingCart className="w-5 h-5 text-emerald-300" />
+          <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/30 flex items-center justify-center">
+            <ShoppingCart className="w-5 h-5 text-primary" />
           </div>
           <div>
             <h3 className="text-sm md:text-base font-semibold">Novos pagamentos por dia</h3>
@@ -149,7 +149,7 @@ export function DailyPaymentsChart({ payments, rangeFrom, rangeTo, rangeLabel, i
             {[0.6, 0.9, 0.5, 1, 0.7, 0.8, 0.4, 0.85, 0.65].map((h, i) => (
               <div
                 key={i}
-                className="flex-1 rounded-t bg-emerald-500/10 animate-pulse"
+                className="flex-1 rounded-t bg-primary/10 animate-pulse"
                 style={{ height: `${h * 100}%` }}
               />
             ))}
@@ -168,8 +168,8 @@ export function DailyPaymentsChart({ payments, rangeFrom, rangeTo, rangeLabel, i
               <ComposedChart data={data} margin={{ top: 8, right: 54, left: 0, bottom: 4 }}>
                 <defs>
                   <linearGradient id="paymentsBarGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="hsl(160 84% 55%)" stopOpacity={0.85} />
-                    <stop offset="100%" stopColor="hsl(160 84% 55%)" stopOpacity={0.3} />
+                    <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.85} />
+                    <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.18} vertical={false} />
@@ -194,7 +194,7 @@ export function DailyPaymentsChart({ payments, rangeFrom, rangeTo, rangeLabel, i
                 <YAxis
                   yAxisId="revenue"
                   orientation="right"
-                  tick={{ fontSize: 10, fill: 'hsl(40 80% 65%)' }}
+                  tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
                   axisLine={false}
                   tickLine={false}
                   tickFormatter={fmtMoneyShort}
@@ -214,7 +214,7 @@ export function DailyPaymentsChart({ payments, rangeFrom, rangeTo, rangeLabel, i
                 <ReferenceLine
                   yAxisId="count"
                   y={avgCount}
-                  stroke="hsl(160 84% 70%)"
+                  stroke="hsl(var(--primary))"
                   strokeDasharray="6 4"
                   strokeWidth={1.5}
                   strokeOpacity={0.7}
@@ -222,7 +222,7 @@ export function DailyPaymentsChart({ payments, rangeFrom, rangeTo, rangeLabel, i
                     value: `~${avgCount.toFixed(1)}/dia`,
                     position: 'insideTopLeft',
                     fontSize: 10,
-                    fill: 'hsl(160 84% 70%)',
+                    fill: 'hsl(var(--primary))',
                     dy: -4,
                   }}
                 />
@@ -232,18 +232,18 @@ export function DailyPaymentsChart({ payments, rangeFrom, rangeTo, rangeLabel, i
                   type="monotone"
                   dataKey="revenue"
                   name="Receita R$"
-                  stroke="hsl(40 90% 60%)"
+                  stroke="hsl(var(--muted-foreground))"
                   strokeWidth={2}
                   strokeDasharray="6 3"
                   dot={false}
-                  activeDot={{ r: 4, fill: 'hsl(40 90% 60%)', stroke: 'hsl(40 90% 80%)', strokeWidth: 2 }}
+                  activeDot={{ r: 4, fill: 'hsl(var(--muted-foreground))', stroke: 'hsl(var(--border))', strokeWidth: 2 }}
                 />
                 {/* Média diária de R$ — linha de referência horizontal tracejada */}
                 {avgRevenue > 0 && (
                   <ReferenceLine
                     yAxisId="revenue"
                     y={avgRevenue}
-                    stroke="hsl(40 90% 60%)"
+                    stroke="hsl(var(--muted-foreground))"
                     strokeDasharray="4 6"
                     strokeWidth={1}
                     strokeOpacity={0.5}
@@ -251,7 +251,7 @@ export function DailyPaymentsChart({ payments, rangeFrom, rangeTo, rangeLabel, i
                       value: `~${fmtMoneyShort(avgRevenue)}/dia`,
                       position: 'insideTopRight',
                       fontSize: 10,
-                      fill: 'hsl(40 90% 65%)',
+                      fill: 'hsl(var(--muted-foreground))',
                       dy: -4,
                     }}
                   />

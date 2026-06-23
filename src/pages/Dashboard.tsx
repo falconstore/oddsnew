@@ -3,11 +3,12 @@ import { useState } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Layout } from '@/components/Layout';
+import { PageHeader } from '@/components/PageHeader';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
-  Zap, FileText, TrendingUp, CreditCard, Bot, ArrowRight,
-  Activity, Calendar, Clock, Trophy, ChevronDown, Users,
-  CheckCircle2, Gift, Layers, Pencil, Check, X,
+  Activity, FileText, TrendingUp, CreditCard, Bot, ArrowRight,
+  Calendar, Clock, Trophy, ChevronDown, Users,
+  CheckCircle2, Gift, Layers, Pencil, Check, X, Zap,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -37,47 +38,15 @@ import {
 } from '@/lib/procedureUtils';
 
 const quickLinks = [
-  {
-    name: 'Procedimentos',
-    href: '/procedures',
-    icon: FileText,
-    pageKey: PAGE_KEYS.PROCEDURE_CONTROL,
-    description: 'Controle e acompanhe seus procedimentos',
-    color: 'from-cyan-500/20 to-cyan-500/5 border-cyan-500/20',
-    iconColor: 'text-cyan-400',
-    glow: 'dark:hover:shadow-[0_0_30px_hsl(200_90%_58%/0.2)]',
-  },
-  {
-    name: 'Betbra Affiliate',
-    href: '/betbra',
-    icon: TrendingUp,
-    pageKey: PAGE_KEYS.BETBRA_AFFILIATE,
-    description: 'Dados e estatísticas de afiliação',
-    color: 'from-amber-500/20 to-amber-500/5 border-amber-500/20',
-    iconColor: 'text-amber-400',
-    glow: 'dark:hover:shadow-[0_0_30px_hsl(38_95%_58%/0.2)]',
-  },
-  {
-    name: 'Assinaturas',
-    href: '/subscriptions',
-    icon: CreditCard,
-    pageKey: PAGE_KEYS.SUBSCRIPTIONS,
-    description: 'Gerencie assinantes e pagamentos',
-    color: 'from-purple-500/20 to-purple-500/5 border-purple-500/20',
-    iconColor: 'text-purple-400',
-    glow: 'dark:hover:shadow-[0_0_30px_hsl(270_75%_65%/0.2)]',
-  },
-  {
-    name: 'Bot Telegram',
-    href: '/telegram-bot',
-    icon: Bot,
-    pageKey: PAGE_KEYS.TELEGRAM_BOT,
-    description: 'Alertas automáticos de Duplo Green',
-    color: 'from-pink-500/20 to-pink-500/5 border-pink-500/20',
-    iconColor: 'text-pink-400',
-    glow: 'dark:hover:shadow-[0_0_30px_hsl(340_80%_65%/0.2)]',
-  },
+  { name: 'Procedimentos', href: '/procedures', icon: FileText, pageKey: PAGE_KEYS.PROCEDURE_CONTROL, description: 'Controle e acompanhe seus procedimentos' },
+  { name: 'Betbra Affiliate', href: '/betbra', icon: TrendingUp, pageKey: PAGE_KEYS.BETBRA_AFFILIATE, description: 'Dados e estatísticas de afiliação' },
+  { name: 'Assinaturas', href: '/subscriptions', icon: CreditCard, pageKey: PAGE_KEYS.SUBSCRIPTIONS, description: 'Gerencie assinantes e pagamentos' },
+  { name: 'Bot Telegram', href: '/telegram-bot', icon: Bot, pageKey: PAGE_KEYS.TELEGRAM_BOT, description: 'Alertas automáticos de Duplo Green' },
 ];
+
+// Cor semântica de dinheiro: verde (positivo) / vermelho (negativo). Só significado.
+const money = (v: number) => (v >= 0 ? 'text-primary' : 'text-destructive');
+const fmt = (v: number) => `${v >= 0 ? '+' : ''}R$ ${v.toFixed(2)}`;
 
 function CpfInput({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   const [editing, setEditing] = useState(false);
@@ -99,9 +68,9 @@ function CpfInput({ value, onChange }: { value: number; onChange: (v: number) =>
           value={draft}
           onChange={e => setDraft(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') confirm(); if (e.key === 'Escape') setEditing(false); }}
-          className="w-16 bg-white/10 border border-primary/40 rounded px-1.5 py-0.5 text-sm text-center font-bold outline-none focus:border-primary"
+          className="w-16 bg-input border border-primary/50 rounded-[2px] px-1.5 py-0.5 text-sm text-center font-mono outline-none focus:border-primary"
         />
-        <button onClick={confirm} className="text-emerald-400 hover:text-emerald-300"><Check className="w-3.5 h-3.5" /></button>
+        <button onClick={confirm} className="text-primary hover:text-primary/80"><Check className="w-3.5 h-3.5" /></button>
         <button onClick={() => setEditing(false)} className="text-muted-foreground hover:text-foreground"><X className="w-3.5 h-3.5" /></button>
       </span>
     );
@@ -109,7 +78,7 @@ function CpfInput({ value, onChange }: { value: number; onChange: (v: number) =>
   return (
     <button
       onClick={() => { setDraft(String(value)); setEditing(true); }}
-      className="inline-flex items-center gap-1 text-primary font-bold hover:text-primary/80 transition-colors group"
+      className="inline-flex items-center gap-1 text-primary font-mono font-semibold hover:text-primary/80 transition-colors group"
     >
       {value}
       <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-60 transition-opacity" />
@@ -139,340 +108,213 @@ const Dashboard = () => {
 
   return (
     <Layout>
-      <div className="space-y-5 animate-fade-in">
+      <div className="animate-fade-in">
 
-        {/* ── Hero ── */}
-        <div className="relative rounded-2xl overflow-hidden border border-border/50 dark:border-primary/10 bg-card">
-          <div className="absolute inset-0 hero-grid opacity-50" />
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-48 bg-primary/10 rounded-full blur-3xl -translate-y-1/2" />
-          <div className="relative z-10 px-8 py-10 text-center">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 dark:bg-primary/15 border border-primary/20 text-primary text-xs font-semibold mb-5 animate-fade-in-up">
-              <Activity className="h-3.5 w-3.5 animate-pulse" />
-              <span>Sistema Online</span>
-              <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse-glow" />
+        <PageHeader
+          eyebrow="OPS"
+          title={displayName ? `Bem-vindo, ${displayName}` : 'Painel Administrativo'}
+          subtitle="MONITORAMENTO E CONTROLE DE OPERAÇÕES"
+          icon={Activity}
+        />
+
+        <div className="space-y-5">
+
+          {/* ── SOMATÓRIA DO DIA ── */}
+          <div className="panel-bracket bg-card" data-corner="accent">
+            <div className="p-5">
+              <div className="flex items-center justify-between mb-5">
+                <div>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <span className="status-dot" data-state="live" />
+                    <span className="telemetry-label text-primary">AO VIVO</span>
+                  </div>
+                  <h2 className="text-base font-semibold text-foreground">Somatória do Dia</h2>
+                  <p className="telemetry-label text-muted-foreground mt-0.5">{todayLabel}</p>
+                </div>
+                <div className="flex items-center gap-1.5 px-3 py-1.5 border border-border bg-background">
+                  <Users className="w-3.5 h-3.5 text-muted-foreground" />
+                  <span className="telemetry-label">CPFs</span>
+                  <CpfInput value={numCpfs} onChange={setNumCpfs} />
+                </div>
+              </div>
+
+              {/* KPIs grid — divisórias por hairline (grid gap 1px) */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-border border border-border">
+                <DayKpi label="Operações" icon={Layers} value={daily.totalOperacoes}>
+                  <div className="flex items-center gap-3 telemetry-label">
+                    <span className="flex items-center gap-1"><CheckCircle2 className="w-3 h-3 text-primary" />{daily.operacoesEncerradas} ENC</span>
+                    <span className="flex items-center gap-1"><Clock className="w-3 h-3 text-warning" />{daily.operacoesAbertas} ABE</span>
+                  </div>
+                </DayKpi>
+
+                <DayKpi label="Freebets" icon={Gift} value={daily.totalFreebets}>
+                  <div className="flex flex-col gap-0.5">
+                    {daily.totalFreebetsValor > 0 && (
+                      <p className="telemetry-label text-foreground">R${daily.totalFreebetsValor.toFixed(2)} EM FB</p>
+                    )}
+                    <p className="telemetry-label text-muted-foreground">{daily.totalSemFb} SEM FREEBET</p>
+                  </div>
+                </DayKpi>
+
+                <DayKpi label="Lucro Bruto" icon={TrendingUp} value={fmt(daily.lucroBruto)} valueClass={money(daily.lucroBruto)}>
+                  <p className="telemetry-label text-muted-foreground">RESULTADO REAL DO DIA</p>
+                </DayKpi>
+
+                <DayKpi label="Por CPF" icon={Users} value={fmt(lucroPorCpf)} valueClass={money(lucroPorCpf)}>
+                  <p className="telemetry-label text-muted-foreground">
+                    COM <CpfInput value={numCpfs} onChange={setNumCpfs} /> CPFs
+                  </p>
+                </DayKpi>
+              </div>
             </div>
-            <h1 className="text-3xl sm:text-4xl font-bold mb-2 tracking-tight animate-fade-in-up delay-100">
-              {displayName ? (
-                <>Bem-vindo, <span className="gradient-text">{displayName}</span></>
-              ) : (
-                <span className="gradient-text">BetShark Pro</span>
-              )}
-            </h1>
-            <p className="text-muted-foreground text-sm max-w-md mx-auto animate-fade-in-up delay-200">
-              Sua plataforma profissional de monitoramento e controle de apostas esportivas
-            </p>
           </div>
-        </div>
 
-        {/* ── RESUMO DO DIA ── */}
-        <div className="relative rounded-2xl overflow-hidden border border-primary/20 bg-gradient-to-br from-[#0a1a0f] via-[#081510] to-[#060d08]">
-          {/* glow de fundo */}
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,hsl(145_80%_48%/0.12)_0%,transparent_60%)]" />
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,hsl(145_80%_48%/0.07)_0%,transparent_60%)]" />
-
-          <div className="relative z-10 p-5 sm:p-6">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-5">
-              <div>
-                <div className="flex items-center gap-2 mb-0.5">
-                  <div className="w-2 h-2 rounded-full bg-primary animate-pulse-glow" />
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-primary/70">Ao Vivo</span>
-                </div>
-                <h2 className="text-lg font-bold text-foreground">Somatória do Dia</h2>
-                <p className="text-xs text-muted-foreground">{todayLabel}</p>
+          {/* ── Seletor de Mês + Lucro ── */}
+          <div className="panel p-4 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            <div className="flex items-center gap-3 flex-1">
+              <div className="w-9 h-9 flex items-center justify-center border border-border text-primary">
+                <Calendar className="w-4 h-4" />
               </div>
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10">
-                <Users className="w-3.5 h-3.5 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground">CPFs:</span>
-                <CpfInput value={numCpfs} onChange={setNumCpfs} />
+              <div>
+                <p className="telemetry-label text-muted-foreground">MÊS SELECIONADO</p>
+                <Select value={selectedMonth.toISOString()} onValueChange={(v) => setSelectedMonth(new Date(v))}>
+                  <SelectTrigger className="bg-transparent border-none p-0 h-auto text-lg font-semibold hover:text-primary transition-colors w-auto gap-1 focus:ring-0">
+                    <SelectValue>
+                      {capitalizeMonth(format(selectedMonth, 'MMMM', { locale: ptBR }))} {format(selectedMonth, 'yyyy')}
+                    </SelectValue>
+                    <ChevronDown className="w-4 h-4 opacity-50" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {generateMonthOptions().map(option => (
+                      <SelectItem key={option.value} value={option.value}>{capitalizeMonth(option.label)}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
-
-            {/* KPIs grid */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-
-              {/* Operações */}
-              <div className="rounded-xl bg-white/5 border border-white/8 p-4 flex flex-col gap-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-cyan-500/20 flex items-center justify-center">
-                    <Layers className="w-3.5 h-3.5 text-cyan-400" />
-                  </div>
-                  <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Operações</span>
-                </div>
-                <p className="text-3xl font-black text-cyan-300 leading-none">{daily.totalOperacoes}</p>
-                <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
-                  <span className="flex items-center gap-1">
-                    <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                    {daily.operacoesEncerradas} encerradas
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Clock className="w-3 h-3 text-amber-400" />
-                    {daily.operacoesAbertas} abertas
-                  </span>
-                </div>
+            <div className="flex items-center gap-8">
+              <div className="text-right">
+                <p className="telemetry-label text-muted-foreground">LUCRO DO MÊS</p>
+                <p className={cn('kpi text-2xl font-semibold mt-1', money(monthlyProfit))}>{fmt(monthlyProfit)}</p>
               </div>
+              <div className="text-right">
+                <p className="telemetry-label text-muted-foreground">TOTAL PROC.</p>
+                <p className="kpi text-2xl font-semibold text-foreground mt-1">{getTotalProceduresForMonth(procedures, selectedMonth)}</p>
+              </div>
+            </div>
+          </div>
 
-              {/* Freebets */}
-              <div className="rounded-xl bg-white/5 border border-white/8 p-4 flex flex-col gap-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-purple-500/20 flex items-center justify-center">
-                    <Gift className="w-3.5 h-3.5 text-purple-400" />
-                  </div>
-                  <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Freebets</span>
+          {/* ── KPIs Row 1 ── */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            <StatCard title="Lucro Mensal" value={`R$ ${getCurrentMonthProfit(procedures, selectedMonth).toFixed(2)}`} icon={TrendingUp} />
+            <StatCard title="Lucro Médio Diário" value={`R$ ${getAverageDailyProfit(procedures, selectedMonth).toFixed(2)}`} icon={Activity} />
+            <StatCard title="Média Proc./Dia" value={getAverageProceduresPerDay(procedures, selectedMonth)} icon={FileText} />
+            <StatCard title="Proc. Abertos" value={getOpenProcedures(procedures, selectedMonth)} subtitle="Falta Girar Freebet" icon={Clock} />
+            <StatCard title="Partidas Abertas" value={getOpenMatches(procedures, selectedMonth)} subtitle="Aguardando resultado" icon={Activity} />
+          </div>
+
+          {/* ── KPIs Row 2 ── */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <StatCard title="Melhor Plataforma" value={bestPlatform.name} subtitle={`R$ ${bestPlatform.profit.toFixed(2)} • ${bestPlatform.count} proc.`} icon={Trophy} />
+            <StatCard title="Dia com Maior Lucro" value={dayWithMostProfit.date} subtitle={`R$ ${dayWithMostProfit.profit.toFixed(2)}`} icon={TrendingUp} />
+            <StatCard title="Dia com Mais Proc." value={dayWithMostProcedures.date} subtitle={`${dayWithMostProcedures.count} procedimentos`} icon={FileText} />
+          </div>
+
+          {/* ── Duplo Green ── */}
+          <div className="panel">
+            <div className="px-5 py-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Zap className="w-3.5 h-3.5 text-primary" />
+                <span className="telemetry-label text-foreground">DUPLO GREEN</span>
+                <span className="telemetry-label text-muted-foreground/60">— {capitalizeMonth(format(selectedMonth, 'MMMM/yyyy', { locale: ptBR }))}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-px bg-border border border-border">
+                <div className="bg-card p-4 flex flex-col gap-1.5">
+                  <span className="telemetry-label text-muted-foreground">CONFIRMADOS</span>
+                  <p className="kpi text-2xl font-semibold text-foreground">{dgCount}</p>
+                  <p className="telemetry-label text-muted-foreground">NO MÊS SELECIONADO</p>
                 </div>
-                <p className="text-3xl font-black text-purple-300 leading-none">{daily.totalFreebets}</p>
-                <div className="flex flex-col gap-0.5">
-                  {daily.totalFreebetsValor > 0 && (
-                    <p className="text-[11px] font-semibold text-purple-400">
-                      R${daily.totalFreebetsValor.toFixed(2)} em FB
-                    </p>
-                  )}
-                  <p className="text-[10px] text-muted-foreground">
-                    {daily.totalSemFb} sem freebet
+                <div className="bg-card p-4 flex flex-col gap-1.5">
+                  <span className="telemetry-label text-muted-foreground">LUCRO COM DG</span>
+                  <p className={cn('kpi text-2xl font-semibold', money(dgProfit))}>{fmt(dgProfit)}</p>
+                  <p className="telemetry-label text-muted-foreground">
+                    {dgCount > 0 ? `≈ R$ ${(dgProfit / dgCount).toFixed(2)} POR DG` : 'NENHUM CONFIRMADO'}
                   </p>
                 </div>
               </div>
-
-              {/* Lucro bruto */}
-              <div className="rounded-xl bg-white/5 border border-white/8 p-4 flex flex-col gap-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-emerald-500/20 flex items-center justify-center">
-                    <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
-                  </div>
-                  <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Lucro Bruto</span>
-                </div>
-                <p className={cn(
-                  'text-3xl font-black leading-none',
-                  daily.lucroBruto >= 0 ? 'text-emerald-300' : 'text-red-400'
-                )}>
-                  {daily.lucroBruto >= 0 ? '+' : ''}R${daily.lucroBruto.toFixed(2)}
-                </p>
-                <p className="text-[10px] text-muted-foreground">resultado real do dia</p>
-              </div>
-
-              {/* Por CPF */}
-              <div className="rounded-xl border p-4 flex flex-col gap-2 relative overflow-hidden
-                bg-gradient-to-br from-primary/15 to-primary/5 border-primary/25">
-                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,hsl(145_80%_48%/0.15)_0%,transparent_70%)]" />
-                <div className="relative flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-primary/30 flex items-center justify-center">
-                    <Users className="w-3.5 h-3.5 text-primary" />
-                  </div>
-                  <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Por CPF</span>
-                </div>
-                <p className={cn(
-                  'relative text-3xl font-black leading-none',
-                  lucroPorCpf >= 0 ? 'text-primary' : 'text-red-400'
-                )}>
-                  {lucroPorCpf >= 0 ? '+' : ''}R${lucroPorCpf.toFixed(2)}
-                </p>
-                <p className="relative text-[10px] text-muted-foreground">
-                  com <CpfInput value={numCpfs} onChange={setNumCpfs} /> CPFs
-                </p>
-              </div>
             </div>
           </div>
-        </div>
 
-        {/* ── Seletor de Mês + Lucro Hero ── */}
-        <div className="glass rounded-2xl border border-white/5 p-4 flex flex-col sm:flex-row items-start sm:items-center gap-4">
-          <div className="flex items-center gap-3 flex-1">
-            <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
-              <Calendar className="w-5 h-5 text-primary" />
-            </div>
+          {/* ── Gráficos ── */}
+          <div className="grid grid-cols-1 gap-5">
+            <CalendarChart
+              data={getDailyProfitData(procedures, selectedMonth)}
+              title="Calendário de Lucro/Prejuízo"
+              selectedMonth={selectedMonth}
+            />
+            <MountainChart
+              data={getMountainChartData(procedures, selectedMonth)}
+              title="Evolução do Lucro (Inicial: R$ 1.000)"
+            />
+          </div>
+
+          {/* ── Acesso Rápido ── */}
+          {visibleLinks.length > 0 && (
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Mês selecionado</p>
-              <Select
-                value={selectedMonth.toISOString()}
-                onValueChange={(value) => setSelectedMonth(new Date(value))}
-              >
-                <SelectTrigger className="bg-transparent border-none p-0 h-auto text-lg font-bold hover:text-primary transition-colors w-auto gap-1 focus:ring-0">
-                  <SelectValue>
-                    {capitalizeMonth(format(selectedMonth, 'MMMM', { locale: ptBR }))} {format(selectedMonth, 'yyyy')}
-                  </SelectValue>
-                  <ChevronDown className="w-4 h-4 opacity-50" />
-                </SelectTrigger>
-                <SelectContent>
-                  {generateMonthOptions().map(option => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {capitalizeMonth(option.label)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="flex items-center gap-6">
-            <div className="text-right">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Lucro do Mês</p>
-              <p className={`text-2xl font-bold ${monthlyProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                {monthlyProfit >= 0 ? '+' : ''}R$ {monthlyProfit.toFixed(2)}
-              </p>
-            </div>
-            <div className="text-right">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Total Proc.</p>
-              <p className="text-2xl font-bold text-foreground">{getTotalProceduresForMonth(procedures, selectedMonth)}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* ── KPIs Row 1 ── */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 md:gap-3">
-          <StatCard
-            title="Lucro Mensal"
-            value={`R$ ${getCurrentMonthProfit(procedures, selectedMonth).toFixed(2)}`}
-            icon={TrendingUp}
-            color="green"
-          />
-          <StatCard
-            title="Lucro Médio Diário"
-            value={`R$ ${getAverageDailyProfit(procedures, selectedMonth).toFixed(2)}`}
-            icon={Activity}
-            color="purple"
-          />
-          <StatCard
-            title="Média Proc./Dia"
-            value={getAverageProceduresPerDay(procedures, selectedMonth)}
-            icon={FileText}
-            color="cyan"
-          />
-          <StatCard
-            title="Proc. Abertos"
-            value={getOpenProcedures(procedures, selectedMonth)}
-            subtitle="Falta Girar Freebet"
-            icon={Clock}
-            color="amber"
-          />
-          <StatCard
-            title="Partidas Abertas"
-            value={getOpenMatches(procedures, selectedMonth)}
-            subtitle="Aguardando resultado"
-            icon={Activity}
-            color="orange"
-          />
-        </div>
-
-        {/* ── KPIs Row 2 ── */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 md:gap-3">
-          <StatCard
-            title="Melhor Plataforma"
-            value={bestPlatform.name}
-            subtitle={`R$ ${bestPlatform.profit.toFixed(2)} • ${bestPlatform.count} proc.`}
-            icon={Trophy}
-            color="yellow"
-          />
-          <StatCard
-            title="Dia com Maior Lucro"
-            value={dayWithMostProfit.date}
-            subtitle={`R$ ${dayWithMostProfit.profit.toFixed(2)}`}
-            icon={TrendingUp}
-            color="green"
-          />
-          <StatCard
-            title="Dia com Mais Proc."
-            value={dayWithMostProcedures.date}
-            subtitle={`${dayWithMostProcedures.count} procedimentos`}
-            icon={FileText}
-            color="pink"
-          />
-        </div>
-
-        {/* ── Duplo Green ── */}
-        <div className="relative rounded-2xl overflow-hidden border border-emerald-500/20 bg-gradient-to-br from-emerald-950/40 via-[#060d08] to-[#060d08]">
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,hsl(145_80%_48%/0.10)_0%,transparent_60%)]" />
-          <div className="relative z-10 px-5 py-4">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-6 h-6 rounded-lg bg-emerald-500/20 flex items-center justify-center">
-                <Zap className="w-3.5 h-3.5 text-emerald-400" />
-              </div>
-              <span className="text-xs font-bold uppercase tracking-widest text-emerald-400/80">Duplo Green</span>
-              <span className="text-[10px] text-muted-foreground ml-1">— {capitalizeMonth(format(selectedMonth, 'MMMM/yyyy', { locale: ptBR }))}</span>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-xl bg-white/5 border border-emerald-500/15 p-4 flex flex-col gap-1.5">
-                <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Confirmados</span>
-                <p className="text-3xl font-black text-emerald-300 leading-none">{dgCount}</p>
-                <p className="text-[10px] text-muted-foreground">no mês selecionado</p>
-              </div>
-              <div className="rounded-xl bg-white/5 border border-emerald-500/15 p-4 flex flex-col gap-1.5">
-                <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Lucro com DG</span>
-                <p className={`text-3xl font-black leading-none ${dgProfit >= 0 ? 'text-emerald-300' : 'text-red-400'}`}>
-                  {dgProfit >= 0 ? '+' : ''}R$ {dgProfit.toFixed(2)}
-                </p>
-                <p className="text-[10px] text-muted-foreground">
-                  {dgCount > 0 ? `≈ R$ ${(dgProfit / dgCount).toFixed(2)} por DG` : 'nenhum confirmado'}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ── Gráficos ── */}
-        <div className="grid grid-cols-1 gap-5">
-          <CalendarChart
-            data={getDailyProfitData(procedures, selectedMonth)}
-            title="Calendário de Lucro/Prejuízo"
-            selectedMonth={selectedMonth}
-          />
-          <MountainChart
-            data={getMountainChartData(procedures, selectedMonth)}
-            title="Evolução do Lucro (Inicial: R$ 1.000)"
-          />
-        </div>
-
-        {/* ── Acesso Rápido ── */}
-        {visibleLinks.length > 0 && (
-          <div>
-            <div className="flex items-center gap-3 mb-4">
-              <h2 className="text-lg font-bold">Acesso Rápido</h2>
-              <div className="flex-1 h-px bg-gradient-to-r from-border to-transparent" />
-            </div>
-            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-              {visibleLinks.map((link, i) => (
-                <Link
-                  key={link.href}
-                  to={link.href}
-                  className={cn(
-                    'group relative rounded-xl border bg-card overflow-hidden',
-                    'transition-all duration-300 hover:-translate-y-1',
-                    'animate-fade-in-up',
-                    link.color,
-                    link.glow
-                  )}
-                  style={{ animationDelay: `${i * 80}ms` }}
-                >
-                  <div className={cn(
-                    'absolute inset-0 bg-gradient-to-br opacity-60 transition-opacity duration-300',
-                    link.color.split(' ').slice(0, 2).join(' ')
-                  )} />
-                  <div className="relative p-5">
-                    <div className={cn(
-                      'w-10 h-10 rounded-xl flex items-center justify-center mb-4',
-                      'bg-background/50 dark:bg-white/5 border border-white/10',
-                      'group-hover:scale-110 transition-transform duration-300'
-                    )}>
-                      <link.icon className={cn('h-5 w-5', link.iconColor)} />
+              <p className="telemetry-label text-muted-foreground mb-3">[ ACESSO RÁPIDO ]</p>
+              <div className="grid gap-px bg-border border border-border grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+                {visibleLinks.map((link) => (
+                  <Link
+                    key={link.href}
+                    to={link.href}
+                    className="group relative bg-card p-5 transition-colors duration-150 hover:bg-accent/40"
+                  >
+                    <div className="w-9 h-9 flex items-center justify-center mb-4 border border-border text-muted-foreground group-hover:text-primary group-hover:border-primary/40 transition-colors">
+                      <link.icon className="h-4 w-4" />
                     </div>
-                    <h3 className="font-semibold text-sm mb-1">{link.name}</h3>
+                    <h3 className="font-medium text-sm mb-1">{link.name}</h3>
                     <p className="text-xs text-muted-foreground leading-relaxed">{link.description}</p>
-                    <div className="flex items-center gap-1 mt-4 text-xs font-medium text-primary/70 group-hover:text-primary transition-colors duration-200">
-                      <span>Acessar</span>
-                      <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-1 transition-transform duration-200" />
+                    <div className="flex items-center gap-1 mt-4 telemetry-label text-primary/70 group-hover:text-primary transition-colors">
+                      <span>ACESSAR</span>
+                      <ArrowRight className="h-3 w-3 group-hover:translate-x-0.5 transition-transform" />
                     </div>
-                  </div>
-                </Link>
-              ))}
+                  </Link>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground/50 pb-4">
-          <Zap className="h-3 w-3 text-primary/40" />
-          <span>BetShark Pro — Plataforma de monitoramento profissional</span>
+          <div className="flex items-center gap-2 telemetry-label text-muted-foreground/40 pb-4 pt-2">
+            <span>BETSHARK PRO</span>
+            <span>·</span>
+            <span>CONSOLE DE OPERAÇÃO</span>
+          </div>
         </div>
       </div>
     </Layout>
   );
 };
+
+// KPI do bloco "Somatória do Dia" — célula de grid com hairline.
+function DayKpi({
+  label, icon: Icon, value, valueClass, children,
+}: {
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  value: string | number;
+  valueClass?: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="bg-card p-4 flex flex-col gap-2">
+      <div className="flex items-center gap-2">
+        <Icon className="w-3.5 h-3.5 text-muted-foreground" />
+        <span className="telemetry-label">{label}</span>
+      </div>
+      <p className={cn('kpi text-2xl font-semibold leading-none', valueClass || 'text-foreground')}>{value}</p>
+      {children}
+    </div>
+  );
+}
 
 export default Dashboard;

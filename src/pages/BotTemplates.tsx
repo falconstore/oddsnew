@@ -20,11 +20,13 @@ import {
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { Sidebar } from '@/components/Sidebar';
+import { PageHeader } from '@/components/PageHeader';
 import { parseMessage, type ParseResult } from '@/lib/botParser';
 import { EventoAutocomplete } from '@/components/procedures/EventoAutocomplete';
 import { useProcedures } from '@/hooks/useProcedures';
-import { useBookmakers } from '@/hooks/useOddsData';
+import { useBookmakers } from '@/hooks/useBookmakers';
 import { getAllPlatforms } from '@/lib/procedureUtils';
+import { traduzirEvento } from '@/lib/traduzirEvento';
 import { PROCEDURE_CATEGORIES } from '@/types/procedures';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
@@ -168,8 +170,8 @@ const TEMPLATES: TemplateConfig[] = [
     name: 'Queimar FreeBet',
     shortName: 'Queimar FB',
     description: 'Para girar freebet ganha em procedimento anterior.',
-    color: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
-    dotColor: 'bg-emerald-400',
+    color: 'bg-primary/15 text-primary border-primary/30',
+    dotColor: 'bg-primary',
     emoji: '🟢',
     fields: [
       { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
@@ -213,8 +215,8 @@ const TEMPLATES: TemplateConfig[] = [
     name: 'Ganhar Freebet — Promoção',
     shortName: 'Ganhar FB (Promo)',
     description: 'Promoção da casa com aposta grátis. Ex: "Super Sextou".',
-    color: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30',
-    dotColor: 'bg-cyan-400',
+    color: 'bg-muted border-border text-muted-foreground',
+    dotColor: 'bg-muted-foreground',
     emoji: '🟢',
     fields: [
       { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
@@ -257,8 +259,8 @@ const TEMPLATES: TemplateConfig[] = [
     name: 'Ganhar Freebet — Missão',
     shortName: 'Ganhar FB (Missão)',
     description: 'Missão da casa com recompensa em freebet ao completar.',
-    color: 'bg-violet-500/15 text-violet-400 border-violet-500/30',
-    dotColor: 'bg-violet-400',
+    color: 'bg-muted border-border text-muted-foreground',
+    dotColor: 'bg-muted-foreground',
     emoji: '🟢',
     fields: [
       { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
@@ -301,8 +303,8 @@ const TEMPLATES: TemplateConfig[] = [
     name: 'Superodd',
     shortName: 'Superodd',
     description: 'Superodd com lucro mínimo e máximo. Opção de Possível Duplo Green quando ativada. Emoji azul 🔵.',
-    color: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
-    dotColor: 'bg-blue-400',
+    color: 'bg-muted border-border text-muted-foreground',
+    dotColor: 'bg-muted-foreground',
     emoji: '🔵',
     fields: [
       { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
@@ -340,8 +342,8 @@ const TEMPLATES: TemplateConfig[] = [
     name: 'Aumento 25%',
     shortName: 'Aumento 25%',
     description: 'Promoção de aumento de 25% da casa. Lucro em range mínimo–máximo. Quantidade de CPFs configurável.',
-    color: 'bg-green-500/15 text-green-400 border-green-500/30',
-    dotColor: 'bg-green-400',
+    color: 'bg-primary/15 text-primary border-primary/30',
+    dotColor: 'bg-primary',
     emoji: '🟢',
     fields: [
       { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
@@ -391,8 +393,8 @@ const TEMPLATES: TemplateConfig[] = [
     name: 'Tentativa de Duplo Green',
     shortName: 'Tentativa DG',
     description: 'Operação com objetivo de Duplo Green. Exibe o valor alvo do DG.',
-    color: 'bg-teal-500/15 text-teal-400 border-teal-500/30',
-    dotColor: 'bg-teal-400',
+    color: 'bg-primary/15 text-primary border-primary/30',
+    dotColor: 'bg-primary',
     emoji: '🟢',
     fields: [
       { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
@@ -429,8 +431,8 @@ const TEMPLATES: TemplateConfig[] = [
     name: 'Promoção — Lucro em Range',
     shortName: 'Promoção (Range)',
     description: 'Lucro varia entre valor mínimo e máximo. Ex: R$3,25 à R$3,75.',
-    color: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
-    dotColor: 'bg-amber-400',
+    color: 'bg-warning/15 text-warning border-warning/30',
+    dotColor: 'bg-warning',
     emoji: '🟢',
     fields: [
       { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
@@ -468,8 +470,8 @@ const TEMPLATES: TemplateConfig[] = [
     name: 'Aposta Protegida',
     shortName: 'Aposta Protegida',
     description: 'Promoção OU lucra cash OU ganha freebet (cenários excludentes). Opção 2 vai para observações.',
-    color: 'bg-orange-500/15 text-orange-400 border-orange-500/30',
-    dotColor: 'bg-orange-400',
+    color: 'bg-warning/15 text-warning border-warning/30',
+    dotColor: 'bg-warning',
     emoji: '🟢',
     fields: [
       { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
@@ -516,8 +518,8 @@ const TEMPLATES: TemplateConfig[] = [
     name: 'Superodd — Bolsa de Aposta',
     shortName: 'Bolsa',
     description: 'Super Odd via Bolsa de Aposta (Smarkets, Betfair Exchange etc). Lucro em range com "OU ANULA".',
-    color: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30',
-    dotColor: 'bg-cyan-400',
+    color: 'bg-muted border-border text-muted-foreground',
+    dotColor: 'bg-muted-foreground',
     emoji: '🟢',
     fields: [
       { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
@@ -559,8 +561,8 @@ const TEMPLATES: TemplateConfig[] = [
     name: 'Tentativa Duplo Green',
     shortName: 'Tentativa DG',
     description: 'Procedimento cash sem freebet com objetivo de Duplo Green. Usa CASA: separado.',
-    color: 'bg-violet-500/15 text-violet-400 border-violet-500/30',
-    dotColor: 'bg-violet-400',
+    color: 'bg-muted border-border text-muted-foreground',
+    dotColor: 'bg-muted-foreground',
     emoji: '🟡',
     fields: [
       { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
@@ -775,7 +777,7 @@ function FreebetSelectField({ value, onChange }: { value: string; onChange: (v: 
                 : `${selectedFbs.length} freebets selecionadas: ${selectedNums.join(', ')}`}
             </span>
           ) : rawNums.length > 0 ? (
-            <span className="truncate text-amber-400">
+            <span className="truncate text-warning">
               REF N° {rawNums.join(', ')} <span className="text-muted-foreground/60">(não encontrado na lista)</span>
             </span>
           ) : (
@@ -839,7 +841,7 @@ function FreebetSelectField({ value, onChange }: { value: string; onChange: (v: 
                   </span>
                 </div>
                 {selectedNums.length > 0 && (
-                  <p className="text-[11px] text-cyan-400">
+                  <p className="text-[11px] text-muted-foreground">
                     Múltipla seleção ativa — clique nos itens para adicionar/remover
                   </p>
                 )}
@@ -862,9 +864,9 @@ function FreebetSelectField({ value, onChange }: { value: string; onChange: (v: 
                     const isSelected = selectedIdSet.has(fb.id);
                     const credStatus = fb.freebet_creditada ?? 'PENDENTE';
                     const credBadgeColor =
-                      credStatus === 'SIM' ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' :
-                      credStatus === 'AGUARDANDO' ? 'bg-amber-500/15 text-amber-300 border-amber-500/30' :
-                      credStatus === 'NAO' ? 'bg-red-500/15 text-red-300 border-red-500/30' :
+                      credStatus === 'SIM' ? 'bg-primary/15 text-primary border-primary/30' :
+                      credStatus === 'AGUARDANDO' ? 'bg-warning/15 text-warning border-warning/30' :
+                      credStatus === 'NAO' ? 'bg-destructive/15 text-destructive border-destructive/30' :
                       'bg-muted/30 text-muted-foreground border-border/50';
                     return (
                       <button
@@ -886,7 +888,7 @@ function FreebetSelectField({ value, onChange }: { value: string; onChange: (v: 
                             {credStatus}
                           </span>
                           {fb.is_extra && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded border font-bold bg-amber-500/15 text-amber-300 border-amber-500/30">
+                            <span className="text-[10px] px-1.5 py-0.5 rounded border font-bold bg-warning/15 text-warning border-warning/30">
                               EXTRA
                             </span>
                           )}
@@ -894,7 +896,7 @@ function FreebetSelectField({ value, onChange }: { value: string; onChange: (v: 
                         </div>
                         {(fb.partida_descricao || dataBR) && (
                           <span className={cn('text-xs', isSelected ? 'text-primary/70' : 'text-muted-foreground')}>
-                            {[fb.partida_descricao, dataBR].filter(Boolean).join(' · ')}
+                            {[traduzirEvento(fb.partida_descricao), dataBR].filter(Boolean).join(' · ')}
                           </span>
                         )}
                       </button>
@@ -909,7 +911,7 @@ function FreebetSelectField({ value, onChange }: { value: string; onChange: (v: 
                   <button
                     type="button"
                     onClick={() => { setSelectedIds([]); suppressSync.current = true; onChange(''); }}
-                    className="text-[11px] text-red-400 hover:text-red-300"
+                    className="text-[11px] text-destructive hover:text-destructive/80"
                   >
                     Limpar todas
                   </button>
@@ -924,11 +926,11 @@ function FreebetSelectField({ value, onChange }: { value: string; onChange: (v: 
       {selectedFbs.length > 0 && (
         <div className="flex flex-col gap-1.5">
           {selectedFbs.map(fb => (
-            <div key={fb.id} className="bg-cyan-500/5 border border-cyan-500/20 rounded-lg px-3 py-2 flex flex-col gap-0.5 relative">
+            <div key={fb.id} className="bg-muted/30 border border-border rounded-lg px-3 py-2 flex flex-col gap-0.5 relative">
               <button
                 type="button"
                 onClick={() => removeSelection(fb.id)}
-                className="absolute top-1.5 right-1.5 h-5 w-5 flex items-center justify-center rounded text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                className="absolute top-1.5 right-1.5 h-5 w-5 flex items-center justify-center rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                 title="Remover seleção"
               >
                 <X className="h-3 w-3" />
@@ -937,10 +939,10 @@ function FreebetSelectField({ value, onChange }: { value: string; onChange: (v: 
                 <span className="text-muted-foreground">Proc:</span>
                 <span className="font-mono font-medium text-foreground">#{fb.procedure_number}</span>
                 {fb.is_extra && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded border font-bold bg-amber-500/15 text-amber-300 border-amber-500/30">EXTRA</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded border font-bold bg-warning/15 text-warning border-warning/30">EXTRA</span>
                 )}
                 <span className="text-muted-foreground">·</span>
-                <span className="text-cyan-400 font-medium">{fmtCurrency(fb.freebet_value ?? fb.freebet_valor_previsto) ?? '—'}</span>
+                <span className="text-foreground font-medium">{fmtCurrency(fb.freebet_value ?? fb.freebet_valor_previsto) ?? '—'}</span>
                 {fb.platform && <>
                   <span className="text-muted-foreground">·</span>
                   <span className="text-foreground">{fb.platform}</span>
@@ -949,14 +951,14 @@ function FreebetSelectField({ value, onChange }: { value: string; onChange: (v: 
               {fb.partida_descricao && (
                 <div className="flex items-center gap-2 text-xs">
                   <span className="text-muted-foreground">Jogo:</span>
-                  <span className="text-foreground">{fb.partida_descricao}</span>
+                  <span className="text-foreground">{traduzirEvento(fb.partida_descricao)}</span>
                   {fb.date && <span className="text-muted-foreground">{fmtDateBR(fb.date)}</span>}
                 </div>
               )}
             </div>
           ))}
           {selectedFbs.length > 1 && (
-            <p className="text-[11px] text-amber-400/90 px-1">
+            <p className="text-[11px] text-warning/90 px-1">
               ⚠ Vínculo automático será feito apenas com a 1ª (#{selectedFbs[0].procedure_number}). Os demais nºs aparecerão no texto da mensagem.
             </p>
           )}
@@ -974,7 +976,7 @@ function ValidationBadge({ result }: { result: ParseResult | null }) {
   if (!result) return null;
   if (result.ok === false) {
     return (
-      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-medium">
+      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-xs font-medium">
         <XCircle className="h-3.5 w-3.5 shrink-0" />
         Bot não vai registrar
       </div>
@@ -982,14 +984,14 @@ function ValidationBadge({ result }: { result: ParseResult | null }) {
   }
   if (result.ok === 'partial') {
     return (
-      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-medium">
+      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-warning/10 border border-warning/20 text-warning text-xs font-medium">
         <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
         Bot registra (incompleto)
       </div>
     );
   }
   return (
-    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium">
+    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/10 border border-primary/20 text-primary text-xs font-medium">
       <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
       Bot vai registrar ✓
     </div>
@@ -1015,14 +1017,14 @@ function ValidationPanel({ result, text }: { result: ParseResult | null; text: s
   if (result.ok === false) {
     return (
       <div className="flex flex-col gap-3">
-        <div className="flex items-center gap-2 text-red-400 text-sm font-semibold">
+        <div className="flex items-center gap-2 text-destructive text-sm font-semibold">
           <XCircle className="h-4 w-4" />
           Bot não consegue registrar
         </div>
         <p className="text-xs text-muted-foreground">O template não foi reconhecido. Verifique:</p>
         <ul className="space-y-1">
           {result.missingFields.map(f => (
-            <li key={f} className="flex items-start gap-1.5 text-xs text-red-400/80">
+            <li key={f} className="flex items-start gap-1.5 text-xs text-destructive/80">
               <span className="mt-0.5 shrink-0">•</span>{f}
             </li>
           ))}
@@ -1050,7 +1052,7 @@ function ValidationPanel({ result, text }: { result: ParseResult | null; text: s
     <div className="flex flex-col gap-3">
       <div className={cn(
         'flex items-center gap-2 text-sm font-semibold',
-        isPartial ? 'text-amber-400' : 'text-emerald-400',
+        isPartial ? 'text-warning' : 'text-primary',
       )}>
         {isPartial ? <AlertTriangle className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" />}
         {isPartial ? 'Bot registra (com flag INCOMPLETO)' : 'Bot vai registrar normalmente'}
@@ -1070,7 +1072,7 @@ function ValidationPanel({ result, text }: { result: ParseResult | null; text: s
         </>}
         {data.partida_descricao && <>
           <span className="text-muted-foreground">Evento:</span>
-          <span className="text-foreground">{data.partida_descricao}</span>
+          <span className="text-foreground">{traduzirEvento(data.partida_descricao)}</span>
         </>}
         {data.horario_partida && <>
           <span className="text-muted-foreground">Horário:</span>
@@ -1078,11 +1080,11 @@ function ValidationPanel({ result, text }: { result: ParseResult | null; text: s
         </>}
         {data.lucro_prejuizo_previsto != null && <>
           <span className="text-muted-foreground">Lucro prev.:</span>
-          <span className="text-emerald-400 font-medium">R$ {data.lucro_prejuizo_previsto.toFixed(2).replace('.', ',')}</span>
+          <span className="text-primary font-medium">R$ {data.lucro_prejuizo_previsto.toFixed(2).replace('.', ',')}</span>
         </>}
         {data.freebet_valor_previsto != null && <>
           <span className="text-muted-foreground">Freebet:</span>
-          <span className="text-cyan-400 font-medium">R$ {data.freebet_valor_previsto.toFixed(2).replace('.', ',')}</span>
+          <span className="text-muted-foreground font-medium">R$ {data.freebet_valor_previsto.toFixed(2).replace('.', ',')}</span>
         </>}
         {data.tags && data.tags.length > 0 && <>
           <span className="text-muted-foreground">Tags:</span>
@@ -1098,11 +1100,11 @@ function ValidationPanel({ result, text }: { result: ParseResult | null; text: s
 
       {/* Campos faltando */}
       {missing.length > 0 && (
-        <div className="p-2.5 rounded-lg bg-amber-500/5 border border-amber-500/20">
-          <p className="text-xs font-medium text-amber-400 mb-1.5">Campos faltando:</p>
+        <div className="p-2.5 rounded-lg bg-warning/5 border border-warning/20">
+          <p className="text-xs font-medium text-warning mb-1.5">Campos faltando:</p>
           <ul className="space-y-0.5">
             {missing.map(f => (
-              <li key={f} className="flex items-start gap-1.5 text-xs text-amber-400/70">
+              <li key={f} className="flex items-start gap-1.5 text-xs text-warning/70">
                 <span className="mt-0.5 shrink-0">•</span>{f}
               </li>
             ))}
@@ -1420,20 +1422,12 @@ export default function BotTemplates() {
 
       <main className="flex-1 md:ml-64 p-4 md:p-6 flex flex-col gap-6 min-w-0">
 
-        {/* Header */}
-        <div className="flex items-start justify-between gap-3 pt-10 md:pt-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-emerald-400 flex items-center justify-center shadow-lg shrink-0">
-              <Bot className="h-5 w-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-foreground leading-tight">Templates do Bot</h1>
-              <p className="text-sm text-muted-foreground">Preencha e copie o procedimento pronto para enviar no Telegram</p>
-            </div>
-          </div>
-
-          {/* Toggle ligar/desligar bot — visível para admins */}
-          {isAdmin && (
+        <PageHeader
+          eyebrow="TMPL"
+          title="Templates do Bot"
+          subtitle="PREENCHA E COPIE O PROCEDIMENTO PRONTO PARA ENVIAR NO TELEGRAM"
+          icon={Bot}
+          actions={isAdmin ? (
             <div className="flex flex-col items-end gap-1 shrink-0">
               <button
                 onClick={() => toggleBot.mutate(!botEnabled)}
@@ -1443,7 +1437,7 @@ export default function BotTemplates() {
                   'flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-semibold transition-all duration-200',
                   botEnabled
                     ? 'bg-primary/15 border-primary/40 text-primary hover:bg-primary/25'
-                    : 'bg-red-500/15 border-red-500/40 text-red-400 hover:bg-red-500/25',
+                    : 'bg-destructive/15 border-destructive/40 text-destructive hover:bg-destructive/25',
                   (botLoading || toggleBot.isPending) && 'opacity-60 cursor-not-allowed',
                 )}
               >
@@ -1458,13 +1452,13 @@ export default function BotTemplates() {
               </button>
               <span className={cn(
                 'text-[11px] font-medium',
-                botEnabled ? 'text-primary/70' : 'text-red-400/70',
+                botEnabled ? 'text-primary/70' : 'text-destructive/70',
               )}>
                 {botEnabled ? 'Registrando procedimentos' : 'Ignorando mensagens'}
               </span>
             </div>
-          )}
-        </div>
+          ) : undefined}
+        />
 
         {/* Template selector tabs */}
         <div className="flex gap-2 flex-wrap items-center" data-testid="template-tabs">
@@ -1503,7 +1497,7 @@ export default function BotTemplates() {
                 className={cn(
                   'flex items-center gap-2 px-3 py-2 rounded-l-xl text-sm font-medium border border-r-0 transition-all duration-200',
                   activeCustomId === ct.id
-                    ? 'bg-slate-500/15 text-slate-300 border-slate-500/30 shadow-sm'
+                    ? 'bg-muted text-foreground border-border shadow-sm'
                     : 'border-border/50 text-muted-foreground hover:border-border hover:text-foreground bg-card/50',
                 )}
               >
@@ -1515,8 +1509,8 @@ export default function BotTemplates() {
                 className={cn(
                   'flex items-center justify-center px-1.5 py-2 rounded-r-xl text-sm border transition-all duration-200',
                   activeCustomId === ct.id
-                    ? 'bg-slate-500/15 text-slate-400 border-slate-500/30 hover:text-red-400 hover:bg-red-500/10'
-                    : 'border-border/50 text-muted-foreground/50 hover:text-red-400 hover:bg-red-500/10 bg-card/50',
+                    ? 'bg-muted text-muted-foreground border-border hover:text-destructive hover:bg-destructive/10'
+                    : 'border-border/50 text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 bg-card/50',
                 )}
                 data-testid={`btn-delete-custom-${ct.id}`}
                 title="Excluir template"
@@ -1544,9 +1538,9 @@ export default function BotTemplates() {
               initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
-              className="flex items-center gap-3 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3"
+              className="flex items-center gap-3 bg-destructive/10 border border-destructive/20 rounded-xl px-4 py-3"
             >
-              <Trash2 className="h-4 w-4 text-red-400 shrink-0" />
+              <Trash2 className="h-4 w-4 text-destructive shrink-0" />
               <p className="text-sm text-foreground flex-1">
                 Excluir <strong>"{customTemplates.find(t => t.id === deleteConfirmId)?.name}"</strong>? Esta ação não pode ser desfeita.
               </p>
@@ -1561,7 +1555,7 @@ export default function BotTemplates() {
               <Button
                 size="sm"
                 onClick={() => handleDeleteCustom(deleteConfirmId)}
-                className="h-7 text-xs bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30"
+                className="h-7 text-xs bg-destructive/20 text-destructive hover:bg-destructive/30 border border-destructive/30"
               >
                 Excluir
               </Button>
@@ -1580,7 +1574,7 @@ export default function BotTemplates() {
           {activeCustomId ? (
             <>
               <span className="font-medium text-foreground flex items-center gap-1.5">
-                <Pencil className="h-3.5 w-3.5 text-slate-400" />
+                <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
                 {customTemplates.find(t => t.id === activeCustomId)?.name}
               </span>
               {' — '}Template personalizado. Edite o texto à vontade antes de copiar.
@@ -1664,7 +1658,7 @@ export default function BotTemplates() {
                   className={cn(
                     'w-full h-11 font-semibold gap-2 transition-all duration-300',
                     copied
-                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/25'
+                      ? 'bg-primary/20 text-primary border border-primary/30 hover:bg-primary/25'
                       : 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg',
                   )}
                   data-testid="btn-copy-template"
@@ -1677,7 +1671,7 @@ export default function BotTemplates() {
                 </Button>
 
                 <p className="text-[11px] text-muted-foreground text-center leading-relaxed">
-                  O bot confirma em até 3 segundos com <span className="text-emerald-400 font-medium">✅ Procedimento registrado</span>
+                  O bot confirma em até 3 segundos com <span className="text-primary font-medium">✅ Procedimento registrado</span>
                 </p>
               </div>
             </motion.div>
@@ -1921,7 +1915,7 @@ export default function BotTemplates() {
                   className={cn(
                     'w-full h-11 font-semibold gap-2 transition-all duration-300',
                     copied
-                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/25'
+                      ? 'bg-primary/20 text-primary border border-primary/30 hover:bg-primary/25'
                       : 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg',
                   )}
                   data-testid="btn-copy-template"
@@ -1934,7 +1928,7 @@ export default function BotTemplates() {
                 </Button>
 
                 <p className="text-[11px] text-muted-foreground text-center leading-relaxed">
-                  O bot confirma em até 3 segundos com <span className="text-emerald-400 font-medium">✅ Procedimento registrado</span>
+                  O bot confirma em até 3 segundos com <span className="text-primary font-medium">✅ Procedimento registrado</span>
                 </p>
               </div>
             </motion.div>
@@ -2061,17 +2055,17 @@ function RegistrarPorTexto() {
   }
 
   return (
-    <div className="bg-amber-500/5 border border-amber-500/20 rounded-2xl overflow-hidden">
+    <div className="bg-warning/5 border border-warning/20 rounded-2xl overflow-hidden">
       <button
         onClick={() => setExpanded(v => !v)}
-        className="w-full flex items-center gap-3 p-4 md:p-5 hover:bg-amber-500/5 transition-colors text-left"
+        className="w-full flex items-center gap-3 p-4 md:p-5 hover:bg-warning/5 transition-colors text-left"
         data-testid="btn-toggle-contingencia"
       >
-        <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center shrink-0">
-          <LifeBuoy className="h-4 w-4 text-amber-400" />
+        <div className="w-8 h-8 rounded-lg bg-warning/20 flex items-center justify-center shrink-0">
+          <LifeBuoy className="h-4 w-4 text-warning" />
         </div>
         <div className="flex-1">
-          <p className="text-sm font-semibold text-amber-400">Contingência — Bot não registrou?</p>
+          <p className="text-sm font-semibold text-warning">Contingência — Bot não registrou?</p>
           <p className="text-xs text-muted-foreground">Cole o texto da mensagem para registrar manualmente</p>
         </div>
         {expanded
@@ -2088,7 +2082,7 @@ function RegistrarPorTexto() {
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className="border-t border-amber-500/15 p-4 md:p-5 flex flex-col gap-4">
+            <div className="border-t border-warning/15 p-4 md:p-5 flex flex-col gap-4">
               <p className="text-xs text-muted-foreground">
                 Use quando o bot perdeu uma mensagem (editada rapidamente, bot offline, webhook atrasado, etc).
                 Cole o texto exato do canal e clique em <strong className="text-foreground">Registrar</strong>.
@@ -2102,7 +2096,7 @@ function RegistrarPorTexto() {
                       Texto da mensagem do Telegram *
                     </Label>
                     {wasNormalized && (
-                      <span className="text-[10px] text-amber-400/80 bg-amber-500/10 border border-amber-500/20 rounded px-1.5 py-0.5">
+                      <span className="text-[10px] text-warning/80 bg-warning/10 border border-warning/20 rounded px-1.5 py-0.5">
                         🟢 adicionado automaticamente
                       </span>
                     )}
@@ -2140,10 +2134,10 @@ function RegistrarPorTexto() {
                     initial={{ opacity: 0, y: -6 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0 }}
-                    className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-4 py-3"
+                    className="flex items-center gap-2 bg-primary/10 border border-primary/30 rounded-xl px-4 py-3"
                   >
-                    <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
-                    <p className="text-sm text-emerald-400 font-medium">Procedimento registrado com sucesso!</p>
+                    <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+                    <p className="text-sm text-primary font-medium">Procedimento registrado com sucesso!</p>
                   </motion.div>
                 )}
                 {state === 'error' && (
@@ -2152,10 +2146,10 @@ function RegistrarPorTexto() {
                     initial={{ opacity: 0, y: -6 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0 }}
-                    className="flex items-center gap-2 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3"
+                    className="flex items-center gap-2 bg-destructive/10 border border-destructive/30 rounded-xl px-4 py-3"
                   >
-                    <XCircle className="h-4 w-4 text-red-400 shrink-0" />
-                    <p className="text-sm text-red-400">{errorMsg || 'Erro ao registrar o procedimento.'}</p>
+                    <XCircle className="h-4 w-4 text-destructive shrink-0" />
+                    <p className="text-sm text-destructive">{errorMsg || 'Erro ao registrar o procedimento.'}</p>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -2168,7 +2162,7 @@ function RegistrarPorTexto() {
                   className={cn(
                     'gap-1.5',
                     canRegister
-                      ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30'
+                      ? 'bg-warning/20 hover:bg-warning/30 text-warning border border-warning/30'
                       : 'opacity-40 cursor-not-allowed bg-muted/20 text-muted-foreground border border-border/40',
                   )}
                   data-testid="btn-registrar-por-texto"

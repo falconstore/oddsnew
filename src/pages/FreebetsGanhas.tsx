@@ -8,6 +8,7 @@
 //   ou lucro_prejuizo_previsto do QUEIMAR_FB que aponta pra ele)
 import { useMemo } from 'react';
 import { Layout } from '@/components/Layout';
+import { PageHeader } from '@/components/PageHeader';
 import { useProcedures } from '@/hooks/useProcedures';
 import { Procedure } from '@/types/procedures';
 import { usePersistedState } from '@/hooks/usePersistedState';
@@ -107,20 +108,20 @@ function brl(n: number) {
 function StatusBadge({ s }: { s: FreebetCiclo['status_label'] }) {
   if (s === 'falta_girar') {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-red-500/15 text-red-400 border border-red-500/30">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-destructive/15 text-destructive border border-destructive/30">
         <AlertCircle className="w-3 h-3" /> Falta Girar
       </span>
     );
   }
   if (s === 'queimando') {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-amber-500/15 text-amber-400 border border-amber-500/30">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-warning/15 text-warning border border-warning/30">
         <Flame className="w-3 h-3" /> Queimando
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-primary/15 text-primary border border-primary/30">
       <CheckCircle2 className="w-3 h-3" /> Concluído
     </span>
   );
@@ -177,29 +178,26 @@ export default function FreebetsGanhas() {
     };
   }, [ciclos]);
 
-  const lucroLiquidoColor = kpis.lucro_liquido_total >= 0 ? 'text-emerald-400' : 'text-red-400';
+  const lucroLiquidoColor = kpis.lucro_liquido_total >= 0 ? 'text-primary' : 'text-destructive';
 
   return (
     <Layout>
       <div className="max-w-7xl mx-auto p-4 lg:p-6 space-y-5">
         {/* Header */}
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-500/25 to-emerald-500/5 border border-emerald-500/30 flex items-center justify-center">
-              <Trophy className="w-5 h-5 text-emerald-400" />
+        <PageHeader
+          eyebrow="FB"
+          title="FreeBets Ganhas"
+          subtitle="CICLO DA FREEBET — QUEM GANHOU, QUEM QUEIMOU, QUANTO SOBROU."
+          icon={Trophy}
+          actions={
+            <div className="text-right">
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Lucro líquido total (ciclos completos)</p>
+              <p className={`text-2xl lg:text-3xl font-bold font-mono ${lucroLiquidoColor}`} data-testid="text-lucro-liquido-total">
+                {brl(kpis.lucro_liquido_total)}
+              </p>
             </div>
-            <div>
-              <h1 className="text-xl lg:text-2xl font-bold tracking-tight">FreeBets Ganhas</h1>
-              <p className="text-xs text-muted-foreground">Ciclo da freebet — quem ganhou, quem queimou, quanto sobrou.</p>
-            </div>
-          </div>
-          <div className="text-right">
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Lucro líquido total (ciclos completos)</p>
-            <p className={`text-2xl lg:text-3xl font-bold font-mono ${lucroLiquidoColor}`} data-testid="text-lucro-liquido-total">
-              {brl(kpis.lucro_liquido_total)}
-            </p>
-          </div>
-        </div>
+          }
+        />
 
         {/* KPIs */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -208,28 +206,28 @@ export default function FreebetsGanhas() {
             label="Total de FBs"
             value={String(kpis.total_count)}
             sub={brl(kpis.total_valor)}
-            accent="from-emerald-500/10 to-emerald-500/0 border-emerald-500/20"
+            accent="from-primary/10 to-primary/0 border-primary/20"
           />
           <KpiCard
             icon={Clock}
             label="Aguardando crédito"
             value={String(kpis.aguardando_count)}
             sub={brl(kpis.aguardando_valor)}
-            accent="from-amber-500/10 to-amber-500/0 border-amber-500/20"
+            accent="from-warning/10 to-warning/0 border-warning/20"
           />
           <KpiCard
             icon={CheckCircle2}
             label="Creditadas"
             value={String(kpis.creditadas_count)}
             sub={brl(kpis.creditadas_valor)}
-            accent="from-cyan-500/10 to-cyan-500/0 border-cyan-500/20"
+            accent="border-border"
           />
           <KpiCard
             icon={AlertCircle}
             label="Não vieram"
             value={String(kpis.nao_creditadas_count)}
             sub={`${kpis.ciclos_completos_count} ciclos completos`}
-            accent="from-red-500/10 to-red-500/0 border-red-500/20"
+            accent="from-destructive/10 to-destructive/0 border-destructive/20"
           />
         </div>
 
@@ -244,7 +242,7 @@ export default function FreebetsGanhas() {
                 data-testid={`pill-periodo-${p}`}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                   periodo === p
-                    ? 'bg-emerald-500/20 text-emerald-300 shadow-inner'
+                    ? 'bg-primary/20 text-primary shadow-inner'
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
@@ -261,7 +259,7 @@ export default function FreebetsGanhas() {
                 data-testid={`tab-status-${s}`}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                   statusFiltro === s
-                    ? 'bg-purple-500/20 text-purple-300 shadow-inner'
+                    ? 'bg-muted text-foreground shadow-inner'
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
@@ -284,7 +282,7 @@ export default function FreebetsGanhas() {
           )}
           <ul className="divide-y divide-white/5">
             {itens.map((c) => {
-              const lpColor = c.lucro_liquido_ciclo > 0 ? 'text-emerald-400' : c.lucro_liquido_ciclo < 0 ? 'text-red-400' : 'text-muted-foreground';
+              const lpColor = c.lucro_liquido_ciclo > 0 ? 'text-primary' : c.lucro_liquido_ciclo < 0 ? 'text-destructive' : 'text-muted-foreground';
               return (
                 <li
                   key={c.origem.id}
@@ -306,12 +304,12 @@ export default function FreebetsGanhas() {
                         )}
                       </div>
                       <div className="text-[11px] text-muted-foreground mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
-                        <span>FB: <span className="text-emerald-300 font-mono">{brl(c.fb_ganha_valor)}</span></span>
+                        <span>FB: <span className="text-primary font-mono">{brl(c.fb_ganha_valor)}</span></span>
                         <span>Etapa 1: <span className="font-mono">{brl(c.etapa1_lp)}</span></span>
                         {c.queimador && (
                           <span>Etapa 2 (#{c.queimador.procedure_number}): <span className="font-mono">{brl(c.etapa2_lp)}</span></span>
                         )}
-                        {!c.queimador && <span className="text-amber-400">Aguardando ser queimada</span>}
+                        {!c.queimador && <span className="text-warning">Aguardando ser queimada</span>}
                       </div>
                     </div>
                     <div className="text-right">

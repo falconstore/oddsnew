@@ -32,10 +32,10 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
       <p className="text-[11px] text-muted-foreground mb-2 font-medium">{label}</p>
       <div className="flex items-center justify-between gap-3">
         <span className="text-[11px] flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-pink-400" />
+          <span className="w-2 h-2 rounded-full bg-primary" />
           Leads
         </span>
-        <span className="text-[12px] font-semibold text-pink-300">{count}</span>
+        <span className="text-[12px] font-semibold text-primary">{count}</span>
       </div>
     </div>
   );
@@ -92,8 +92,8 @@ export function DailyLeadsChart({ leads, monthFilter, isLoading = false }: Daily
     <div className="glass rounded-3xl border border-white/8 overflow-hidden" data-testid="card-daily-leads-chart">
       <div className="flex items-center justify-between gap-2 p-4 md:p-5 border-b border-white/5">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-pink-500/25 to-fuchsia-500/10 border border-pink-500/30 flex items-center justify-center">
-            <Users className="w-5 h-5 text-pink-300" />
+          <div className="w-10 h-10 rounded-xl border border-border flex items-center justify-center">
+            <Users className="w-5 h-5 text-muted-foreground" />
           </div>
           <div>
             <h3 className="text-sm md:text-base font-semibold">Novos leads por dia</h3>
@@ -110,7 +110,7 @@ export function DailyLeadsChart({ leads, monthFilter, isLoading = false }: Daily
             {[0.5, 0.8, 0.6, 1, 0.7, 0.9, 0.4, 0.75, 0.55, 0.85].map((h, i) => (
               <div
                 key={i}
-                className="flex-1 rounded-t bg-pink-500/10 animate-pulse"
+                className="flex-1 rounded-t bg-primary/10 animate-pulse"
                 style={{ height: `${h * 100}%` }}
               />
             ))}
@@ -125,8 +125,8 @@ export function DailyLeadsChart({ leads, monthFilter, isLoading = false }: Daily
               <ComposedChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
                 <defs>
                   <linearGradient id="leadsBarGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="hsl(330 80% 60%)" stopOpacity={0.85} />
-                    <stop offset="100%" stopColor="hsl(330 80% 60%)" stopOpacity={0.3} />
+                    <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.85} />
+                    <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.18} vertical={false} />
@@ -156,7 +156,7 @@ export function DailyLeadsChart({ leads, monthFilter, isLoading = false }: Daily
                 {/* Linha tracejada — média diária de leads */}
                 <ReferenceLine
                   y={avg}
-                  stroke="hsl(330 80% 70%)"
+                  stroke="hsl(var(--primary))"
                   strokeDasharray="6 4"
                   strokeWidth={1.5}
                   strokeOpacity={0.75}
@@ -164,7 +164,7 @@ export function DailyLeadsChart({ leads, monthFilter, isLoading = false }: Daily
                     value: `~${avg.toFixed(1)}/dia`,
                     position: 'insideTopRight',
                     fontSize: 10,
-                    fill: 'hsl(330 80% 70%)',
+                    fill: 'hsl(var(--primary))',
                     dy: -4,
                   }}
                 />

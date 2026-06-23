@@ -24,7 +24,7 @@ function RawDataAccordion({ label, data }: { label: string; data: Record<string,
         className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
       >
         <span className="flex items-center gap-2">
-          <Database className="w-3.5 h-3.5 text-violet-400" />
+          <Database className="w-3.5 h-3.5 text-muted-foreground" />
           {label}
         </span>
         {open ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
@@ -212,9 +212,9 @@ export function BetbraModal({ entry, onClose }: BetbraModalProps) {
                 </p>
 
                 {entry?.updated_at && (
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-violet-500/8 border border-violet-500/20">
-                    <Clock className="w-3.5 h-3.5 text-violet-400 flex-shrink-0" />
-                    <span className="text-xs text-violet-300">
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-border">
+                    <Clock className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                    <span className="text-xs text-muted-foreground">
                       Última atualização: {formatUpdatedAt(entry.updated_at)}
                     </span>
                   </div>

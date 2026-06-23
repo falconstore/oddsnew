@@ -229,7 +229,7 @@ export function ProcedureFilters({ filters, onFilterChange, platforms, available
             data-testid="switch-only-favorites"
           />
           <Label htmlFor="onlyFavorites" className="text-xs flex items-center gap-1.5 cursor-pointer">
-            <Star className="w-3 h-3 text-yellow-400" /> Favoritos
+            <Star className="w-3 h-3 text-warning" /> Favoritos
           </Label>
         </div>
 

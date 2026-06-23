@@ -27,10 +27,10 @@ export function getActivityInfo(lastSeenIso: string | undefined): ActivityInfo {
       level: 'never',
       label: 'Nunca abriu',
       sublabel: 'Sem acesso ao app',
-      color: 'text-zinc-400',
-      bgClass: 'bg-zinc-500/10',
-      textClass: 'text-zinc-400',
-      borderClass: 'border-zinc-500/20',
+      color: 'text-muted-foreground',
+      bgClass: 'bg-muted',
+      textClass: 'text-muted-foreground',
+      borderClass: 'border-border',
     };
   }
 
@@ -44,10 +44,10 @@ export function getActivityInfo(lastSeenIso: string | undefined): ActivityInfo {
       level: 'today',
       label: 'Ativo hoje',
       sublabel: hours < 1 ? 'Há menos de 1h' : `Há ${hours}h`,
-      color: 'text-emerald-400',
-      bgClass: 'bg-emerald-500/15',
-      textClass: 'text-emerald-300',
-      borderClass: 'border-emerald-500/30',
+      color: 'text-primary',
+      bgClass: 'bg-primary/15',
+      textClass: 'text-primary',
+      borderClass: 'border-primary/30',
     };
   }
   if (days <= 3) {
@@ -55,10 +55,10 @@ export function getActivityInfo(lastSeenIso: string | undefined): ActivityInfo {
       level: 'recent',
       label: `Ativo ${days}d atrás`,
       sublabel: 'Uso recente',
-      color: 'text-blue-400',
-      bgClass: 'bg-blue-500/15',
-      textClass: 'text-blue-300',
-      borderClass: 'border-blue-500/30',
+      color: 'text-muted-foreground',
+      bgClass: 'bg-muted',
+      textClass: 'text-muted-foreground',
+      borderClass: 'border-border',
     };
   }
   if (days <= 7) {
@@ -66,10 +66,10 @@ export function getActivityInfo(lastSeenIso: string | undefined): ActivityInfo {
       level: 'sleeping',
       label: `Dormindo ${days}d`,
       sublabel: 'Sem acesso recente',
-      color: 'text-amber-400',
-      bgClass: 'bg-amber-500/15',
-      textClass: 'text-amber-300',
-      borderClass: 'border-amber-500/30',
+      color: 'text-warning',
+      bgClass: 'bg-warning/15',
+      textClass: 'text-warning',
+      borderClass: 'border-warning/30',
     };
   }
   if (days <= 14) {
@@ -77,20 +77,20 @@ export function getActivityInfo(lastSeenIso: string | undefined): ActivityInfo {
       level: 'inactive',
       label: `Inativo ${days}d`,
       sublabel: 'Precisa de reativação',
-      color: 'text-orange-400',
-      bgClass: 'bg-orange-500/15',
-      textClass: 'text-orange-300',
-      borderClass: 'border-orange-500/30',
+      color: 'text-warning',
+      bgClass: 'bg-warning/15',
+      textClass: 'text-warning',
+      borderClass: 'border-warning/30',
     };
   }
   return {
     level: 'gone',
     label: `Sumiu ${days}d`,
     sublabel: 'Abandono',
-    color: 'text-red-400',
-    bgClass: 'bg-red-500/15',
-    textClass: 'text-red-300',
-    borderClass: 'border-red-500/30',
+    color: 'text-destructive',
+    bgClass: 'bg-destructive/15',
+    textClass: 'text-destructive',
+    borderClass: 'border-destructive/30',
   };
 }
 

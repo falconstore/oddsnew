@@ -5,7 +5,10 @@ import path from "path";
 export default defineConfig(({ mode }) => ({
   server: {
     host: "0.0.0.0",
-    port: 5000,
+    // Porta dedicada do admin. strictPort = não "pula" de porta se estiver
+    // ocupada (falha explícita em vez de cair na 5001/5002 e confundir).
+    port: 5200,
+    strictPort: true,
     allowedHosts: true,
   },
   plugins: [react()].filter(Boolean),

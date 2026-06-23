@@ -85,31 +85,31 @@ export function NotificationPanel({ procedures, onDismiss, onProcedureClick }: N
   const mediumUrgency = urgentProcs.filter(p => p.urgency === 'medium').length;
 
   const colorConfig: Record<string, { border: string; bg: string; text: string; glow: string }> = {
-    red:    { border: 'border-red-500/30', bg: 'bg-red-500/15', text: 'text-red-400', glow: 'shadow-red-500/10' },
-    orange: { border: 'border-orange-500/30', bg: 'bg-orange-500/15', text: 'text-orange-400', glow: 'shadow-orange-500/10' },
-    amber:  { border: 'border-amber-500/30', bg: 'bg-amber-500/15', text: 'text-amber-400', glow: 'shadow-amber-500/10' },
-    yellow: { border: 'border-yellow-500/30', bg: 'bg-yellow-500/15', text: 'text-yellow-400', glow: 'shadow-yellow-500/10' },
+    red:    { border: 'border-destructive/30', bg: 'bg-destructive/15', text: 'text-destructive', glow: 'shadow-destructive/10' },
+    orange: { border: 'border-warning/30', bg: 'bg-warning/15', text: 'text-warning', glow: 'shadow-warning/10' },
+    amber:  { border: 'border-warning/30', bg: 'bg-warning/15', text: 'text-warning', glow: 'shadow-warning/10' },
+    yellow: { border: 'border-warning/30', bg: 'bg-warning/15', text: 'text-warning', glow: 'shadow-warning/10' },
   };
 
   return (
-    <div className="rounded-2xl border border-red-500/25 overflow-hidden">
-      <div className="bg-gradient-to-r from-red-500/10 via-orange-500/8 to-transparent p-4 flex justify-between items-center border-b border-red-500/15">
+    <div className="rounded-2xl border border-destructive/25 overflow-hidden">
+      <div className="bg-destructive/10 p-4 flex justify-between items-center border-b border-destructive/15">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-red-500/20 rounded-xl flex items-center justify-center shadow-lg shadow-red-500/20">
-            <Bell className="w-4.5 h-4.5 text-red-400" />
+          <div className="w-9 h-9 bg-destructive/20 rounded-xl flex items-center justify-center shadow-lg shadow-destructive/20">
+            <Bell className="w-4.5 h-4.5 text-destructive" />
           </div>
           <div>
             <h3 className="font-bold text-sm text-foreground">Procedimentos que Precisam de Atenção</h3>
             <div className="flex items-center gap-2 mt-0.5">
               {highUrgency > 0 && (
-                <span className="text-[10px] font-semibold text-red-400 flex items-center gap-1">
+                <span className="text-[10px] font-semibold text-destructive flex items-center gap-1">
                   <AlertCircle className="w-2.5 h-2.5" />
                   {highUrgency} urgente{highUrgency > 1 ? 's' : ''}
                 </span>
               )}
               {highUrgency > 0 && mediumUrgency > 0 && <span className="text-muted-foreground/40 text-[10px]">•</span>}
               {mediumUrgency > 0 && (
-                <span className="text-[10px] font-semibold text-amber-400 flex items-center gap-1">
+                <span className="text-[10px] font-semibold text-warning flex items-center gap-1">
                   <Clock className="w-2.5 h-2.5" />
                   {mediumUrgency} média{mediumUrgency > 1 ? 's' : ''}
                 </span>
@@ -158,13 +158,13 @@ export function NotificationPanel({ procedures, onDismiss, onProcedureClick }: N
                       {proc.freebet_value && (
                         <>
                           <span className="text-muted-foreground/40 text-[10px]">•</span>
-                          <span className="text-[10px] text-purple-400 font-semibold">FB: R$ {proc.freebet_value.toFixed(2)}</span>
+                          <span className="text-[10px] text-muted-foreground font-semibold">FB: R$ {proc.freebet_value.toFixed(2)}</span>
                         </>
                       )}
                       {proc.profit_loss !== null && proc.profit_loss !== undefined && (
                         <>
                           <span className="text-muted-foreground/40 text-[10px]">•</span>
-                          <span className={`text-[10px] font-bold ${proc.profit_loss >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                          <span className={`text-[10px] font-bold ${proc.profit_loss >= 0 ? 'text-primary' : 'text-destructive'}`}>
                             R$ {proc.profit_loss.toFixed(2)}
                           </span>
                         </>
@@ -178,7 +178,7 @@ export function NotificationPanel({ procedures, onDismiss, onProcedureClick }: N
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}
-                    className="text-cyan-400 hover:text-cyan-300 transition-colors mt-0.5"
+                    className="text-muted-foreground hover:text-foreground transition-colors mt-0.5"
                   >
                     <ExternalLink className="w-3.5 h-3.5" />
                   </a>

@@ -4,6 +4,7 @@ import { format, formatDistanceToNowStrict } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Bot, RefreshCw, AlertCircle, AlertTriangle, Info, Trash2, ChevronDown, ChevronUp, Activity, PlugZap } from 'lucide-react';
 import { Layout } from '@/components/Layout';
+import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -46,20 +47,20 @@ function useBotLogs() {
 const levelConfig = {
   error: {
     icon: AlertCircle,
-    badge: 'bg-red-500/15 text-red-400 border-red-500/30',
-    row: 'border-l-2 border-l-red-500/50',
+    badge: 'bg-destructive/15 text-destructive border-destructive/30',
+    row: 'border-l-2 border-l-destructive/50',
     label: 'Erro',
   },
   warning: {
     icon: AlertTriangle,
-    badge: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
-    row: 'border-l-2 border-l-amber-500/50',
+    badge: 'bg-warning/15 text-warning border-warning/30',
+    row: 'border-l-2 border-l-warning/50',
     label: 'Aviso',
   },
   info: {
     icon: Info,
-    badge: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
-    row: 'border-l-2 border-l-blue-500/50',
+    badge: 'bg-muted/15 text-muted-foreground border-border/30',
+    row: 'border-l-2 border-l-border/50',
     label: 'Info',
   },
 };
@@ -87,7 +88,7 @@ function LogRow({ log }: { log: BotLog }) {
               {log.event}
             </span>
             {log.procedure_number && (
-              <span className="text-[10px] font-semibold text-cyan-400">#{log.procedure_number}</span>
+              <span className="text-[10px] font-semibold text-muted-foreground">#{log.procedure_number}</span>
             )}
           </div>
           <p className="text-sm text-foreground/90 leading-snug">{log.message}</p>
@@ -220,31 +221,21 @@ export default function BotLogs() {
           : 'bad';
   const freshnessClass = {
     muted: 'from-white/5 to-transparent border-white/10 text-muted-foreground',
-    ok: 'from-emerald-500/15 to-transparent border-emerald-500/30 text-emerald-300',
-    warn: 'from-amber-500/15 to-transparent border-amber-500/30 text-amber-300',
-    bad: 'from-red-500/15 to-transparent border-red-500/30 text-red-300',
+    ok: 'from-primary/15 to-transparent border-primary/30 text-primary',
+    warn: 'from-warning/15 to-transparent border-warning/30 text-warning',
+    bad: 'from-destructive/15 to-transparent border-destructive/30 text-destructive',
   }[freshnessTone];
 
   return (
     <Layout>
       <div className="space-y-5 animate-fade-in">
 
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-red-500/25 to-red-500/5 border border-red-500/25 flex items-center justify-center flex-shrink-0">
-              <Bot className="h-5 w-5 text-red-400" />
-            </div>
-            <div>
-              <h1 className="text-xl md:text-2xl font-bold tracking-tight gradient-text">
-                Logs do Bot de Procedimentos
-              </h1>
-              <p className="text-muted-foreground text-xs md:text-sm mt-0.5">
-                Erros e avisos do bot — não vão mais para o grupo do Telegram
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
+        <PageHeader
+          eyebrow="LOGS"
+          title="Logs do Bot"
+          subtitle="ERROS E AVISOS DO BOT — NÃO VÃO MAIS PARA O GRUPO DO TELEGRAM"
+          icon={Bot}
+          actions={<>
             {dataUpdatedAt && (
               <span className="text-xs text-muted-foreground/50 flex items-center gap-1">
                 <RefreshCw className={cn('h-3 w-3', isFetching && 'animate-spin')} />
@@ -256,7 +247,7 @@ export default function BotLogs() {
               onClick={handleRegisterWebhook}
               disabled={registering}
               data-testid="button-register-webhook"
-              className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10 h-9"
+              className="border-warning/30 text-warning hover:bg-warning/10 h-9"
             >
               <PlugZap className={cn('w-3.5 h-3.5 mr-1.5', registering && 'animate-pulse')} />
               {registering ? 'Registrando…' : 'Registrar Webhook'}
@@ -265,8 +256,8 @@ export default function BotLogs() {
               <RefreshCw className={cn('w-3.5 h-3.5 mr-1.5', isFetching && 'animate-spin')} />
               Atualizar
             </Button>
-          </div>
-        </div>
+          </>}
+        />
 
         {/* Freshness — última atividade do bot */}
         <div className={cn(

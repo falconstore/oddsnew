@@ -11,6 +11,7 @@ import {
   Smartphone, Bell, Crown, Shield,
 } from 'lucide-react';
 import { Layout } from '@/components/Layout';
+import { PageHeader } from '@/components/PageHeader';
 import { DailyLeadsChart } from '@/components/trial/DailyLeadsChart';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -47,13 +48,13 @@ const RANGE_LABELS: Record<TrialStatsRange, string> = {
 };
 
 const STATUS_META: Record<TrialStatus, { label: string; cls: string }> = {
-  pending: { label: 'Aguardando entrada', cls: 'bg-amber-500/15 text-amber-300 border-amber-500/30' },
-  active: { label: 'Ativo', cls: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' },
-  expired: { label: 'Expirado', cls: 'bg-zinc-500/15 text-zinc-300 border-zinc-500/30' },
-  removed: { label: 'Removido', cls: 'bg-red-500/15 text-red-300 border-red-500/30' },
-  blocked: { label: 'Bloqueado', cls: 'bg-purple-500/15 text-purple-300 border-purple-500/30' },
-  blocked_repeat: { label: 'Repetidor bloqueado', cls: 'bg-orange-500/15 text-orange-300 border-orange-500/30' },
-  converted: { label: 'Convertido (pago)', cls: 'bg-emerald-600/20 text-emerald-200 border-emerald-500/40' },
+  pending: { label: 'Aguardando entrada', cls: 'bg-warning/15 text-warning border-warning/30' },
+  active: { label: 'Ativo', cls: 'bg-primary/15 text-primary border-primary/30' },
+  expired: { label: 'Expirado', cls: 'bg-muted text-muted-foreground border-border' },
+  removed: { label: 'Removido', cls: 'bg-destructive/15 text-destructive border-destructive/30' },
+  blocked: { label: 'Bloqueado', cls: 'bg-muted text-muted-foreground border-border' },
+  blocked_repeat: { label: 'Repetidor bloqueado', cls: 'bg-warning/15 text-warning border-warning/30' },
+  converted: { label: 'Convertido (pago)', cls: 'bg-primary/20 text-primary border-primary/40' },
 };
 
 const fmtDate = (iso: string | null) =>
@@ -183,73 +184,46 @@ export default function TrialAdmin() {
   return (
     <Layout>
       <div className="relative space-y-4 md:space-y-6 animate-fade-in">
-        <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
-          <div className="absolute top-0 left-1/3 -translate-x-1/2 w-[800px] h-[500px] rounded-full bg-pink-500/8 blur-[130px]" />
-          <div className="absolute top-1/2 right-0 w-[400px] h-[400px] rounded-full bg-purple-500/6 blur-[100px]" />
-        </div>
-
-        {/* Hero */}
-        <div className="relative rounded-3xl overflow-hidden border border-white/8 glass p-6 md:p-8">
-          <div className="absolute inset-0 pointer-events-none">
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[180px] rounded-full bg-pink-500/12 blur-[70px]" />
-          </div>
-          <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
-            <div className="space-y-3">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-pink-500/10 border border-pink-500/25 text-pink-300 text-xs font-semibold">
-                <Sparkles className="w-3 h-3" />
-                Trial Telegram
-                <span className="w-1.5 h-1.5 rounded-full bg-pink-400 animate-pulse-glow" />
-              </div>
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-pink-500/30 to-purple-600/10 border border-pink-500/30 flex items-center justify-center shadow-lg shadow-pink-500/15 flex-shrink-0">
-                  <Gift className="h-7 w-7 text-pink-300" />
-                </div>
-                <div>
-                  <h1 className="text-2xl md:text-3xl font-bold tracking-tight bg-gradient-to-r from-pink-400 via-fuchsia-400 to-purple-400 bg-clip-text text-transparent">
-                    CRM Trial 7 dias
-                  </h1>
-                  <p className="text-muted-foreground text-sm">
-                    {stats.total} leads · {stats.active} ativos · {stats.pending} aguardando
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                className="border-amber-500/30 text-amber-300 hover:bg-amber-500/10"
-                onClick={() => { setDiagOpen(true); diagnose.mutate(); }}
-                data-testid="button-diagnose-telegram"
-              >
-                <Stethoscope className="w-4 h-4 mr-1.5" />
-                Diagnosticar Telegram
+        <PageHeader
+          eyebrow="TRIAL"
+          title="CRM Trial 7 dias"
+          subtitle="TRIAL TELEGRAM"
+          icon={Gift}
+          actions={<>
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-warning/30 text-warning hover:bg-warning/10"
+              onClick={() => { setDiagOpen(true); diagnose.mutate(); }}
+              data-testid="button-diagnose-telegram"
+            >
+              <Stethoscope className="w-4 h-4 mr-1.5" />
+              Diagnosticar Telegram
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-primary/30 text-primary hover:bg-primary/10"
+              onClick={() => setTestOpen(true)}
+              data-testid="button-open-test-dm"
+            >
+              <Send className="w-4 h-4 mr-1.5" />
+              Enviar DM teste
+            </Button>
+            <a href={`${TRIAL_PUBLIC_URL}/`} target="_blank" rel="noopener noreferrer">
+              <Button size="sm" variant="outline" className="border-border text-muted-foreground hover:bg-muted" data-testid="link-trial-landing">
+                <ExternalLink className="w-4 h-4 mr-1.5" />
+                Abrir landing
               </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10"
-                onClick={() => setTestOpen(true)}
-                data-testid="button-open-test-dm"
-              >
-                <Send className="w-4 h-4 mr-1.5" />
-                Enviar DM teste
-              </Button>
-              <a href={`${TRIAL_PUBLIC_URL}/`} target="_blank" rel="noopener noreferrer">
-                <Button size="sm" variant="outline" className="border-pink-500/30 text-pink-300 hover:bg-pink-500/10" data-testid="link-trial-landing">
-                  <ExternalLink className="w-4 h-4 mr-1.5" />
-                  Abrir landing
-                </Button>
-              </a>
-            </div>
-          </div>
-        </div>
+            </a>
+          </>}
+        />
 
         {/* Webhook Guard — auto-heal contra "sequestro" do bot token */}
         <div
           className={`glass rounded-3xl border p-5 md:p-6 ${
             (webhookAudit.data?.recentDriftCount ?? 0) > 0
-              ? 'border-amber-500/40 bg-amber-500/[0.04]'
+              ? 'border-warning/40 bg-warning/[0.04]'
               : 'border-white/8'
           }`}
           data-testid="webhook-guard-card"
@@ -258,19 +232,19 @@ export default function TrialAdmin() {
             <div className="flex-1 min-w-0 space-y-2">
               <h2 className="text-lg md:text-xl font-bold flex items-center gap-2">
                 <ShieldAlert className={`w-5 h-5 ${
-                  (webhookAudit.data?.recentDriftCount ?? 0) > 0 ? 'text-amber-300' : 'text-emerald-400'
+                  (webhookAudit.data?.recentDriftCount ?? 0) > 0 ? 'text-warning' : 'text-primary'
                 }`} />
                 Guarda do Webhook
               </h2>
               {(webhookAudit.data?.recentDriftCount ?? 0) > 0 ? (
                 <div className="space-y-1.5">
-                  <p className="text-sm text-amber-100" data-testid="webhook-guard-banner">
+                  <p className="text-sm text-warning/90" data-testid="webhook-guard-banner">
                     O webhook foi corrigido automaticamente{' '}
                     <b>{webhookAudit.data!.recentDriftCount}× nas últimas 24h</b> — alguém (provavelmente
                     outro projeto seu usando o mesmo token) está sobrescrevendo o webhook do bot do trial.
                   </p>
                   {webhookAudit.data?.lastDrift?.previous_url && (
-                    <p className="text-xs text-amber-200/80 font-mono break-all">
+                    <p className="text-xs text-warning/80 font-mono break-all">
                       Última URL estranha: {webhookAudit.data.lastDrift.previous_url}
                     </p>
                   )}
@@ -300,7 +274,7 @@ export default function TrialAdmin() {
                   }
                   data-testid="switch-webhook-autoheal"
                 />
-                <span className={settings.data?.webhook_autoheal_enabled === false ? 'text-red-300' : 'text-emerald-300'}>
+                <span className={settings.data?.webhook_autoheal_enabled === false ? 'text-destructive' : 'text-primary'}>
                   {settings.data?.webhook_autoheal_enabled === false ? 'desligado' : 'ligado'}
                 </span>
               </label>
@@ -325,7 +299,7 @@ export default function TrialAdmin() {
                   key={ev.id}
                   className={`rounded-xl border p-3 text-xs space-y-1 ${
                     ev.was_drifted
-                      ? 'border-amber-500/25 bg-amber-500/[0.04]'
+                      ? 'border-warning/25 bg-warning/[0.04]'
                       : 'border-white/8 bg-white/[0.02]'
                   }`}
                   data-testid={`audit-event-${ev.id}`}
@@ -333,26 +307,26 @@ export default function TrialAdmin() {
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-semibold flex items-center gap-1.5">
                       {ev.was_drifted ? (
-                        <AlertTriangle className="w-3.5 h-3.5 text-amber-300" />
+                        <AlertTriangle className="w-3.5 h-3.5 text-warning" />
                       ) : (
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-300" />
+                        <CheckCircle2 className="w-3.5 h-3.5 text-primary" />
                       )}
                       {ev.action_taken}
                     </span>
                     <span className="text-muted-foreground">{fmtDate(ev.checked_at)}</span>
                   </div>
                   {ev.previous_url && (
-                    <div className="font-mono text-amber-200/80 break-all">
+                    <div className="font-mono text-warning/80 break-all">
                       antes: {ev.previous_url}
                     </div>
                   )}
                   {ev.new_url && (
-                    <div className="font-mono text-emerald-300/80 break-all">
+                    <div className="font-mono text-primary/80 break-all">
                       novo: {ev.new_url}
                     </div>
                   )}
                   {ev.error_message && (
-                    <div className="text-red-300">erro: {ev.error_message}</div>
+                    <div className="text-destructive">erro: {ev.error_message}</div>
                   )}
                 </div>
               ))}
@@ -365,7 +339,7 @@ export default function TrialAdmin() {
           <div className="flex flex-col md:flex-row md:items-end gap-4">
             <div className="flex-1 min-w-0">
               <h2 className="text-lg md:text-xl font-bold flex items-center gap-2">
-                <ShoppingCart className="w-5 h-5 text-pink-400" />
+                <ShoppingCart className="w-5 h-5 text-muted-foreground" />
                 Cupom dos avisos (24h e 1h)
               </h2>
               <p className="text-xs text-muted-foreground mt-0.5">
@@ -402,7 +376,7 @@ export default function TrialAdmin() {
                   || !couponDraft.trim()
                   || couponDraft.trim() === settings.data?.reminder_coupon
                 }
-                className="bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-500/30 h-9"
+                className="bg-primary/20 hover:bg-primary/30 text-primary border border-primary/30 h-9"
                 data-testid="button-save-coupon"
               >
                 {updateSettings.isPending ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-1.5" />}
@@ -417,7 +391,7 @@ export default function TrialAdmin() {
           <div className="flex flex-col md:flex-row md:items-end gap-4">
             <div className="flex-1 min-w-0">
               <h2 className="text-lg md:text-xl font-bold flex items-center gap-2">
-                <RefreshCw className="w-5 h-5 text-cyan-400" />
+                <RefreshCw className="w-5 h-5 text-muted-foreground" />
                 Recall de leads travados
               </h2>
               <p className="text-xs text-muted-foreground mt-0.5">
@@ -469,7 +443,7 @@ export default function TrialAdmin() {
                   updateSettings.mutate(patch, { onSuccess: () => setRecallDraft({}) });
                 }}
                 disabled={updateSettings.isPending || Object.keys(recallDraft).length === 0}
-                className="bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-200 border border-cyan-500/30 h-9"
+                className="bg-primary/20 hover:bg-primary/30 text-primary border border-primary/30 h-9"
                 data-testid="button-save-recall-settings"
               >
                 {updateSettings.isPending ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-1.5" />}
@@ -484,7 +458,7 @@ export default function TrialAdmin() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
               <h2 className="text-lg md:text-xl font-bold flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-emerald-400" />
+                <TrendingUp className="w-5 h-5 text-primary" />
                 Conversão do aviso de 24h
               </h2>
               <p className="text-xs text-muted-foreground mt-0.5">
@@ -493,7 +467,7 @@ export default function TrialAdmin() {
             </div>
             <Select value={statsRange} onValueChange={v => setStatsRange(v as TrialStatsRange)}>
               <SelectTrigger
-                className="bg-white/5 border-white/10 h-9 text-sm w-[180px]"
+                className="bg-white/5 border-white/10 h-9 text-sm w-full sm:w-[180px]"
                 data-testid="select-stats-range"
               >
                 <SelectValue />
@@ -520,7 +494,7 @@ export default function TrialAdmin() {
                 label="Avisos 24h enviados"
                 value={upgradeStats.remindersSent}
                 hint="Trials que receberam o aviso de 24h"
-                accent="from-amber-500/20 to-amber-500/5 border-amber-500/25 text-amber-300"
+                accent="from-warning/20 to-warning/5 border-warning/25 text-warning"
                 testId="metric-reminders-sent"
               />
               <MetricCard
@@ -528,7 +502,7 @@ export default function TrialAdmin() {
                 label="Avisos 1h enviados"
                 value={upgradeStats.reminders1hSent}
                 hint="Último lembrete antes da expiração"
-                accent="from-orange-500/20 to-orange-500/5 border-orange-500/25 text-orange-300"
+                accent="from-warning/20 to-warning/5 border-warning/25 text-warning"
                 testId="metric-reminders-1h-sent"
               />
               <MetricCard
@@ -536,7 +510,7 @@ export default function TrialAdmin() {
                 label="Pagamentos pós-aviso"
                 value={upgradeStats.paidAfterReminder}
                 hint="Leads avisados que viraram assinatura"
-                accent="from-fuchsia-500/20 to-fuchsia-500/5 border-fuchsia-500/25 text-fuchsia-300"
+                accent="from-muted/20 to-muted/5 border-border text-muted-foreground"
                 testId="metric-paid-after-reminder"
               />
               <MetricCard
@@ -548,7 +522,7 @@ export default function TrialAdmin() {
                     ? `${upgradeStats.paidAfterReminder} de ${upgradeStats.remindersSent} avisos`
                     : 'Sem avisos no período'
                 }
-                accent="from-emerald-500/20 to-emerald-500/5 border-emerald-500/25 text-emerald-300"
+                accent="from-primary/20 to-primary/5 border-primary/25 text-primary"
                 testId="metric-conversion-rate"
               />
             </div>
@@ -560,7 +534,7 @@ export default function TrialAdmin() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
               <h2 className="text-lg md:text-xl font-bold flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-emerald-400" />
+                <Sparkles className="w-5 h-5 text-primary" />
                 LP Shark 100% Green
               </h2>
               <p className="text-xs text-muted-foreground mt-0.5">
@@ -571,7 +545,7 @@ export default function TrialAdmin() {
               <Button
                 size="sm"
                 variant="outline"
-                className="border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10"
+                className="border-primary/30 text-primary hover:bg-primary/10"
                 data-testid="link-trial-landing-stats"
               >
                 <ExternalLink className="w-4 h-4 mr-1.5" />
@@ -594,7 +568,7 @@ export default function TrialAdmin() {
                   label="Visitas na LP"
                   value={landingStats.views}
                   hint="Quantas vezes a landing foi aberta"
-                  accent="from-sky-500/20 to-sky-500/5 border-sky-500/25 text-sky-300"
+                  accent="from-muted/20 to-muted/5 border-border text-muted-foreground"
                   testId="metric-lp-views"
                 />
                 <MetricCard
@@ -602,7 +576,7 @@ export default function TrialAdmin() {
                   label="Total de cliques"
                   value={landingStats.totalClicks}
                   hint="Soma dos 3 botões"
-                  accent="from-fuchsia-500/20 to-fuchsia-500/5 border-fuchsia-500/25 text-fuchsia-300"
+                  accent="from-muted/20 to-muted/5 border-border text-muted-foreground"
                   testId="metric-lp-total-clicks"
                 />
                 <MetricCard
@@ -618,7 +592,7 @@ export default function TrialAdmin() {
                       ? `${landingStats.totalClicks} de ${landingStats.views} visitas`
                       : 'Sem visitas no período'
                   }
-                  accent="from-emerald-500/20 to-emerald-500/5 border-emerald-500/25 text-emerald-300"
+                  accent="from-primary/20 to-primary/5 border-primary/25 text-primary"
                   testId="metric-lp-ctr"
                 />
                 <MetricCard
@@ -626,7 +600,7 @@ export default function TrialAdmin() {
                   label="Abriu form trial"
                   value={landingStats.clicksOpenForm}
                   hint='Cliques em "Quero testar 7 Dias"'
-                  accent="from-amber-500/20 to-amber-500/5 border-amber-500/25 text-amber-300"
+                  accent="from-warning/20 to-warning/5 border-warning/25 text-warning"
                   testId="metric-lp-open-form"
                 />
               </div>
@@ -637,8 +611,8 @@ export default function TrialAdmin() {
                   label="Quero testar 7 Dias"
                   value={landingStats.clicksOpenForm}
                   total={landingStats.totalClicks}
-                  accent="text-amber-300 bg-amber-500/10 border-amber-500/25"
-                  bar="bg-amber-400/70"
+                  accent="text-warning bg-warning/10 border-warning/25"
+                  bar="bg-warning/70"
                   testId="metric-lp-cta-form"
                 />
                 <CtaBreakdownCard
@@ -646,8 +620,8 @@ export default function TrialAdmin() {
                   label="Acessar Grupos Free"
                   value={landingStats.clicksFreeGroup}
                   total={landingStats.totalClicks}
-                  accent="text-sky-300 bg-sky-500/10 border-sky-500/25"
-                  bar="bg-sky-400/70"
+                  accent="text-muted-foreground bg-muted border-border"
+                  bar="bg-muted-foreground/70"
                   testId="metric-lp-cta-free-group"
                 />
                 <CtaBreakdownCard
@@ -655,8 +629,8 @@ export default function TrialAdmin() {
                   label="Compre Agora"
                   value={landingStats.clicksCheckout}
                   total={landingStats.totalClicks}
-                  accent="text-pink-300 bg-pink-500/10 border-pink-500/25"
-                  bar="bg-pink-400/70"
+                  accent="text-muted-foreground bg-muted border-border"
+                  bar="bg-muted-foreground/70"
                   testId="metric-lp-cta-checkout"
                 />
               </div>
@@ -669,11 +643,11 @@ export default function TrialAdmin() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
               <h2 className="text-lg md:text-xl font-bold flex items-center gap-2">
-                <Radio className="w-5 h-5 text-emerald-400" />
+                <Radio className="w-5 h-5 text-primary" />
                 Conversions API · últimas 24h
               </h2>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Eventos enviados pra Meta direto da Edge Function (PageView e Lead). Casa com o pixel via <code className="text-emerald-300">event_id</code> pra deduplicar.
+                Eventos enviados pra Meta direto da Edge Function (PageView e Lead). Casa com o pixel via <code className="text-primary">event_id</code> pra deduplicar.
               </p>
             </div>
           </div>
@@ -691,7 +665,7 @@ export default function TrialAdmin() {
             >
               <ServerCog className="w-5 h-5 text-white/40 flex-shrink-0" />
               <div>
-                Nenhum evento server-side enviado nas últimas 24h. Confira se a secret <code className="text-emerald-300">META_CAPI_ACCESS_TOKEN</code> está configurada no Supabase.
+                Nenhum evento server-side enviado nas últimas 24h. Confira se a secret <code className="text-primary">META_CAPI_ACCESS_TOKEN</code> está configurada no Supabase.
               </div>
             </div>
           ) : (
@@ -702,7 +676,7 @@ export default function TrialAdmin() {
                   label="Eventos enviados"
                   value={capiStats.total}
                   hint="Total de tentativas (sucesso + erro)"
-                  accent="from-sky-500/20 to-sky-500/5 border-sky-500/25 text-sky-300"
+                  accent="from-muted/20 to-muted/5 border-border text-muted-foreground"
                   testId="metric-capi-total"
                 />
                 <MetricCard
@@ -710,7 +684,7 @@ export default function TrialAdmin() {
                   label="Sucessos"
                   value={capiStats.success}
                   hint="Aceitos pela Meta (HTTP 200)"
-                  accent="from-emerald-500/20 to-emerald-500/5 border-emerald-500/25 text-emerald-300"
+                  accent="from-primary/20 to-primary/5 border-primary/25 text-primary"
                   testId="metric-capi-success"
                 />
                 <MetricCard
@@ -722,7 +696,7 @@ export default function TrialAdmin() {
                       ? `Último: ${capiStats.lastError.error_message ?? 'falha desconhecida'}`
                       : 'Nenhum erro registrado'
                   }
-                  accent="from-red-500/20 to-red-500/5 border-red-500/25 text-red-300"
+                  accent="from-destructive/20 to-destructive/5 border-destructive/25 text-destructive"
                   testId="metric-capi-errors"
                 />
                 <MetricCard
@@ -730,7 +704,7 @@ export default function TrialAdmin() {
                   label="Taxa de sucesso"
                   value={`${capiStats.successRate.toFixed(1)}%`}
                   hint={`${capiStats.success} de ${capiStats.total}`}
-                  accent="from-fuchsia-500/20 to-fuchsia-500/5 border-fuchsia-500/25 text-fuchsia-300"
+                  accent="from-primary/20 to-primary/5 border-primary/25 text-primary"
                   testId="metric-capi-success-rate"
                 />
               </div>
@@ -748,18 +722,18 @@ export default function TrialAdmin() {
                       >
                         <div className="flex items-center justify-between gap-2 mb-2">
                           <span className="text-sm font-semibold flex items-center gap-1.5">
-                            <Radio className="w-3.5 h-3.5 text-emerald-300" />
+                            <Radio className="w-3.5 h-3.5 text-primary" />
                             {name}
                           </span>
-                          <span className="text-xs font-mono text-emerald-300">
+                          <span className="text-xs font-mono text-primary">
                             {rate.toFixed(0)}% ok
                           </span>
                         </div>
                         <div className="flex items-center gap-3 text-xs">
-                          <span className="inline-flex items-center gap-1 text-emerald-300">
+                          <span className="inline-flex items-center gap-1 text-primary">
                             <CheckCircle2 className="w-3 h-3" /> {b.success}
                           </span>
-                          <span className="inline-flex items-center gap-1 text-red-300">
+                          <span className="inline-flex items-center gap-1 text-destructive">
                             <XCircle className="w-3 h-3" /> {b.errors}
                           </span>
                         </div>
@@ -771,20 +745,20 @@ export default function TrialAdmin() {
 
               {capiStats.lastError && (
                 <div
-                  className="rounded-2xl border border-red-500/30 bg-red-500/5 p-4 text-xs text-red-200 space-y-1"
+                  className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-xs text-destructive space-y-1"
                   data-testid="capi-last-error"
                 >
                   <div className="font-semibold flex items-center gap-1.5">
                     <AlertTriangle className="w-3.5 h-3.5" />
                     Último erro: {capiStats.lastError.event_name}
                   </div>
-                  <div className="font-mono text-red-300/90 break-words">
+                  <div className="font-mono text-destructive/90 break-words">
                     {capiStats.lastError.error_message ?? 'falha desconhecida'}
                     {capiStats.lastError.http_status
                       ? ` · HTTP ${capiStats.lastError.http_status}`
                       : ''}
                   </div>
-                  <div className="text-[11px] text-red-300/60">
+                  <div className="text-[11px] text-destructive/60">
                     {fmtDate(capiStats.lastError.created_at)}
                   </div>
                 </div>
@@ -794,20 +768,20 @@ export default function TrialAdmin() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-3 md:gap-4">
-          <StatCard icon={<Users className="w-5 h-5" />} label="Total leads" value={stats.total} accent="from-pink-500/20 to-pink-500/5 border-pink-500/25 text-pink-300" />
-          <StatCard icon={<CheckCircle2 className="w-5 h-5" />} label="Ativos" value={stats.active} accent="from-emerald-500/20 to-emerald-500/5 border-emerald-500/25 text-emerald-300" />
-          <StatCard icon={<Clock className="w-5 h-5" />} label="Expirados" value={stats.expired} accent="from-zinc-500/20 to-zinc-500/5 border-zinc-500/25 text-zinc-300" />
-          <StatCard icon={<Ban className="w-5 h-5" />} label="Bloqueados" value={stats.blocked} accent="from-purple-500/20 to-purple-500/5 border-purple-500/25 text-purple-300" />
-          <StatCard icon={<ShieldAlert className="w-5 h-5" />} label="Repetidores bloqueados" value={stats.blockedRepeat} accent="from-orange-500/20 to-orange-500/5 border-orange-500/25 text-orange-300" />
-          <StatCard icon={<CheckCircle2 className="w-5 h-5" />} label="Convertidos (pagos)" value={stats.converted} accent="from-emerald-600/25 to-emerald-600/5 border-emerald-500/30 text-emerald-200" />
-          <StatCard icon={<Ban className="w-5 h-5" />} label="Removidos" value={stats.removed} accent="from-red-500/20 to-red-500/5 border-red-500/25 text-red-300" />
-          <StatCard icon={<Users2 className="w-5 h-5" />} label="Grupo Free" value={stats.freeGroup} accent="from-teal-500/20 to-teal-500/5 border-teal-500/25 text-teal-300" />
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
+          <StatCard icon={<Users className="w-5 h-5" />} label="Total leads" value={stats.total} accent="from-muted/20 to-muted/5 border-border text-muted-foreground" />
+          <StatCard icon={<CheckCircle2 className="w-5 h-5" />} label="Ativos" value={stats.active} accent="from-primary/20 to-primary/5 border-primary/25 text-primary" />
+          <StatCard icon={<Clock className="w-5 h-5" />} label="Expirados" value={stats.expired} accent="from-muted/20 to-muted/5 border-border text-muted-foreground" />
+          <StatCard icon={<Ban className="w-5 h-5" />} label="Bloqueados" value={stats.blocked} accent="from-muted/20 to-muted/5 border-border text-muted-foreground" />
+          <StatCard icon={<ShieldAlert className="w-5 h-5" />} label="Repetidores bloqueados" value={stats.blockedRepeat} accent="from-warning/20 to-warning/5 border-warning/25 text-warning" />
+          <StatCard icon={<CheckCircle2 className="w-5 h-5" />} label="Convertidos (pagos)" value={stats.converted} accent="from-primary/25 to-primary/5 border-primary/30 text-primary" />
+          <StatCard icon={<Ban className="w-5 h-5" />} label="Removidos" value={stats.removed} accent="from-destructive/20 to-destructive/5 border-destructive/25 text-destructive" />
+          <StatCard icon={<Users2 className="w-5 h-5" />} label="Grupo Free" value={stats.freeGroup} accent="from-primary/20 to-primary/5 border-primary/25 text-primary" />
         </div>
 
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-2">
-          <div className="relative flex-1 min-w-[200px] max-w-sm">
+          <div className="relative flex-1 min-w-[140px] max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               value={search}
@@ -818,7 +792,7 @@ export default function TrialAdmin() {
             />
           </div>
           <Select value={monthFilter} onValueChange={setMonthFilter}>
-            <SelectTrigger className="bg-white/5 border-white/10 h-9 text-sm w-[190px]" data-testid="select-trial-month-filter">
+            <SelectTrigger className="bg-white/5 border-white/10 h-9 text-sm w-full sm:w-[190px]" data-testid="select-trial-month-filter">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -828,7 +802,7 @@ export default function TrialAdmin() {
             </SelectContent>
           </Select>
           <Select value={statusFilter} onValueChange={v => setStatusFilter(v as 'all' | TrialStatus)}>
-            <SelectTrigger className="bg-white/5 border-white/10 h-9 text-sm w-[180px]" data-testid="select-trial-status-filter">
+            <SelectTrigger className="bg-white/5 border-white/10 h-9 text-sm w-full sm:w-[180px]" data-testid="select-trial-status-filter">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -843,7 +817,7 @@ export default function TrialAdmin() {
             </SelectContent>
           </Select>
           <Select value={cohortFilter} onValueChange={v => setCohortFilter(v as 'all' | 'v1' | 'v2' | 'ads' | 'free_group')}>
-            <SelectTrigger className="bg-white/5 border-white/10 h-9 text-sm w-[180px]" data-testid="select-trial-cohort-filter">
+            <SelectTrigger className="bg-white/5 border-white/10 h-9 text-sm w-full sm:w-[180px]" data-testid="select-trial-cohort-filter">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -855,7 +829,7 @@ export default function TrialAdmin() {
             </SelectContent>
           </Select>
           <Select value={recallFilter} onValueChange={v => setRecallFilter(v as 'all' | 'never' | 'sent')}>
-            <SelectTrigger className="bg-white/5 border-white/10 h-9 text-sm w-[180px]" data-testid="select-trial-recall-filter">
+            <SelectTrigger className="bg-white/5 border-white/10 h-9 text-sm w-full sm:w-[180px]" data-testid="select-trial-recall-filter">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -865,7 +839,7 @@ export default function TrialAdmin() {
             </SelectContent>
           </Select>
           <Select value={activityFilter} onValueChange={v => setActivityFilter(v as 'all' | ActivityLevel)}>
-            <SelectTrigger className="bg-white/5 border-white/10 h-9 text-sm w-[190px]" data-testid="select-trial-activity-filter">
+            <SelectTrigger className="bg-white/5 border-white/10 h-9 text-sm w-full sm:w-[190px]" data-testid="select-trial-activity-filter">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -905,7 +879,7 @@ export default function TrialAdmin() {
                   size="sm"
                   onClick={() => setConfirmBulkRecall(true)}
                   disabled={recall.isPending || validSelected.length === 0}
-                  className="h-9 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-200 border border-cyan-500/30 disabled:opacity-40"
+                  className="h-9 bg-primary/20 hover:bg-primary/30 text-primary border border-primary/30 disabled:opacity-40"
                   data-testid="button-bulk-recall"
                   title={validSelected.length === 0
                     ? 'Marque ao menos um lead pendente pra fazer o recall em lote'
@@ -935,7 +909,7 @@ export default function TrialAdmin() {
             <p className="text-sm text-muted-foreground">
               {leads.length === 0 ? 'Nenhum lead capturado ainda. Compartilhe ' : 'Nenhum lead com esses filtros.'}
               {leads.length === 0 && (
-                <a href={`${TRIAL_PUBLIC_URL}/`} target="_blank" rel="noopener noreferrer" className="text-pink-400 hover:text-pink-300 underline">
+                <a href={`${TRIAL_PUBLIC_URL}/`} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary/80 underline">
                   o link da landing
                 </a>
               )}
@@ -961,7 +935,7 @@ export default function TrialAdmin() {
               const kickLabel = isAlreadyRemoved ? 'Re-expulsar' : 'Remover';
               return (
                 <div key={lead.id}
-                  className="glass rounded-2xl border border-white/8 p-4 hover:border-pink-500/25 transition-all duration-200 card-hover"
+                  className="glass rounded-2xl border border-white/8 p-4 hover:border-primary/25 transition-all duration-200 card-hover"
                   data-testid={`card-trial-lead-${lead.id}`}>
                   <div className="flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-4">
                     {lead.status === 'pending' && !!lead.telegram_user_id && (
@@ -969,7 +943,7 @@ export default function TrialAdmin() {
                         type="checkbox"
                         checked={selectedRecallIds.has(lead.id)}
                         onChange={() => toggleRecallSelection(lead.id)}
-                        className="h-4 w-4 accent-cyan-400 cursor-pointer flex-shrink-0"
+                        className="h-4 w-4 accent-primary cursor-pointer flex-shrink-0"
                         title="Selecionar pra recall em lote"
                         data-testid={`checkbox-recall-${lead.id}`}
                       />
@@ -992,7 +966,7 @@ export default function TrialAdmin() {
                         )}
                         {lead.cohort === 'ads' && (
                           <Badge
-                            className="text-[10px] bg-cyan-500/15 text-cyan-300 border-cyan-500/35"
+                            className="text-[10px] bg-muted text-muted-foreground border-border"
                             data-testid={`badge-cohort-ads-${lead.id}`}
                             title={lead.utm_campaign ? `Campanha: ${lead.utm_campaign}` : 'Lead captado via tráfego pago'}
                           >
@@ -1001,7 +975,7 @@ export default function TrialAdmin() {
                         )}
                         {lead.cohort === 'free_group' && (
                           <Badge
-                            className="text-[10px] bg-teal-500/15 text-teal-300 border-teal-500/35"
+                            className="text-[10px] bg-primary/15 text-primary border-primary/35"
                             data-testid={`badge-cohort-free-group-${lead.id}`}
                             title="Lead do Grupo Free (grupo gratuito)"
                           >
@@ -1010,7 +984,7 @@ export default function TrialAdmin() {
                         )}
                         {lead.previous_lead_id && (
                           <Badge
-                            className="text-[10px] bg-orange-500/10 text-orange-300 border-orange-500/30"
+                            className="text-[10px] bg-warning/10 text-warning border-warning/30"
                             data-testid={`badge-previous-lead-${lead.id}`}
                           >
                             <ShieldAlert className="w-2.5 h-2.5 mr-1" />
@@ -1021,7 +995,7 @@ export default function TrialAdmin() {
                           <button
                             type="button"
                             onClick={() => setHistoryLead(lead)}
-                            className="text-[10px] text-orange-300 hover:text-orange-200 underline underline-offset-2"
+                            className="text-[10px] text-warning hover:text-warning/80 underline underline-offset-2"
                             data-testid={`button-view-previous-${lead.id}`}
                           >
                             Ver trial anterior
@@ -1039,7 +1013,7 @@ export default function TrialAdmin() {
                               : `há ${mins}min`;
                           return (
                             <Badge
-                              className="text-[10px] bg-cyan-500/10 text-cyan-300 border-cyan-500/30"
+                              className="text-[10px] bg-muted text-muted-foreground border-border"
                               data-testid={`badge-recall-${lead.id}`}
                               title={`Recall enviado ${lead.recall_count ?? 1}x · último em ${fmtDate(lead.last_recall_at)}`}
                             >
@@ -1051,7 +1025,7 @@ export default function TrialAdmin() {
                         {(lead.status === 'converted' || lead.paid_at) && (
                           <RouterLink
                             to={`/lastlink-admin?lead=${lead.id}`}
-                            className="inline-flex items-center gap-1 text-[10px] text-emerald-300 hover:text-emerald-200 underline underline-offset-2"
+                            className="inline-flex items-center gap-1 text-[10px] text-primary hover:text-primary/80 underline underline-offset-2"
                             data-testid={`link-lastlink-detail-${lead.id}`}
                             title="Ver detalhes do pagamento na Lastlink"
                           >
@@ -1066,7 +1040,7 @@ export default function TrialAdmin() {
                         <span className="inline-flex items-center gap-1"><Send className="w-3 h-3" />@{lead.telegram_username}</span>
                       </div>
                       {lead.cohort === 'ads' && (lead.utm_source || lead.utm_medium || lead.utm_campaign || lead.utm_content || lead.utm_term || lead.fbclid) && (
-                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-blue-300/70 mt-0.5" data-testid={`utm-row-${lead.id}`}>
+                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground/70 mt-0.5" data-testid={`utm-row-${lead.id}`}>
                           {lead.utm_source   && <span>src: <span className="font-mono">{lead.utm_source}</span></span>}
                           {lead.utm_medium   && <span>med: <span className="font-mono">{lead.utm_medium}</span></span>}
                           {lead.utm_campaign && <span>camp: <span className="font-mono">{lead.utm_campaign}</span></span>}
@@ -1079,7 +1053,7 @@ export default function TrialAdmin() {
                       <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                         {lead.entered_at ? (
                           <Badge
-                            className="text-[10px] bg-emerald-500/10 text-emerald-300 border-emerald-500/30"
+                            className="text-[10px] bg-primary/10 text-primary border-primary/30"
                             data-testid={`badge-vip-${lead.id}`}
                             title={`Entrou no VIP em ${fmtDate(lead.entered_at)}`}
                           >
@@ -1098,7 +1072,7 @@ export default function TrialAdmin() {
                         )}
                         {lead.bonus_entered_at ? (
                           <Badge
-                            className="text-[10px] bg-amber-500/10 text-amber-300 border-amber-500/30"
+                            className="text-[10px] bg-warning/10 text-warning border-warning/30"
                             data-testid={`badge-bonus-${lead.id}`}
                             title={`Entrou no bônus em ${fmtDate(lead.bonus_entered_at)}`}
                           >
@@ -1128,12 +1102,12 @@ export default function TrialAdmin() {
                           <Badge
                             className={`text-[10px] ${
                               lead.subscription_status === 'active'
-                                ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                                ? 'bg-primary/15 text-primary border-primary/30'
                                 : lead.subscription_status === 'canceled' || lead.subscription_status === 'refunded'
-                                ? 'bg-red-500/15 text-red-300 border-red-500/30'
+                                ? 'bg-destructive/15 text-destructive border-destructive/30'
                                 : lead.subscription_status === 'expired'
-                                ? 'bg-zinc-500/15 text-zinc-400 border-zinc-500/30'
-                                : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                                ? 'bg-muted text-muted-foreground border-border'
+                                : 'bg-warning/15 text-warning border-warning/30'
                             }`}
                             data-testid={`badge-sub-status-${lead.id}`}
                             title={`Lastlink: assinatura ${lead.subscription_status}`}
@@ -1163,7 +1137,7 @@ export default function TrialAdmin() {
                         {/* Push notification */}
                         {pwaStats?.pushLeadIds.has(lead.id) ? (
                           <Badge
-                            className="text-[10px] bg-violet-500/15 text-violet-300 border-violet-500/30"
+                            className="text-[10px] bg-muted text-muted-foreground border-border"
                             data-testid={`badge-push-${lead.id}`}
                             title="Usuário tem notificações push ativas"
                           >
@@ -1231,7 +1205,7 @@ export default function TrialAdmin() {
                         <Button
                           size="sm"
                           variant="outline"
-                          className="h-8 text-xs border-sky-500/30 text-sky-300 hover:bg-sky-500/10"
+                          className="h-8 text-xs border-border text-muted-foreground hover:bg-muted"
                           onClick={() => {
                             setLinkLead(lead);
                             setManualUserId('');
@@ -1249,7 +1223,7 @@ export default function TrialAdmin() {
                         <Button
                           size="sm"
                           variant="outline"
-                          className="h-8 text-xs border-orange-500/30 text-orange-300 hover:bg-orange-500/10"
+                          className="h-8 text-xs border-warning/30 text-warning hover:bg-warning/10"
                           onClick={() => setForceLead(lead)}
                           data-testid={`button-lead-force-activate-${lead.id}`}
                           title="Forçar a ativação por 7 dias mesmo sendo um Telegram repetido"
@@ -1262,7 +1236,7 @@ export default function TrialAdmin() {
                         <Button
                           size="sm"
                           variant="outline"
-                          className="h-8 text-xs border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/10 disabled:opacity-40"
+                          className="h-8 text-xs border-border text-muted-foreground hover:bg-muted disabled:opacity-40"
                           disabled={!lead.telegram_user_id || recall.isPending}
                           onClick={() => recall.mutate({ leadIds: [lead.id] })}
                           data-testid={`button-lead-recall-${lead.id}`}
@@ -1283,7 +1257,7 @@ export default function TrialAdmin() {
                         <Button
                           size="sm"
                           variant="outline"
-                          className="h-8 text-xs border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-40"
+                          className="h-8 text-xs border-primary/30 text-primary hover:bg-primary/10 disabled:opacity-40"
                           disabled={manualActivate.isPending}
                           onClick={() => setConfirmActivate(lead)}
                           data-testid={`button-lead-manual-activate-${lead.id}`}
@@ -1298,7 +1272,7 @@ export default function TrialAdmin() {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="h-8 w-8 p-0 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-40"
+                        className="h-8 w-8 p-0 border-primary/30 text-primary hover:bg-primary/10 disabled:opacity-40"
                         disabled={!lead.telegram_user_id || sendTest.isPending}
                         onClick={() => sendTest.mutate({
                           variant: '24h',
@@ -1321,7 +1295,7 @@ export default function TrialAdmin() {
                           <Button
                             size="sm"
                             variant="outline"
-                            className="h-8 w-8 p-0 border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/10 disabled:opacity-40"
+                            className="h-8 w-8 p-0 border-border text-muted-foreground hover:bg-muted disabled:opacity-40"
                             disabled={!tgValid}
                             onClick={async () => {
                               const username = normalizeTelegramUsername(lead.telegram_username);
@@ -1360,7 +1334,7 @@ export default function TrialAdmin() {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="h-8 text-xs border-red-500/30 text-red-300 hover:bg-red-500/10 disabled:opacity-40"
+                        className="h-8 text-xs border-destructive/30 text-destructive hover:bg-destructive/10 disabled:opacity-40"
                         disabled={!canKick}
                         onClick={() => setConfirmKick(lead)}
                         data-testid={`button-lead-kick-${lead.id}`}
@@ -1372,7 +1346,7 @@ export default function TrialAdmin() {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="h-8 text-xs border-red-700/40 text-red-400 hover:bg-red-700/15"
+                        className="h-8 text-xs border-destructive/40 text-destructive hover:bg-destructive/15"
                         onClick={() => setConfirmPurge(lead)}
                         data-testid={`button-lead-purge-${lead.id}`}
                         title="Apagar definitivamente do banco — libera email/whatsapp/@ pra um novo trial"
@@ -1394,7 +1368,7 @@ export default function TrialAdmin() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Trash2 className="w-5 h-5 text-red-400" />
+              <Trash2 className="w-5 h-5 text-destructive" />
               Remover do grupo
             </DialogTitle>
             <DialogDescription>
@@ -1427,14 +1401,14 @@ export default function TrialAdmin() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+              <CheckCircle2 className="w-5 h-5 text-primary" />
               Ativar manualmente
             </DialogTitle>
             <DialogDescription className="space-y-2 pt-1">
               <span className="block">
                 Confirme que <b>{confirmActivate?.name}</b> (@{confirmActivate?.telegram_username}) já está no grupo VIP antes de continuar.
               </span>
-              <span className="block text-amber-300/90 text-xs border border-amber-500/25 rounded-lg px-3 py-2 bg-amber-500/8">
+              <span className="block text-warning/90 text-xs border border-warning/25 rounded-lg px-3 py-2 bg-warning/8">
                 ⚠️ Use este botão <b>somente</b> quando a pessoa já entrou no grupo mas o status não atualizou automaticamente. Se ela ainda não entrou, o trial vai contar os 7 dias sem que ela esteja presente.
               </span>
             </DialogDescription>
@@ -1444,7 +1418,7 @@ export default function TrialAdmin() {
               Cancelar
             </Button>
             <Button
-              className="bg-emerald-600 hover:bg-emerald-500 text-white"
+              className="bg-primary hover:bg-primary/80 text-primary-foreground"
               disabled={manualActivate.isPending}
               onClick={async () => {
                 if (!confirmActivate) return;
@@ -1465,7 +1439,7 @@ export default function TrialAdmin() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <RefreshCw className="w-5 h-5 text-cyan-400" />
+              <RefreshCw className="w-5 h-5 text-muted-foreground" />
               Recall em massa
             </DialogTitle>
             <DialogDescription>
@@ -1478,7 +1452,7 @@ export default function TrialAdmin() {
               Cancelar
             </Button>
             <Button
-              className="bg-cyan-500/30 hover:bg-cyan-500/40 text-cyan-100 border border-cyan-500/40"
+              className="bg-primary/30 hover:bg-primary/40 text-primary border border-primary/40"
               disabled={recall.isPending}
               onClick={async () => {
                 const ids = Array.from(selectedRecallIds).filter(id =>
@@ -1502,7 +1476,7 @@ export default function TrialAdmin() {
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Stethoscope className="w-5 h-5 text-amber-400" />
+              <Stethoscope className="w-5 h-5 text-warning" />
               Diagnóstico do Telegram
             </DialogTitle>
             <DialogDescription>
@@ -1518,7 +1492,7 @@ export default function TrialAdmin() {
           )}
 
           {diagnose.isError && (
-            <div className="text-sm text-red-300 bg-red-500/10 border border-red-500/30 rounded-xl p-4">
+            <div className="text-sm text-destructive bg-destructive/10 border border-destructive/30 rounded-xl p-4">
               {(diagnose.error as Error)?.message || 'Falha ao rodar o diagnóstico.'}
             </div>
           )}
@@ -1528,8 +1502,8 @@ export default function TrialAdmin() {
               {/* Banner global */}
               <div className={`rounded-xl border p-3 flex items-start gap-2 ${
                 diag.ok
-                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-200'
-                  : 'bg-red-500/10 border-red-500/30 text-red-200'
+                  ? 'bg-primary/10 border-primary/30 text-primary'
+                  : 'bg-destructive/10 border-destructive/30 text-destructive'
               }`}>
                 {diag.ok
                   ? <CheckCircle2 className="w-5 h-5 flex-shrink-0 mt-0.5" />
@@ -1592,7 +1566,7 @@ export default function TrialAdmin() {
               </div>
 
               {!diag.summary.webhook_has_chat_member_subscription && (
-                <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 text-xs text-amber-100 space-y-2">
+                <div className="bg-warning/10 border border-warning/30 rounded-xl p-3 text-xs text-warning space-y-2">
                   <div className="font-semibold flex items-center gap-1.5">
                     <AlertTriangle className="w-4 h-4" /> Como religar o webhook (causa mais comum)
                   </div>
@@ -1611,7 +1585,7 @@ export default function TrialAdmin() {
             </Button>
             <Button
               variant="outline"
-              className="border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10"
+              className="border-primary/30 text-primary hover:bg-primary/10"
               onClick={() => linkGc.mutate()}
               disabled={linkGc.isPending}
               data-testid="button-link-gc"
@@ -1622,7 +1596,7 @@ export default function TrialAdmin() {
             </Button>
             <Button
               variant="outline"
-              className="border-sky-500/30 text-sky-300 hover:bg-sky-500/10"
+              className="border-border text-muted-foreground hover:bg-muted"
               onClick={async () => {
                 await resetWebhook.mutateAsync().catch(() => {});
                 diagnose.mutate();
@@ -1636,7 +1610,7 @@ export default function TrialAdmin() {
             </Button>
             <Button
               variant="outline"
-              className="border-amber-500/30 text-amber-300 hover:bg-amber-500/10"
+              className="border-warning/30 text-warning hover:bg-warning/10"
               onClick={() => diagnose.mutate()}
               disabled={diagnose.isPending}
               data-testid="button-rerun-diag"
@@ -1663,7 +1637,7 @@ export default function TrialAdmin() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Link2 className="w-5 h-5 text-sky-400" />
+              <Link2 className="w-5 h-5 text-muted-foreground" />
               Vincular ao Telegram
             </DialogTitle>
             <DialogDescription>
@@ -1675,7 +1649,7 @@ export default function TrialAdmin() {
 
           <div className="space-y-3 text-sm">
             {linkResult?.needManual && (
-              <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-100 space-y-2">
+              <div className="rounded-xl border border-warning/30 bg-warning/10 p-3 text-xs text-warning space-y-2">
                 <div className="font-semibold flex items-center gap-1.5">
                   <AlertTriangle className="w-3.5 h-3.5" /> ID numérico necessário
                 </div>
@@ -1702,7 +1676,7 @@ export default function TrialAdmin() {
               </div>
             )}
             {linkManual.isError && (
-              <div className="text-xs text-red-300 bg-red-500/10 border border-red-500/30 rounded-xl p-3">
+              <div className="text-xs text-destructive bg-destructive/10 border border-destructive/30 rounded-xl p-3">
                 {(linkManual.error as Error)?.message}
               </div>
             )}
@@ -1717,7 +1691,7 @@ export default function TrialAdmin() {
               Cancelar
             </Button>
             <Button
-              className="bg-sky-500 hover:bg-sky-400 text-white"
+              className="bg-primary hover:bg-primary/80 text-primary-foreground"
               disabled={linkManual.isPending}
               onClick={async () => {
                 if (!linkLead) return;
@@ -1756,7 +1730,7 @@ export default function TrialAdmin() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Trash2 className="w-5 h-5 text-red-500" />
+              <Trash2 className="w-5 h-5 text-destructive" />
               Apagar do banco
             </DialogTitle>
             <DialogDescription className="space-y-2">
@@ -1764,7 +1738,7 @@ export default function TrialAdmin() {
                 Você está prestes a <b>apagar definitivamente</b> o lead <b>{confirmPurge?.name}</b>{' '}
                 (@{confirmPurge?.telegram_username}) do banco de dados.
               </span>
-              <span className="block text-amber-300/90 text-xs">
+              <span className="block text-warning/90 text-xs">
                 ⚠️ Essa ação <b>não pode ser desfeita</b>. Se o usuário ainda estiver
                 no grupo, ele será removido antes. O email, WhatsApp e @ ficam livres
                 para um novo cadastro.
@@ -1796,7 +1770,7 @@ export default function TrialAdmin() {
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <ShieldAlert className="w-5 h-5 text-orange-400" />
+              <ShieldAlert className="w-5 h-5 text-warning" />
               Trial anterior
             </DialogTitle>
             <DialogDescription>
@@ -1863,7 +1837,7 @@ export default function TrialAdmin() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Unlock className="w-5 h-5 text-orange-400" />
+              <Unlock className="w-5 h-5 text-warning" />
               Liberar e ativar trial
             </DialogTitle>
             <DialogDescription>
@@ -1877,7 +1851,7 @@ export default function TrialAdmin() {
               Cancelar
             </Button>
             <Button
-              className="bg-orange-500 hover:bg-orange-400 text-white"
+              className="bg-warning hover:bg-warning/80 text-warning-foreground"
               disabled={forceActivate.isPending}
               onClick={async () => {
                 if (!forceLead) return;
@@ -1904,13 +1878,13 @@ export default function TrialAdmin() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Send className="w-5 h-5 text-emerald-400" />
+              <Send className="w-5 h-5 text-primary" />
               Enviar DM de teste
             </DialogTitle>
             <DialogDescription>
               Manda a mensagem real (24h ou 1h antes da expiração) para um Telegram qualquer. O cupom usado é o que está salvo acima.
               <br />
-              <span className="text-amber-300/80 text-xs">Importante: o destinatário precisa ter iniciado conversa com o bot pelo menos uma vez (mandar /start).</span>
+              <span className="text-warning/80 text-xs">Importante: o destinatário precisa ter iniciado conversa com o bot pelo menos uma vez (mandar /start).</span>
             </DialogDescription>
           </DialogHeader>
 
@@ -1976,7 +1950,7 @@ export default function TrialAdmin() {
                 });
               }}
               disabled={sendTest.isPending || (!testForm.userId.trim() && !testForm.username.trim())}
-              className="bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-500/30"
+              className="bg-primary/20 hover:bg-primary/30 text-primary border border-primary/30"
               data-testid="button-confirm-test"
             >
               {sendTest.isPending ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Enviando…</> : <><Send className="w-4 h-4 mr-1.5" /> Enviar DM teste</>}
@@ -1992,14 +1966,14 @@ function DiagRow({
   ok, label, value, tone,
 }: { ok: boolean; label: string; value: string; tone?: 'info' }) {
   const cls = tone === 'info'
-    ? 'border-amber-500/30 bg-amber-500/5'
+    ? 'border-warning/30 bg-warning/5'
     : ok
-      ? 'border-emerald-500/20 bg-emerald-500/5'
-      : 'border-red-500/25 bg-red-500/5';
+      ? 'border-primary/20 bg-primary/5'
+      : 'border-destructive/25 bg-destructive/5';
   const Icon = tone === 'info' ? AlertTriangle : ok ? CheckCircle2 : XCircle;
   const iconCls = tone === 'info'
-    ? 'text-amber-400'
-    : ok ? 'text-emerald-400' : 'text-red-400';
+    ? 'text-warning'
+    : ok ? 'text-primary' : 'text-destructive';
   return (
     <div className={`rounded-xl border p-2.5 flex items-start gap-2 ${cls}`}>
       <Icon className={`w-4 h-4 flex-shrink-0 mt-0.5 ${iconCls}`} />

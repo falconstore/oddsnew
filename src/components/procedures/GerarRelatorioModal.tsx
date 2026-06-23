@@ -174,7 +174,7 @@ export function GerarRelatorioModal({ open, onOpenChange, procedures }: Props) {
           </Button>
           <Button
             onClick={handleCopy}
-            className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground font-semibold"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
             data-testid="button-copy-relatorio-final"
           >
             <Copy className="w-4 h-4 mr-2" />

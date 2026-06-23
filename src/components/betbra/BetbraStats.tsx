@@ -22,44 +22,44 @@ const colorMap: Record<StatColor, {
   bar: string;
 }> = {
   amber: {
-    card: 'bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent',
-    border: 'border-amber-500/20',
-    iconBg: 'bg-gradient-to-br from-amber-500/25 to-amber-600/10',
-    icon: 'text-amber-400',
-    accent: 'text-amber-400',
-    bar: 'from-amber-400 to-amber-600',
+    card: 'bg-card',
+    border: 'border-border',
+    iconBg: 'bg-muted',
+    icon: 'text-muted-foreground',
+    accent: 'text-muted-foreground',
+    bar: 'from-border to-border',
   },
   cyan: {
-    card: 'bg-gradient-to-br from-cyan-500/10 via-cyan-500/5 to-transparent',
-    border: 'border-cyan-500/20',
-    iconBg: 'bg-gradient-to-br from-cyan-500/25 to-cyan-600/10',
-    icon: 'text-cyan-400',
-    accent: 'text-cyan-400',
-    bar: 'from-cyan-400 to-cyan-600',
+    card: 'bg-card',
+    border: 'border-border',
+    iconBg: 'bg-muted',
+    icon: 'text-muted-foreground',
+    accent: 'text-muted-foreground',
+    bar: 'from-border to-border',
   },
   green: {
-    card: 'bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-transparent',
-    border: 'border-emerald-500/20',
-    iconBg: 'bg-gradient-to-br from-emerald-500/25 to-emerald-600/10',
-    icon: 'text-emerald-400',
-    accent: 'text-emerald-400',
-    bar: 'from-emerald-400 to-emerald-600',
+    card: 'bg-card',
+    border: 'border-primary/40',
+    iconBg: 'bg-card',
+    icon: 'text-primary',
+    accent: 'text-primary',
+    bar: 'from-primary to-primary/60',
   },
   purple: {
-    card: 'bg-gradient-to-br from-purple-500/10 via-purple-500/5 to-transparent',
-    border: 'border-purple-500/20',
-    iconBg: 'bg-gradient-to-br from-purple-500/25 to-purple-600/10',
-    icon: 'text-purple-400',
-    accent: 'text-purple-400',
-    bar: 'from-purple-400 to-purple-600',
+    card: 'bg-card',
+    border: 'border-border',
+    iconBg: 'bg-muted',
+    icon: 'text-muted-foreground',
+    accent: 'text-muted-foreground',
+    bar: 'from-border to-border',
   },
   yellow: {
-    card: 'bg-gradient-to-br from-yellow-500/10 via-yellow-500/5 to-transparent',
-    border: 'border-yellow-500/20',
-    iconBg: 'bg-gradient-to-br from-yellow-500/25 to-yellow-600/10',
-    icon: 'text-yellow-400',
-    accent: 'text-yellow-400',
-    bar: 'from-yellow-400 to-yellow-500',
+    card: 'bg-card',
+    border: 'border-border',
+    iconBg: 'bg-muted',
+    icon: 'text-muted-foreground',
+    accent: 'text-foreground',
+    bar: 'from-border to-border',
   },
 };
 
@@ -67,7 +67,7 @@ function StatCard({ title, value, icon: Icon, color, subtitle }: StatCardProps) 
   const c = colorMap[color];
   return (
     <div className={`relative rounded-2xl border p-4 flex flex-col gap-3 card-hover overflow-hidden transition-all duration-300 ${c.card} ${c.border}`}>
-      <div className={`absolute top-0 left-0 w-full h-0.5 bg-gradient-to-r ${c.bar} opacity-60`} />
+      <div className={`absolute top-0 left-0 w-full h-0.5 bg-gradient-to-r ${c.bar} opacity-80`} />
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider mb-1.5 truncate">
