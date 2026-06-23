@@ -62,7 +62,14 @@ serve(async (req) => {
 
   const cutoff = Deno.env.get("FREEBETPRO_DATA_DE_CORTE") ?? "2026-05-03";
 
-  // Janela de retry: apenas procedures dos últimos 2 dias.
+  // Modo "reprocessar tudo": chamada manual com ?all=true ignora a janela de 2
+  // dias e reprocessa TODOS os pendentes desde o cutoff. Usado pra recuperar
+  // falhas em massa (ex: 400 transitório na criação). O cron periódico NÃO
+  // passa esse param, então continua conservador.
+  const url = new URL(req.url);
+  const reprocessAll = url.searchParams.get("all") === "true";
+
+  // Janela de retry: apenas procedures dos últimos 2 dias (modo cron).
   // Garante que o cron só retenta FALHAS RECENTES — procs antigos que nunca
   // foram sincronizados NÃO são enviados agora, evitando que apareçam como
   // "hoje" no painel do FreeBet PRO.
@@ -70,8 +77,10 @@ serve(async (req) => {
   windowStart.setDate(windowStart.getDate() - 2);
   const windowStartDate = windowStart.toISOString().slice(0, 10);
 
-  // Usa o maior entre cutoff e windowStart
-  const effectiveFrom = windowStartDate > cutoff ? windowStartDate : cutoff;
+  // Modo all: usa só o cutoff (sem janela de 2 dias). Modo cron: maior entre os dois.
+  const effectiveFrom = reprocessAll
+    ? cutoff
+    : (windowStartDate > cutoff ? windowStartDate : cutoff);
 
   try {
     // Busca procedures não-sincronizados elegíveis (até 50 por tick)
@@ -124,13 +133,17 @@ serve(async (req) => {
           synced++;
           log("synced", { id: proc.id, num: proc.procedure_number, fbStatus: res.status });
         } else {
-          const errMsg = res.body?.error
-            ? `${res.status} ${res.errorCode ?? ""} ${res.body.error.message ?? ""}`.trim()
-            : `${res.status} ${JSON.stringify(res.body).slice(0, 200)}`;
+          const e = res.body?.error;
+          const detalhe =
+            e?.message ??
+            (e?.details ? JSON.stringify(e.details) : null) ??
+            res.body?.message ??
+            (res.body ? JSON.stringify(res.body) : "");
+          const errMsg = `${res.status} ${res.errorCode ?? ""} ${detalhe ?? ""}`.trim().slice(0, 300);
           updates.freebetpro_last_error = errMsg;
           failed++;
           errors.push({ num: proc.procedure_number ?? proc.id, err: errMsg });
-          log("failed", { id: proc.id, num: proc.procedure_number, status: res.status, errMsg });
+          log("failed", { id: proc.id, num: proc.procedure_number, status: res.status, body: res.body });
         }
 
         await supabase.from("procedures").update(updates).eq("id", proc.id);
