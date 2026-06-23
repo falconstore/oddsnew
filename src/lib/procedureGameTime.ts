@@ -44,19 +44,35 @@ export function getGameTimeBucket(
 // Status que indicam procedimento já finalizado — não precisa definir resultado.
 const FINALIZED_STATUSES = ['Concluído', 'Lucro Direto'];
 
+// Decide se o troféu "Definir Resultado" deve aparecer.
+//
+// Regras (acordadas com o operador):
+//  1. Já conferido (resultado_lucro registrado) → NÃO mostra (já definido).
+//  2. Status finalizado (Concluído / Lucro Direto) → NÃO mostra.
+//  3. SUPERODD com lucro previsto = 0 → MOSTRA (precisa definir o valor real),
+//     mesmo que o jogo ainda não tenha "acabado" pela regra de horário.
+//  4. Caso geral (Promoção, Freebet, etc.) → MOSTRA quando o jogo já acabou
+//     ou não tem horário definido (bucket 'ended' | 'none').
 export function canCheckResult(
   proc: Pick<Procedure, 'data_partida' | 'horario_partida'> & {
     kickoff_at?: string | null;
     status?: string | null;
     resultado_lucro?: number | null;
+    category?: string | null;
+    lucro_prejuizo_previsto?: number | null;
+    profit_loss?: number | null;
   },
   now: Date = new Date(),
 ): boolean {
-  // Já finalizado (status concluído OU resultado já registrado): não mostra o
-  // troféu — o resultado já está definido.
-  if (proc.status && FINALIZED_STATUSES.includes(proc.status)) return false;
+  // 1 + 2 — já definido / finalizado: não precisa do troféu.
   if (proc.resultado_lucro != null) return false;
+  if (proc.status && FINALIZED_STATUSES.includes(proc.status)) return false;
 
+  // 3 — Superodd com lucro previsto zerado precisa de conferência sempre.
+  const lucroPrevisto = proc.lucro_prejuizo_previsto ?? proc.profit_loss ?? 0;
+  if (proc.category === 'Superodd' && Number(lucroPrevisto) === 0) return true;
+
+  // 4 — regra geral pelo tempo de jogo.
   const bucket = getGameTimeBucket(proc, now);
   return bucket === 'ended' || bucket === 'none';
 }
