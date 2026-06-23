@@ -2,7 +2,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Star, Pencil, Trash2, ExternalLink, Tag, Archive, ArchiveRestore, Trophy, CheckCircle2, AlertCircle, AlertTriangle, ShieldAlert, Timer } from 'lucide-react';
+import { Star, Pencil, Trash2, ExternalLink, Tag, Archive, ArchiveRestore, Trophy, CheckCircle2, AlertCircle, Timer } from 'lucide-react';
 import { Procedure } from '@/types/procedures';
 import { formatProcedureDate, translateCategory, getDisplayProfitLoss, getCategoryBadgeClass } from '@/lib/procedureUtils';
 import { canCheckResult } from '@/lib/procedureGameTime';
@@ -69,8 +69,6 @@ export function ProcedureTable({ procedures, proceduresById, visibleColumns, onE
         <TableBody>
           {procedures.flatMap((proc, idx) => {
             const showCheck = onCheckResult && canCheckResult(proc) && !proc.archived;
-            const hasIncomplete = proc.bot_needs_review && proc.bot_missing_fields && proc.bot_missing_fields.length > 0;
-            const needsReviewOnly = proc.bot_needs_review && (!proc.bot_missing_fields || proc.bot_missing_fields.length === 0);
             const prevDate = idx > 0 ? procedures[idx - 1].date : null;
             const showSeparator = idx === 0 || proc.date !== prevDate;
             const rows = [];
@@ -92,7 +90,7 @@ export function ProcedureTable({ procedures, proceduresById, visibleColumns, onE
             <TableRow
               key={proc.id}
               data-testid={`row-procedure-${proc.id}`}
-              className={`border-white/5 ${idx % 2 === 0 ? 'bg-white/[0.025]' : 'bg-transparent'} hover:bg-white/[0.06] transition-colors group ${proc.archived ? 'opacity-50' : ''} ${proc.tachado ? 'opacity-50 grayscale' : ''} ${hasIncomplete ? 'border-l-2 border-l-warning/40' : needsReviewOnly ? 'border-l-2 border-l-warning/30' : ''}`}
+              className={`border-white/5 ${idx % 2 === 0 ? 'bg-white/[0.025]' : 'bg-transparent'} hover:bg-white/[0.06] transition-colors group ${proc.archived ? 'opacity-50' : ''} ${proc.tachado ? 'opacity-50 grayscale' : ''}`}
             >
               <TableCell className="w-8 py-2 px-2">
                 <Button
@@ -133,32 +131,6 @@ export function ProcedureTable({ procedures, proceduresById, visibleColumns, onE
                       </TooltipTrigger>
                       <TooltipContent side="top" className="max-w-xs">
                         <p className="text-warning">Erro FreeBet Pro: {proc.freebetpro_last_error}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  )}
-                  {hasIncomplete && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span data-testid={`icon-bot-incomplete-${proc.id}`} tabIndex={0} className="inline-flex ml-1 cursor-help">
-                          <AlertTriangle className="w-3 h-3 text-warning" />
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent side="top" className="max-w-xs">
-                        <p className="text-warning font-semibold text-[11px] mb-0.5">Incompleto (bot)</p>
-                        <p className="text-[11px]">Falta: {proc.bot_missing_fields!.join(', ')}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  )}
-                  {needsReviewOnly && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span data-testid={`icon-bot-review-${proc.id}`} tabIndex={0} className="inline-flex ml-1 cursor-help">
-                          <ShieldAlert className="w-3 h-3 text-warning/90" />
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent side="top" className="max-w-xs">
-                        <p className="text-warning font-semibold text-[11px] mb-0.5">Verificar dados (bot)</p>
-                        <p className="text-[11px]">Registrado pelo bot — confirme se os dados estão corretos.</p>
                       </TooltipContent>
                     </Tooltip>
                   )}
