@@ -47,6 +47,11 @@ export function CalendarChart({ data, title, selectedMonth }: CalendarChartProps
         <CardTitle className="telemetry-label text-foreground">{title}</CardTitle>
       </CardHeader>
       <CardContent>
+        {/* Wrapper com scroll horizontal em telas estreitas: o calendário tem
+            largura mínima (7 colunas legíveis); abaixo disso, rola de lado em
+            vez de espremer o conteúdo. */}
+        <div className="overflow-x-auto -mx-2 px-2">
+        <div className="min-w-[640px]">
         {/* Cabeçalho dos dias da semana */}
         <div className="grid grid-cols-7 gap-px mb-px">
           {weekDays.map(day => (
@@ -137,6 +142,8 @@ export function CalendarChart({ data, title, selectedMonth }: CalendarChartProps
               </div>
             );
           })}
+        </div>
+        </div>
         </div>
 
         {/* Legenda */}
