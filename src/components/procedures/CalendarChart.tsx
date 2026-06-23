@@ -51,7 +51,7 @@ export function CalendarChart({ data, title, selectedMonth }: CalendarChartProps
             largura mínima (7 colunas legíveis); abaixo disso, rola de lado em
             vez de espremer o conteúdo. */}
         <div className="overflow-x-auto -mx-2 px-2">
-        <div className="min-w-[640px]">
+        <div className="min-w-[760px]">
         {/* Cabeçalho dos dias da semana */}
         <div className="grid grid-cols-7 gap-px mb-px">
           {weekDays.map(day => (
@@ -98,27 +98,27 @@ export function CalendarChart({ data, title, selectedMonth }: CalendarChartProps
                   <div className="px-2 pb-2 flex flex-col gap-1 w-full">
                     {/* LUCRO — número principal mono */}
                     <div className={cn(
-                      'kpi font-semibold leading-none text-base sm:text-lg md:text-xl',
+                      'kpi font-semibold leading-none text-sm sm:text-base md:text-lg whitespace-nowrap',
                       'text-foreground'
                     )}>
                       {dayData.profit >= 0 ? '+' : ''}R${dayData.profit.toFixed(0)}
                     </div>
 
                     {dgCount > 0 && (
-                      <div className="flex items-center gap-1 leading-tight">
+                      <div className="flex items-center gap-1 leading-tight whitespace-nowrap">
                         <span className="text-[10px] leading-none">🏆</span>
-                        <span className="telemetry-label text-foreground/80">{dgCount} DUPLO GREEN</span>
+                        <span className="telemetry-label text-foreground/80 truncate">{dgCount} DUPLO GREEN</span>
                       </div>
                     )}
 
                     {fbCount > 0 && (
-                      <div className="flex items-center gap-1 leading-tight">
+                      <div className="flex items-center gap-1 leading-tight whitespace-nowrap">
                         <span className="text-[10px] leading-none">🎁</span>
-                        <span className="telemetry-label text-foreground/80">{fbCount} FREEBET{fbCount > 1 ? 'S' : ''}</span>
+                        <span className="telemetry-label text-foreground/80 truncate">{fbCount} FREEBET{fbCount > 1 ? 'S' : ''}</span>
                       </div>
                     )}
 
-                    <div className="telemetry-label text-foreground/60">{dayData.count} PROC</div>
+                    <div className="telemetry-label text-foreground/60 whitespace-nowrap">{dayData.count} PROC</div>
                   </div>
                 ) : (
                   <div className="px-2 pb-2 telemetry-label text-muted-foreground/30">—</div>
