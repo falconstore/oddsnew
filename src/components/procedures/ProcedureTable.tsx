@@ -194,17 +194,24 @@ export function ProcedureTable({ procedures, proceduresById, visibleColumns, onE
               )}
               {visibleColumns.includes('profit_loss') && (() => {
                 const dpl = getDisplayProfitLoss(proc, proceduresById);
+                // Procedimento finalizado (Concluído/Lucro Direto): trata o valor
+                // como REALIZADO (verde/vermelho, sem "~"), mesmo que só tenha o
+                // previsto — o resultado já está definido pelo status.
+                const isFinalized = proc.status === 'Concluído' || proc.status === 'Lucro Direto';
                 // Settled vs previsto deve ser decidido pelo LÍQUIDO cru (profit_loss),
                 // não pelo effective — pois effective = liquid + déficit das origens,
                 // então pode ser != 0 mesmo com jogo ainda em aberto (liquid=0).
-                const showEffective = dpl.liquidEffective !== 0;
+                const showEffective = isFinalized || dpl.liquidEffective !== 0;
                 const showPrevisto = !showEffective && dpl.previsto !== 0;
+                // Quando finalizado sem resultado realizado, effective pode ser 0;
+                // usa o previsto como valor exibido (já que o status diz finalizado).
+                const valorFinal = (isFinalized && dpl.liquidEffective === 0) ? dpl.previsto : dpl.effective;
                 return (
                   <TableCell className="py-2 px-2 text-right">
                     {showEffective ? (
                       <LucroMaximoTooltip dpl={dpl} liquid={dpl.liquidEffective} total={dpl.effective}>
-                        <span className={`text-xs font-bold font-mono tabular-nums ${dpl.effective >= 0 ? 'text-primary' : 'text-destructive'} ${dpl.isGross ? 'underline decoration-dotted decoration-primary/40 underline-offset-2' : ''}`}>
-                          {dpl.effective >= 0 ? '+' : ''}R$ {dpl.effective.toFixed(2)}
+                        <span className={`text-xs font-bold font-mono tabular-nums ${valorFinal >= 0 ? 'text-primary' : 'text-destructive'} ${dpl.isGross ? 'underline decoration-dotted decoration-primary/40 underline-offset-2' : ''}`}>
+                          {valorFinal >= 0 ? '+' : ''}R$ {valorFinal.toFixed(2)}
                         </span>
                       </LucroMaximoTooltip>
                     ) : showPrevisto ? (

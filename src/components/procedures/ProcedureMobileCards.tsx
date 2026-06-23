@@ -142,11 +142,15 @@ export function ProcedureMobileCards({ procedures, proceduresById, onEdit, onDel
             </div>
             {(() => {
               const dpl = getDisplayProfitLoss(proc, proceduresById);
+              // Finalizado (Concluído/Lucro Direto): trata como realizado (verde/
+              // vermelho, sem "~"), usando o previsto quando não há resultado.
+              const isFinalized = proc.status === 'Concluído' || proc.status === 'Lucro Direto';
               // Settled vs previsto deve ser decidido pelo LÍQUIDO cru (profit_loss),
               // não pelo effective — pois effective = liquid + déficit das origens,
               // então pode ser != 0 mesmo com jogo ainda em aberto (liquid=0).
-              const showEffective = dpl.liquidEffective !== 0;
+              const showEffective = isFinalized || dpl.liquidEffective !== 0;
               const showPrevisto = !showEffective && dpl.previsto !== 0;
+              const valorFinal = (isFinalized && dpl.liquidEffective === 0) ? dpl.previsto : dpl.effective;
               return (
                 <div className="bg-white/[0.03] rounded-xl p-2.5 border border-white/5">
                   <p className="text-muted-foreground mb-1">
@@ -155,8 +159,8 @@ export function ProcedureMobileCards({ procedures, proceduresById, onEdit, onDel
                   </p>
                   {showEffective ? (
                     <LucroMaximoTooltip dpl={dpl} liquid={dpl.liquidEffective} total={dpl.effective}>
-                      <span className={`font-bold text-sm ${dpl.effective >= 0 ? 'text-primary' : 'text-destructive'}`}>
-                        {dpl.effective >= 0 ? '+' : ''}R$ {dpl.effective.toFixed(2)}
+                      <span className={`font-bold text-sm ${valorFinal >= 0 ? 'text-primary' : 'text-destructive'}`}>
+                        {valorFinal >= 0 ? '+' : ''}R$ {valorFinal.toFixed(2)}
                       </span>
                     </LucroMaximoTooltip>
                   ) : showPrevisto ? (
