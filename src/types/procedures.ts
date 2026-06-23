@@ -9,7 +9,7 @@ export type ProcedureCategory =
 
 export type ProcedureStatus =
   | 'Enviado'
-  | 'Enviada partida em Aberto'
+  | 'Enviada Partida em Aberto'
   | 'Aguardando Resultado'
   | 'Concluído'
   | 'Lucro Direto'

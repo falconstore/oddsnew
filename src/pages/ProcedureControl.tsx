@@ -140,7 +140,7 @@ export default function ProcedureControl() {
       if (filters.onlyFavorites && !proc.is_favorite) return false;
       if (filters.platform !== 'all' && normalizePlatformName(proc.platform) !== filters.platform) return false;
       if (filters.category !== 'all' && proc.category !== filters.category) return false;
-      if (filters.status !== 'all' && proc.status !== filters.status) return false;
+      if (filters.status !== 'all' && (proc.status ?? '').trim().toLowerCase() !== filters.status.trim().toLowerCase()) return false;
 
       if (filters.profitLoss !== 'all') {
         if (filters.profitLoss === 'profit' && (proc.profit_loss === null || proc.profit_loss <= 0)) return false;
