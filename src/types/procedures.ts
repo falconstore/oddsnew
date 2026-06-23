@@ -81,7 +81,9 @@ export interface Procedure {
   // Bot Telegram — sinalizador de verificação (doc bot-review)
   bot_needs_review: boolean;
   bot_missing_fields: string[] | null;
-  bot_raw_message: string | null;
+  /** Texto bruto do Telegram. Opcional: a listagem (useProcedures) NÃO traz
+   *  este campo por performance — só vem em queries específicas. */
+  bot_raw_message?: string | null;
   // Observações opcionais (ex: Opção 2 da Aposta Protegida)
   observacoes: string | null;
 }

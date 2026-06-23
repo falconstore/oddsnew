@@ -17,9 +17,15 @@ export function useProcedures() {
         return [];
       }
 
+      // Performance: NÃO trazer bot_raw_message (texto inteiro do Telegram por
+      // procedimento — campo mais pesado e não usado na lista/cálculo). Com
+      // milhares de procedimentos, isso reduz muito o payload e acelera a
+      // navegação. Quem precisa do raw (RegisterBotMessageModal, BotTemplates)
+      // carrega o registro à parte.
+      const COLS = 'id,created_date,updated_date,created_by,date,procedure_number,platform,promotion_name,category,status,freebet_reference,freebet_value,profit_loss,telegram_link,dp,tags,is_favorite,data_partida,horario_partida,partida_descricao,tipo,archived,archived_at,lucro_prejuizo_previsto,freebet_valor_previsto,resultado_lucro,resultado_freebet_ganha,freebet_creditada,resultado_observacao,freebetpro_external_id,freebetpro_synced_at,freebetpro_last_error,freebetpro_numero,freebetpro_last_request_id,freebet_reference_id,freebet_reference_ids,is_extra,editado_por,kickoff_at,fixture_id,esporte,cenario_b_cash,tachado,tachado_em,reenviado_em,reenviado_count,duplo_green_confirmado,duplo_green_lucro,bot_needs_review,bot_missing_fields,observacoes';
       const { data, error } = await supabaseProcedures
         .from('procedures')
-        .select('*')
+        .select(COLS)
         .order('date', { ascending: false })
         .limit(10000);
 
@@ -28,7 +34,7 @@ export function useProcedures() {
         throw error;
       }
 
-      return (data || []) as Procedure[];
+      return (data || []) as unknown as Procedure[];
     },
     staleTime: 60000,
     refetchInterval: 120000,
