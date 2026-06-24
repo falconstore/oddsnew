@@ -34,6 +34,7 @@ import WatermarkStudio from '@/pages/WatermarkStudio';
 import { PushNotifications } from '@/pages/PushNotifications';
 import { AppStats } from '@/pages/AppStats';
 import BotTemplates from '@/pages/BotTemplates';
+import EnvioProcedimentos from '@/pages/EnvioProcedimentos';
 import BioLinks from '@/pages/BioLinks';
 import NotFound from '@/pages/NotFound';
 
@@ -271,6 +272,13 @@ export function AnimatedRoutes() {
           <RequireAuth pageKey={PAGE_KEYS.DASHBOARD}>
             <PageTransition>
               <BotTemplates />
+            </PageTransition>
+          </RequireAuth>
+        } />
+        <Route path="/envio-procedimentos" element={
+          <RequireAuth pageKey={'envio_procedimentos' as never}>
+            <PageTransition>
+              <EnvioProcedimentos />
             </PageTransition>
           </RequireAuth>
         } />

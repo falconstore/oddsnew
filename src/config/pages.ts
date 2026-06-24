@@ -32,6 +32,7 @@ import {
   Bell,
   BarChart3,
   Brain,
+  Send,
 } from 'lucide-react';
 
 /** Seções do menu, na ordem em que aparecem. */
@@ -72,6 +73,7 @@ export const PAGES: PageDef[] = [
   { key: 'procedure_control', label: 'Procedimentos', description: 'Gerenciar procedimentos', href: '/procedures', icon: FileText, section: 'OPERAÇÃO' },
   { key: 'freebets_ganhas', label: 'FreeBets Ganhas', description: 'Registro de freebets ganhas', href: '/procedures/freebets-ganhas', icon: Trophy, section: 'OPERAÇÃO' },
   { key: 'bot_templates', label: 'Templates Bot', description: 'Templates de mensagens do bot', href: '/bot-templates', icon: BookOpen, section: 'OPERAÇÃO', alwaysVisible: true },
+  { key: 'envio_procedimentos', label: 'Envio Procedimentos', description: 'Monta e dispara a sequência do procedimento no Telegram', href: '/envio-procedimentos', icon: Send, section: 'OPERAÇÃO' },
   { key: 'casas', label: 'Casas', description: 'Cadastro de casas de apostas', href: '/cadastros', icon: Building2, section: 'OPERAÇÃO' },
 
   // RECEITA
