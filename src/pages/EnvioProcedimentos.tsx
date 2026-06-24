@@ -12,6 +12,7 @@ import {
   DEFAULT_CONFIG, loadImage, fileToDataURL, renderWatermarkedCanvas,
 } from '@/lib/watermark';
 import { PasteImageZone } from '@/components/PasteImageZone';
+import { useBookmakers } from '@/hooks/useBookmakers';
 import defaultLogoUrl from '@assets/logo_1778182494299.png';
 import {
   Send, Plus, Trash2, Film, Calculator,
@@ -24,13 +25,14 @@ interface Entrada {
   casa: string;
   oddLinha: string;     // ex: "ODD 4,25 + ATIVE O BOOST 26% X APOSTE R$100,00"
   link: string;         // bilhete pronto / link da partida
-  printDataUrl: string | null; // preview do print (base64) — upload local por enquanto
+  observacao: string;   // observação opcional da entrada
+  printDataUrl: string | null; // preview do print (já com marca d'água)
   printName: string | null;
 }
 
 let _seq = 0;
 const novaEntrada = (): Entrada => ({
-  id: `e${++_seq}`, casa: '', oddLinha: '', link: '', printDataUrl: null, printName: null,
+  id: `e${++_seq}`, casa: '', oddLinha: '', link: '', observacao: '', printDataUrl: null, printName: null,
 });
 
 export default function EnvioProcedimentos() {
@@ -91,6 +93,13 @@ export default function EnvioProcedimentos() {
 
   // 2) Entradas dinâmicas (1..N)
   const [entradas, setEntradas] = useState<Entrada[]>([novaEntrada()]);
+
+  // Casas cadastradas (fonte oficial: tabela bookmakers) — pro autocomplete.
+  const { data: bookmakers = [] } = useBookmakers();
+  const casasCadastradas = useMemo(
+    () => bookmakers.map((b) => b.name).filter(Boolean).sort(),
+    [bookmakers],
+  );
 
   // 3) Calculadora
   const [calcPrint, setCalcPrint] = useState<{ dataUrl: string; name: string } | null>(null);
@@ -269,6 +278,11 @@ export default function EnvioProcedimentos() {
                 </Button>
               </div>
 
+              {/* Casas cadastradas (bookmakers) — autocomplete compartilhado */}
+              <datalist id="envio-casas-datalist">
+                {casasCadastradas.map((c) => <option key={c} value={c} />)}
+              </datalist>
+
               <div className="space-y-3">
                 {entradas.map((e, idx) => (
                   <div key={e.id} className="border border-border rounded-lg p-3 bg-card space-y-2">
@@ -282,12 +296,15 @@ export default function EnvioProcedimentos() {
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <Input value={e.casa} onChange={(ev) => updateEntrada(e.id, { casa: ev.target.value })}
-                        placeholder="Casa (ex: PAGOLBET)" className="text-sm" />
+                        placeholder="Casa (selecione ou digite)" className="text-sm"
+                        list="envio-casas-datalist" autoComplete="off" />
                       <Input value={e.link} onChange={(ev) => updateEntrada(e.id, { link: ev.target.value })}
                         placeholder="Link (bilhete / partida)" className="text-sm" />
                     </div>
                     <Input value={e.oddLinha} onChange={(ev) => updateEntrada(e.id, { oddLinha: ev.target.value })}
                       placeholder="Linha da odd (ex: ODD 4,25 + BOOST 26% X APOSTE R$100,00)" className="text-sm" />
+                    <Input value={e.observacao} onChange={(ev) => updateEntrada(e.id, { observacao: ev.target.value })}
+                      placeholder="Observação (opcional)" className="text-sm" />
                     {/* Print da entrada — colar (Ctrl+V), arrastar ou selecionar.
                         Já sai com marca d'água aplicada. */}
                     <PasteImageZone
