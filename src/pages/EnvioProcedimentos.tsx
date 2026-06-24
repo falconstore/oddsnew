@@ -9,6 +9,10 @@ import { cn } from '@/lib/utils';
 import { TEMPLATES, kickoffToDateStr, kickoffToTimeStr, type FieldConfig } from '@/lib/botTemplatesData';
 import { EventoAutocomplete } from '@/components/procedures/EventoAutocomplete';
 import {
+  DEFAULT_CONFIG, loadImage, fileToDataURL, renderWatermarkedCanvas,
+} from '@/lib/watermark';
+import defaultLogoUrl from '@assets/logo_1778182494299.png';
+import {
   Send, Plus, Trash2, Image as ImageIcon, Film, Calculator,
   CheckCircle2, FileText, Ticket, Loader2, X,
 } from 'lucide-react';
@@ -98,23 +102,35 @@ export default function EnvioProcedimentos() {
   const updateEntrada = (id: string, patch: Partial<Entrada>) =>
     setEntradas((p) => p.map((e) => (e.id === id ? { ...e, ...patch } : e)));
 
-  const readFile = (file: File): Promise<string> =>
-    new Promise((resolve, reject) => {
-      const r = new FileReader();
-      r.onload = () => resolve(String(r.result));
-      r.onerror = reject;
-      r.readAsDataURL(file);
-    });
+  // Logo padrão da marca d'água (mesmo da aba Marca d'Água). Carregado 1x.
+  const [logoImg, setLogoImg] = useState<HTMLImageElement | null>(null);
+  useEffect(() => {
+    loadImage(defaultLogoUrl).then(setLogoImg).catch(() => setLogoImg(null));
+  }, []);
+
+  // Aplica a marca d'água padrão no print e devolve o dataURL já marcado.
+  // Se o logo ainda não carregou, devolve a imagem original (sem travar o fluxo).
+  const aplicarMarcaDagua = async (file: File): Promise<string> => {
+    const dataUrl = await fileToDataURL(file);
+    if (!logoImg) return dataUrl;
+    try {
+      const baseImg = await loadImage(dataUrl);
+      const canvas = renderWatermarkedCanvas(baseImg, logoImg, DEFAULT_CONFIG);
+      return canvas.toDataURL('image/png');
+    } catch {
+      return dataUrl; // fallback — usa o original se algo falhar
+    }
+  };
 
   const onEntradaPrint = async (id: string, file: File | null) => {
     if (!file) return;
-    const dataUrl = await readFile(file);
+    const dataUrl = await aplicarMarcaDagua(file);
     updateEntrada(id, { printDataUrl: dataUrl, printName: file.name });
   };
 
   const onCalcPrint = async (file: File | null) => {
     if (!file) return;
-    const dataUrl = await readFile(file);
+    const dataUrl = await aplicarMarcaDagua(file);
     setCalcPrint({ dataUrl, name: file.name });
   };
 
@@ -289,7 +305,7 @@ export default function EnvioProcedimentos() {
                         </label>
                       )}
                       <span className="text-[11px] text-muted-foreground/60">
-                        {e.printName ? e.printName : 'Print do bilhete (opcional)'}
+                        {e.printName ? `${e.printName} · marca d'água aplicada` : "Print do bilhete (marca d'água automática)"}
                       </span>
                     </div>
                   </div>
