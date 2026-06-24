@@ -20,8 +20,8 @@ import defaultLogoUrl from '@assets/logo_1778182494299.png';
 // Destino e GIF fixos do disparo (Fase 2).
 // CHAT_ID = grupo "GRUPO PRÉ ENVIO 🦈🔥".
 const CHAT_ID = -1002197121868;
-// file_id do GIF de atenção — preencher após rodar scripts/upload-gif-atencao.mjs.
-const GIF_ATENCAO_FILE_ID = '';
+// file_id do GIF de atenção (subido 1x via scripts/upload-gif-atencao.mjs).
+const GIF_ATENCAO_FILE_ID = 'CgACAgEAAyEGAASC9WtMAAECOFxqO0vU1puA5-mv9Tkkvb8bNqbH0AACsgYAArx72UWJ2Kr93mPV6jwE';
 import {
   Send, Plus, Trash2, Film, Calculator,
   CheckCircle2, FileText, Ticket, Loader2,
