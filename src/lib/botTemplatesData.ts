@@ -61,7 +61,7 @@ export interface TemplateConfig {
   generate: (f: Record<string, string>) => string;
 }
 
-interface CustomTemplate {
+export interface CustomTemplate {
   id: string;
   name: string;
   text: string;
@@ -71,7 +71,7 @@ interface CustomTemplate {
 const CUSTOM_TEMPLATES_KEY = 'bsk_custom_templates';
 const CUSTOM_CATEGORIES_KEY = 'bsk_procedure_categories';
 
-function loadCustomTemplates(): CustomTemplate[] {
+export function loadCustomTemplates(): CustomTemplate[] {
   try {
     const raw = localStorage.getItem(CUSTOM_TEMPLATES_KEY);
     return raw ? JSON.parse(raw) : [];
@@ -80,11 +80,11 @@ function loadCustomTemplates(): CustomTemplate[] {
   }
 }
 
-function saveCustomTemplates(templates: CustomTemplate[]) {
+export function saveCustomTemplates(templates: CustomTemplate[]) {
   localStorage.setItem(CUSTOM_TEMPLATES_KEY, JSON.stringify(templates));
 }
 
-function loadCustomCategories(): string[] {
+export function loadCustomCategories(): string[] {
   try {
     const raw = localStorage.getItem(CUSTOM_CATEGORIES_KEY);
     return raw ? JSON.parse(raw) : [];
@@ -93,7 +93,7 @@ function loadCustomCategories(): string[] {
   }
 }
 
-function saveCustomCategories(cats: string[]) {
+export function saveCustomCategories(cats: string[]) {
   localStorage.setItem(CUSTOM_CATEGORIES_KEY, JSON.stringify(cats));
 }
 

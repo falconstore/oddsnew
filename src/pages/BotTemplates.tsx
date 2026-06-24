@@ -37,7 +37,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import {
   TEMPLATES, buildPartidas, fmtDate, todayISO,
   kickoffToDateStr, kickoffToTimeStr,
-  type TemplateConfig, type FieldConfig,
+  loadCustomTemplates, saveCustomTemplates,
+  loadCustomCategories, saveCustomCategories,
+  type TemplateConfig, type FieldConfig, type CustomTemplate,
 } from '@/lib/botTemplatesData';
 
 // ─────────────────────────────────────────
