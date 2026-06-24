@@ -20,10 +20,36 @@ const log = (event: string, data: Record<string, unknown> = {}) =>
 
 interface Entrada {
   casa: string;
-  oddLinha: string;
-  link: string;
+  odd: string;          // ex: "45.00"
+  aposte: string;       // ex: "6,50"
+  link: string;         // URL da partida (vai escondida em "LINK DA PARTIDA")
   observacao?: string;
   printDataUrl?: string | null; // dataURL (base64) já com marca d'água
+}
+
+// Escapa caracteres especiais do HTML do Telegram.
+function esc(s: string): string {
+  return (s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+// Monta a legenda da entrada no padrão Shark:
+//   Casa - <b><u>ODD X</u></b> - APOSTE <b><u>Y</u></b>
+//   📝 observação (se houver)
+//   🔗 LINK DA PARTIDA  (link clicável, URL escondida)
+function montarLegenda(e: Entrada): string {
+  const linhas: string[] = [];
+  const casa = esc(e.casa).trim();
+  const odd = esc(e.odd).trim();
+  const aposte = esc(e.aposte).trim();
+  let principal = casa;
+  if (odd) principal += ` - <b><u>ODD ${odd}</u></b>`;
+  if (aposte) principal += ` - APOSTE <b><u>${aposte}</u></b>`;
+  linhas.push(principal);
+  if (e.observacao && e.observacao.trim()) linhas.push(`📝 ${esc(e.observacao.trim())}`);
+  if (e.link && e.link.trim()) {
+    linhas.push(`🔗 <a href="${esc(e.link.trim())}">LINK DA PARTIDA</a>`);
+  }
+  return linhas.join("\n");
 }
 
 interface SendPayload {
@@ -113,22 +139,21 @@ serve(async (req) => {
     await tgCall(token, "sendMessage", { chat_id: chatId, text: texto });
     sent.push("texto");
 
-    // 3) Entradas — foto (se houver) com legenda, senão só a legenda
+    // 3) Entradas — foto (se houver) com legenda; separador 🦈🔥 entre elas.
     for (let i = 0; i < entradas.length; i++) {
       const e = entradas[i];
-      const partes = [
-        e.casa ? `<b>${e.casa}</b>` : "",
-        e.oddLinha ?? "",
-        e.observacao ? `📝 ${e.observacao}` : "",
-        e.link ? `🔗 ${e.link}` : "",
-      ].filter(Boolean);
-      const caption = partes.join("\n");
+      const caption = montarLegenda(e);
       if (e.printDataUrl) {
         await tgSendPhoto(token, chatId, e.printDataUrl, caption);
       } else if (caption) {
         await tgCall(token, "sendMessage", { chat_id: chatId, text: caption, parse_mode: "HTML" });
       }
       sent.push(`entrada_${i + 1}`);
+      // Separador entre entradas (não após a última — depois vem a calc/fecho).
+      if (i < entradas.length - 1) {
+        await tgCall(token, "sendMessage", { chat_id: chatId, text: "🦈🔥" });
+        sent.push(`sep_${i + 1}`);
+      }
     }
 
     // 4) Calculadora

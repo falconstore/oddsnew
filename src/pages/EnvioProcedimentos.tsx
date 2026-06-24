@@ -31,8 +31,9 @@ import {
 interface Entrada {
   id: string;
   casa: string;
-  oddLinha: string;     // ex: "ODD 4,25 + ATIVE O BOOST 26% X APOSTE R$100,00"
-  link: string;         // bilhete pronto / link da partida
+  odd: string;          // ex: "45.00"
+  aposte: string;       // ex: "6,50"
+  link: string;         // link da partida (vai escondido no texto "LINK DA PARTIDA")
   observacao: string;   // observação opcional da entrada
   printDataUrl: string | null; // preview do print (já com marca d'água)
   printName: string | null;
@@ -40,7 +41,7 @@ interface Entrada {
 
 let _seq = 0;
 const novaEntrada = (): Entrada => ({
-  id: `e${++_seq}`, casa: '', oddLinha: '', link: '', observacao: '', printDataUrl: null, printName: null,
+  id: `e${++_seq}`, casa: '', odd: '', aposte: '', link: '', observacao: '', printDataUrl: null, printName: null,
 });
 
 export default function EnvioProcedimentos() {
@@ -156,7 +157,7 @@ export default function EnvioProcedimentos() {
   const podeEnviar = useMemo(() => {
     if (!texto.trim()) return false;
     if (entradas.length === 0) return false;
-    return entradas.every((e) => e.casa.trim() && e.oddLinha.trim());
+    return entradas.every((e) => e.casa.trim() && e.odd.trim() && e.aposte.trim());
   }, [texto, entradas]);
 
   const handleEnviar = async () => {
@@ -169,7 +170,8 @@ export default function EnvioProcedimentos() {
           texto,
           entradas: entradas.map((e) => ({
             casa: e.casa,
-            oddLinha: e.oddLinha,
+            odd: e.odd,
+            aposte: e.aposte,
             link: e.link,
             observacao: e.observacao,
             printDataUrl: e.printDataUrl,
@@ -322,17 +324,25 @@ export default function EnvioProcedimentos() {
                         </button>
                       )}
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                       <Input value={e.casa} onChange={(ev) => updateEntrada(e.id, { casa: ev.target.value })}
-                        placeholder="Casa (selecione ou digite)" className="text-sm"
+                        placeholder="Casa" className="text-sm"
                         list="envio-casas-datalist" autoComplete="off" />
-                      <Input value={e.link} onChange={(ev) => updateEntrada(e.id, { link: ev.target.value })}
-                        placeholder="Link (bilhete / partida)" className="text-sm" />
+                      <Input value={e.odd} onChange={(ev) => updateEntrada(e.id, { odd: ev.target.value })}
+                        placeholder="ODD (ex: 45.00)" className="text-sm" />
+                      <Input value={e.aposte} onChange={(ev) => updateEntrada(e.id, { aposte: ev.target.value })}
+                        placeholder="APOSTE (ex: 6,50)" className="text-sm" />
                     </div>
-                    <Input value={e.oddLinha} onChange={(ev) => updateEntrada(e.id, { oddLinha: ev.target.value })}
-                      placeholder="Linha da odd (ex: ODD 4,25 + BOOST 26% X APOSTE R$100,00)" className="text-sm" />
+                    <Input value={e.link} onChange={(ev) => updateEntrada(e.id, { link: ev.target.value })}
+                      placeholder="Link da partida (fica escondido em 'LINK DA PARTIDA')" className="text-sm" />
                     <Input value={e.observacao} onChange={(ev) => updateEntrada(e.id, { observacao: ev.target.value })}
                       placeholder="Observação (opcional)" className="text-sm" />
+                    {/* Preview da legenda que vai pro Telegram */}
+                    {(e.casa || e.odd || e.aposte) && (
+                      <p className="text-[11px] text-muted-foreground/70">
+                        Sairá: <span className="text-foreground/90">{e.casa || 'Casa'} - <u>ODD {e.odd || '—'}</u> - APOSTE <u>{e.aposte || '—'}</u></span>
+                      </p>
+                    )}
                     {/* Print da entrada — colar (Ctrl+V), arrastar ou selecionar.
                         Já sai com marca d'água aplicada. */}
                     <PasteImageZone
@@ -376,7 +386,7 @@ export default function EnvioProcedimentos() {
                 <PreviewLine icon={Film} label="GIF de atenção" ok />
                 <PreviewLine icon={FileText} label="Texto do procedimento" ok={!!texto.trim()} />
                 {entradas.map((e, i) => (
-                  <PreviewLine key={e.id} icon={Ticket} label={`Entrada ${i + 1}${e.casa ? ` · ${e.casa}` : ''}`} ok={!!(e.casa.trim() && e.oddLinha.trim())} />
+                  <PreviewLine key={e.id} icon={Ticket} label={`Entrada ${i + 1}${e.casa ? ` · ${e.casa}` : ''}`} ok={!!(e.casa.trim() && e.odd.trim() && e.aposte.trim())} />
                 ))}
                 <PreviewLine icon={Calculator} label="Calculadora" ok={!!calcLink.trim() || !!calcPrint} />
                 <PreviewLine icon={CheckCircle2} label="Fechamento 🦈 ✅" ok />
