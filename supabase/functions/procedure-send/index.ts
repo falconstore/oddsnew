@@ -33,23 +33,26 @@ function esc(s: string): string {
 }
 
 // Monta a legenda da entrada no padrão Shark:
-//   Casa - <b><u>ODD X</u></b> - APOSTE <b><u>Y</u></b>
+//   CASA - <b><u>ODD X</u></b> - <b><u>APOSTE Y</u></b>
+//   (linha em branco)
 //   📝 observação (se houver)
+//   (linha em branco)
 //   🔗 LINK DA PARTIDA  (link clicável, URL escondida)
 function montarLegenda(e: Entrada): string {
-  const linhas: string[] = [];
-  const casa = esc(e.casa).trim();
+  const blocos: string[] = [];
+  const casa = esc(e.casa).trim().toUpperCase();   // casa sempre MAIÚSCULA
   const odd = esc(e.odd).trim();
   const aposte = esc(e.aposte).trim();
   let principal = casa;
   if (odd) principal += ` - <b><u>ODD ${odd}</u></b>`;
-  if (aposte) principal += ` - APOSTE <b><u>${aposte}</u></b>`;
-  linhas.push(principal);
-  if (e.observacao && e.observacao.trim()) linhas.push(`📝 ${esc(e.observacao.trim())}`);
+  if (aposte) principal += ` - <b><u>APOSTE ${aposte}</u></b>`;
+  blocos.push(principal);
+  if (e.observacao && e.observacao.trim()) blocos.push(`📝 ${esc(e.observacao.trim())}`);
   if (e.link && e.link.trim()) {
-    linhas.push(`🔗 <a href="${esc(e.link.trim())}">LINK DA PARTIDA</a>`);
+    blocos.push(`🔗 <a href="${esc(e.link.trim())}">LINK DA PARTIDA</a>`);
   }
-  return linhas.join("\n");
+  // Linha em branco entre cada bloco (principal / observação / link).
+  return blocos.join("\n\n");
 }
 
 interface SendPayload {

@@ -80,7 +80,9 @@ export default function EnvioProcedimentos() {
   }, [campos, eventoData]);
 
   // Texto final: o manual (se editado) ou o gerado pelo template.
-  const texto = textoManual ?? (template ? template.generate(camposEnriquecidos) : '');
+  // Texto do template em MAIÚSCULO (padrão dos procedimentos), como na aba
+  // Templates Bot. Se o usuário editou à mão, respeita o que ele escreveu.
+  const texto = textoManual ?? (template ? template.generate(camposEnriquecidos).toUpperCase() : '');
 
   const setCampo = (id: string, v: string) => {
     setCampos((p) => ({ ...p, [id]: v }));
