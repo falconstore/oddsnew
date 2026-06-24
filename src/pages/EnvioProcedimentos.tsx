@@ -13,7 +13,15 @@ import {
 } from '@/lib/watermark';
 import { PasteImageZone } from '@/components/PasteImageZone';
 import { useBookmakers } from '@/hooks/useBookmakers';
+import { supabaseProcedures } from '@/lib/supabaseProcedures';
+import { toast } from '@/hooks/use-toast';
 import defaultLogoUrl from '@assets/logo_1778182494299.png';
+
+// Destino e GIF fixos do disparo (Fase 2).
+// CHAT_ID = grupo "GRUPO PRÉ ENVIO 🦈🔥".
+const CHAT_ID = -1002197121868;
+// file_id do GIF de atenção — preencher após rodar scripts/upload-gif-atencao.mjs.
+const GIF_ATENCAO_FILE_ID = '';
 import {
   Send, Plus, Trash2, Film, Calculator,
   CheckCircle2, FileText, Ticket, Loader2,
@@ -151,16 +159,36 @@ export default function EnvioProcedimentos() {
     return entradas.every((e) => e.casa.trim() && e.oddLinha.trim());
   }, [texto, entradas]);
 
-  const handleEnviarPreview = async () => {
-    // Fase 1: ainda sem disparo real no Telegram. Aqui só simula/valida a
-    // sequência. O disparo (edge function) entra na fase 2.
+  const handleEnviar = async () => {
     setEnviando(true);
-    await new Promise((r) => setTimeout(r, 600));
-    setEnviando(false);
-    alert(
-      'Pré-visualização montada com sucesso!\n\n' +
-      'O disparo real no Telegram será ligado na próxima fase (canal de teste).',
-    );
+    try {
+      const { data, error } = await supabaseProcedures.functions.invoke('procedure-send', {
+        body: {
+          chatId: CHAT_ID,
+          gifFileId: GIF_ATENCAO_FILE_ID || null,
+          texto,
+          entradas: entradas.map((e) => ({
+            casa: e.casa,
+            oddLinha: e.oddLinha,
+            link: e.link,
+            observacao: e.observacao,
+            printDataUrl: e.printDataUrl,
+          })),
+          calc: (calcPrint || calcLink) ? { printDataUrl: calcPrint?.dataUrl ?? null, link: calcLink } : null,
+        },
+      });
+      if (error) throw error;
+      if (data?.ok === false) throw new Error(data.error || 'Falha no envio');
+      toast({ title: 'Enviado!', description: 'A sequência foi disparada no grupo.' });
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao enviar',
+        description: err?.message ?? 'Não foi possível disparar a sequência.',
+        variant: 'destructive',
+      });
+    } finally {
+      setEnviando(false);
+    }
   };
 
   return (
@@ -355,14 +383,14 @@ export default function EnvioProcedimentos() {
               </ol>
 
               <Button
-                onClick={handleEnviarPreview}
+                onClick={handleEnviar}
                 disabled={!podeEnviar || enviando}
                 className="w-full mt-4 gap-2"
               >
-                {enviando ? <><Loader2 className="w-4 h-4 animate-spin" /> Montando…</> : <><Send className="w-4 h-4" /> Pré-visualizar envio</>}
+                {enviando ? <><Loader2 className="w-4 h-4 animate-spin" /> Enviando…</> : <><Send className="w-4 h-4" /> Enviar no grupo</>}
               </Button>
               <p className="text-[10px] text-muted-foreground/60 mt-2 text-center">
-                Disparo no Telegram (canal de teste) entra na próxima fase.
+                Dispara em sequência no grupo de pré-envio 🦈🔥
               </p>
             </div>
           </aside>
