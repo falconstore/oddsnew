@@ -11,10 +11,11 @@ import { EventoAutocomplete } from '@/components/procedures/EventoAutocomplete';
 import {
   DEFAULT_CONFIG, loadImage, fileToDataURL, renderWatermarkedCanvas,
 } from '@/lib/watermark';
+import { PasteImageZone } from '@/components/PasteImageZone';
 import defaultLogoUrl from '@assets/logo_1778182494299.png';
 import {
-  Send, Plus, Trash2, Image as ImageIcon, Film, Calculator,
-  CheckCircle2, FileText, Ticket, Loader2, X,
+  Send, Plus, Trash2, Film, Calculator,
+  CheckCircle2, FileText, Ticket, Loader2,
 } from 'lucide-react';
 
 // ── Tipos da sequência ───────────────────────────────────────────────────
@@ -287,27 +288,17 @@ export default function EnvioProcedimentos() {
                     </div>
                     <Input value={e.oddLinha} onChange={(ev) => updateEntrada(e.id, { oddLinha: ev.target.value })}
                       placeholder="Linha da odd (ex: ODD 4,25 + BOOST 26% X APOSTE R$100,00)" className="text-sm" />
-                    {/* Print da entrada */}
-                    <div className="flex items-center gap-2">
-                      {e.printDataUrl ? (
-                        <div className="relative">
-                          <img src={e.printDataUrl} alt="" className="h-14 w-14 object-cover rounded border border-border" />
-                          <button onClick={() => updateEntrada(e.id, { printDataUrl: null, printName: null })}
-                            className="absolute -top-1.5 -right-1.5 bg-card border border-border rounded-full p-0.5 hover:text-destructive">
-                            <X className="w-3 h-3" />
-                          </button>
-                        </div>
-                      ) : (
-                        <label className="h-14 w-14 rounded border border-dashed border-border flex items-center justify-center cursor-pointer hover:border-primary/40 text-muted-foreground/60">
-                          <ImageIcon className="w-5 h-5" />
-                          <input type="file" accept="image/*" className="hidden"
-                            onChange={(ev) => onEntradaPrint(e.id, ev.target.files?.[0] ?? null)} />
-                        </label>
-                      )}
-                      <span className="text-[11px] text-muted-foreground/60">
-                        {e.printName ? `${e.printName} · marca d'água aplicada` : "Print do bilhete (marca d'água automática)"}
-                      </span>
-                    </div>
+                    {/* Print da entrada — colar (Ctrl+V), arrastar ou selecionar.
+                        Já sai com marca d'água aplicada. */}
+                    <PasteImageZone
+                      previewUrl={e.printDataUrl}
+                      onFile={(file) => onEntradaPrint(e.id, file)}
+                      onClear={() => updateEntrada(e.id, { printDataUrl: null, printName: null })}
+                      label="Cole o bilhete (Ctrl+V), arraste ou clique pra selecionar"
+                    />
+                    {e.printDataUrl && (
+                      <p className="text-[10px] text-primary/70 mt-1">✓ marca d'água aplicada</p>
+                    )}
                   </div>
                 ))}
               </div>
@@ -318,24 +309,16 @@ export default function EnvioProcedimentos() {
               <p className="telemetry-label text-primary flex items-center gap-1.5 mb-2">
                 <Calculator className="w-3 h-3" /> [ 4 · CALCULADORA ]
               </p>
-              <div className="flex items-center gap-3">
-                {calcPrint ? (
-                  <div className="relative">
-                    <img src={calcPrint.dataUrl} alt="" className="h-16 w-16 object-cover rounded border border-border" />
-                    <button onClick={() => setCalcPrint(null)}
-                      className="absolute -top-1.5 -right-1.5 bg-card border border-border rounded-full p-0.5 hover:text-destructive">
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                ) : (
-                  <label className="h-16 w-16 rounded border border-dashed border-border flex items-center justify-center cursor-pointer hover:border-primary/40 text-muted-foreground/60">
-                    <ImageIcon className="w-5 h-5" />
-                    <input type="file" accept="image/*" className="hidden"
-                      onChange={(ev) => onCalcPrint(ev.target.files?.[0] ?? null)} />
-                  </label>
-                )}
+              <div className="space-y-2">
+                <PasteImageZone
+                  previewUrl={calcPrint?.dataUrl ?? null}
+                  onFile={(file) => onCalcPrint(file)}
+                  onClear={() => setCalcPrint(null)}
+                  label="Cole o print da calculadora (Ctrl+V), arraste ou selecione"
+                />
+                {calcPrint && <p className="text-[10px] text-primary/70">✓ marca d'água aplicada</p>}
                 <Input value={calcLink} onChange={(e) => setCalcLink(e.target.value)}
-                  placeholder="Link da calculadora" className="text-sm flex-1" />
+                  placeholder="Link da calculadora" className="text-sm" />
               </div>
             </section>
           </div>
