@@ -6,7 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
-import { TEMPLATES, type FieldConfig } from '@/lib/botTemplatesData';
+import { TEMPLATES, kickoffToDateStr, kickoffToTimeStr, type FieldConfig } from '@/lib/botTemplatesData';
+import { EventoAutocomplete } from '@/components/procedures/EventoAutocomplete';
 import {
   Send, Plus, Trash2, Image as ImageIcon, Film, Calculator,
   CheckCircle2, FileText, Ticket, Loader2, X,
@@ -33,6 +34,9 @@ export default function EnvioProcedimentos() {
   const [templateId, setTemplateId] = useState<string>(TEMPLATES[0]?.id ?? '');
   const [campos, setCampos] = useState<Record<string, string>>({});
   const [textoManual, setTextoManual] = useState<string | null>(null); // != null quando o user editou à mão
+  // Dados de evento por campo (evento1, evento2…) vindos do autocomplete API-Football.
+  type EventoVal = { partida_descricao: string; fixture_id: number | null; kickoff_at: string | null };
+  const [eventoData, setEventoData] = useState<Record<string, EventoVal>>({});
 
   const template = useMemo(() => TEMPLATES.find((t) => t.id === templateId) ?? TEMPLATES[0], [templateId]);
 
@@ -42,15 +46,35 @@ export default function EnvioProcedimentos() {
     const init: Record<string, string> = {};
     for (const f of template.fields) init[f.id] = f.default ? f.default() : '';
     setCampos(init);
+    setEventoData({});
     setTextoManual(null); // volta a gerar pelo template
   }, [template]);
 
+  // Campos enriquecidos: injeta evento1/evento1_data/evento1_hora a partir do
+  // autocomplete (mesma lógica da aba Templates Bot), pro generate() montar a
+  // linha da partida com data e horário corretos.
+  const camposEnriquecidos = useMemo(() => {
+    const merged: Record<string, string> = { ...campos };
+    for (const [id, ev] of Object.entries(eventoData)) {
+      merged[id] = ev.partida_descricao;
+      merged[`${id}_data`] = kickoffToDateStr(ev.kickoff_at);
+      merged[`${id}_hora`] = kickoffToTimeStr(ev.kickoff_at);
+    }
+    return merged;
+  }, [campos, eventoData]);
+
   // Texto final: o manual (se editado) ou o gerado pelo template.
-  const texto = textoManual ?? (template ? template.generate(campos) : '');
+  const texto = textoManual ?? (template ? template.generate(camposEnriquecidos) : '');
 
   const setCampo = (id: string, v: string) => {
     setCampos((p) => ({ ...p, [id]: v }));
     setTextoManual(null); // editar um campo volta pro modo gerado
+  };
+
+  const setEvento = (id: string, partial: EventoVal) => {
+    setEventoData((p) => ({ ...p, [id]: partial }));
+    setCampos((p) => ({ ...p, [id]: partial.partida_descricao }));
+    setTextoManual(null);
   };
 
   // Campos visíveis (respeita showIf) e que não são do tipo freebet_select
@@ -159,7 +183,7 @@ export default function EnvioProcedimentos() {
               {/* Campos do template */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
                 {camposVisiveis.map((f) => (
-                  <div key={f.id} className={cn(f.type === 'toggle' && 'sm:col-span-2')}>
+                  <div key={f.id} className={cn((f.type === 'toggle' || f.type === 'evento') && 'sm:col-span-2')}>
                     {f.type === 'toggle' ? (
                       <label className="flex items-center justify-between gap-2 h-9 px-2.5 border border-border rounded bg-card cursor-pointer">
                         <span className="text-xs text-foreground/90">{f.label}</span>
@@ -168,6 +192,21 @@ export default function EnvioProcedimentos() {
                           onCheckedChange={(c) => setCampo(f.id, c ? 'true' : 'false')}
                         />
                       </label>
+                    ) : f.type === 'evento' ? (
+                      <div>
+                        <label className="block text-[10px] text-muted-foreground/70 mb-0.5">{f.label}</label>
+                        <EventoAutocomplete
+                          partidaDescricao={eventoData[f.id]?.partida_descricao ?? campos[f.id] ?? ''}
+                          fixtureId={eventoData[f.id]?.fixture_id ?? null}
+                          kickoffAt={eventoData[f.id]?.kickoff_at ?? null}
+                          onChange={(partial) => setEvento(f.id, {
+                            partida_descricao: partial.partida_descricao,
+                            fixture_id: partial.fixture_id,
+                            kickoff_at: partial.kickoff_at,
+                          })}
+                          inputClassName="h-9 text-sm"
+                        />
+                      </div>
                     ) : (
                       <div>
                         <label className="block text-[10px] text-muted-foreground/70 mb-0.5">{f.label}</label>
