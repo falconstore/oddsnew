@@ -1,10 +1,12 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Layout } from '@/components/Layout';
 import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
+import { TEMPLATES, type FieldConfig } from '@/lib/botTemplatesData';
 import {
   Send, Plus, Trash2, Image as ImageIcon, Film, Calculator,
   CheckCircle2, FileText, Ticket, Loader2, X,
@@ -26,9 +28,37 @@ const novaEntrada = (): Entrada => ({
 });
 
 export default function EnvioProcedimentos() {
-  // 1) Texto do procedimento (por enquanto colado/livre; integraremos os
-  //    templates da aba Templates Bot na fase de disparo real).
-  const [texto, setTexto] = useState('');
+  // 1) Texto do procedimento — gerado pelos templates existentes (reusados da
+  //    aba Templates Bot) OU editado/colado manualmente.
+  const [templateId, setTemplateId] = useState<string>(TEMPLATES[0]?.id ?? '');
+  const [campos, setCampos] = useState<Record<string, string>>({});
+  const [textoManual, setTextoManual] = useState<string | null>(null); // != null quando o user editou à mão
+
+  const template = useMemo(() => TEMPLATES.find((t) => t.id === templateId) ?? TEMPLATES[0], [templateId]);
+
+  // Aplica defaults dos campos ao trocar de template.
+  useEffect(() => {
+    if (!template) return;
+    const init: Record<string, string> = {};
+    for (const f of template.fields) init[f.id] = f.default ? f.default() : '';
+    setCampos(init);
+    setTextoManual(null); // volta a gerar pelo template
+  }, [template]);
+
+  // Texto final: o manual (se editado) ou o gerado pelo template.
+  const texto = textoManual ?? (template ? template.generate(campos) : '');
+
+  const setCampo = (id: string, v: string) => {
+    setCampos((p) => ({ ...p, [id]: v }));
+    setTextoManual(null); // editar um campo volta pro modo gerado
+  };
+
+  // Campos visíveis (respeita showIf) e que não são do tipo freebet_select
+  // (esse é específico do BotTemplates; aqui tratamos como texto simples).
+  const camposVisiveis = useMemo<FieldConfig[]>(() => {
+    if (!template) return [];
+    return template.fields.filter((f) => !f.showIf || f.showIf(campos));
+  }, [template, campos]);
 
   // 2) Entradas dinâmicas (1..N)
   const [entradas, setEntradas] = useState<Entrada[]>([novaEntrada()]);
@@ -109,20 +139,67 @@ export default function EnvioProcedimentos() {
               </div>
             </section>
 
-            {/* Texto do procedimento */}
+            {/* Texto do procedimento — via template */}
             <section className="panel-bracket p-4">
               <p className="telemetry-label text-primary flex items-center gap-1.5 mb-2">
                 <FileText className="w-3 h-3" /> [ 2 · TEXTO DO PROCEDIMENTO ]
               </p>
+
+              {/* Seletor de template */}
+              <select
+                value={templateId}
+                onChange={(e) => setTemplateId(e.target.value)}
+                className="w-full h-9 px-2 text-sm bg-background border border-border outline-none focus:border-primary mb-3"
+              >
+                {TEMPLATES.map((t) => (
+                  <option key={t.id} value={t.id}>{t.emoji} {t.name}</option>
+                ))}
+              </select>
+
+              {/* Campos do template */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+                {camposVisiveis.map((f) => (
+                  <div key={f.id} className={cn(f.type === 'toggle' && 'sm:col-span-2')}>
+                    {f.type === 'toggle' ? (
+                      <label className="flex items-center justify-between gap-2 h-9 px-2.5 border border-border rounded bg-card cursor-pointer">
+                        <span className="text-xs text-foreground/90">{f.label}</span>
+                        <Switch
+                          checked={campos[f.id] === 'true'}
+                          onCheckedChange={(c) => setCampo(f.id, c ? 'true' : 'false')}
+                        />
+                      </label>
+                    ) : (
+                      <div>
+                        <label className="block text-[10px] text-muted-foreground/70 mb-0.5">{f.label}</label>
+                        <Input
+                          type={f.type === 'date' ? 'date' : f.type === 'time' ? 'time' : 'text'}
+                          value={campos[f.id] ?? ''}
+                          onChange={(e) => setCampo(f.id, f.uppercase ? e.target.value.toUpperCase() : e.target.value)}
+                          placeholder={f.placeholder}
+                          className="text-sm h-9"
+                        />
+                        {f.hint && <p className="text-[9px] text-muted-foreground/50 mt-0.5">{f.hint}</p>}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Preview do texto gerado (editável) */}
+              <p className="text-[10px] text-muted-foreground/60 mb-1">Pré-visualização (pode editar à mão):</p>
               <Textarea
                 value={texto}
-                onChange={(e) => setTexto(e.target.value)}
-                placeholder={'Cole aqui o texto do procedimento (ou geraremos pelos templates).\n\nEx:\n🔵 PROCEDIMENTO 552 - 23/06/2026\n🟢 PROCEDIMENTO REFERENTE A SUPERODD DA PAGOLBET 🔥\n...'}
-                className="min-h-[160px] font-mono text-[13px]"
+                onChange={(e) => setTextoManual(e.target.value)}
+                className="min-h-[150px] font-mono text-[13px]"
               />
-              <p className="text-[10px] text-muted-foreground/60 mt-1">
-                Na próxima fase isto será preenchido pelos templates existentes (Superodd, Queimar FB, etc.).
-              </p>
+              {textoManual !== null && (
+                <button
+                  onClick={() => setTextoManual(null)}
+                  className="text-[10px] text-primary/80 hover:underline mt-1"
+                >
+                  ↺ Voltar ao texto gerado pelo template
+                </button>
+              )}
             </section>
 
             {/* Entradas */}
