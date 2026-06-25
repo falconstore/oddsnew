@@ -24,7 +24,8 @@ const getFirstPermittedPath = (
     if (page.adminOnly) continue;
     if (allowed.includes(page.key)) return page.href;
   }
-  // fallback: alguma página alwaysVisible (ex.: settings)
+  // Sem nenhuma aba liberada: não há destino. Cai numa página utilitária se
+  // houver (alwaysVisible), senão volta pro login.
   const util = PAGES.find((p) => p.alwaysVisible);
   return util ? util.href : '/login';
 };

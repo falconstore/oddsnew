@@ -72,7 +72,7 @@ export const PAGES: PageDef[] = [
   { key: 'dashboard', label: 'Dashboard', description: 'Visão geral do sistema', href: '/', icon: LayoutDashboard, section: 'OPERAÇÃO' },
   { key: 'procedure_control', label: 'Procedimentos', description: 'Gerenciar procedimentos', href: '/procedures', icon: FileText, section: 'OPERAÇÃO' },
   { key: 'freebets_ganhas', label: 'FreeBets Ganhas', description: 'Registro de freebets ganhas', href: '/procedures/freebets-ganhas', icon: Trophy, section: 'OPERAÇÃO' },
-  { key: 'bot_templates', label: 'Templates Bot', description: 'Templates de mensagens do bot', href: '/bot-templates', icon: BookOpen, section: 'OPERAÇÃO', alwaysVisible: true },
+  { key: 'bot_templates', label: 'Templates Bot', description: 'Templates de mensagens do bot', href: '/bot-templates', icon: BookOpen, section: 'OPERAÇÃO' },
   { key: 'envio_procedimentos', label: 'Envio Procedimentos', description: 'Monta e dispara a sequência do procedimento no Telegram', href: '/envio-procedimentos', icon: Send, section: 'OPERAÇÃO' },
   { key: 'casas', label: 'Casas', description: 'Cadastro de casas de apostas', href: '/cadastros', icon: Building2, section: 'OPERAÇÃO' },
 
@@ -90,7 +90,7 @@ export const PAGES: PageDef[] = [
 
   // SISTEMA
   { key: 'watermark', label: "Marca d'Água", description: "Editor de marca d'água com logo Shark", href: '/watermark', icon: Stamp, section: 'SISTEMA' },
-  { key: 'settings', label: 'Configurações', description: 'Configurações do sistema', href: '/settings', icon: Settings, section: 'SISTEMA', alwaysVisible: true },
+  { key: 'settings', label: 'Configurações', description: 'Configurações do sistema', href: '/settings', icon: Settings, section: 'SISTEMA' },
   { key: 'admin_users', label: 'Usuários', description: 'Gerenciar usuários e permissões', href: '/admin/users', icon: UserCog, section: 'SISTEMA', adminOnly: true },
   { key: 'bot_logs', label: 'Logs do Bot', description: 'Logs e diagnóstico do bot', href: '/admin/bot-logs', icon: ScrollText, section: 'SISTEMA', adminOnly: true },
   { key: 'parser_ia', label: 'Parser IA', description: 'Aprendizado e custos da IA do parser', href: '/admin/parser-ia', icon: Brain, section: 'SISTEMA', adminOnly: true },
