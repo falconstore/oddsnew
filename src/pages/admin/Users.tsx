@@ -15,7 +15,7 @@ import {
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
-import { Shield, Settings, Trash2, Loader2, Save, Users, Clock, UserCog } from 'lucide-react';
+import { Shield, ShieldAlert, ShieldOff, Settings, Trash2, Loader2, Save, Users, Clock, UserCog } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 
 // Total de páginas liberáveis (não-admin, não-utilitárias).
@@ -23,7 +23,7 @@ const TOTAL_PERMISSION_PAGES = PERMISSION_PAGES.length;
 
 const AdminUsers = () => {
   const {
-    users, loading, updateAllowedPages, toggleSuperAdmin, deleteUserByEmail,
+    users, loading, updateAllowedPages, toggleSuperAdmin, revokeLegacyAdmin, deleteUserByEmail,
   } = useUserManagement();
 
   const [selectedUser, setSelectedUser] = useState<UserWithPermissions | null>(null);
@@ -71,6 +71,12 @@ const AdminUsers = () => {
       : 0;
   const isPending = (perms: UserPermissionRow) => activePermCount(perms) === 0 && !perms.is_super_admin;
   const pendingCount = users.filter(u => isPending(u.permissions)).length;
+  // Admin legado: flag can_view_admin do sistema antigo ligada. Enquanto ela
+  // existir, o usuário vê TUDO e o allowed_pages é ignorado. Sinalizamos pra
+  // o admin revogar com um clique.
+  const hasLegacyAdmin = (perms: UserPermissionRow) =>
+    !!perms.can_view_admin && !perms.is_super_admin;
+  const legacyAdminCount = users.filter(u => hasLegacyAdmin(u.permissions)).length;
 
   if (loading) {
     return (
@@ -155,15 +161,27 @@ const AdminUsers = () => {
                           </p>
                         </TableCell>
                         <TableCell>
-                          {isPending(user.permissions) ? (
-                            <Badge variant="outline" className="border-warning text-warning">
-                              Pendente
-                            </Badge>
-                          ) : (
-                            <Badge variant="secondary">
-                              {activePermCount(user.permissions)}/{TOTAL_PERMISSION_PAGES}
-                            </Badge>
-                          )}
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {isPending(user.permissions) ? (
+                              <Badge variant="outline" className="border-warning text-warning">
+                                Pendente
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary">
+                                {activePermCount(user.permissions)}/{TOTAL_PERMISSION_PAGES}
+                              </Badge>
+                            )}
+                            {hasLegacyAdmin(user.permissions) && (
+                              <Badge
+                                variant="outline"
+                                className="border-destructive text-destructive gap-1"
+                                title="Acesso de admin legado: vê TODAS as abas e ignora as permissões marcadas. Revogue para aplicar as abas."
+                              >
+                                <ShieldAlert className="h-3 w-3" />
+                                Admin legado
+                              </Badge>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell>
                           <Switch
@@ -173,6 +191,15 @@ const AdminUsers = () => {
                         </TableCell>
                         <TableCell className="text-right">
                           <ActionGroup className="justify-end">
+                            {hasLegacyAdmin(user.permissions) && (
+                              <ActionButton
+                                showLabel
+                                icon={ShieldOff}
+                                intent="delete"
+                                label="Revogar admin"
+                                onClick={() => revokeLegacyAdmin(user.email)}
+                              />
+                            )}
                             <ActionButton
                               showLabel
                               icon={Settings}

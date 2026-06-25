@@ -81,7 +81,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return permTyped;
       });
 
-      const nextIsAdmin = !!permTyped?.is_super_admin || !!permTyped?.can_view_admin
+      // Admin = super admin OU tem a aba admin_users liberada em allowed_pages.
+      // NÃO consideramos mais can_view_admin (flag legada do sistema antigo):
+      // ela ligava acesso total silenciosamente e ignorava o allowed_pages,
+      // fazendo abas ocultadas continuarem visíveis pra usuários antigos.
+      const nextIsAdmin = !!permTyped?.is_super_admin
         || !!permTyped?.allowed_pages?.includes('admin_users');
       const nextIsApproved = !!permData;
       setIsAdmin((prev) => (prev === nextIsAdmin ? prev : nextIsAdmin));

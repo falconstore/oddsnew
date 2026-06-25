@@ -45,7 +45,10 @@ export function useUserManagement() {
     try {
       const { error } = await supabase
         .from('user_permissions')
-        .update({ allowed_pages: allowedPages } as any)
+        // Ao salvar permissões também zeramos can_view_admin (flag legada do
+        // sistema antigo): ela dava acesso total e ignorava o allowed_pages.
+        // Assim, salvar as abas de um usuário antigo já o "limpa".
+        .update({ allowed_pages: allowedPages, can_view_admin: false } as any)
         .eq('user_email', userEmail);
 
       if (error) throw error;
@@ -91,6 +94,33 @@ export function useUserManagement() {
     }
   };
 
+  // Revoga o "admin legado" (can_view_admin) de um usuário antigo. A partir
+  // daí só o allowed_pages controla o que ele vê — abas ocultadas somem.
+  const revokeLegacyAdmin = async (userEmail: string) => {
+    try {
+      const { error } = await supabase
+        .from('user_permissions')
+        .update({ can_view_admin: false } as any)
+        .eq('user_email', userEmail);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Acesso revogado',
+        description: 'Admin legado removido. As permissões agora seguem as abas marcadas.',
+      });
+
+      await fetchUsers();
+    } catch (error) {
+      console.error('Error revoking legacy admin:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível revogar o acesso.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const deleteUserByEmail = async (userEmail: string) => {
     try {
       const { error } = await supabase
@@ -126,6 +156,7 @@ export function useUserManagement() {
     fetchUsers,
     updateAllowedPages,
     toggleSuperAdmin,
+    revokeLegacyAdmin,
     deleteUserByEmail,
   };
 }
