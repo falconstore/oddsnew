@@ -2,11 +2,11 @@ import { useMemo, useState } from 'react';
 import { format, subDays, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
-  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, CartesianGrid,
+  ResponsiveContainer, BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip as RTooltip, CartesianGrid,
 } from 'recharts';
 import {
   Users2, UserCheck, UserMinus, Percent, Search, RefreshCw,
-  Copy, ExternalLink, TrendingUp, Send, MessageCircle,
+  Copy, ExternalLink, TrendingUp, MessageCircle, Radio,
 } from 'lucide-react';
 import { Layout } from '@/components/Layout';
 import { PageHeader } from '@/components/PageHeader';
@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { useTrialLeads } from '@/hooks/useTrialLeads';
+import { useTrialLeads, useFreeGroupSnapshots } from '@/hooks/useTrialLeads';
 import { toast } from '@/hooks/use-toast';
 import type { TrialLead } from '@/types/trial';
 import { cn } from '@/lib/utils';
@@ -54,6 +54,7 @@ const usernameReal = (l: TrialLead): string | null => {
 
 export default function GrupoFree() {
   const { data: allLeads = [], isLoading, isRefetching, refetch } = useTrialLeads();
+  const { data: snapshots = [] } = useFreeGroupSnapshots();
 
   const [search, setSearch] = useState('');
   const [vinculoFiltro, setVinculoFiltro] = useState<'all' | Vinculo>('all');
@@ -109,6 +110,17 @@ export default function GrupoFree() {
   }, [leads]);
 
   const temSerie = serie.some((d) => d.Cadastros > 0);
+
+  // Crescimento do total de inscritos do canal (snapshots diários do cron).
+  const inscritos = useMemo(
+    () => snapshots.map((s) => ({ label: format(new Date(s.dia + 'T12:00:00'), 'dd/MM'), Inscritos: s.total })),
+    [snapshots],
+  );
+  const totalInscritos = snapshots.length ? snapshots[snapshots.length - 1].total : null;
+  // Variação vs primeiro snapshot disponível (desde quando começamos a medir).
+  const varInscritos = snapshots.length >= 2
+    ? snapshots[snapshots.length - 1].total - snapshots[0].total
+    : 0;
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -218,13 +230,52 @@ export default function GrupoFree() {
           </div>
         </div>
 
+        {/* Crescimento do canal (total de inscritos — snapshot diário) */}
+        <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-3">
+          <div className="rounded-lg border border-primary/25 bg-gradient-to-br from-primary/15 to-primary/5 p-4 flex flex-col justify-center">
+            <p className="text-[11px] uppercase tracking-wider text-primary/80 flex items-center gap-1.5">
+              <Radio className="w-3.5 h-3.5" /> Inscritos no canal
+            </p>
+            <p className="text-3xl font-bold font-mono tabular-nums text-primary mt-1">
+              {totalInscritos != null ? totalInscritos.toLocaleString('pt-BR') : '—'}
+            </p>
+            <p className="text-[11px] text-muted-foreground mt-1">
+              {snapshots.length >= 2
+                ? `${varInscritos >= 0 ? '+' : ''}${varInscritos.toLocaleString('pt-BR')} desde ${format(new Date(snapshots[0].dia + 'T12:00:00'), 'dd/MM')}`
+                : 'medição diária (atualiza às 3h)'}
+            </p>
+          </div>
+
+          <div className="rounded-lg border border-border bg-card p-4">
+            <p className="telemetry-label text-primary mb-3">[ CRESCIMENTO DE INSCRITOS NO CANAL ]</p>
+            {inscritos.length < 2 ? (
+              <p className="text-sm text-muted-foreground py-12 text-center">
+                Coletando dados… o gráfico de crescimento aparece a partir do 2º dia de medição.
+                {totalInscritos != null && ` Hoje: ${totalInscritos.toLocaleString('pt-BR')} inscritos.`}
+              </p>
+            ) : (
+              <ResponsiveContainer width="100%" height={220}>
+                <LineChart data={inscritos} margin={{ top: 4, right: 8, left: -10, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} interval="preserveStartEnd" />
+                  <YAxis tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} domain={['dataMin - 5', 'dataMax + 5']} allowDecimals={false} width={48} />
+                  <RTooltip
+                    contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 0, fontSize: 12 }}
+                  />
+                  <Line type="monotone" dataKey="Inscritos" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 2 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </div>
+
         {/* Nota explicativa sobre canal */}
         <div className="flex items-start gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
           <MessageCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-muted-foreground/60" />
           <p>
             O Grupo Free é um <b>canal</b> do Telegram — canais não avisam quando alguém entra ou sai.
-            Por isso rastreamos a <b className="text-primary">confirmação do Telegram</b>: quem passa pelo
-            bot (botão da página de obrigado) tem o ID/@ capturado e aparece como <b className="text-primary">confirmado</b>.
+            Por isso rastreamos a <b className="text-primary">confirmação do Telegram</b> (quem passa pelo
+            bot tem o ID/@ capturado) e o <b className="text-primary">total de inscritos</b>, medido 1x/dia.
           </p>
         </div>
 

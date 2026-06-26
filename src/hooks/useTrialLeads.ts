@@ -22,6 +22,25 @@ export const useTrialLeads = () => {
   });
 };
 
+export type FreeGroupSnapshot = { dia: string; total: number };
+
+// Snapshots diários do total de inscritos do CANAL Grupo Free. Gravados pelo
+// cron free-group-snapshot (getChatMemberCount 1x/dia).
+export const useFreeGroupSnapshots = () => {
+  return useQuery<FreeGroupSnapshot[]>({
+    queryKey: ['free_group_snapshots'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('free_group_snapshots')
+        .select('dia, total')
+        .order('dia', { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as FreeGroupSnapshot[];
+    },
+    staleTime: 60_000,
+  });
+};
+
 export const usePurgeTrialLead = () => {
   const qc = useQueryClient();
   return useMutation({
