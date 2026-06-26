@@ -117,6 +117,67 @@ async function captureFreeGroupLead(
   }
 }
 
+// Registra um evento de entrada/saída no GRUPO FREE no lead correspondente.
+// `entered=true` → grava free_group_entered_at e limpa free_group_left_at.
+// `entered=false` → grava free_group_left_at.
+// Se ninguém com esse telegram_user_id existe (entrou pelo link sem dar
+// /start), cria o lead (cohort='free_group') na entrada. Best-effort.
+async function recordFreeGroupMembership(
+  supabase: ReturnType<typeof createClient>,
+  userId: number,
+  entered: boolean,
+  username?: string | null,
+  firstName?: string | null,
+) {
+  try {
+    const { data: lead } = await supabase
+      .from("trial_leads")
+      .select("id")
+      .eq("telegram_user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const nowIso = new Date().toISOString();
+
+    if (lead) {
+      const patch = entered
+        ? { free_group_entered_at: nowIso, free_group_left_at: null }
+        : { free_group_left_at: nowIso };
+      const { error } = await supabase
+        .from("trial_leads")
+        .update(patch)
+        .eq("id", (lead as { id: string }).id);
+      if (error) console.warn("free-group membership update error", error);
+      else log(entered ? "free-group-entered" : "free-group-left", { user_id: userId, lead_id: (lead as { id: string }).id });
+      return;
+    }
+
+    // Sem lead e ENTROU pelo link direto: cria já marcando a entrada.
+    if (entered) {
+      const nome = (firstName ?? "").trim() || (username ? `@${username}` : `Free ${userId}`);
+      const uname = username ? username.toLowerCase() : `free_${userId}`;
+      const { error } = await supabase.from("trial_leads").insert({
+        name: nome.slice(0, 60),
+        email: `free_${userId}@telegram.local`,
+        whatsapp: `tg_${userId}`,
+        telegram_username: uname,
+        telegram_user_id: userId,
+        status: "pending",
+        cohort: "free_group",
+        free_group_entered_at: nowIso,
+      });
+      if (error) console.warn("free-group join insert error", error);
+      else log("free-group-entered-new", { user_id: userId, username: username ?? null });
+    } else {
+      // Saiu mas não temos lead — nada a atualizar.
+      log("free-group-left-unknown", { user_id: userId });
+    }
+  } catch (e) {
+    console.warn("free-group membership failed", e);
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -124,6 +185,7 @@ serve(async (req) => {
     const expectedSecret = Deno.env.get("TELEGRAM_TRIAL_WEBHOOK_SECRET");
     const expectedChatId = Deno.env.get("TELEGRAM_TRIAL_CHAT_ID");
     const bonusChatId = Deno.env.get("TELEGRAM_TRIAL_BONUS_CHAT_ID") ?? null;
+    const freeGroupChatId = Deno.env.get("TELEGRAM_FREE_GROUP_CHAT_ID") ?? null;
     const botToken = Deno.env.get("TELEGRAM_TRIAL_BOT_TOKEN");
 
     if (!expectedSecret) {
@@ -321,11 +383,13 @@ serve(async (req) => {
     const updateChatId = String(cm.chat?.id ?? "");
     const isVipChat = !!expectedChatId && updateChatId === String(expectedChatId);
     const isBonusChat = !!bonusChatId && updateChatId === String(bonusChatId);
-    if (!isVipChat && !isBonusChat) {
+    const isFreeGroupChat = !!freeGroupChatId && updateChatId === String(freeGroupChatId);
+    if (!isVipChat && !isBonusChat && !isFreeGroupChat) {
       log("ignored", {
         reason: "wrong chat", update_id: updateId, got_chat: updateChatId,
         expected_vip: expectedChatId ? String(expectedChatId) : null,
         expected_bonus: bonusChatId ?? null,
+        expected_free: freeGroupChatId ?? null,
       });
       return json({ ok: true, ignored: "wrong chat" });
     }
@@ -345,7 +409,7 @@ serve(async (req) => {
     log("received", {
       update_id: updateId,
       kind: cmKind,
-      chat: isBonusChat ? "bonus" : "vip",
+      chat: isFreeGroupChat ? "free" : isBonusChat ? "bonus" : "vip",
       user_id: userId ?? null,
       username: username ?? null,
       old_status: oldStatus ?? null,
@@ -369,6 +433,26 @@ serve(async (req) => {
       INACTIVE_STATUSES.has(newStatus) &&
       oldStatus !== undefined &&
       ACTIVE_STATUSES.has(oldStatus);
+
+    // ============================================================
+    // Caso FREE — eventos no GRUPO FREE (acompanhamento gratuito)
+    // ============================================================
+    // Esse grupo NÃO controla trial nem é kickável: só rastreamos a
+    // entrada (free_group_entered_at) e a saída (free_group_left_at) no
+    // lead com esse telegram_user_id (cohort='free_group'). Se entrou pelo
+    // link sem ter dado /start, criamos o lead na hora.
+    if (isFreeGroupChat) {
+      if (becameActiveTmp) {
+        await recordFreeGroupMembership(supabase, userId, true, username, cm.new_chat_member?.user?.first_name);
+        return json({ ok: true, action: "free-group-entered", user_id: userId });
+      }
+      if (becameInactiveTmp) {
+        await recordFreeGroupMembership(supabase, userId, false, username);
+        return json({ ok: true, action: "free-group-left", user_id: userId });
+      }
+      log("ignored", { reason: "free-group non-transition", update_id: updateId, old_status: oldStatus, new_status: newStatus });
+      return json({ ok: true, ignored: "free-group non-transition" });
+    }
 
     // ============================================================
     // Caso BONUS — eventos no grupo "Área do Aluno"
