@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { format, subDays, startOfDay, differenceInDays, differenceInHours } from 'date-fns';
+import { format, subDays, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
   ResponsiveContainer, BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip as RTooltip, CartesianGrid,
@@ -40,8 +40,10 @@ function presencaDe(l: TrialLead): Presenca {
   return 'no_grupo';
 }
 
-const fmtDia = (iso: string | null) =>
-  iso ? format(new Date(iso), 'dd/MM/yy', { locale: ptBR }) : '—';
+// Data + horário (ex.: "26/06 14:32"). Hora ajuda a entender entradas/saídas
+// rápidas no mesmo dia.
+const fmtDataHora = (iso: string | null) =>
+  iso ? format(new Date(iso), "dd/MM HH:mm", { locale: ptBR }) : '—';
 
 const fmtWhatsapp = (raw: string) => {
   const d = (raw ?? '').replace(/\D/g, '');
@@ -71,14 +73,21 @@ const temContatoReal = (l: TrialLead): boolean => {
 const origemDe = (l: TrialLead): Origem => (temContatoReal(l) ? 'site' : 'link');
 
 // Tempo no grupo: entrada→saída, ou entrada→agora (se ainda dentro).
+// Granularidade fina: dias / horas / minutos / segundos — pra captar até
+// quem entrou e saiu em segundos (não mais "0h" inútil).
 function tempoNoGrupo(l: TrialLead): string | null {
   if (!l.free_group_entered_at) return null;
-  const inicio = new Date(l.free_group_entered_at);
-  const fim = l.free_group_left_at && new Date(l.free_group_left_at) >= inicio
-    ? new Date(l.free_group_left_at) : new Date();
-  const dias = differenceInDays(fim, inicio);
-  if (dias >= 1) return `${dias}d`;
-  return `${Math.max(differenceInHours(fim, inicio), 0)}h`;
+  const inicio = new Date(l.free_group_entered_at).getTime();
+  const saida = l.free_group_left_at ? new Date(l.free_group_left_at).getTime() : null;
+  const fim = saida && saida >= inicio ? saida : Date.now();
+  const segs = Math.max(0, Math.round((fim - inicio) / 1000));
+  if (segs < 60) return `${segs}s`;
+  const mins = Math.floor(segs / 60);
+  if (mins < 60) return `${mins}min`;
+  const horas = Math.floor(mins / 60);
+  if (horas < 24) return `${horas}h${mins % 60 ? ` ${mins % 60}min` : ''}`;
+  const dias = Math.floor(horas / 24);
+  return `${dias}d${horas % 24 ? ` ${horas % 24}h` : ''}`;
 }
 
 export default function GrupoFree() {
@@ -405,12 +414,12 @@ function LeadCard({ lead, onReconvidar }: { lead: TrialLead; onReconvidar: (lead
       <div className="flex items-center gap-5 text-xs">
         <div>
           <p className="text-muted-foreground/60 uppercase tracking-wider mb-0.5">Entrou</p>
-          <p className="font-mono">{fmtDia(lead.free_group_entered_at)}</p>
+          <p className="font-mono whitespace-nowrap">{fmtDataHora(lead.free_group_entered_at)}</p>
         </div>
         <div>
           <p className="text-muted-foreground/60 uppercase tracking-wider mb-0.5">Saiu</p>
-          <p className={cn('font-mono', p === 'saiu' ? 'text-destructive' : 'text-muted-foreground/50')}>
-            {fmtDia(lead.free_group_left_at)}
+          <p className={cn('font-mono whitespace-nowrap', p === 'saiu' ? 'text-destructive' : 'text-muted-foreground/50')}>
+            {fmtDataHora(lead.free_group_left_at)}
           </p>
         </div>
         <div>
