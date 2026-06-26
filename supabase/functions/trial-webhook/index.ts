@@ -34,6 +34,89 @@ const log = (event: string, data: Record<string, unknown>) => {
   console.log(JSON.stringify({ tag: "trial-webhook", event, ...data }));
 };
 
+// Links públicos mostrados a quem dá /start sem cadastro válido (ou cujo
+// cadastro não foi achado / já encerrou). Em vez de uma mensagem morta,
+// oferecemos um caminho: entrar no Grupo Free ou falar com o suporte.
+const FREE_GROUP_URL = "https://t.me/sharkgreenfree2";
+const SUPPORT_URL = "https://t.me/SuporteSharkGreen_financeiro";
+
+// Botões padrão (Grupo Free + Suporte) pro fallback do /start.
+const FALLBACK_BUTTONS = [
+  [{ text: "🎁 Entrar no Grupo Free", url: FREE_GROUP_URL }],
+  [{ text: "💬 Falar com o Suporte", url: SUPPORT_URL }],
+];
+
+// Manda a mensagem de fallback com os 2 botões. Usada quando o usuário chega
+// no bot sem um cadastro de trial válido — nunca deixa ele sem saída.
+async function sendFreeGroupFallback(
+  botToken: string,
+  chatId: number,
+  firstName?: string | null,
+) {
+  const nome = (firstName ?? "").split(/\s+/)[0] || "tudo bem?";
+  const safeName = nome.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const lines = [
+    `Oi, <b>${safeName}</b>! 👋`,
+    ``,
+    `Entre agora no nosso <b>Grupo Free</b> da SHARK 100% GREEN e acompanhe as entradas gratuitas. 👇`,
+    ``,
+    `Qualquer dúvida, fale com o nosso suporte.`,
+  ];
+  await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text: lines.join("\n"),
+      parse_mode: "HTML",
+      reply_markup: { inline_keyboard: FALLBACK_BUTTONS },
+    }),
+  });
+}
+
+// Registra quem chegou pelo Grupo Free na própria trial_leads, marcando
+// cohort='free_group' (valor já válido no schema) e capturando o
+// telegram_user_id pra acompanhamento. Best-effort: não derruba o fluxo.
+//
+// trial_leads exige email/whatsapp/telegram_username NOT NULL e únicos. Quem
+// dá /start puro não tem esses dados, então preenchemos placeholders únicos
+// derivados do telegram_user_id (ex.: free_<id>@telegram.local). Dedup pelo
+// telegram_user_id: se já existe qualquer lead com esse id, não recria.
+async function captureFreeGroupLead(
+  supabase: ReturnType<typeof createClient>,
+  fromId: number,
+  fromUsername?: string | null,
+  firstName?: string | null,
+) {
+  try {
+    const { data: existing } = await supabase
+      .from("trial_leads")
+      .select("id")
+      .eq("telegram_user_id", fromId)
+      .maybeSingle();
+    if (existing) {
+      log("free-group-existing", { from_id: fromId, lead_id: (existing as { id: string }).id });
+      return;
+    }
+    const nome = (firstName ?? "").trim() || (fromUsername ? `@${fromUsername}` : `Free ${fromId}`);
+    // Placeholders únicos pros campos NOT NULL/únicos (sem email/whatsapp reais).
+    const uname = fromUsername ? fromUsername.toLowerCase() : `free_${fromId}`;
+    const { error } = await supabase.from("trial_leads").insert({
+      name: nome.slice(0, 60),
+      email: `free_${fromId}@telegram.local`,
+      whatsapp: `tg_${fromId}`,
+      telegram_username: uname,
+      telegram_user_id: fromId,
+      status: "pending",
+      cohort: "free_group",
+    });
+    if (error) console.warn("free-group capture insert error", error);
+    else log("free-group-captured", { from_id: fromId, username: fromUsername ?? null });
+  } catch (e) {
+    console.warn("free-group capture failed", e);
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -83,19 +166,13 @@ serve(async (req) => {
         const leadId = m ? m[1] : null;
 
         if (!leadId || !fromId) {
-          // /start sem payload válido — manda mensagem genérica
+          // /start sem payload de trial válido. Em vez de mensagem morta,
+          // captura o contato e oferece Grupo Free + Suporte.
           if (botToken && fromId) {
+            await captureFreeGroupLead(supabase, fromId, fromUsername, msg.from?.first_name);
             try {
-              await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  chat_id: fromId,
-                  text: "Olá! Para liberar seu acesso, faça o cadastro pelo site oficial primeiro.",
-                  parse_mode: "HTML",
-                }),
-              });
-            } catch (e) { console.warn("start no-payload reply failed", e); }
+              await sendFreeGroupFallback(botToken, fromId, msg.from?.first_name);
+            } catch (e) { console.warn("start no-payload fallback failed", e); }
           }
           log("start-no-payload", { update_id: updateId, from_id: fromId ?? null, payload });
           return json({ ok: true, action: "start-no-payload" });
@@ -109,17 +186,13 @@ serve(async (req) => {
         if (leadErr) console.error("start lookup failed", leadErr);
 
         if (!lead) {
+          // Cadastro não achado — não deixa o usuário no vácuo: captura e
+          // oferece Grupo Free + Suporte.
           if (botToken) {
+            await captureFreeGroupLead(supabase, fromId, fromUsername, msg.from?.first_name);
             try {
-              await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  chat_id: fromId,
-                  text: "Cadastro não encontrado. Refaça o cadastro pelo site.",
-                }),
-              });
-            } catch (e) { console.warn("start lead-not-found reply failed", e); }
+              await sendFreeGroupFallback(botToken, fromId, msg.from?.first_name);
+            } catch (e) { console.warn("start lead-not-found fallback failed", e); }
           }
           log("start-lead-not-found", { update_id: updateId, lead_id: leadId, from_id: fromId });
           return json({ ok: true, action: "start-lead-not-found" });
@@ -160,6 +233,8 @@ serve(async (req) => {
         }
 
         if (BLOCKED_LEAD_STATUSES.has(lead.status)) {
+          // Trial já encerrado — oferece Grupo Free (acompanhamento gratuito)
+          // e o suporte, em vez de só uma mensagem morta.
           if (botToken) {
             try {
               await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
@@ -167,7 +242,9 @@ serve(async (req) => {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                   chat_id: fromId,
-                  text: "Seu trial já foi encerrado. Para continuar, fale com o suporte.",
+                  text: "Seu trial já foi encerrado. Mas você pode continuar no nosso <b>Grupo Free</b> ou falar com o suporte 👇",
+                  parse_mode: "HTML",
+                  reply_markup: { inline_keyboard: FALLBACK_BUTTONS },
                 }),
               });
             } catch (e) { console.warn("start blocked reply failed", e); }
