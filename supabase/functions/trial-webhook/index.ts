@@ -171,6 +171,11 @@ async function recordFreeGroupMembership(
   firstName?: string | null,
 ) {
   try {
+    // Ignora o próprio bot (entra/sai como admin) — não é um lead.
+    if (username && username.toLowerCase().endsWith("bot")) {
+      log("free-group-ignore-bot", { user_id: userId, username });
+      return;
+    }
     const nowIso = new Date().toISOString();
     const unameLower = username ? username.toLowerCase() : null;
 

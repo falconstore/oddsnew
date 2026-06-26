@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react';
-import { format, subDays, startOfDay } from 'date-fns';
+import { format, subDays, startOfDay, differenceInDays, differenceInHours } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
   ResponsiveContainer, BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip as RTooltip, CartesianGrid,
 } from 'recharts';
 import {
-  Users2, UserCheck, UserMinus, Percent, Search, RefreshCw,
-  Copy, ExternalLink, TrendingUp, MessageCircle, Radio,
+  Users2, UserCheck, UserX, UserMinus, Percent, Search, RefreshCw,
+  Copy, ExternalLink, TrendingUp, LogOut, MessageCircle, Radio, Clock,
 } from 'lucide-react';
 import { Layout } from '@/components/Layout';
 import { PageHeader } from '@/components/PageHeader';
@@ -19,20 +19,25 @@ import { toast } from '@/hooks/use-toast';
 import type { TrialLead } from '@/types/trial';
 import { cn } from '@/lib/utils';
 
-// Link público do Grupo Free (canal). Usado pra reconvite.
-const FREE_GROUP_URL = 'https://t.me/sharkgreenfree2';
+// Convite fixo do canal (entra direto). Usado no reconvite.
+const FREE_GROUP_URL = 'https://t.me/+yiX221dVMrBmNTMx';
+// telegram_user_id do próprio bot — não é um "lead", filtramos da lista.
+const BOT_USER_ID = 8680680297;
 
-// ── Vínculo do lead ──
-// O "Grupo Free" é um CANAL do Telegram (não grupo): canais NÃO notificam
-// entrada/saída individual via bot. Então não dá pra saber quem "saiu".
-// O sinal confiável é: a pessoa passou pelo BOT (deep-link ?start=free_<id>),
-// que captura o telegram_user_id REAL → consideramos "vinculada".
-//   vinculado   → tem telegram_user_id real (confirmou o Telegram via bot)
-//   so_cadastro → só preencheu o forms, sem Telegram real capturado
-type Vinculo = 'vinculado' | 'so_cadastro';
+// ── Presença no canal ──
+// O bot virou admin do canal → o Telegram passou a emitir chat_member
+// (entrada/saída). Derivamos a presença dos timestamps:
+//   no_grupo  → entrou e não saiu (ou reentrou após sair)
+//   saiu      → saída registrada e posterior à última entrada
+//   nao_entrou→ sem entrada registrada (só cadastro, ou ainda não entrou)
+type Presenca = 'no_grupo' | 'saiu' | 'nao_entrou';
 
-function vinculoDe(l: TrialLead): Vinculo {
-  return l.telegram_user_id != null ? 'vinculado' : 'so_cadastro';
+function presencaDe(l: TrialLead): Presenca {
+  const entrou = l.free_group_entered_at ? new Date(l.free_group_entered_at).getTime() : null;
+  const saiu = l.free_group_left_at ? new Date(l.free_group_left_at).getTime() : null;
+  if (!entrou) return 'nao_entrou';
+  if (saiu && saiu >= entrou) return 'saiu';
+  return 'no_grupo';
 }
 
 const fmtDia = (iso: string | null) =>
@@ -45,87 +50,101 @@ const fmtWhatsapp = (raw: string) => {
   return raw;
 };
 
-// Um @username é "real" quando não é o placeholder (free_<whats> / email).
 const usernameReal = (l: TrialLead): string | null => {
   const u = l.telegram_username ?? '';
   if (!u || u.startsWith('free_') || u.includes('@')) return null;
   return u;
 };
 
+// Tempo no grupo: entrada→saída, ou entrada→agora (se ainda dentro).
+function tempoNoGrupo(l: TrialLead): string | null {
+  if (!l.free_group_entered_at) return null;
+  const inicio = new Date(l.free_group_entered_at);
+  const fim = l.free_group_left_at && new Date(l.free_group_left_at) >= inicio
+    ? new Date(l.free_group_left_at) : new Date();
+  const dias = differenceInDays(fim, inicio);
+  if (dias >= 1) return `${dias}d`;
+  return `${Math.max(differenceInHours(fim, inicio), 0)}h`;
+}
+
 export default function GrupoFree() {
   const { data: allLeads = [], isLoading, isRefetching, refetch } = useTrialLeads();
   const { data: snapshots = [] } = useFreeGroupSnapshots();
 
   const [search, setSearch] = useState('');
-  const [vinculoFiltro, setVinculoFiltro] = useState<'all' | Vinculo>('all');
+  const [presencaFiltro, setPresencaFiltro] = useState<'all' | Presenca>('all');
 
-  // Só leads do grupo free.
+  // Leads do grupo free, exceto o próprio bot.
   const leads = useMemo(
-    () => allLeads.filter((l) => l.cohort === 'free_group'),
+    () => allLeads.filter((l) => l.cohort === 'free_group' && l.telegram_user_id !== BOT_USER_ID),
     [allLeads],
   );
 
   const stats = useMemo(() => {
-    const s = { total: leads.length, vinculados: 0, soCadastro: 0 };
+    const s = { total: leads.length, noGrupo: 0, saiu: 0, naoEntrou: 0, confirmados: 0 };
     for (const l of leads) {
-      if (vinculoDe(l) === 'vinculado') s.vinculados++;
-      else s.soCadastro++;
+      const p = presencaDe(l);
+      if (p === 'no_grupo') s.noGrupo++;
+      else if (p === 'saiu') s.saiu++;
+      else s.naoEntrou++;
+      if (l.telegram_user_id != null) s.confirmados++;
     }
     return s;
   }, [leads]);
 
-  // Taxa de vínculo: quantos confirmaram o Telegram (passaram pelo bot).
-  const taxaVinculo = stats.total > 0
-    ? Math.round((stats.vinculados / stats.total) * 100)
+  // Taxa de entrada: já entrou alguma vez (no grupo + saiu) / total.
+  const taxaEntrada = stats.total > 0
+    ? Math.round(((stats.noGrupo + stats.saiu) / stats.total) * 100)
     : 0;
 
-  // Vínculos nas últimas 24h (pessoas que confirmaram o Telegram via bot hoje).
-  const vinculos24h = useMemo(() => {
+  // Movimento nas últimas 24h.
+  const mov24h = useMemo(() => {
     const limite = Date.now() - 24 * 60 * 60 * 1000;
-    return leads.filter((l) =>
-      l.telegram_user_id != null &&
-      l.free_group_entered_at != null &&
-      new Date(l.free_group_entered_at).getTime() >= limite,
-    ).length;
+    let entraram = 0, sairam = 0;
+    for (const l of leads) {
+      if (l.free_group_entered_at && new Date(l.free_group_entered_at).getTime() >= limite) entraram++;
+      if (l.free_group_left_at && new Date(l.free_group_left_at).getTime() >= limite) sairam++;
+    }
+    return { entraram, sairam };
   }, [leads]);
 
-  // Série diária (30 dias) de NOVOS cadastros — usa created_at, que sempre
-  // existe. É a métrica de captação confiável pra um canal.
+  // Série diária (30 dias): entradas e saídas por dia.
   const serie = useMemo(() => {
-    const dias: { key: string; label: string; Cadastros: number }[] = [];
+    const dias: { key: string; label: string; Entradas: number; Saídas: number }[] = [];
     const idx = new Map<string, number>();
     for (let i = 29; i >= 0; i--) {
       const d = startOfDay(subDays(new Date(), i));
       const key = format(d, 'yyyy-MM-dd');
       idx.set(key, dias.length);
-      dias.push({ key, label: format(d, 'dd/MM'), Cadastros: 0 });
+      dias.push({ key, label: format(d, 'dd/MM'), Entradas: 0, Saídas: 0 });
     }
     for (const l of leads) {
-      if (!l.created_at) continue;
-      const k = format(startOfDay(new Date(l.created_at)), 'yyyy-MM-dd');
-      const i = idx.get(k);
-      if (i != null) dias[i].Cadastros++;
+      if (l.free_group_entered_at) {
+        const i = idx.get(format(startOfDay(new Date(l.free_group_entered_at)), 'yyyy-MM-dd'));
+        if (i != null) dias[i].Entradas++;
+      }
+      if (l.free_group_left_at) {
+        const i = idx.get(format(startOfDay(new Date(l.free_group_left_at)), 'yyyy-MM-dd'));
+        if (i != null) dias[i].Saídas++;
+      }
     }
     return dias;
   }, [leads]);
+  const temSerie = serie.some((d) => d.Entradas > 0 || d.Saídas > 0);
 
-  const temSerie = serie.some((d) => d.Cadastros > 0);
-
-  // Crescimento do total de inscritos do canal (snapshots diários do cron).
+  // Crescimento do total de inscritos do canal (snapshots diários).
   const inscritos = useMemo(
     () => snapshots.map((s) => ({ label: format(new Date(s.dia + 'T12:00:00'), 'dd/MM'), Inscritos: s.total })),
     [snapshots],
   );
   const totalInscritos = snapshots.length ? snapshots[snapshots.length - 1].total : null;
-  // Variação vs primeiro snapshot disponível (desde quando começamos a medir).
   const varInscritos = snapshots.length >= 2
-    ? snapshots[snapshots.length - 1].total - snapshots[0].total
-    : 0;
+    ? snapshots[snapshots.length - 1].total - snapshots[0].total : 0;
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     return leads.filter((l) => {
-      if (vinculoFiltro !== 'all' && vinculoDe(l) !== vinculoFiltro) return false;
+      if (presencaFiltro !== 'all' && presencaDe(l) !== presencaFiltro) return false;
       if (!term) return true;
       return (
         l.name?.toLowerCase().includes(term) ||
@@ -134,7 +153,7 @@ export default function GrupoFree() {
         l.telegram_username?.toLowerCase().includes(term)
       );
     });
-  }, [leads, search, vinculoFiltro]);
+  }, [leads, search, presencaFiltro]);
 
   const copiarLink = async () => {
     try {
@@ -145,15 +164,13 @@ export default function GrupoFree() {
     }
   };
 
-  // Reconvida o lead. Se tiver WhatsApp real, abre o WhatsApp com mensagem
-  // pronta + link. Senão, abre o canal no Telegram pra compartilhar.
   const reconvidar = (lead: TrialLead) => {
     const digits = (lead.whatsapp ?? '').replace(/\D/g, '');
     const ehWhatsReal = digits.length >= 10 && !lead.whatsapp?.startsWith('tg_');
     if (ehWhatsReal) {
       const nome = (lead.name || '').split(' ')[0] || '';
       const msg = encodeURIComponent(
-        `Oi${nome ? ` ${nome}` : ''}! 🦈 Aqui é da Shark Green. Você se cadastrou mas ainda não confirmou sua entrada no nosso Grupo Free. Entra aqui pra acompanhar as entradas gratuitas: ${FREE_GROUP_URL}`,
+        `Oi${nome ? ` ${nome}` : ''}! 🦈 Aqui é da Shark Green. Você se cadastrou mas ainda não entrou no nosso Grupo Free. Entra aqui pra acompanhar as entradas gratuitas: ${FREE_GROUP_URL}`,
       );
       const wa = digits.startsWith('55') ? digits : `55${digits}`;
       window.open(`https://wa.me/${wa}?text=${msg}`, '_blank', 'noopener');
@@ -169,7 +186,7 @@ export default function GrupoFree() {
         <PageHeader
           eyebrow="FREE"
           title="Grupo Free"
-          subtitle="ACOMPANHAMENTO DOS LEADS DO CANAL GRATUITO"
+          subtitle="ACOMPANHAMENTO DE QUEM ENTRA E SAI DO CANAL GRATUITO"
           icon={Users2}
           actions={
             <>
@@ -186,32 +203,41 @@ export default function GrupoFree() {
         />
 
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           <StatCard icon={<Users2 className="w-5 h-5" />} label="Total de leads" value={stats.total}
             accent="from-muted/20 to-muted/5 border-border text-muted-foreground" />
-          <StatCard icon={<UserCheck className="w-5 h-5" />} label="Telegram confirmado" value={stats.vinculados}
+          <StatCard icon={<UserCheck className="w-5 h-5" />} label="No canal" value={stats.noGrupo}
             accent="from-primary/20 to-primary/5 border-primary/25 text-primary" />
-          <StatCard icon={<UserMinus className="w-5 h-5" />} label="Só cadastro" value={stats.soCadastro}
+          <StatCard icon={<UserX className="w-5 h-5" />} label="Saíram" value={stats.saiu}
+            accent="from-destructive/20 to-destructive/5 border-destructive/25 text-destructive" />
+          <StatCard icon={<UserMinus className="w-5 h-5" />} label="Nunca entraram" value={stats.naoEntrou}
             accent="from-warning/20 to-warning/5 border-warning/25 text-warning" />
-          <StatCard icon={<Percent className="w-5 h-5" />} label="Taxa de confirmação" value={taxaVinculo} suffix="%"
+          <StatCard icon={<Percent className="w-5 h-5" />} label="Taxa de entrada" value={taxaEntrada} suffix="%"
             accent="from-primary/20 to-primary/5 border-primary/25 text-primary" />
         </div>
 
-        {/* Movimento 24h + gráfico de cadastros */}
+        {/* Movimento 24h + gráfico entradas/saídas */}
         <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-3">
-          <div className="rounded-lg border border-primary/25 bg-gradient-to-br from-primary/15 to-primary/5 p-4 flex flex-col justify-center">
-            <p className="text-[11px] uppercase tracking-wider text-primary/80 flex items-center gap-1.5">
-              <TrendingUp className="w-3.5 h-3.5" /> Confirmaram (24h)
-            </p>
-            <p className="text-3xl font-bold font-mono tabular-nums text-primary mt-1">{vinculos24h}</p>
-            <p className="text-[11px] text-muted-foreground mt-1">passaram pelo bot nas últimas 24h</p>
+          <div className="grid grid-cols-2 lg:grid-cols-1 gap-3">
+            <div className="rounded-lg border border-primary/25 bg-gradient-to-br from-primary/15 to-primary/5 p-3">
+              <p className="text-[11px] uppercase tracking-wider text-primary/80 flex items-center gap-1.5">
+                <TrendingUp className="w-3.5 h-3.5" /> Entraram (24h)
+              </p>
+              <p className="text-2xl font-bold font-mono tabular-nums text-primary mt-1">{mov24h.entraram}</p>
+            </div>
+            <div className="rounded-lg border border-destructive/25 bg-gradient-to-br from-destructive/15 to-destructive/5 p-3">
+              <p className="text-[11px] uppercase tracking-wider text-destructive/80 flex items-center gap-1.5">
+                <LogOut className="w-3.5 h-3.5" /> Saíram (24h)
+              </p>
+              <p className="text-2xl font-bold font-mono tabular-nums text-destructive mt-1">{mov24h.sairam}</p>
+            </div>
           </div>
 
           <div className="rounded-lg border border-border bg-card p-4">
-            <p className="telemetry-label text-primary mb-3">[ NOVOS CADASTROS — ÚLTIMOS 30 DIAS ]</p>
+            <p className="telemetry-label text-primary mb-3">[ ENTRADAS vs SAÍDAS — ÚLTIMOS 30 DIAS ]</p>
             {!temSerie ? (
               <p className="text-sm text-muted-foreground py-12 text-center">
-                Sem cadastros nos últimos 30 dias.
+                Sem entradas/saídas registradas ainda. Os dados aparecem conforme as pessoas entram/saem do canal.
               </p>
             ) : (
               <ResponsiveContainer width="100%" height={220}>
@@ -223,14 +249,15 @@ export default function GrupoFree() {
                     contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 0, fontSize: 12 }}
                     cursor={{ fill: 'hsl(var(--accent))' }}
                   />
-                  <Bar dataKey="Cadastros" fill="hsl(var(--primary))" radius={[2, 2, 0, 0]} />
+                  <Bar dataKey="Entradas" fill="hsl(var(--primary))" radius={[2, 2, 0, 0]} />
+                  <Bar dataKey="Saídas" fill="hsl(var(--destructive))" radius={[2, 2, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             )}
           </div>
         </div>
 
-        {/* Crescimento do canal (total de inscritos — snapshot diário) */}
+        {/* Crescimento do total de inscritos do canal */}
         <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-3">
           <div className="rounded-lg border border-primary/25 bg-gradient-to-br from-primary/15 to-primary/5 p-4 flex flex-col justify-center">
             <p className="text-[11px] uppercase tracking-wider text-primary/80 flex items-center gap-1.5">
@@ -259,24 +286,12 @@ export default function GrupoFree() {
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                   <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} interval="preserveStartEnd" />
                   <YAxis tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} domain={['dataMin - 5', 'dataMax + 5']} allowDecimals={false} width={48} />
-                  <RTooltip
-                    contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 0, fontSize: 12 }}
-                  />
+                  <RTooltip contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 0, fontSize: 12 }} />
                   <Line type="monotone" dataKey="Inscritos" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 2 }} />
                 </LineChart>
               </ResponsiveContainer>
             )}
           </div>
-        </div>
-
-        {/* Nota explicativa sobre canal */}
-        <div className="flex items-start gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-          <MessageCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-muted-foreground/60" />
-          <p>
-            O Grupo Free é um <b>canal</b> do Telegram — canais não avisam quando alguém entra ou sai.
-            Por isso rastreamos a <b className="text-primary">confirmação do Telegram</b> (quem passa pelo
-            bot tem o ID/@ capturado) e o <b className="text-primary">total de inscritos</b>, medido 1x/dia.
-          </p>
         </div>
 
         {/* Filtros */}
@@ -290,18 +305,19 @@ export default function GrupoFree() {
               className="w-full h-9 pl-9 pr-3 text-sm bg-background border border-border focus:border-primary outline-none rounded-md"
             />
           </div>
-          <Select value={vinculoFiltro} onValueChange={(v) => setVinculoFiltro(v as 'all' | Vinculo)}>
+          <Select value={presencaFiltro} onValueChange={(v) => setPresencaFiltro(v as 'all' | Presenca)}>
             <SelectTrigger className="w-full sm:w-[220px] h-9">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="vinculado">🟢 Telegram confirmado ({stats.vinculados})</SelectItem>
-              <SelectItem value="so_cadastro">🟡 Só cadastro ({stats.soCadastro})</SelectItem>
+              <SelectItem value="all">Presença: todos</SelectItem>
+              <SelectItem value="no_grupo">🟢 No canal ({stats.noGrupo})</SelectItem>
+              <SelectItem value="saiu">🔴 Saíram ({stats.saiu})</SelectItem>
+              <SelectItem value="nao_entrou">🟡 Nunca entraram ({stats.naoEntrou})</SelectItem>
             </SelectContent>
           </Select>
-          {(search || vinculoFiltro !== 'all') && (
-            <Button size="sm" variant="ghost" onClick={() => { setSearch(''); setVinculoFiltro('all'); }}>
+          {(search || presencaFiltro !== 'all') && (
+            <Button size="sm" variant="ghost" onClick={() => { setSearch(''); setPresencaFiltro('all'); }}>
               Limpar
             </Button>
           )}
@@ -335,8 +351,9 @@ export default function GrupoFree() {
 }
 
 function LeadCard({ lead, onReconvidar }: { lead: TrialLead; onReconvidar: (lead: TrialLead) => void }) {
-  const v = vinculoDe(lead);
+  const p = presencaDe(lead);
   const uname = usernameReal(lead);
+  const tempo = tempoNoGrupo(lead);
 
   return (
     <div className="border border-border rounded-lg bg-card px-4 py-3 flex flex-col md:flex-row md:items-center gap-3">
@@ -344,7 +361,12 @@ function LeadCard({ lead, onReconvidar }: { lead: TrialLead; onReconvidar: (lead
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="font-medium truncate">{lead.name || uname || lead.email}</span>
-          <VinculoBadge v={v} />
+          <PresencaBadge p={p} />
+          {lead.telegram_user_id != null && (
+            <span className="text-[10px] px-1.5 py-0.5 border rounded-full border-primary/40 text-primary/80 whitespace-nowrap">
+              Telegram ✓
+            </span>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground mt-1">
           {lead.email && !lead.email.includes('@telegram.local') && !lead.email.includes('@placeholder') && (
@@ -355,29 +377,31 @@ function LeadCard({ lead, onReconvidar }: { lead: TrialLead; onReconvidar: (lead
         </div>
       </div>
 
-      {/* Datas: cadastro + confirmação */}
+      {/* Datas + tempo */}
       <div className="flex items-center gap-5 text-xs">
         <div>
-          <p className="text-muted-foreground/60 uppercase tracking-wider mb-0.5">Cadastro</p>
-          <p className="font-mono">{fmtDia(lead.created_at)}</p>
+          <p className="text-muted-foreground/60 uppercase tracking-wider mb-0.5">Entrou</p>
+          <p className="font-mono">{fmtDia(lead.free_group_entered_at)}</p>
         </div>
         <div>
-          <p className="text-muted-foreground/60 uppercase tracking-wider mb-0.5">Telegram ID</p>
-          <p className={cn('font-mono', v === 'vinculado' ? 'text-primary' : 'text-muted-foreground/50')}>
-            {lead.telegram_user_id ?? '—'}
+          <p className="text-muted-foreground/60 uppercase tracking-wider mb-0.5">Saiu</p>
+          <p className={cn('font-mono', p === 'saiu' ? 'text-destructive' : 'text-muted-foreground/50')}>
+            {fmtDia(lead.free_group_left_at)}
           </p>
+        </div>
+        <div>
+          <p className="text-muted-foreground/60 uppercase tracking-wider mb-0.5 flex items-center gap-1">
+            <Clock className="w-3 h-3" /> {p === 'no_grupo' ? 'Está há' : 'Ficou'}
+          </p>
+          <p className="font-mono">{tempo ?? '—'}</p>
         </div>
       </div>
 
-      {/* Ação: reconvidar quem só cadastrou (não confirmou o Telegram) */}
-      {v === 'so_cadastro' && (
+      {/* Reconvidar quem não entrou */}
+      {p === 'nao_entrou' && (
         <div className="flex-shrink-0">
-          <Button
-            size="sm"
-            variant="outline"
-            className="border-warning/40 text-warning hover:bg-warning/10"
-            onClick={() => onReconvidar(lead)}
-          >
+          <Button size="sm" variant="outline" className="border-warning/40 text-warning hover:bg-warning/10"
+            onClick={() => onReconvidar(lead)}>
             <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
             Reconvidar
           </Button>
@@ -387,11 +411,12 @@ function LeadCard({ lead, onReconvidar }: { lead: TrialLead; onReconvidar: (lead
   );
 }
 
-function VinculoBadge({ v }: { v: Vinculo }) {
+function PresencaBadge({ p }: { p: Presenca }) {
   const map = {
-    vinculado: { txt: 'Telegram confirmado', cls: 'bg-primary/15 text-primary border-primary/40' },
-    so_cadastro: { txt: 'Só cadastro', cls: 'bg-warning/15 text-warning border-warning/40' },
-  }[v];
+    no_grupo: { txt: 'No canal', cls: 'bg-primary/15 text-primary border-primary/40' },
+    saiu: { txt: 'Saiu', cls: 'bg-destructive/15 text-destructive border-destructive/40' },
+    nao_entrou: { txt: 'Não entrou', cls: 'bg-warning/15 text-warning border-warning/40' },
+  }[p];
   return (
     <span className={cn('text-[10px] px-2 py-0.5 border rounded-full whitespace-nowrap font-medium', map.cls)}>
       {map.txt}
