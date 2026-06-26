@@ -14,7 +14,13 @@ export const FREE_GROUP_SESSION_KEY = 'free_group_success';
 export interface FreeGroupSuccess {
   name: string;
   eventId: string;
+  /** id do lead em trial_leads — usado pro deep-link do bot (?start=free_<id>). */
+  leadId?: string | null;
 }
+
+// Username do bot do trial (mesmo bot do Grupo Free). Deep-link manda a pessoa
+// pro bot, que captura o telegram_user_id real e dá o botão do grupo.
+const BOT_USERNAME = 'sharkinhogreen_bot';
 
 interface FbqStub {
   (...args: unknown[]): void;
@@ -121,6 +127,11 @@ export default function FreeGroupObrigado() {
   } catch { /* sessionStorage indisponível */ }
 
   const firstName = successData?.name?.split(' ')[0] ?? '';
+  // Se temos o leadId, manda pro BOT (captura telegram_user_id real + vincula).
+  // Sem leadId (fallback), vai direto pro grupo.
+  const ctaUrl = successData?.leadId
+    ? `https://t.me/${BOT_USERNAME}?start=free_${successData.leadId}`
+    : FREE_GROUPS_URL;
 
   useEffect(() => {
     if (!successData) {
@@ -203,15 +214,16 @@ export default function FreeGroupObrigado() {
         {/* Instrução */}
         <div className="w-full rounded-2xl border border-emerald-500/20 bg-emerald-500/8 px-6 py-4 text-center space-y-1">
           <p className="text-white/80 text-sm leading-relaxed">
-            Clique no botão abaixo e depois em{' '}
-            <strong className="text-emerald-300">"Aceitar convite"</strong>{' '}
-            no Telegram para entrar no grupo.
+            Clique no botão abaixo, toque em{' '}
+            <strong className="text-emerald-300">"Iniciar"</strong>{' '}
+            no nosso assistente e depois no botão{' '}
+            <strong className="text-emerald-300">"Entrar no Grupo Free"</strong>.
           </p>
         </div>
 
         {/* CTA principal */}
         <a
-          href={FREE_GROUPS_URL}
+          href={ctaUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="pulse-glow-btn w-full flex items-center justify-center gap-3 rounded-xl px-4 py-5 font-extrabold text-base sm:text-lg uppercase tracking-wide text-black bg-gradient-to-r from-emerald-400 to-green-500 shadow-xl shadow-emerald-500/40 transition-transform hover:scale-[1.02] active:scale-[0.98]"
@@ -222,7 +234,7 @@ export default function FreeGroupObrigado() {
         </a>
 
         <p className="text-white/40 text-xs text-center">
-          O link é gratuito e abre direto no Telegram
+          O acesso é 100% gratuito e abre direto no Telegram
         </p>
 
         {/* Prova social — números */}

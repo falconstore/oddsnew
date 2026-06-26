@@ -874,7 +874,7 @@ function FreeGroupModal({ open, onClose }: { open: boolean; onClose: () => void 
 
       const expiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
 
-      const { error: insertErr } = await _sbLeads
+      const { data: insertedLead, error: insertErr } = await _sbLeads
         .from('trial_leads')
         .insert({
           name: parsed.data.name,
@@ -888,11 +888,25 @@ function FreeGroupModal({ open, onClose }: { open: boolean; onClose: () => void 
           utm_medium:   utms.utm_medium   || null,
           utm_campaign: utms.utm_campaign || null,
           ct:           utms.ct           || null,
-        });
+        })
+        .select('id')
+        .single();
 
-      // 23505 = whatsapp duplicado — tudo bem, deixa entrar no grupo mesmo assim
+      // 23505 = whatsapp duplicado — tudo bem, deixa entrar no grupo mesmo assim.
+      // Nesse caso buscamos o id do lead já existente pra ainda vincular via bot.
       const pgCode = (insertErr as { code?: string } | null)?.code;
-      if (insertErr && pgCode !== '23505') {
+      let leadId: string | null = (insertedLead as { id: string } | null)?.id ?? null;
+      if (insertErr && pgCode === '23505') {
+        const { data: existing } = await _sbLeads
+          .from('trial_leads')
+          .select('id')
+          .eq('whatsapp', whatsapp)
+          .eq('cohort', 'free_group')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        leadId = (existing as { id: string } | null)?.id ?? null;
+      } else if (insertErr) {
         console.error('free-group-signup insert error', insertErr);
         setServerError('Não foi possível salvar seu cadastro. Tente novamente.');
         return;
@@ -910,9 +924,11 @@ function FreeGroupModal({ open, onClose }: { open: boolean; onClose: () => void 
       });
       trackPixel('Lead', { content_name: 'free-group' });
 
-      // Salva dados para a página de obrigado e redireciona
+      // Salva dados para a página de obrigado e redireciona. O leadId vai
+      // junto pra montar o deep-link do bot (?start=free_<id>) e vincular o
+      // telegram_user_id real quando a pessoa der /start.
       try {
-        const sessionData: FreeGroupSuccess = { name: parsed.data.name, eventId };
+        const sessionData: FreeGroupSuccess = { name: parsed.data.name, eventId, leadId };
         sessionStorage.setItem(FREE_GROUP_SESSION_KEY, JSON.stringify(sessionData));
       } catch { /* sessionStorage indisponível */ }
 

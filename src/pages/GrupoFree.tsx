@@ -1,9 +1,12 @@
 import { useMemo, useState } from 'react';
-import { format, differenceInDays, differenceInHours, formatDistanceToNowStrict } from 'date-fns';
+import { format, differenceInDays, differenceInHours, subDays, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
+  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, CartesianGrid,
+} from 'recharts';
+import {
   Users2, UserCheck, UserMinus, UserX, Percent, Search, RefreshCw,
-  Copy, ExternalLink, Clock,
+  Copy, ExternalLink, Clock, TrendingUp, LogOut,
 } from 'lucide-react';
 import { Layout } from '@/components/Layout';
 import { PageHeader } from '@/components/PageHeader';
@@ -86,6 +89,42 @@ export default function GrupoFree() {
     ? Math.round(((stats.noGrupo + stats.saiu) / stats.total) * 100)
     : 0;
 
+  // Movimento nas últimas 24h.
+  const mov24h = useMemo(() => {
+    const limite = Date.now() - 24 * 60 * 60 * 1000;
+    let entraram = 0, sairam = 0;
+    for (const l of leads) {
+      if (l.free_group_entered_at && new Date(l.free_group_entered_at).getTime() >= limite) entraram++;
+      if (l.free_group_left_at && new Date(l.free_group_left_at).getTime() >= limite) sairam++;
+    }
+    return { entraram, sairam };
+  }, [leads]);
+
+  // Série diária dos últimos 30 dias: entradas e saídas por dia.
+  const serie = useMemo(() => {
+    const dias: { key: string; label: string; Entradas: number; Saídas: number }[] = [];
+    const idx = new Map<string, number>();
+    for (let i = 29; i >= 0; i--) {
+      const d = startOfDay(subDays(new Date(), i));
+      const key = format(d, 'yyyy-MM-dd');
+      idx.set(key, dias.length);
+      dias.push({ key, label: format(d, 'dd/MM'), Entradas: 0, Saídas: 0 });
+    }
+    for (const l of leads) {
+      if (l.free_group_entered_at) {
+        const k = format(startOfDay(new Date(l.free_group_entered_at)), 'yyyy-MM-dd');
+        const i = idx.get(k); if (i != null) dias[i].Entradas++;
+      }
+      if (l.free_group_left_at) {
+        const k = format(startOfDay(new Date(l.free_group_left_at)), 'yyyy-MM-dd');
+        const i = idx.get(k); if (i != null) dias[i].Saídas++;
+      }
+    }
+    return dias;
+  }, [leads]);
+
+  const temMovimento = serie.some((d) => d.Entradas > 0 || d.Saídas > 0);
+
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     return leads.filter((l) => {
@@ -106,6 +145,24 @@ export default function GrupoFree() {
       toast({ title: 'Link copiado', description: FREE_GROUP_URL });
     } catch {
       toast({ title: 'Não consegui copiar', description: FREE_GROUP_URL, variant: 'destructive' });
+    }
+  };
+
+  // Reconvida o lead. Se tiver WhatsApp real, abre o WhatsApp Web/app com uma
+  // mensagem pronta + link do grupo. Senão, abre o grupo no Telegram.
+  const reconvidar = (lead: TrialLead) => {
+    const digits = (lead.whatsapp ?? '').replace(/\D/g, '');
+    const ehWhatsReal = digits.length >= 10 && !lead.whatsapp?.startsWith('tg_');
+    if (ehWhatsReal) {
+      const nome = (lead.name || '').split(' ')[0] || '';
+      const msg = encodeURIComponent(
+        `Oi${nome ? ` ${nome}` : ''}! 🦈 Aqui é da Shark Green. Você se cadastrou mas ainda não entrou no nosso Grupo Free. Entra aqui pra acompanhar as entradas gratuitas: ${FREE_GROUP_URL}`,
+      );
+      const wa = digits.startsWith('55') ? digits : `55${digits}`;
+      window.open(`https://wa.me/${wa}?text=${msg}`, '_blank', 'noopener');
+    } else {
+      window.open(FREE_GROUP_URL, '_blank', 'noopener');
+      toast({ title: 'Sem WhatsApp válido', description: 'Abri o grupo no Telegram pra você compartilhar o link.' });
     }
   };
 
@@ -143,6 +200,47 @@ export default function GrupoFree() {
             accent="from-warning/20 to-warning/5 border-warning/25 text-warning" />
           <StatCard icon={<Percent className="w-5 h-5" />} label="Taxa de entrada" value={taxaEntrada} suffix="%"
             accent="from-primary/20 to-primary/5 border-primary/25 text-primary" />
+        </div>
+
+        {/* Movimento 24h + gráfico */}
+        <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-1 gap-3">
+            <div className="rounded-lg border border-primary/25 bg-gradient-to-br from-primary/15 to-primary/5 p-3">
+              <p className="text-[11px] uppercase tracking-wider text-primary/80 flex items-center gap-1.5">
+                <TrendingUp className="w-3.5 h-3.5" /> Entraram (24h)
+              </p>
+              <p className="text-2xl font-bold font-mono tabular-nums text-primary mt-1">{mov24h.entraram}</p>
+            </div>
+            <div className="rounded-lg border border-destructive/25 bg-gradient-to-br from-destructive/15 to-destructive/5 p-3">
+              <p className="text-[11px] uppercase tracking-wider text-destructive/80 flex items-center gap-1.5">
+                <LogOut className="w-3.5 h-3.5" /> Saíram (24h)
+              </p>
+              <p className="text-2xl font-bold font-mono tabular-nums text-destructive mt-1">{mov24h.sairam}</p>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-border bg-card p-4">
+            <p className="telemetry-label text-primary mb-3">[ ENTRADAS vs SAÍDAS — ÚLTIMOS 30 DIAS ]</p>
+            {!temMovimento ? (
+              <p className="text-sm text-muted-foreground py-12 text-center">
+                Sem entradas/saídas registradas ainda. Os dados aparecem conforme as pessoas entram no grupo.
+              </p>
+            ) : (
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={serie} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} interval="preserveStartEnd" />
+                  <YAxis tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} allowDecimals={false} />
+                  <RTooltip
+                    contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 0, fontSize: 12 }}
+                    cursor={{ fill: 'hsl(var(--accent))' }}
+                  />
+                  <Bar dataKey="Entradas" fill="hsl(var(--primary))" radius={[2, 2, 0, 0]} />
+                  <Bar dataKey="Saídas" fill="hsl(var(--destructive))" radius={[2, 2, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
         </div>
 
         {/* Filtros */}
@@ -192,7 +290,7 @@ export default function GrupoFree() {
               {filtered.length} {filtered.length === 1 ? 'LEAD' : 'LEADS'}
             </p>
             {filtered.map((lead) => (
-              <LeadCard key={lead.id} lead={lead} onReconvidar={copiarLink} />
+              <LeadCard key={lead.id} lead={lead} onReconvidar={reconvidar} />
             ))}
           </div>
         )}
@@ -201,7 +299,7 @@ export default function GrupoFree() {
   );
 }
 
-function LeadCard({ lead, onReconvidar }: { lead: TrialLead; onReconvidar: () => void }) {
+function LeadCard({ lead, onReconvidar }: { lead: TrialLead; onReconvidar: (lead: TrialLead) => void }) {
   const p = presencaDe(lead);
   const tempo = tempoNoGrupo(lead);
 
@@ -240,10 +338,17 @@ function LeadCard({ lead, onReconvidar }: { lead: TrialLead; onReconvidar: () =>
         </div>
       </div>
 
-      {/* Ação: reconvidar quem não entrou */}
+      {/* Ação: reconvidar quem não entrou.
+          - tem WhatsApp real → abre conversa no WhatsApp com mensagem + link
+          - senão → abre o grupo no Telegram (e o admin compartilha) */}
       {p === 'nao_entrou' && (
         <div className="flex-shrink-0">
-          <Button size="sm" variant="outline" className="border-warning/40 text-warning hover:bg-warning/10" onClick={onReconvidar}>
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-warning/40 text-warning hover:bg-warning/10"
+            onClick={() => onReconvidar(lead)}
+          >
             <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
             Reconvidar
           </Button>

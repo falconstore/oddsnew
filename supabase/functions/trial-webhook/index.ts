@@ -120,8 +120,14 @@ async function captureFreeGroupLead(
 // Registra um evento de entrada/saída no GRUPO FREE no lead correspondente.
 // `entered=true` → grava free_group_entered_at e limpa free_group_left_at.
 // `entered=false` → grava free_group_left_at.
-// Se ninguém com esse telegram_user_id existe (entrou pelo link sem dar
-// /start), cria o lead (cohort='free_group') na entrada. Best-effort.
+//
+// MATCHING em camadas (importante porque os leads vêm da landing
+// free-group-signup SEM telegram_user_id — só com o @username digitado):
+//   1) por telegram_user_id (vínculo forte, se já capturado antes)
+//   2) por telegram_username case-insensitive (casa o lead do formulário com
+//      o evento real do Telegram) → aproveita pra GRAVAR o telegram_user_id
+//      real + o username real (captura de ID após a entrada)
+//   3) nada achado → cria lead novo (entrou pelo link sem cadastro)
 async function recordFreeGroupMembership(
   supabase: ReturnType<typeof createClient>,
   userId: number,
@@ -130,33 +136,61 @@ async function recordFreeGroupMembership(
   firstName?: string | null,
 ) {
   try {
-    const { data: lead } = await supabase
+    const nowIso = new Date().toISOString();
+    const unameLower = username ? username.toLowerCase() : null;
+
+    // 1) Vínculo forte por telegram_user_id.
+    let lead: { id: string } | null = null;
+    let matchedVia = "user_id";
+    const { data: byId } = await supabase
       .from("trial_leads")
       .select("id")
       .eq("telegram_user_id", userId)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
+    if (byId) lead = byId as { id: string };
 
-    const nowIso = new Date().toISOString();
+    // 2) Sem id: tenta casar pelo @username do formulário (free_group).
+    if (!lead && unameLower) {
+      const { data: byUsername } = await supabase
+        .from("trial_leads")
+        .select("id")
+        .eq("cohort", "free_group")
+        .ilike("telegram_username", unameLower)
+        .is("telegram_user_id", null)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (byUsername) { lead = byUsername as { id: string }; matchedVia = "username"; }
+    }
 
     if (lead) {
-      const patch = entered
+      // Patch base do evento (entrada/saída).
+      const patch: Record<string, unknown> = entered
         ? { free_group_entered_at: nowIso, free_group_left_at: null }
         : { free_group_left_at: nowIso };
+      // Captura o ID/username REAL do Telegram no lead (se ainda não tinha).
+      if (matchedVia === "username") {
+        patch.telegram_user_id = userId;
+        if (unameLower) patch.telegram_username = unameLower;
+      }
       const { error } = await supabase
         .from("trial_leads")
         .update(patch)
-        .eq("id", (lead as { id: string }).id);
+        .eq("id", lead.id);
       if (error) console.warn("free-group membership update error", error);
-      else log(entered ? "free-group-entered" : "free-group-left", { user_id: userId, lead_id: (lead as { id: string }).id });
+      else log(entered ? "free-group-entered" : "free-group-left", {
+        user_id: userId, lead_id: lead.id, matched_via: matchedVia,
+      });
       return;
     }
 
-    // Sem lead e ENTROU pelo link direto: cria já marcando a entrada.
+    // 3) Sem lead e ENTROU pelo link direto: cria já marcando a entrada,
+    //    com o ID/username reais do Telegram.
     if (entered) {
       const nome = (firstName ?? "").trim() || (username ? `@${username}` : `Free ${userId}`);
-      const uname = username ? username.toLowerCase() : `free_${userId}`;
+      const uname = unameLower ?? `free_${userId}`;
       const { error } = await supabase.from("trial_leads").insert({
         name: nome.slice(0, 60),
         email: `free_${userId}@telegram.local`,
@@ -224,6 +258,36 @@ serve(async (req) => {
 
       if (chatType === "private" && /^\/start(\s|@|$)/i.test(text)) {
         const payload = text.replace(/^\/start(?:@\S+)?\s*/i, "").trim();
+
+        // Deep-link do GRUPO FREE: ?start=free_<uuid> (vindo da página de
+        // obrigado). Vincula o telegram_user_id/username REAL ao lead do
+        // formulário e manda o botão do Grupo Free + Suporte.
+        const freeMatch = payload.match(/^free_([0-9a-f-]{36})$/i);
+        if (freeMatch && fromId) {
+          const freeLeadId = freeMatch[1];
+          const { data: freeLead } = await supabase
+            .from("trial_leads")
+            .select("id, name, telegram_user_id")
+            .eq("id", freeLeadId)
+            .maybeSingle();
+          if (freeLead) {
+            // Captura o ID/username reais no lead (peça-chave do tracking).
+            const patch: Record<string, unknown> = { telegram_user_id: fromId };
+            if (fromUsername) patch.telegram_username = fromUsername.toLowerCase();
+            await supabase.from("trial_leads").update(patch).eq("id", freeLeadId);
+            log("start-free-linked", { update_id: updateId, lead_id: freeLeadId, from_id: fromId });
+          } else {
+            log("start-free-lead-not-found", { update_id: updateId, lead_id: freeLeadId, from_id: fromId });
+          }
+          // Em ambos os casos, oferece os botões (não deixa sem saída).
+          if (botToken) {
+            try {
+              await sendFreeGroupFallback(botToken, fromId, msg.from?.first_name);
+            } catch (e) { console.warn("start free fallback failed", e); }
+          }
+          return json({ ok: true, action: "start-free", lead_id: freeLeadId });
+        }
+
         const m = payload.match(/^lead_([0-9a-f-]{36})$/i);
         const leadId = m ? m[1] : null;
 
