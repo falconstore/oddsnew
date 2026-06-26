@@ -39,12 +39,47 @@ const log = (event: string, data: Record<string, unknown>) => {
 // oferecemos um caminho: entrar no Grupo Free ou falar com o suporte.
 const FREE_GROUP_URL = "https://t.me/sharkgreenfree2";
 const SUPPORT_URL = "https://t.me/SuporteSharkGreen_financeiro";
+// Link de convite FIXO/permanente do canal (não expira, ilimitado, entra
+// direto). Gerado pelo bot (admin do canal). Usado no botão de entrada.
+const FREE_GROUP_INVITE = "https://t.me/+yiX221dVMrBmNTMx";
 
 // Botões padrão (Grupo Free + Suporte) pro fallback do /start.
 const FALLBACK_BUTTONS = [
-  [{ text: "🎁 Entrar no Grupo Free", url: FREE_GROUP_URL }],
+  [{ text: "🎁 Entrar no Grupo Free", url: FREE_GROUP_INVITE }],
   [{ text: "💬 Falar com o Suporte", url: SUPPORT_URL }],
 ];
+
+// Botão único e grande pra quem vem do site (deep-link free_): foco total em
+// entrar no canal, sem distração.
+const WELCOME_BUTTONS = [
+  [{ text: "🔓 ENTRAR NO GRUPO FREE", url: FREE_GROUP_INVITE }],
+];
+
+// Mensagem curta e direta pra quem chega pelo deep-link do site (já cadastrou,
+// já capturamos o ID). Último passo: 1 toque pra entrar.
+async function sendFreeGroupWelcome(
+  botToken: string,
+  chatId: number,
+  firstName?: string | null,
+) {
+  const nome = (firstName ?? "").split(/\s+/)[0] || "";
+  const safeName = nome.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const lines = [
+    `Pronto${safeName ? `, <b>${safeName}</b>` : ""}! ✅`,
+    ``,
+    `Último passo: toque no botão abaixo pra entrar no <b>Grupo Free</b> da SHARK 100% GREEN 👇`,
+  ];
+  await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text: lines.join("\n"),
+      parse_mode: "HTML",
+      reply_markup: { inline_keyboard: WELCOME_BUTTONS },
+    }),
+  });
+}
 
 // Manda a mensagem de fallback com os 2 botões. Usada quando o usuário chega
 // no bot sem um cadastro de trial válido — nunca deixa ele sem saída.
@@ -279,11 +314,11 @@ serve(async (req) => {
           } else {
             log("start-free-lead-not-found", { update_id: updateId, lead_id: freeLeadId, from_id: fromId });
           }
-          // Em ambos os casos, oferece os botões (não deixa sem saída).
+          // Em ambos os casos, manda a mensagem direta com o botão do canal.
           if (botToken) {
             try {
-              await sendFreeGroupFallback(botToken, fromId, msg.from?.first_name);
-            } catch (e) { console.warn("start free fallback failed", e); }
+              await sendFreeGroupWelcome(botToken, fromId, msg.from?.first_name);
+            } catch (e) { console.warn("start free welcome failed", e); }
           }
           return json({ ok: true, action: "start-free", lead_id: freeLeadId });
         }

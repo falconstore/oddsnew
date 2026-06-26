@@ -2,7 +2,9 @@ import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Send } from 'lucide-react';
 
-const FREE_GROUPS_URL = 'https://t.me/sharkgreenfree2';
+// Invite fixo/permanente do canal (entra direto). Fallback quando não temos
+// leadId pra mandar pro bot.
+const FREE_GROUPS_URL = 'https://t.me/+yiX221dVMrBmNTMx';
 const PIXEL_ID = '1672225667108236';
 const PIXEL_SCRIPT_SRC = 'https://connect.facebook.net/en_US/fbevents.js';
 
