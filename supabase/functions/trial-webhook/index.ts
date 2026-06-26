@@ -39,6 +39,19 @@ const log = (event: string, data: Record<string, unknown>) => {
 // oferecemos um caminho: entrar no Grupo Free ou falar com o suporte.
 const FREE_GROUP_URL = "https://t.me/sharkgreenfree2";
 const SUPPORT_URL = "https://t.me/SuporteSharkGreen_financeiro";
+
+// Contas INTERNAS (equipe/bots) que NÃO devem virar lead do Grupo Free.
+// Comparado em lowercase contra o telegram_username.
+const INTERNAL_USERNAMES = new Set([
+  "suportesharkgreen_financeiro",
+  "sharkinhogreen_bot",
+]);
+// True se o username é de conta interna (equipe) ou de qualquer bot.
+function isInternalAccount(username?: string | null): boolean {
+  if (!username) return false;
+  const u = username.toLowerCase();
+  return u.endsWith("bot") || INTERNAL_USERNAMES.has(u);
+}
 // Link de convite FIXO/permanente do canal (não expira, ilimitado, entra
 // direto). Gerado pelo bot (admin do canal). Usado no botão de entrada.
 const FREE_GROUP_INVITE = "https://t.me/+yiX221dVMrBmNTMx";
@@ -124,6 +137,11 @@ async function captureFreeGroupLead(
   firstName?: string | null,
 ) {
   try {
+    // Não captura contas internas (bot, suporte).
+    if (isInternalAccount(fromUsername)) {
+      log("free-group-ignore-internal", { from_id: fromId, username: fromUsername });
+      return;
+    }
     const { data: existing } = await supabase
       .from("trial_leads")
       .select("id")
@@ -171,9 +189,9 @@ async function recordFreeGroupMembership(
   firstName?: string | null,
 ) {
   try {
-    // Ignora o próprio bot (entra/sai como admin) — não é um lead.
-    if (username && username.toLowerCase().endsWith("bot")) {
-      log("free-group-ignore-bot", { user_id: userId, username });
+    // Ignora contas internas (bot, suporte) — não são leads.
+    if (isInternalAccount(username)) {
+      log("free-group-ignore-internal", { user_id: userId, username });
       return;
     }
     const nowIso = new Date().toISOString();
