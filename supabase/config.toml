@@ -23,3 +23,6 @@ verify_jwt = false
 
 [functions.trial-webhook-guard]
 verify_jwt = false
+
+[functions.free-group-snapshot]
+verify_jwt = false
