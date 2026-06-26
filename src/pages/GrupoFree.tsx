@@ -56,6 +56,20 @@ const usernameReal = (l: TrialLead): string | null => {
   return u;
 };
 
+// ── Origem do lead ──
+//   site → preencheu o formulário (tem email/WhatsApp reais)
+//   link → entrou direto pelo link compartilhado (só dados do Telegram;
+//          email/whatsapp são placeholders tg_/@telegram.local)
+type Origem = 'site' | 'link';
+
+const temContatoReal = (l: TrialLead): boolean => {
+  const wppReal = !!l.whatsapp && !l.whatsapp.startsWith('tg_');
+  const emailReal = !!l.email && !l.email.includes('@telegram.local');
+  return wppReal || emailReal;
+};
+
+const origemDe = (l: TrialLead): Origem => (temContatoReal(l) ? 'site' : 'link');
+
 // Tempo no grupo: entrada→saída, ou entrada→agora (se ainda dentro).
 function tempoNoGrupo(l: TrialLead): string | null {
   if (!l.free_group_entered_at) return null;
@@ -73,6 +87,7 @@ export default function GrupoFree() {
 
   const [search, setSearch] = useState('');
   const [presencaFiltro, setPresencaFiltro] = useState<'all' | Presenca>('all');
+  const [origemFiltro, setOrigemFiltro] = useState<'all' | Origem>('all');
 
   // Leads do grupo free, exceto o próprio bot.
   const leads = useMemo(
@@ -81,13 +96,14 @@ export default function GrupoFree() {
   );
 
   const stats = useMemo(() => {
-    const s = { total: leads.length, noGrupo: 0, saiu: 0, naoEntrou: 0, confirmados: 0 };
+    const s = { total: leads.length, noGrupo: 0, saiu: 0, naoEntrou: 0, confirmados: 0, site: 0, link: 0 };
     for (const l of leads) {
       const p = presencaDe(l);
       if (p === 'no_grupo') s.noGrupo++;
       else if (p === 'saiu') s.saiu++;
       else s.naoEntrou++;
       if (l.telegram_user_id != null) s.confirmados++;
+      if (origemDe(l) === 'site') s.site++; else s.link++;
     }
     return s;
   }, [leads]);
@@ -145,6 +161,7 @@ export default function GrupoFree() {
     const term = search.trim().toLowerCase();
     return leads.filter((l) => {
       if (presencaFiltro !== 'all' && presencaDe(l) !== presencaFiltro) return false;
+      if (origemFiltro !== 'all' && origemDe(l) !== origemFiltro) return false;
       if (!term) return true;
       return (
         l.name?.toLowerCase().includes(term) ||
@@ -153,7 +170,7 @@ export default function GrupoFree() {
         l.telegram_username?.toLowerCase().includes(term)
       );
     });
-  }, [leads, search, presencaFiltro]);
+  }, [leads, search, presencaFiltro, origemFiltro]);
 
   const copiarLink = async () => {
     try {
@@ -306,7 +323,7 @@ export default function GrupoFree() {
             />
           </div>
           <Select value={presencaFiltro} onValueChange={(v) => setPresencaFiltro(v as 'all' | Presenca)}>
-            <SelectTrigger className="w-full sm:w-[220px] h-9">
+            <SelectTrigger className="w-full sm:w-[200px] h-9">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -316,8 +333,18 @@ export default function GrupoFree() {
               <SelectItem value="nao_entrou">🟡 Nunca entraram ({stats.naoEntrou})</SelectItem>
             </SelectContent>
           </Select>
-          {(search || presencaFiltro !== 'all') && (
-            <Button size="sm" variant="ghost" onClick={() => { setSearch(''); setPresencaFiltro('all'); }}>
+          <Select value={origemFiltro} onValueChange={(v) => setOrigemFiltro(v as 'all' | Origem)}>
+            <SelectTrigger className="w-full sm:w-[200px] h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Origem: todas</SelectItem>
+              <SelectItem value="site">🌐 Veio do site ({stats.site})</SelectItem>
+              <SelectItem value="link">🔗 Entrou pelo link ({stats.link})</SelectItem>
+            </SelectContent>
+          </Select>
+          {(search || presencaFiltro !== 'all' || origemFiltro !== 'all') && (
+            <Button size="sm" variant="ghost" onClick={() => { setSearch(''); setPresencaFiltro('all'); setOrigemFiltro('all'); }}>
               Limpar
             </Button>
           )}
@@ -354,6 +381,7 @@ function LeadCard({ lead, onReconvidar }: { lead: TrialLead; onReconvidar: (lead
   const p = presencaDe(lead);
   const uname = usernameReal(lead);
   const tempo = tempoNoGrupo(lead);
+  const origem = origemDe(lead);
 
   return (
     <div className="border border-border rounded-lg bg-card px-4 py-3 flex flex-col md:flex-row md:items-center gap-3">
@@ -362,11 +390,7 @@ function LeadCard({ lead, onReconvidar }: { lead: TrialLead; onReconvidar: (lead
         <div className="flex items-center gap-2 flex-wrap">
           <span className="font-medium truncate">{lead.name || uname || lead.email}</span>
           <PresencaBadge p={p} />
-          {lead.telegram_user_id != null && (
-            <span className="text-[10px] px-1.5 py-0.5 border rounded-full border-primary/40 text-primary/80 whitespace-nowrap">
-              Telegram ✓
-            </span>
-          )}
+          <OrigemBadge origem={origem} />
         </div>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground mt-1">
           {lead.email && !lead.email.includes('@telegram.local') && !lead.email.includes('@placeholder') && (
@@ -419,6 +443,19 @@ function PresencaBadge({ p }: { p: Presenca }) {
   }[p];
   return (
     <span className={cn('text-[10px] px-2 py-0.5 border rounded-full whitespace-nowrap font-medium', map.cls)}>
+      {map.txt}
+    </span>
+  );
+}
+
+function OrigemBadge({ origem }: { origem: Origem }) {
+  const map = {
+    site: { txt: '🌐 Site', cls: 'border-primary/30 text-primary/70', title: 'Preencheu o formulário (tem email/WhatsApp)' },
+    link: { txt: '🔗 Link', cls: 'border-border text-muted-foreground', title: 'Entrou pelo link compartilhado (só dados do Telegram)' },
+  }[origem];
+  return (
+    <span title={map.title}
+      className={cn('text-[10px] px-1.5 py-0.5 border rounded-full whitespace-nowrap', map.cls)}>
       {map.txt}
     </span>
   );
