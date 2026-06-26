@@ -55,10 +55,17 @@ serve(async (req) => {
 
     const { data: lead } = await admin
       .from("trial_leads")
-      .select("id, telegram_user_id, status, invite_link, bonus_invite_link")
+      .select("id, telegram_user_id, status, invite_link, bonus_invite_link, cohort")
       .eq("id", leadId)
       .maybeSingle();
     if (!lead) return json({ error: "Lead não encontrado" }, { status: 404 });
+
+    // Guard: leads do GRUPO FREE não são kickáveis. O Free não tem trial nem
+    // expulsão — quem entra sai por conta própria. Recusa pra evitar remoção
+    // acidental pelo painel.
+    if (lead.cohort === "free_group") {
+      return json({ error: "Lead do Grupo Free não pode ser removido por aqui." }, { status: 422 });
+    }
 
     const botToken = Deno.env.get("TELEGRAM_TRIAL_BOT_TOKEN");
     const chatId = Deno.env.get("TELEGRAM_TRIAL_CHAT_ID");

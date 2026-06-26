@@ -63,10 +63,17 @@ serve(async (req) => {
 
     const { data: lead } = await admin
       .from("trial_leads")
-      .select("id, telegram_user_id, status, invite_link, bonus_invite_link, name, email")
+      .select("id, telegram_user_id, status, invite_link, bonus_invite_link, name, email, cohort")
       .eq("id", leadId)
       .maybeSingle();
     if (!lead) return json({ error: "Lead não encontrado" }, { status: 404 });
+
+    // Guard: não apagar leads do GRUPO FREE pelo painel — protege o tracking
+    // de entrada/saída do Free de exclusão acidental. (Pra apagar de fato,
+    // use SQL direto.)
+    if (lead.cohort === "free_group") {
+      return json({ error: "Lead do Grupo Free não pode ser apagado por aqui." }, { status: 422 });
+    }
 
     const botToken = Deno.env.get("TELEGRAM_TRIAL_BOT_TOKEN");
     const chatId = Deno.env.get("TELEGRAM_TRIAL_CHAT_ID");
