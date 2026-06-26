@@ -24,6 +24,7 @@ import TrialLanding from '@/pages/TrialLanding';
 import TrialObrigado from '@/pages/TrialObrigado';
 import TrialUpgrade from '@/pages/TrialUpgrade';
 import TrialAdmin from '@/pages/TrialAdmin';
+import GrupoFree from '@/pages/GrupoFree';
 import AdsLanding from '@/pages/AdsLanding';
 import AdsObrigado from '@/pages/AdsObrigado';
 import FreeGroupObrigado from '@/pages/FreeGroupObrigado';
@@ -223,6 +224,13 @@ export function AnimatedRoutes() {
           <RequireAuth pageKey={PAGE_KEYS.TRIAL}>
             <PageTransition>
               <TrialAdmin />
+            </PageTransition>
+          </RequireAuth>
+        } />
+        <Route path="/grupo-free" element={
+          <RequireAuth pageKey={'grupo_free' as never}>
+            <PageTransition>
+              <GrupoFree />
             </PageTransition>
           </RequireAuth>
         } />

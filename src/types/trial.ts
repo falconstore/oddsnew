@@ -59,6 +59,11 @@ export interface TrialLead {
   bonus_removed_at: string | null;
   created_at: string;
 
+  // Rastreio do GRUPO FREE (cohort='free_group'). Preenchidos pelo
+  // trial-webhook ao detectar JOIN/LEFT no grupo free.
+  free_group_entered_at: string | null;
+  free_group_left_at: string | null;
+
   // Anti-abuso
   signup_ip: string | null;
   signup_fingerprint: string | null;

@@ -33,6 +33,7 @@ import {
   BarChart3,
   Brain,
   Send,
+  Users2,
 } from 'lucide-react';
 
 /** Seções do menu, na ordem em que aparecem. */
@@ -83,7 +84,8 @@ export const PAGES: PageDef[] = [
   { key: 'lastlink_dashboard', label: 'Dashboard Lastlink', description: 'Dashboard de vendas e renovações Lastlink', href: '/lastlink-dashboard', icon: BarChart3, section: 'RECEITA' },
 
   // AQUISIÇÃO
-  { key: 'trial', label: 'Trial Telegram', description: 'CRM dos leads do trial gratuito', href: '/trial-admin', icon: Gift, section: 'AQUISIÇÃO' },
+  { key: 'grupo_free', label: 'Grupo Free', description: 'Acompanhamento de quem entra e sai do grupo gratuito', href: '/grupo-free', icon: Users2, section: 'AQUISIÇÃO' },
+  { key: 'trial', label: 'Trial Telegram', description: 'CRM legado do trial de 7 dias (histórico)', href: '/trial-admin', icon: Gift, section: 'AQUISIÇÃO', hideFromSidebar: true },
   { key: 'ads_admin', label: 'Anúncios', description: 'Gerenciar anúncios', href: '/ads-admin', icon: Megaphone, section: 'AQUISIÇÃO' },
   { key: 'app_stats', label: 'Estatísticas App', description: 'Estatísticas de uso do app', href: '/app-stats', icon: BarChart3, section: 'AQUISIÇÃO' },
   { key: 'push_notifications', label: 'Push Notifications', description: 'Envio de notificações push', href: '/push-notifications', icon: Bell, section: 'AQUISIÇÃO' },
