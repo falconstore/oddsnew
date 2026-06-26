@@ -212,7 +212,11 @@ async function processNurture(supabase: ReturnType<typeof createClient>): Promis
     .select("id, whatsapp, name, email, nurture_day, entered_at, expires_at, subscription_status, status, day7_offer_sent_at, day7_nudge1_sent_at, day7_nudge2_sent_at")
     .eq("status", "active")
     .not("entered_at", "is", null)
-    .not("whatsapp", "is", null);
+    .not("whatsapp", "is", null)
+    // NUNCA tratar leads do Grupo Free como trial: o Free não tem ciclo de 7
+    // dias, oferta nem remoção. (Defesa explícita — hoje eles já não têm
+    // entered_at, mas isto blinda contra qualquer fluxo futuro.)
+    .neq("cohort", "free_group");
 
   if (!leads?.length) return 0;
 
