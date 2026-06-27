@@ -572,17 +572,11 @@ serve(async (req) => {
     if (isFreeGroupChat) {
       // Nome do link de convite usado pra entrar (ex.: "site") — vira a origem.
       const inviteName: string | null = cm.invite_link?.name ?? null;
-      // DEBUG: registra o objeto invite_link cru + transição, pra diagnosticar
-      // por que a origem às vezes vem vazia.
-      log("free-debug", {
-        update_id: updateId,
-        old_status: oldStatus ?? null,
-        new_status: newStatus ?? null,
-        became_active: becameActiveTmp,
-        became_inactive: becameInactiveTmp,
-        invite_link_obj: cm.invite_link ?? null,
-        invite_name: inviteName,
-      });
+      // DEBUG: grava o chat_member cru numa tabela pra inspeção (o CLI não
+      // expõe logs). Remover depois de diagnosticar.
+      try {
+        await supabase.from("free_debug").insert({ payload: cm as unknown as Record<string, unknown> });
+      } catch (_e) { /* best-effort */ }
       if (becameActiveTmp) {
         await recordFreeGroupMembership(supabase, userId, true, username, cm.new_chat_member?.user?.first_name, inviteName);
         return json({ ok: true, action: "free-group-entered", user_id: userId });
