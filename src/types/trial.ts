@@ -63,6 +63,8 @@ export interface TrialLead {
   // trial-webhook ao detectar JOIN/LEFT no grupo free.
   free_group_entered_at: string | null;
   free_group_left_at: string | null;
+  // Origem da entrada no canal = nome do link de convite usado (ex.: 'site').
+  free_group_source: string | null;
 
   // Anti-abuso
   signup_ip: string | null;

@@ -187,6 +187,7 @@ async function recordFreeGroupMembership(
   entered: boolean,
   username?: string | null,
   firstName?: string | null,
+  sourceName?: string | null,
 ) {
   try {
     // Ignora contas internas (bot, suporte) — não são leads.
@@ -194,6 +195,8 @@ async function recordFreeGroupMembership(
       log("free-group-ignore-internal", { user_id: userId, username });
       return;
     }
+    // Origem: nome do link de convite usado (ex.: "site"). Só na ENTRADA.
+    const source = entered && sourceName ? sourceName.trim().slice(0, 60) : null;
     const nowIso = new Date().toISOString();
     const unameLower = username ? username.toLowerCase() : null;
 
@@ -233,6 +236,8 @@ async function recordFreeGroupMembership(
         patch.telegram_user_id = userId;
         if (unameLower) patch.telegram_username = unameLower;
       }
+      // Grava a origem na entrada (se veio por um link nomeado).
+      if (source) patch.free_group_source = source;
       const { error } = await supabase
         .from("trial_leads")
         .update(patch)
@@ -258,6 +263,7 @@ async function recordFreeGroupMembership(
         status: "pending",
         cohort: "free_group",
         free_group_entered_at: nowIso,
+        free_group_source: source,
       });
       if (error) console.warn("free-group join insert error", error);
       else log("free-group-entered-new", { user_id: userId, username: username ?? null });
@@ -564,12 +570,14 @@ serve(async (req) => {
     // lead com esse telegram_user_id (cohort='free_group'). Se entrou pelo
     // link sem ter dado /start, criamos o lead na hora.
     if (isFreeGroupChat) {
+      // Nome do link de convite usado pra entrar (ex.: "site") — vira a origem.
+      const inviteName: string | null = cm.invite_link?.name ?? null;
       if (becameActiveTmp) {
-        await recordFreeGroupMembership(supabase, userId, true, username, cm.new_chat_member?.user?.first_name);
+        await recordFreeGroupMembership(supabase, userId, true, username, cm.new_chat_member?.user?.first_name, inviteName);
         return json({ ok: true, action: "free-group-entered", user_id: userId });
       }
       if (becameInactiveTmp) {
-        await recordFreeGroupMembership(supabase, userId, false, username);
+        await recordFreeGroupMembership(supabase, userId, false, username, null);
         return json({ ok: true, action: "free-group-left", user_id: userId });
       }
       log("ignored", { reason: "free-group non-transition", update_id: updateId, old_status: oldStatus, new_status: newStatus });

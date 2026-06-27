@@ -2,9 +2,11 @@ import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Send } from 'lucide-react';
 
-// Invite fixo/permanente do canal (entra direto). Fallback quando não temos
-// leadId pra mandar pro bot.
-const FREE_GROUPS_URL = 'https://t.me/+yiX221dVMrBmNTMx';
+// Link de convite ÚNICO do site (nomeado 'site' no Telegram, permanente,
+// entra direto). Vai DIRETO pro canal — sem passar pelo bot, pra reduzir
+// atrito. O webhook lê o nome desse link no evento de entrada e marca a
+// origem como 'site'.
+const FREE_GROUPS_URL = 'https://t.me/+aN1ECw04GbM1YWRh';
 const PIXEL_ID = '1672225667108236';
 const PIXEL_SCRIPT_SRC = 'https://connect.facebook.net/en_US/fbevents.js';
 
@@ -19,10 +21,6 @@ export interface FreeGroupSuccess {
   /** id do lead em trial_leads — usado pro deep-link do bot (?start=free_<id>). */
   leadId?: string | null;
 }
-
-// Username do bot do trial (mesmo bot do Grupo Free). Deep-link manda a pessoa
-// pro bot, que captura o telegram_user_id real e dá o botão do grupo.
-const BOT_USERNAME = 'sharkinhogreen_bot';
 
 interface FbqStub {
   (...args: unknown[]): void;
@@ -129,11 +127,9 @@ export default function FreeGroupObrigado() {
   } catch { /* sessionStorage indisponível */ }
 
   const firstName = successData?.name?.split(' ')[0] ?? '';
-  // Se temos o leadId, manda pro BOT (captura telegram_user_id real + vincula).
-  // Sem leadId (fallback), vai direto pro grupo.
-  const ctaUrl = successData?.leadId
-    ? `https://t.me/${BOT_USERNAME}?start=free_${successData.leadId}`
-    : FREE_GROUPS_URL;
+  // Vai DIRETO pro canal (link único 'site'). Sem passo do bot — menos
+  // atrito. A origem 'site' é identificada pelo nome do link no webhook.
+  const ctaUrl = FREE_GROUPS_URL;
 
   useEffect(() => {
     if (!successData) {
