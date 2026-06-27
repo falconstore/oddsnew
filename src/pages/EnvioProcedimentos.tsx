@@ -8,6 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { TEMPLATES, kickoffToDateStr, kickoffToTimeStr, type FieldConfig } from '@/lib/botTemplatesData';
 import { EventoAutocomplete } from '@/components/procedures/EventoAutocomplete';
+import { FreebetSelectField } from '@/components/procedures/FreebetSelectField';
 import {
   DEFAULT_CONFIG, loadImage, fileToDataURL, renderWatermarkedCanvas,
 } from '@/lib/watermark';
@@ -95,8 +96,8 @@ export default function EnvioProcedimentos() {
     setTextoManual(null);
   };
 
-  // Campos visíveis (respeita showIf) e que não são do tipo freebet_select
-  // (esse é específico do BotTemplates; aqui tratamos como texto simples).
+  // Campos visíveis (respeita showIf). O tipo freebet_select usa o
+  // FreebetSelectField compartilhado (igual ao Templates Bot).
   const camposVisiveis = useMemo<FieldConfig[]>(() => {
     if (!template) return [];
     return template.fields.filter((f) => !f.showIf || f.showIf(campos));
@@ -241,7 +242,7 @@ export default function EnvioProcedimentos() {
               {/* Campos do template */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
                 {camposVisiveis.map((f) => (
-                  <div key={f.id} className={cn((f.type === 'toggle' || f.type === 'evento') && 'sm:col-span-2')}>
+                  <div key={f.id} className={cn((f.type === 'toggle' || f.type === 'evento' || f.type === 'freebet_select') && 'sm:col-span-2')}>
                     {f.type === 'toggle' ? (
                       <label className="flex items-center justify-between gap-2 h-9 px-2.5 border border-border rounded bg-card cursor-pointer">
                         <span className="text-xs text-foreground/90">{f.label}</span>
@@ -264,6 +265,15 @@ export default function EnvioProcedimentos() {
                           })}
                           inputClassName="h-9 text-sm"
                         />
+                      </div>
+                    ) : f.type === 'freebet_select' ? (
+                      <div>
+                        <label className="block text-[10px] text-muted-foreground/70 mb-0.5">{f.label}</label>
+                        <FreebetSelectField
+                          value={campos[f.id] ?? ''}
+                          onChange={(v) => setCampo(f.id, v)}
+                        />
+                        {f.hint && <p className="text-[9px] text-muted-foreground/50 mt-0.5">{f.hint}</p>}
                       </div>
                     ) : (
                       <div>
