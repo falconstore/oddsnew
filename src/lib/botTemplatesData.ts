@@ -120,14 +120,23 @@ function fmtRange(min: string, max: string, sep = 'A'): string {
 }
 
 const PARTIDAS_OPCIONAIS: FieldConfig[] = [
-  { id: 'evento2', label: 'Partida 2', placeholder: 'Ex: Real Madrid x Barcelona', type: 'evento', optional: true },
-  { id: 'evento3', label: 'Partida 3', placeholder: 'Ex: Juventus x Inter de Milão', type: 'evento', optional: true },
+  // Toggles controlam a exibição das partidas extras. Só aparecem quando
+  // ligados — evita poluir a tela com campos vazios.
+  { id: 'incluirPartida2', label: 'Adicionar Partida 2', type: 'toggle' },
+  { id: 'evento2', label: 'Partida 2', placeholder: 'Ex: Real Madrid x Barcelona', type: 'evento', optional: true, showIf: (f) => f.incluirPartida2 === 'true' },
+  { id: 'incluirPartida3', label: 'Adicionar Partida 3', type: 'toggle', showIf: (f) => f.incluirPartida2 === 'true' },
+  { id: 'evento3', label: 'Partida 3', placeholder: 'Ex: Juventus x Inter de Milão', type: 'evento', optional: true, showIf: (f) => f.incluirPartida2 === 'true' && f.incluirPartida3 === 'true' },
 ];
 
 export function buildPartidas(f: Record<string, string>): string[] {
   const partidas = [`${f.evento1 || 'TIME A X TIME B'} - ${f.evento1_data || 'DD/MM/AAAA'} ÀS ${f.evento1_hora || 'HH:MM'}`];
-  if (f.evento2) partidas.push(`${f.evento2} - ${f.evento2_data || 'DD/MM/AAAA'} ÀS ${f.evento2_hora || 'HH:MM'}`);
-  if (f.evento3) partidas.push(`${f.evento3} - ${f.evento3_data || 'DD/MM/AAAA'} ÀS ${f.evento3_hora || 'HH:MM'}`);
+  // Partidas extras só entram se o toggle estiver ligado E houver evento.
+  if (f.incluirPartida2 === 'true' && f.evento2) {
+    partidas.push(`${f.evento2} - ${f.evento2_data || 'DD/MM/AAAA'} ÀS ${f.evento2_hora || 'HH:MM'}`);
+  }
+  if (f.incluirPartida2 === 'true' && f.incluirPartida3 === 'true' && f.evento3) {
+    partidas.push(`${f.evento3} - ${f.evento3_data || 'DD/MM/AAAA'} ÀS ${f.evento3_hora || 'HH:MM'}`);
+  }
   return partidas;
 }
 

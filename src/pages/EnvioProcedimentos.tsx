@@ -14,6 +14,8 @@ import {
 } from '@/lib/watermark';
 import { PasteImageZone } from '@/components/PasteImageZone';
 import { useBookmakers } from '@/hooks/useBookmakers';
+import { useProcedures } from '@/hooks/useProcedures';
+import { getAllPlatforms } from '@/lib/procedureUtils';
 import { supabaseProcedures } from '@/lib/supabaseProcedures';
 import { toast } from '@/hooks/use-toast';
 import defaultLogoUrl from '@assets/logo_1778182494299.png';
@@ -106,12 +108,22 @@ export default function EnvioProcedimentos() {
   // 2) Entradas dinâmicas (1..N)
   const [entradas, setEntradas] = useState<Entrada[]>([novaEntrada()]);
 
-  // Casas cadastradas (fonte oficial: tabela bookmakers) — pro autocomplete.
+  // Casas cadastradas pro autocomplete: bookmakers + plataformas já usadas em
+  // procedimentos, normalizado em UPPERCASE e deduplicado (igual Templates Bot).
   const { data: bookmakers = [] } = useBookmakers();
-  const casasCadastradas = useMemo(
-    () => bookmakers.map((b) => b.name).filter(Boolean).sort(),
-    [bookmakers],
-  );
+  const { data: procedures = [] } = useProcedures();
+  const casasCadastradas = useMemo(() => {
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (const b of bookmakers) {
+      const name = (b.name ?? '').trim().toUpperCase();
+      if (name && !seen.has(name)) { seen.add(name); result.push(name); }
+    }
+    for (const p of getAllPlatforms(procedures)) {
+      if (!seen.has(p)) { seen.add(p); result.push(p); }
+    }
+    return result.sort();
+  }, [bookmakers, procedures]);
 
   // 3) Calculadora
   const [calcPrint, setCalcPrint] = useState<{ dataUrl: string; name: string } | null>(null);
@@ -198,6 +210,11 @@ export default function EnvioProcedimentos() {
 
   return (
     <Layout>
+      {/* Datalist único (escopo global da página) — autocomplete de casas no
+          campo do template E nas entradas. */}
+      <datalist id="envio-casas-datalist">
+        {casasCadastradas.map((c) => <option key={c} value={c} />)}
+      </datalist>
       <div className="space-y-5 animate-fade-in pb-24">
         <PageHeader
           eyebrow="ENVIO"
@@ -284,6 +301,9 @@ export default function EnvioProcedimentos() {
                           onChange={(e) => setCampo(f.id, f.uppercase ? e.target.value.toUpperCase() : e.target.value)}
                           placeholder={f.placeholder}
                           className="text-sm h-9"
+                          // Campo de casa: autocomplete com as casas do sistema.
+                          list={f.id === 'casa' ? 'envio-casas-datalist' : undefined}
+                          autoComplete={f.id === 'casa' ? 'off' : undefined}
                         />
                         {f.hint && <p className="text-[9px] text-muted-foreground/50 mt-0.5">{f.hint}</p>}
                       </div>
@@ -319,11 +339,6 @@ export default function EnvioProcedimentos() {
                   <Plus className="w-3.5 h-3.5" /> Adicionar entrada
                 </Button>
               </div>
-
-              {/* Casas cadastradas (bookmakers) — autocomplete compartilhado */}
-              <datalist id="envio-casas-datalist">
-                {casasCadastradas.map((c) => <option key={c} value={c} />)}
-              </datalist>
 
               <div className="space-y-3">
                 {entradas.map((e, idx) => (
