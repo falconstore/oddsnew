@@ -11,13 +11,16 @@ interface PasteImageZoneProps {
   /** Recebe o arquivo bruto (do paste/drop/seleção). */
   onFile: (file: File) => void;
   onClear: () => void;
+  /** Se fornecido, recebe TODOS os arquivos de imagem (colar/soltar vários de
+   *  uma vez). Quando presente, tem prioridade sobre onFile. */
+  onFiles?: (files: File[]) => void;
   /** Se fornecido, mostra um botão de lupa no preview pra ampliar a imagem. */
   onZoom?: (url: string) => void;
   label?: string;
   className?: string;
 }
 
-export function PasteImageZone({ previewUrl, onFile, onClear, onZoom, label, className }: PasteImageZoneProps) {
+export function PasteImageZone({ previewUrl, onFile, onClear, onFiles, onZoom, label, className }: PasteImageZoneProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const [active, setActive] = useState(false); // recebeu foco — pronto pra colar
@@ -25,20 +28,27 @@ export function PasteImageZone({ previewUrl, onFile, onClear, onZoom, label, cla
   const handlePaste = useCallback((e: React.ClipboardEvent) => {
     const items = e.clipboardData?.items;
     if (!items) return;
+    const imgs: File[] = [];
     for (const it of items) {
       if (it.type.startsWith('image/')) {
         const file = it.getAsFile();
-        if (file) { onFile(file); e.preventDefault(); return; }
+        if (file) imgs.push(file);
       }
     }
-  }, [onFile]);
+    if (!imgs.length) return;
+    e.preventDefault();
+    if (onFiles) onFiles(imgs);
+    else onFile(imgs[0]);
+  }, [onFile, onFiles]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(false);
-    const file = e.dataTransfer?.files?.[0];
-    if (file && file.type.startsWith('image/')) onFile(file);
-  }, [onFile]);
+    const all = Array.from(e.dataTransfer?.files ?? []).filter((f) => f.type.startsWith('image/'));
+    if (!all.length) return;
+    if (onFiles) onFiles(all);
+    else onFile(all[0]);
+  }, [onFile, onFiles]);
 
   if (previewUrl) {
     return (
@@ -95,8 +105,14 @@ export function PasteImageZone({ previewUrl, onFile, onClear, onZoom, label, cla
         ref={inputRef}
         type="file"
         accept="image/*"
+        multiple={!!onFiles}
         className="hidden"
-        onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); }}
+        onChange={(e) => {
+          const all = Array.from(e.target.files ?? []).filter((f) => f.type.startsWith('image/'));
+          if (!all.length) return;
+          if (onFiles) onFiles(all); else onFile(all[0]);
+          e.target.value = '';
+        }}
       />
     </div>
   );
