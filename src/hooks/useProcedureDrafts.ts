@@ -26,6 +26,7 @@ export interface DraftEntrada {
 export interface DraftCalc {
   image_path: string | null;
   link: string;
+  obs?: string;
 }
 
 export interface ProcedureDraft {
@@ -41,6 +42,9 @@ export interface ProcedureDraft {
   reviewed_at: string | null;
   reject_reason: string | null;
   sent_at: string | null;
+  sent_chat_id: number | null;
+  sent_message_ids: number[] | null;
+  deleted_from_telegram_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -100,7 +104,7 @@ interface CreateDraftInput {
     casa: string; odd: string; aposte: string; link: string;
     observacao: string; freebet: boolean; printDataUrl: string | null;
   }>;
-  calc: { printDataUrl: string | null; link: string } | null;
+  calc: { printDataUrl: string | null; link: string; obs: string } | null;
   createdByEmail: string | null;
   createdById: string | null;
 }
@@ -119,6 +123,24 @@ export function useCreateDraft() {
   });
 }
 
+interface ResubmitDraftInput extends CreateDraftInput {
+  id: string;
+}
+
+/** Corrige um rascunho rejeitado e reenvia — REABRE o mesmo (volta a pendente). */
+export function useResubmitDraft() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ResubmitDraftInput) => invokeDraftSave({ action: 'resubmit', ...input }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['procedure_drafts'] });
+    },
+    onError: (e: any) => {
+      toast({ title: 'Erro ao reenviar', description: e?.message, variant: 'destructive' });
+    },
+  });
+}
+
 /** Aprova ou rejeita um draft pendente. */
 export function useReviewDraft() {
   const qc = useQueryClient();
@@ -130,6 +152,63 @@ export function useReviewDraft() {
     },
     onError: (e: any) => {
       toast({ title: 'Erro ao revisar', description: e?.message, variant: 'destructive' });
+    },
+  });
+}
+
+/** Exclui o rascunho do SISTEMA (registro + imagens do Storage). Não mexe no
+ *  Telegram — pra isso use useDeleteFromTelegram antes/depois. */
+export function useDeleteDraft() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => invokeDraftSave({ action: 'delete', id }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['procedure_drafts'] });
+      toast({ title: 'Excluído do sistema' });
+    },
+    onError: (e: any) => {
+      toast({ title: 'Erro ao excluir', description: e?.message, variant: 'destructive' });
+    },
+  });
+}
+
+/** Apaga do grupo do Telegram todas as mensagens que o procedimento gerou.
+ *  Chama o procedure-send com action=delete (usa os sent_message_ids salvos). */
+export function useDeleteFromTelegram() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (draftId: string) => {
+      const { data, error } = await supabaseProcedures.functions.invoke('procedure-send', {
+        body: { action: 'delete', draftId },
+      });
+      if (error) {
+        try {
+          const ctx = (error as any)?.context;
+          const parsed = typeof ctx?.json === 'function' ? await ctx.json() : null;
+          if (parsed?.error) throw new Error(parsed.error);
+        } catch (inner: any) {
+          if (inner instanceof Error && inner.message) throw inner;
+        }
+        throw error;
+      }
+      if (data?.ok === false) throw new Error(data?.error || 'Falha ao apagar');
+      return data as { ok: true; apagadas: number; total: number; falhas: any[] };
+    },
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['procedure_drafts'] });
+      const falhas = data?.falhas?.length ?? 0;
+      if (falhas > 0) {
+        toast({
+          title: `Apagadas ${data.apagadas}/${data.total}`,
+          description: `${falhas} não puderam ser apagadas (mais de 48h ou sem permissão do bot).`,
+          variant: 'destructive',
+        });
+      } else {
+        toast({ title: 'Removido do grupo', description: `${data.apagadas} mensagens apagadas do Telegram.` });
+      }
+    },
+    onError: (e: any) => {
+      toast({ title: 'Erro ao apagar do Telegram', description: e?.message, variant: 'destructive' });
     },
   });
 }

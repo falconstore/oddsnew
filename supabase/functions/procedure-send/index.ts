@@ -51,7 +51,7 @@ function montarLegenda(e: Entrada): string {
   if (aposte) principal += ` - <b><u>APOSTE ${aposte}</u></b>`;
   if (e.freebet) principal += ` - 🎟️ <b>FREEBET</b>`;
   blocos.push(principal);
-  if (e.observacao && e.observacao.trim()) blocos.push(`📝 ${esc(e.observacao.trim())}`);
+  if (e.observacao && e.observacao.trim()) blocos.push(`📝 ${esc(e.observacao.trim().toUpperCase())}`);
   if (e.link && e.link.trim()) {
     blocos.push(`🔗 <a href="${esc(e.link.trim())}">LINK DA PARTIDA</a>`);
   }
@@ -59,12 +59,29 @@ function montarLegenda(e: Entrada): string {
   return blocos.join("\n\n");
 }
 
+// Legenda da calculadora no padrão Shark:
+//   🔗 LINK DA CALCULADORA 👆   (texto clicável, URL escondida)
+//   (linha em branco)
+//   🟥 <observação>             (ex.: "nesse link a calculadora já vem configurada")
+const CALC_OBS_DEFAULT = "nesse link a calculadora já vem configurada";
+function montarLegendaCalc(calc: { link?: string; obs?: string }): string {
+  const blocos: string[] = [];
+  const link = (calc.link ?? "").trim();
+  if (link) {
+    blocos.push(`🔗 <a href="${esc(link)}">LINK DA CALCULADORA</a> 👆`);
+  }
+  const obs = ((calc.obs ?? "").trim() || CALC_OBS_DEFAULT).toUpperCase();
+  blocos.push(`🟥 ${esc(obs)}`);
+  return blocos.join("\n\n");
+}
+
 interface SendPayload {
+  action?: "send" | "delete"; // default "send"
   chatId: string | number;
   gifFileId?: string | null;     // file_id do GIF de atenção (reuso)
   texto: string;
   entradas: Entrada[];
-  calc?: { printDataUrl?: string | null; printUrl?: string | null; link?: string } | null;
+  calc?: { printDataUrl?: string | null; printUrl?: string | null; link?: string; obs?: string } | null;
   fechamento?: string;           // default "🦈 ✅"
   draftId?: string | null;       // rascunho aprovado a "consumir" (claim-then-send, evita reenvio)
 }
@@ -121,17 +138,23 @@ async function tgSendPhotoUrl(token: string, chatId: string | number, url: strin
 }
 
 // Envia a foto de uma entrada/calc escolhendo a melhor fonte disponível:
-// URL pública (Storage) se houver, senão o dataURL base64. Retorna true se
-// alguma foto foi enviada.
+// URL pública (Storage) se houver, senão o dataURL base64. Retorna o `data` da
+// API do Telegram (pra capturar o message_id) ou null se não enviou foto.
 async function tgSendEntryPhoto(
   token: string,
   chatId: string | number,
   src: { printUrl?: string | null; printDataUrl?: string | null },
   caption?: string,
-): Promise<boolean> {
-  if (src.printUrl) { await tgSendPhotoUrl(token, chatId, src.printUrl, caption); return true; }
-  if (src.printDataUrl) { await tgSendPhoto(token, chatId, src.printDataUrl, caption); return true; }
-  return false;
+): Promise<any | null> {
+  if (src.printUrl) return await tgSendPhotoUrl(token, chatId, src.printUrl, caption);
+  if (src.printDataUrl) return await tgSendPhoto(token, chatId, src.printDataUrl, caption);
+  return null;
+}
+
+// Extrai o message_id de uma resposta da API do Telegram (se houver).
+function msgId(data: any): number | null {
+  const id = data?.result?.message_id;
+  return typeof id === "number" ? id : null;
 }
 
 serve(async (req) => {
@@ -155,14 +178,57 @@ serve(async (req) => {
     return json({ error: "body inválido" }, { status: 400 });
   }
 
+  // ── DELETE: apaga do grupo todas as mensagens que o procedimento gerou ──
+  if (payload.action === "delete") {
+    const delDraftId = payload.draftId;
+    if (!delDraftId) return json({ error: "draftId obrigatório" }, { status: 400 });
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!SUPABASE_URL || !SERVICE_ROLE) {
+      return json({ error: "config do servidor incompleta" }, { status: 500 });
+    }
+    const supaDel = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
+    const { data: draft, error: readErr } = await supaDel
+      .from("procedure_drafts")
+      .select("sent_chat_id, sent_message_ids")
+      .eq("id", delDraftId)
+      .single();
+    if (readErr) return json({ ok: false, error: `rascunho não encontrado: ${readErr.message}` }, { status: 404 });
+
+    const ids: number[] = Array.isArray(draft?.sent_message_ids) ? draft.sent_message_ids : [];
+    const delChatId = draft?.sent_chat_id;
+    if (!delChatId || ids.length === 0) {
+      return json({ ok: false, error: "não há mensagens registradas pra apagar (envio anterior à atualização?)", noMessages: true }, { status: 409 });
+    }
+
+    let apagadas = 0;
+    const falhas: { id: number; error: string }[] = [];
+    for (const id of ids) {
+      try {
+        await tgCall(token, "deleteMessage", { chat_id: delChatId, message_id: id });
+        apagadas++;
+      } catch (e: any) {
+        // Telegram só deixa apagar msgs com < 48h e se o bot for admin c/ permissão.
+        falhas.push({ id, error: e?.message ?? "erro" });
+      }
+    }
+
+    await supaDel
+      .from("procedure_drafts")
+      .update({ deleted_from_telegram_at: new Date().toISOString() })
+      .eq("id", delDraftId);
+
+    log("deleted", { draftId: delDraftId, apagadas, falhas: falhas.length });
+    return json({ ok: true, apagadas, total: ids.length, falhas });
+  }
+
   const { chatId, gifFileId, texto, entradas = [], calc, fechamento, draftId } = payload;
   if (!chatId) return json({ error: "chatId obrigatório" }, { status: 400 });
   if (!texto?.trim()) return json({ error: "texto obrigatório" }, { status: 400 });
 
-  // CLAIM-THEN-SEND: se este envio é de um rascunho aprovado, "consome" o
-  // rascunho ANTES de disparar — marca status=enviado de forma atômica só se
-  // ele ainda estiver 'aprovado'. Se 0 linhas mudarem, é porque já foi enviado
-  // (ou não está aprovado): abortamos pra não duplicar a sequência no grupo.
+  // Client service_role (pro claim e pra salvar os message_id). Só criado se
+  // houver draftId (envios avulsos sem rascunho não precisam de DB).
+  let supa: any = null;
   if (draftId) {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -170,7 +236,11 @@ serve(async (req) => {
       log("config_error", { missing: "SUPABASE creds (claim)" });
       return json({ error: "config do servidor incompleta" }, { status: 500 });
     }
-    const supa = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
+    supa = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
+
+    // CLAIM-THEN-SEND: "consome" o rascunho aprovado ANTES de disparar — marca
+    // status=enviado de forma atômica só se ainda estiver 'aprovado'. Se 0
+    // linhas mudarem, já foi enviado: abortamos pra não duplicar no grupo.
     const { data: claimed, error: claimErr } = await supa
       .from("procedure_drafts")
       .update({ status: "enviado", sent_at: new Date().toISOString() })
@@ -188,48 +258,64 @@ serve(async (req) => {
   }
 
   const sent: string[] = [];
+  const messageIds: number[] = [];  // ids das mensagens criadas no grupo (pra apagar depois)
+  const collect = (data: any) => { const id = msgId(data); if (id != null) messageIds.push(id); };
   try {
     // 1) GIF de atenção (se houver file_id)
     if (gifFileId) {
-      await tgCall(token, "sendAnimation", { chat_id: chatId, animation: gifFileId });
+      collect(await tgCall(token, "sendAnimation", { chat_id: chatId, animation: gifFileId }));
       sent.push("gif");
     }
 
-    // 2) Texto do procedimento
-    await tgCall(token, "sendMessage", { chat_id: chatId, text: texto });
+    // 2) Texto do procedimento — sempre em MAIÚSCULA (padrão Shark).
+    collect(await tgCall(token, "sendMessage", { chat_id: chatId, text: (texto ?? "").toUpperCase() }));
     sent.push("texto");
 
     // 3) Entradas — foto (se houver) com legenda; separador 🦈🔥 entre elas.
     for (let i = 0; i < entradas.length; i++) {
       const e = entradas[i];
       const caption = montarLegenda(e);
-      const sentPhoto = await tgSendEntryPhoto(token, chatId, e, caption);
-      if (!sentPhoto && caption) {
-        await tgCall(token, "sendMessage", { chat_id: chatId, text: caption, parse_mode: "HTML" });
+      const photoData = await tgSendEntryPhoto(token, chatId, e, caption);
+      if (photoData) {
+        collect(photoData);
+      } else if (caption) {
+        collect(await tgCall(token, "sendMessage", { chat_id: chatId, text: caption, parse_mode: "HTML" }));
       }
       sent.push(`entrada_${i + 1}`);
       // Separador entre entradas (não após a última — depois vem a calc/fecho).
       if (i < entradas.length - 1) {
-        await tgCall(token, "sendMessage", { chat_id: chatId, text: "🦈🔥" });
+        collect(await tgCall(token, "sendMessage", { chat_id: chatId, text: "🦈🔥" }));
         sent.push(`sep_${i + 1}`);
       }
     }
 
-    // 4) Calculadora
+    // 4) Calculadora — padrão: "🔗 LINK DA CALCULADORA 👆" + frase de orientação.
     if (calc) {
-      const capCalc = calc.link ? `🧮 <b>CALCULADORA</b>\n🔗 ${calc.link}` : `🧮 <b>CALCULADORA</b>`;
-      const sentCalcPhoto = await tgSendEntryPhoto(token, chatId, calc, capCalc);
-      if (!sentCalcPhoto && calc.link) {
-        await tgCall(token, "sendMessage", { chat_id: chatId, text: capCalc, parse_mode: "HTML" });
+      const capCalc = montarLegendaCalc(calc);
+      const calcData = await tgSendEntryPhoto(token, chatId, calc, capCalc);
+      if (calcData) {
+        collect(calcData);
+      } else {
+        // Sem print: manda só a legenda (link clicável + frase).
+        collect(await tgCall(token, "sendMessage", { chat_id: chatId, text: capCalc, parse_mode: "HTML" }));
       }
       sent.push("calc");
     }
 
     // 5) Fechamento
-    await tgCall(token, "sendMessage", { chat_id: chatId, text: fechamento || "🦈 ✅" });
+    collect(await tgCall(token, "sendMessage", { chat_id: chatId, text: fechamento || "🦈 ✅" }));
     sent.push("fechamento");
 
-    log("sent_ok", { chatId, count: sent.length });
+    // Salva os message_id no draft (pra permitir "Excluir do Telegram" depois).
+    if (supa && draftId) {
+      const { error: saveErr } = await supa
+        .from("procedure_drafts")
+        .update({ sent_chat_id: chatId, sent_message_ids: messageIds })
+        .eq("id", draftId);
+      if (saveErr) log("save_msgids_error", { draftId, error: saveErr.message });
+    }
+
+    log("sent_ok", { chatId, count: sent.length, messageIds: messageIds.length });
     return json({ ok: true, sent });
   } catch (e: any) {
     log("send_error", { error: e?.message, sentSoFar: sent });

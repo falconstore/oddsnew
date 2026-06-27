@@ -65,6 +65,46 @@ serve(async (req) => {
 
   const action: string = body?.action ?? "create";
 
+  // Sobe as imagens (dataURL → bucket) e devolve { entradas, calc } com os
+  // image_path. Reaproveitado por create e resubmit. upsert=true sobrescreve.
+  async function montarConteudo(draftId: string, entradasIn: EntradaIn[], calcIn: any) {
+    const entradas: any[] = [];
+    for (let i = 0; i < entradasIn.length; i++) {
+      const e = entradasIn[i];
+      let image_path: string | null = null;
+      if (e.printDataUrl) {
+        const parsed = dataUrlToBytes(e.printDataUrl);
+        if (parsed) {
+          const path = `drafts/${draftId}/entrada-${i + 1}.${parsed.ext}`;
+          const { error: upErr } = await supa.storage
+            .from(BUCKET).upload(path, parsed.bytes, { contentType: parsed.mime, upsert: true });
+          if (upErr) throw new Error(`upload entrada ${i + 1}: ${upErr.message}`);
+          image_path = path;
+        }
+      }
+      entradas.push({
+        casa: e.casa ?? "", odd: e.odd ?? "", aposte: e.aposte ?? "",
+        link: e.link ?? "", observacao: e.observacao ?? "", freebet: !!e.freebet, image_path,
+      });
+    }
+    let calc: any = null;
+    if (calcIn && (calcIn.printDataUrl || calcIn.link)) {
+      let calc_path: string | null = null;
+      if (calcIn.printDataUrl) {
+        const parsed = dataUrlToBytes(calcIn.printDataUrl);
+        if (parsed) {
+          const path = `drafts/${draftId}/calc.${parsed.ext}`;
+          const { error: upErr } = await supa.storage
+            .from(BUCKET).upload(path, parsed.bytes, { contentType: parsed.mime, upsert: true });
+          if (upErr) throw new Error(`upload calc: ${upErr.message}`);
+          calc_path = path;
+        }
+      }
+      calc = { image_path: calc_path, link: calcIn.link ?? "", obs: calcIn.obs ?? "" };
+    }
+    return { entradas, calc };
+  }
+
   try {
     // ── CREATE ───────────────────────────────────────────────────────────
     if (action === "create") {
@@ -89,53 +129,10 @@ serve(async (req) => {
       if (insErr) throw new Error(`insert draft: ${insErr.message}`);
       const draftId = created.id as string;
 
-      // 2) Sobe as imagens das entradas e monta o JSON final (com image_path).
-      const entradas: any[] = [];
-      for (let i = 0; i < entradasIn.length; i++) {
-        const e = entradasIn[i];
-        let image_path: string | null = null;
-        if (e.printDataUrl) {
-          const parsed = dataUrlToBytes(e.printDataUrl);
-          if (parsed) {
-            const path = `drafts/${draftId}/entrada-${i + 1}.${parsed.ext}`;
-            const { error: upErr } = await supa.storage
-              .from(BUCKET)
-              .upload(path, parsed.bytes, { contentType: parsed.mime, upsert: true });
-            if (upErr) throw new Error(`upload entrada ${i + 1}: ${upErr.message}`);
-            image_path = path;
-          }
-        }
-        entradas.push({
-          casa: e.casa ?? "",
-          odd: e.odd ?? "",
-          aposte: e.aposte ?? "",
-          link: e.link ?? "",
-          observacao: e.observacao ?? "",
-          freebet: !!e.freebet,
-          image_path,
-        });
-      }
+      // 2) Sobe imagens + monta entradas/calc finais.
+      const { entradas, calc } = await montarConteudo(draftId, entradasIn, body?.calc);
 
-      // 3) Calculadora (opcional).
-      let calc: any = null;
-      const calcIn = body?.calc;
-      if (calcIn && (calcIn.printDataUrl || calcIn.link)) {
-        let calc_path: string | null = null;
-        if (calcIn.printDataUrl) {
-          const parsed = dataUrlToBytes(calcIn.printDataUrl);
-          if (parsed) {
-            const path = `drafts/${draftId}/calc.${parsed.ext}`;
-            const { error: upErr } = await supa.storage
-              .from(BUCKET)
-              .upload(path, parsed.bytes, { contentType: parsed.mime, upsert: true });
-            if (upErr) throw new Error(`upload calc: ${upErr.message}`);
-            calc_path = path;
-          }
-        }
-        calc = { image_path: calc_path, link: calcIn.link ?? "" };
-      }
-
-      // 4) Atualiza o draft com as entradas + calc finais.
+      // 3) Atualiza o draft com as entradas + calc finais.
       const { error: updErr } = await supa
         .from("procedure_drafts")
         .update({ entradas, calc })
@@ -144,6 +141,43 @@ serve(async (req) => {
 
       log("created", { draftId, entradas: entradas.length });
       return json({ ok: true, id: draftId });
+    }
+
+    // ── RESUBMIT (corrigir um rejeitado e reenviar — REABRE o mesmo) ──────
+    if (action === "resubmit") {
+      const id: string = body?.id;
+      const texto: string = body?.texto ?? "";
+      if (!id) return json({ error: "id obrigatório" }, { status: 400 });
+      if (!texto.trim()) return json({ error: "texto obrigatório" }, { status: 400 });
+      const entradasIn: EntradaIn[] = Array.isArray(body?.entradas) ? body.entradas : [];
+
+      // Sobe as imagens (reusa a pasta do próprio draft, com upsert).
+      const { entradas, calc } = await montarConteudo(id, entradasIn, body?.calc);
+
+      // Reabre: volta pra pendente e limpa os dados da revisão anterior.
+      // Só permite se ainda estiver 'rejeitado' (evita corrida/reabrir aprovado).
+      const { data: updated, error } = await supa
+        .from("procedure_drafts")
+        .update({
+          status: "pendente",
+          texto,
+          template_id: body?.templateId ?? null,
+          entradas,
+          calc,
+          reviewed_by_email: null,
+          reviewed_at: null,
+          reject_reason: null,
+        })
+        .eq("id", id)
+        .eq("status", "rejeitado")
+        .select("id");
+      if (error) throw new Error(`resubmit: ${error.message}`);
+      if (!updated || updated.length === 0) {
+        log("resubmit_noop", { id });
+        return json({ ok: false, error: "este rascunho não está mais rejeitado", conflict: true }, { status: 409 });
+      }
+      log("resubmitted", { id, entradas: entradas.length });
+      return json({ ok: true, id });
     }
 
     // ── REVIEW (aprovar / rejeitar) ──────────────────────────────────────
@@ -172,6 +206,28 @@ serve(async (req) => {
         return json({ ok: false, error: "este procedimento já foi revisado por outra pessoa", conflict: true }, { status: 409 });
       }
       log("reviewed", { id, decision });
+      return json({ ok: true });
+    }
+
+    // ── DELETE (exclui o rascunho do sistema + imagens do Storage) ───────
+    if (action === "delete") {
+      const id: string = body?.id;
+      if (!id) return json({ error: "id obrigatório" }, { status: 400 });
+
+      // Remove a pasta de imagens do draft no Storage (best-effort).
+      try {
+        const { data: files } = await supa.storage.from(BUCKET).list(`drafts/${id}`);
+        if (files && files.length) {
+          const paths = files.map((f: any) => `drafts/${id}/${f.name}`);
+          await supa.storage.from(BUCKET).remove(paths);
+        }
+      } catch (e: any) {
+        log("delete_storage_warn", { id, error: e?.message });
+      }
+
+      const { error } = await supa.from("procedure_drafts").delete().eq("id", id);
+      if (error) throw new Error(`delete: ${error.message}`);
+      log("deleted_draft", { id });
       return json({ ok: true });
     }
 

@@ -182,7 +182,7 @@ function DraftCard({
           <FileText className="w-3 h-3" /> TEXTO
         </p>
         <pre className="whitespace-pre-wrap font-mono text-[12px] bg-background border border-border rounded p-3 max-h-64 overflow-auto">
-          {d.texto}
+          {(d.texto ?? '').toUpperCase()}
         </pre>
       </div>
 
@@ -198,10 +198,10 @@ function DraftCard({
               <div key={i} className="border border-border rounded p-2.5 bg-card flex gap-3">
                 <div className="flex-1 min-w-0 space-y-1">
                   <p className="text-[11px] text-foreground/90 font-medium">
-                    {e.casa || 'Casa'} · <span className="text-primary/80">ODD {e.odd || '—'}</span> · APOSTE {e.aposte || '—'}
+                    {(e.casa || 'CASA').toUpperCase()} · <span className="text-primary/80">ODD {e.odd || '—'}</span> · APOSTE {e.aposte || '—'}
                     {e.freebet && <span className="ml-1 text-amber-400">🎟️ FREEBET</span>}
                   </p>
-                  {e.observacao && <p className="text-[10px] text-muted-foreground/70 truncate">📝 {e.observacao}</p>}
+                  {e.observacao && <p className="text-[10px] text-muted-foreground/70 truncate">📝 {e.observacao.toUpperCase()}</p>}
                   {e.link && <p className="text-[10px] text-muted-foreground/50 truncate">🔗 {e.link}</p>}
                 </div>
                 {url ? (
@@ -227,7 +227,7 @@ function DraftCard({
       </div>
 
       {/* Calculadora */}
-      {d.calc && (d.calc.image_path || d.calc.link) && (
+      {d.calc && (d.calc.image_path || d.calc.link || d.calc.obs) && (
         <div>
           <p className="telemetry-label text-muted-foreground flex items-center gap-1.5 mb-1">
             <Calculator className="w-3 h-3" /> CALCULADORA
@@ -244,7 +244,10 @@ function DraftCard({
                 </button>
               ) : null;
             })()}
-            {d.calc.link && <span className="text-[11px] text-muted-foreground/70 truncate">🔗 {d.calc.link}</span>}
+            <div className="min-w-0 space-y-0.5">
+              {d.calc.link && <p className="text-[11px] text-sky-400 truncate">🔗 LINK DA CALCULADORA 👆</p>}
+              {d.calc.obs && <p className="text-[11px] text-muted-foreground/70">🟥 {d.calc.obs.toUpperCase()}</p>}
+            </div>
           </div>
         </div>
       )}

@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback } from 'react';
-import { ImageIcon, X, ClipboardPaste } from 'lucide-react';
+import { ImageIcon, X, ClipboardPaste, ZoomIn } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // Zona pra adicionar uma imagem por: COLAR (Ctrl+V), arrastar-e-soltar ou
@@ -11,11 +11,13 @@ interface PasteImageZoneProps {
   /** Recebe o arquivo bruto (do paste/drop/seleção). */
   onFile: (file: File) => void;
   onClear: () => void;
+  /** Se fornecido, mostra um botão de lupa no preview pra ampliar a imagem. */
+  onZoom?: (url: string) => void;
   label?: string;
   className?: string;
 }
 
-export function PasteImageZone({ previewUrl, onFile, onClear, label, className }: PasteImageZoneProps) {
+export function PasteImageZone({ previewUrl, onFile, onClear, onZoom, label, className }: PasteImageZoneProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const [active, setActive] = useState(false); // recebeu foco — pronto pra colar
@@ -40,12 +42,25 @@ export function PasteImageZone({ previewUrl, onFile, onClear, label, className }
 
   if (previewUrl) {
     return (
-      <div className={cn('relative inline-block', className)}>
-        <img src={previewUrl} alt="" className="h-20 rounded border border-border object-contain bg-muted" />
+      <div className={cn('relative inline-block group', className)}>
+        <button
+          type="button"
+          onClick={() => onZoom?.(previewUrl)}
+          disabled={!onZoom}
+          className={cn('block', onZoom && 'cursor-zoom-in')}
+          title={onZoom ? 'Ampliar imagem' : undefined}
+        >
+          <img src={previewUrl} alt="" className="h-24 rounded border border-border object-contain bg-muted" />
+          {onZoom && (
+            <span className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/40 rounded transition-colors">
+              <ZoomIn className="w-5 h-5 text-white opacity-0 group-hover:opacity-100" />
+            </span>
+          )}
+        </button>
         <button
           type="button"
           onClick={onClear}
-          className="absolute -top-1.5 -right-1.5 bg-card border border-border rounded-full p-0.5 hover:text-destructive"
+          className="absolute -top-1.5 -right-1.5 bg-card border border-border rounded-full p-0.5 hover:text-destructive z-10"
           aria-label="Remover imagem"
         >
           <X className="w-3 h-3" />
