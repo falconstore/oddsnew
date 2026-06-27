@@ -570,13 +570,10 @@ serve(async (req) => {
     // lead com esse telegram_user_id (cohort='free_group'). Se entrou pelo
     // link sem ter dado /start, criamos o lead na hora.
     if (isFreeGroupChat) {
-      // Nome do link de convite usado pra entrar (ex.: "site") — vira a origem.
+      // Origem pelo nome do link: o Telegram NÃO envia invite_link no evento
+      // chat_member de CANAIS (confirmado por teste — só vem em grupos). Então
+      // ficará sempre null aqui; mantido por compatibilidade caso vire grupo.
       const inviteName: string | null = cm.invite_link?.name ?? null;
-      // DEBUG: grava o chat_member cru numa tabela pra inspeção (o CLI não
-      // expõe logs). Remover depois de diagnosticar.
-      try {
-        await supabase.from("free_debug").insert({ payload: cm as unknown as Record<string, unknown> });
-      } catch (_e) { /* best-effort */ }
       if (becameActiveTmp) {
         await recordFreeGroupMembership(supabase, userId, true, username, cm.new_chat_member?.user?.first_name, inviteName);
         return json({ ok: true, action: "free-group-entered", user_id: userId });
