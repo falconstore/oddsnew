@@ -144,7 +144,7 @@ export function buildPartidas(f: Record<string, string>): string[] {
 // Definição dos templates built-in
 // ─────────────────────────────────────────
 
-export const TEMPLATES: TemplateConfig[] = [
+const TEMPLATES_RAW: TemplateConfig[] = [
   {
     id: 'queimar_fb',
     name: 'Queimar FreeBet',
@@ -576,3 +576,16 @@ export const TEMPLATES: TemplateConfig[] = [
     ].join('\n'),
   },
 ];
+
+// ─────────────────────────────────────────
+// TODO procedimento sai em MAIÚSCULA (padrão Shark). Envolvemos a generate()
+// de cada template num wrapper que força .toUpperCase() no texto final — assim
+// literais/fallbacks minúsculos dentro das generate() (ex.: "chance de duplo
+// green", "Freebet", "Extra") saem sempre em maiúscula, em qualquer consumidor
+// (Templates Bot e Envio), sem depender de um .toUpperCase() externo.
+// Os templates não geram URLs no corpo, então é seguro upper na string toda.
+// ─────────────────────────────────────────
+export const TEMPLATES: TemplateConfig[] = TEMPLATES_RAW.map((t) => ({
+  ...t,
+  generate: (f: Record<string, string>) => t.generate(f).toUpperCase(),
+}));
