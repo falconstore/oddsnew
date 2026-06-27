@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { ImageLightbox } from '@/components/ImageLightbox';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -922,14 +922,8 @@ export default function EnvioProcedimentos() {
         </div>
       </div>
 
-      {/* Lightbox de zoom — preview da imagem em tamanho grande (com marca d'água). */}
-      <Dialog open={!!zoomUrl} onOpenChange={(o) => !o && setZoomUrl(null)}>
-        <DialogContent className="max-w-4xl p-2 bg-background/95">
-          {zoomUrl && (
-            <img src={zoomUrl} alt="Imagem do bilhete" className="w-full h-auto max-h-[85vh] object-contain rounded" />
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* Lightbox de zoom interativo — preview da imagem (com marca d'água). */}
+      <ImageLightbox url={zoomUrl} onClose={() => setZoomUrl(null)} />
 
       {/* Confirmação de exclusão do Telegram */}
       <AlertDialog open={!!confirmandoExclusao} onOpenChange={(o) => !o && setConfirmandoExclusao(null)}>
