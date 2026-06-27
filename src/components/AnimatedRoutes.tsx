@@ -36,6 +36,7 @@ import { PushNotifications } from '@/pages/PushNotifications';
 import { AppStats } from '@/pages/AppStats';
 import BotTemplates from '@/pages/BotTemplates';
 import EnvioProcedimentos from '@/pages/EnvioProcedimentos';
+import RevisaoProcedimentos from '@/pages/RevisaoProcedimentos';
 import BioLinks from '@/pages/BioLinks';
 import NotFound from '@/pages/NotFound';
 
@@ -287,6 +288,13 @@ export function AnimatedRoutes() {
           <RequireAuth pageKey={'envio_procedimentos' as never}>
             <PageTransition>
               <EnvioProcedimentos />
+            </PageTransition>
+          </RequireAuth>
+        } />
+        <Route path="/revisao-procedimentos" element={
+          <RequireAuth pageKey={'revisao_procedimentos' as never}>
+            <PageTransition>
+              <RevisaoProcedimentos />
             </PageTransition>
           </RequireAuth>
         } />

@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Layout } from '@/components/Layout';
 import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
@@ -18,6 +19,11 @@ import { useProcedures } from '@/hooks/useProcedures';
 import { getAllPlatforms } from '@/lib/procedureUtils';
 import { supabaseProcedures } from '@/lib/supabaseProcedures';
 import { toast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
+import {
+  useProcedureDrafts, useCreateDraft, draftImageUrl,
+  type ProcedureDraft,
+} from '@/hooks/useProcedureDrafts';
 import defaultLogoUrl from '@assets/logo_1778182494299.png';
 
 // Destino e GIF fixos do disparo (Fase 2).
@@ -27,7 +33,7 @@ const CHAT_ID = -1002197121868;
 const GIF_ATENCAO_FILE_ID = 'CgACAgEAAyEGAASC9WtMAAECOFxqO0vU1puA5-mv9Tkkvb8bNqbH0AACsgYAArx72UWJ2Kr93mPV6jwE';
 import {
   Send, Plus, Trash2, Film, Calculator,
-  CheckCircle2, FileText, Ticket, Loader2,
+  CheckCircle2, FileText, Ticket, Loader2, ClipboardCheck, Clock, XCircle, Ban,
 } from 'lucide-react';
 
 // ── Tipos da sequência ───────────────────────────────────────────────────
@@ -38,13 +44,14 @@ interface Entrada {
   aposte: string;       // ex: "6,50"
   link: string;         // link da partida (vai escondido no texto "LINK DA PARTIDA")
   observacao: string;   // observação opcional da entrada
+  freebet: boolean;     // marca a entrada como aposta grátis (sai "🎟️ FREEBET" na legenda)
   printDataUrl: string | null; // preview do print (já com marca d'água)
   printName: string | null;
 }
 
 let _seq = 0;
 const novaEntrada = (): Entrada => ({
-  id: `e${++_seq}`, casa: '', odd: '', aposte: '', link: '', observacao: '', printDataUrl: null, printName: null,
+  id: `e${++_seq}`, casa: '', odd: '', aposte: '', link: '', observacao: '', freebet: false, printDataUrl: null, printName: null,
 });
 
 export default function EnvioProcedimentos() {
@@ -131,6 +138,19 @@ export default function EnvioProcedimentos() {
 
   const [enviando, setEnviando] = useState(false);
 
+  // Fluxo de revisão.
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  const createDraft = useCreateDraft();
+  const { data: meusDrafts = [] } = useProcedureDrafts(); // todos; filtro abaixo
+  const meusDraftsRecentes = useMemo(() => {
+    const email = user?.email ?? null;
+    return meusDrafts
+      .filter((d) => d.created_by_email === email)
+      .slice(0, 8);
+  }, [meusDrafts, user?.email]);
+  const [disparandoId, setDisparandoId] = useState<string | null>(null);
+
   const addEntrada = () => setEntradas((p) => [...p, novaEntrada()]);
   const removeEntrada = (id: string) => setEntradas((p) => p.filter((e) => e.id !== id));
   const updateEntrada = (id: string, patch: Partial<Entrada>) =>
@@ -175,28 +195,82 @@ export default function EnvioProcedimentos() {
     return entradas.every((e) => e.casa.trim() && e.odd.trim() && e.aposte.trim());
   }, [texto, entradas]);
 
-  const handleEnviar = async () => {
+  // Limpa o formulário após salvar um rascunho com sucesso.
+  const resetForm = () => {
+    setEntradas([novaEntrada()]);
+    setCalcPrint(null);
+    setCalcLink('');
+    if (template) {
+      const init: Record<string, string> = {};
+      for (const f of template.fields) init[f.id] = f.default ? f.default() : '';
+      setCampos(init);
+    }
+    setEventoData({});
+    setTextoManual(null);
+  };
+
+  // "Enviar para Revisão" — salva o procedimento como rascunho pendente (com
+  // upload das imagens). NÃO dispara no Telegram; quem libera é o revisor.
+  const handleEnviarRevisao = async () => {
     setEnviando(true);
+    try {
+      const res = await createDraft.mutateAsync({
+        templateId: textoManual !== null ? null : (template?.id ?? null),
+        texto,
+        entradas: entradas.map((e) => ({
+          casa: e.casa, odd: e.odd, aposte: e.aposte, link: e.link,
+          observacao: e.observacao, freebet: e.freebet, printDataUrl: e.printDataUrl,
+        })),
+        calc: (calcPrint || calcLink) ? { printDataUrl: calcPrint?.dataUrl ?? null, link: calcLink } : null,
+        createdByEmail: user?.email ?? null,
+        createdById: user?.id ?? null,
+      });
+      if (res?.id) {
+        toast({ title: 'Enviado para revisão!', description: 'O procedimento entrou na fila de revisão.' });
+        resetForm();
+      }
+    } catch {
+      /* o toast de erro vem do hook */
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  // Dispara no grupo um rascunho JÁ APROVADO (usa as imagens do Storage).
+  // O procedure-send faz claim-then-send: ele mesmo marca o rascunho como
+  // 'enviado' (atômico) ANTES de disparar, então não precisamos chamar markSent
+  // aqui — e um duplo-clique/reenvio é barrado no servidor (409 alreadySent).
+  const handleDispararAprovado = async (d: ProcedureDraft) => {
+    setDisparandoId(d.id);
     try {
       const { data, error } = await supabaseProcedures.functions.invoke('procedure-send', {
         body: {
           chatId: CHAT_ID,
           gifFileId: GIF_ATENCAO_FILE_ID || null,
-          texto,
-          entradas: entradas.map((e) => ({
-            casa: e.casa,
-            odd: e.odd,
-            aposte: e.aposte,
-            link: e.link,
-            observacao: e.observacao,
-            printDataUrl: e.printDataUrl,
+          draftId: d.id,
+          texto: d.texto,
+          entradas: d.entradas.map((e) => ({
+            casa: e.casa, odd: e.odd, aposte: e.aposte, link: e.link,
+            observacao: e.observacao, freebet: e.freebet,
+            printUrl: draftImageUrl(e.image_path),
           })),
-          calc: (calcPrint || calcLink) ? { printDataUrl: calcPrint?.dataUrl ?? null, link: calcLink } : null,
+          calc: d.calc && (d.calc.image_path || d.calc.link)
+            ? { printUrl: draftImageUrl(d.calc.image_path), link: d.calc.link }
+            : null,
         },
       });
       if (error) throw error;
-      if (data?.ok === false) throw new Error(data.error || 'Falha no envio');
-      toast({ title: 'Enviado!', description: 'A sequência foi disparada no grupo.' });
+      if (data?.ok === false) {
+        if (data?.alreadySent) {
+          toast({ title: 'Já enviado', description: 'Esse procedimento já tinha sido disparado.' });
+        } else {
+          throw new Error(data.error || 'Falha no envio');
+        }
+      } else {
+        toast({ title: 'Enviado!', description: 'A sequência foi disparada no grupo.' });
+      }
+      // Atualiza a lista (o status virou 'enviado' no servidor).
+      qc.invalidateQueries({ queryKey: ['procedure_drafts'] });
     } catch (err: any) {
       toast({
         title: 'Erro ao enviar',
@@ -204,7 +278,7 @@ export default function EnvioProcedimentos() {
         variant: 'destructive',
       });
     } finally {
-      setEnviando(false);
+      setDisparandoId(null);
     }
   };
 
@@ -364,10 +438,21 @@ export default function EnvioProcedimentos() {
                       placeholder="Link da partida (fica escondido em 'LINK DA PARTIDA')" className="text-sm" />
                     <Input value={e.observacao} onChange={(ev) => updateEntrada(e.id, { observacao: ev.target.value })}
                       placeholder="Observação (opcional)" className="text-sm" />
+                    {/* Toggle: marca a entrada como aposta grátis (freebet). Quando
+                        ligado, sai "🎟️ FREEBET" no fim da linha principal da legenda. */}
+                    <label className="flex items-center justify-between gap-2 h-9 px-2.5 border border-border rounded bg-background cursor-pointer">
+                      <span className="text-xs text-foreground/90 flex items-center gap-1.5">
+                        <Ticket className="w-3.5 h-3.5 text-primary/70" /> Aposta grátis (freebet)
+                      </span>
+                      <Switch
+                        checked={e.freebet}
+                        onCheckedChange={(c) => updateEntrada(e.id, { freebet: c })}
+                      />
+                    </label>
                     {/* Preview da legenda que vai pro Telegram */}
                     {(e.casa || e.odd || e.aposte) && (
                       <p className="text-[11px] text-muted-foreground/70">
-                        Sairá: <span className="text-foreground/90">{e.casa || 'Casa'} - <u>ODD {e.odd || '—'}</u> - APOSTE <u>{e.aposte || '—'}</u></span>
+                        Sairá: <span className="text-foreground/90">{e.casa || 'Casa'} - <u>ODD {e.odd || '—'}</u> - APOSTE <u>{e.aposte || '—'}</u>{e.freebet && ' - 🎟️ FREEBET'}</span>
                       </p>
                     )}
                     {/* Print da entrada — colar (Ctrl+V), arrastar ou selecionar.
@@ -420,20 +505,71 @@ export default function EnvioProcedimentos() {
               </ol>
 
               <Button
-                onClick={handleEnviar}
+                onClick={handleEnviarRevisao}
                 disabled={!podeEnviar || enviando}
                 className="w-full mt-4 gap-2"
               >
-                {enviando ? <><Loader2 className="w-4 h-4 animate-spin" /> Enviando…</> : <><Send className="w-4 h-4" /> Enviar no grupo</>}
+                {enviando ? <><Loader2 className="w-4 h-4 animate-spin" /> Enviando…</> : <><ClipboardCheck className="w-4 h-4" /> Enviar para revisão</>}
               </Button>
               <p className="text-[10px] text-muted-foreground/60 mt-2 text-center">
-                Dispara em sequência no grupo de pré-envio 🦈🔥
+                Vai pra fila de revisão. O disparo no grupo só libera após aprovação. 🦈🔥
               </p>
             </div>
+
+            {/* Meus rascunhos — status + disparo dos aprovados */}
+            {meusDraftsRecentes.length > 0 && (
+              <div className="panel-bracket p-4">
+                <p className="telemetry-label text-primary mb-2 flex items-center gap-1.5">
+                  <Clock className="w-3 h-3" /> [ MEUS RASCUNHOS ]
+                </p>
+                <div className="space-y-2">
+                  {meusDraftsRecentes.map((d) => (
+                    <MeuRascunhoLine
+                      key={d.id}
+                      draft={d}
+                      disparando={disparandoId === d.id}
+                      onDisparar={() => handleDispararAprovado(d)}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
           </aside>
         </div>
       </div>
     </Layout>
+  );
+}
+
+function MeuRascunhoLine({ draft: d, disparando, onDisparar }: { draft: ProcedureDraft; disparando: boolean; onDisparar: () => void }) {
+  const resumo = (d.texto ?? '').split('\n')[0]?.slice(0, 40) || 'Procedimento';
+  const STATUS: Record<string, { label: string; cls: string; icon: React.ComponentType<{ className?: string }> }> = {
+    pendente: { label: 'Em revisão', cls: 'text-amber-400', icon: Clock },
+    aprovado: { label: 'Aprovado', cls: 'text-primary', icon: CheckCircle2 },
+    rejeitado: { label: 'Rejeitado', cls: 'text-destructive', icon: XCircle },
+    enviado: { label: 'Enviado', cls: 'text-sky-400', icon: Send },
+  };
+  const s = STATUS[d.status] ?? STATUS.pendente;
+  const Icon = s.icon;
+  return (
+    <div className="border border-border rounded p-2.5 bg-card space-y-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[11px] text-foreground/80 truncate" title={resumo}>{resumo}</span>
+        <span className={cn('inline-flex items-center gap-1 text-[10px] flex-shrink-0', s.cls)}>
+          <Icon className="w-3 h-3" /> {s.label}
+        </span>
+      </div>
+      {d.status === 'rejeitado' && d.reject_reason && (
+        <p className="text-[10px] text-destructive/80 flex items-start gap-1">
+          <Ban className="w-3 h-3 mt-0.5 flex-shrink-0" /> {d.reject_reason}
+        </p>
+      )}
+      {d.status === 'aprovado' && (
+        <Button size="sm" onClick={onDisparar} disabled={disparando} className="w-full h-7 gap-1.5 text-xs">
+          {disparando ? <><Loader2 className="w-3 h-3 animate-spin" /> Enviando…</> : <><Send className="w-3 h-3" /> Enviar no grupo</>}
+        </Button>
+      )}
+    </div>
   );
 }
 

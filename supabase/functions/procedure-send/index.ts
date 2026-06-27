@@ -13,6 +13,7 @@
 // Envio Procedimentos. Token do bot: PROCEDURE_SEND_BOT_TOKEN (secret).
 // deno-lint-ignore-file
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders, json } from "../_shared/cors.ts";
 
 const log = (event: string, data: Record<string, unknown> = {}) =>
@@ -24,7 +25,9 @@ interface Entrada {
   aposte: string;       // ex: "6,50"
   link: string;         // URL da partida (vai escondida em "LINK DA PARTIDA")
   observacao?: string;
+  freebet?: boolean;    // entrada é aposta grátis → "🎟️ FREEBET" na legenda
   printDataUrl?: string | null; // dataURL (base64) já com marca d'água
+  printUrl?: string | null;     // URL pública da imagem (fluxo de revisão; alternativa ao dataURL)
 }
 
 // Escapa caracteres especiais do HTML do Telegram.
@@ -46,6 +49,7 @@ function montarLegenda(e: Entrada): string {
   let principal = casa;
   if (odd) principal += ` - <b><u>ODD ${odd}</u></b>`;
   if (aposte) principal += ` - <b><u>APOSTE ${aposte}</u></b>`;
+  if (e.freebet) principal += ` - 🎟️ <b>FREEBET</b>`;
   blocos.push(principal);
   if (e.observacao && e.observacao.trim()) blocos.push(`📝 ${esc(e.observacao.trim())}`);
   if (e.link && e.link.trim()) {
@@ -60,8 +64,9 @@ interface SendPayload {
   gifFileId?: string | null;     // file_id do GIF de atenção (reuso)
   texto: string;
   entradas: Entrada[];
-  calc?: { printDataUrl?: string | null; link?: string } | null;
+  calc?: { printDataUrl?: string | null; printUrl?: string | null; link?: string } | null;
   fechamento?: string;           // default "🦈 ✅"
+  draftId?: string | null;       // rascunho aprovado a "consumir" (claim-then-send, evita reenvio)
 }
 
 // dataURL "data:image/png;base64,XXXX" → { bytes, mime }
@@ -105,6 +110,30 @@ async function tgSendPhoto(token: string, chatId: string | number, dataUrl: stri
   return data;
 }
 
+// Envia foto a partir de uma URL pública (Telegram baixa direto). Usado no
+// fluxo de revisão, onde as imagens já estão no Storage.
+async function tgSendPhotoUrl(token: string, chatId: string | number, url: string, caption?: string) {
+  return tgCall(token, "sendPhoto", {
+    chat_id: chatId,
+    photo: url,
+    ...(caption ? { caption, parse_mode: "HTML" } : {}),
+  });
+}
+
+// Envia a foto de uma entrada/calc escolhendo a melhor fonte disponível:
+// URL pública (Storage) se houver, senão o dataURL base64. Retorna true se
+// alguma foto foi enviada.
+async function tgSendEntryPhoto(
+  token: string,
+  chatId: string | number,
+  src: { printUrl?: string | null; printDataUrl?: string | null },
+  caption?: string,
+): Promise<boolean> {
+  if (src.printUrl) { await tgSendPhotoUrl(token, chatId, src.printUrl, caption); return true; }
+  if (src.printDataUrl) { await tgSendPhoto(token, chatId, src.printDataUrl, caption); return true; }
+  return false;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "method not allowed" }, { status: 405 });
@@ -126,9 +155,37 @@ serve(async (req) => {
     return json({ error: "body inválido" }, { status: 400 });
   }
 
-  const { chatId, gifFileId, texto, entradas = [], calc, fechamento } = payload;
+  const { chatId, gifFileId, texto, entradas = [], calc, fechamento, draftId } = payload;
   if (!chatId) return json({ error: "chatId obrigatório" }, { status: 400 });
   if (!texto?.trim()) return json({ error: "texto obrigatório" }, { status: 400 });
+
+  // CLAIM-THEN-SEND: se este envio é de um rascunho aprovado, "consome" o
+  // rascunho ANTES de disparar — marca status=enviado de forma atômica só se
+  // ele ainda estiver 'aprovado'. Se 0 linhas mudarem, é porque já foi enviado
+  // (ou não está aprovado): abortamos pra não duplicar a sequência no grupo.
+  if (draftId) {
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!SUPABASE_URL || !SERVICE_ROLE) {
+      log("config_error", { missing: "SUPABASE creds (claim)" });
+      return json({ error: "config do servidor incompleta" }, { status: 500 });
+    }
+    const supa = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
+    const { data: claimed, error: claimErr } = await supa
+      .from("procedure_drafts")
+      .update({ status: "enviado", sent_at: new Date().toISOString() })
+      .eq("id", draftId)
+      .eq("status", "aprovado")
+      .select("id");
+    if (claimErr) {
+      log("claim_error", { draftId, error: claimErr.message });
+      return json({ ok: false, error: `falha ao reservar o rascunho: ${claimErr.message}` }, { status: 500 });
+    }
+    if (!claimed || claimed.length === 0) {
+      log("claim_noop", { draftId });
+      return json({ ok: false, error: "rascunho já foi enviado ou não está aprovado", alreadySent: true }, { status: 409 });
+    }
+  }
 
   const sent: string[] = [];
   try {
@@ -146,9 +203,8 @@ serve(async (req) => {
     for (let i = 0; i < entradas.length; i++) {
       const e = entradas[i];
       const caption = montarLegenda(e);
-      if (e.printDataUrl) {
-        await tgSendPhoto(token, chatId, e.printDataUrl, caption);
-      } else if (caption) {
+      const sentPhoto = await tgSendEntryPhoto(token, chatId, e, caption);
+      if (!sentPhoto && caption) {
         await tgCall(token, "sendMessage", { chat_id: chatId, text: caption, parse_mode: "HTML" });
       }
       sent.push(`entrada_${i + 1}`);
@@ -162,9 +218,8 @@ serve(async (req) => {
     // 4) Calculadora
     if (calc) {
       const capCalc = calc.link ? `🧮 <b>CALCULADORA</b>\n🔗 ${calc.link}` : `🧮 <b>CALCULADORA</b>`;
-      if (calc.printDataUrl) {
-        await tgSendPhoto(token, chatId, calc.printDataUrl, capCalc);
-      } else if (calc.link) {
+      const sentCalcPhoto = await tgSendEntryPhoto(token, chatId, calc, capCalc);
+      if (!sentCalcPhoto && calc.link) {
         await tgCall(token, "sendMessage", { chat_id: chatId, text: capCalc, parse_mode: "HTML" });
       }
       sent.push("calc");
