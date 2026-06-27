@@ -39,7 +39,7 @@ const GIF_ATENCAO_FILE_ID = 'CgACAgEAAyEGAASC9WtMAAECOFxqO0vU1puA5-mv9Tkkvb8bNqb
 import {
   Send, Plus, Trash2, Film, Calculator,
   CheckCircle2, FileText, Ticket, Loader2, ClipboardCheck, Clock, XCircle, Ban, Pencil,
-  RotateCcw, Trash2 as TrashIcon,
+  RotateCcw, Trash2 as TrashIcon, Megaphone, ChevronUp, ChevronDown,
 } from 'lucide-react';
 
 // ── Tipos da sequência ───────────────────────────────────────────────────
@@ -51,14 +51,51 @@ interface Entrada {
   link: string;         // link da partida (vai escondido no texto "LINK DA PARTIDA")
   observacao: string;   // observação opcional da entrada
   freebet: boolean;     // marca a entrada como aposta grátis (sai "🎟️ FREEBET" na legenda)
+  lay: boolean;         // entrada LAY (contra) — abre o campo responsabilidade
+  responsabilidade: string; // valor exposto na lay (ex: "15,00")
   printDataUrl: string | null; // preview do print (já com marca d'água)
   printName: string | null;
 }
 
 let _seq = 0;
 const novaEntrada = (): Entrada => ({
-  id: `e${++_seq}`, casa: '', odd: '', aposte: '', link: '', observacao: '', freebet: false, printDataUrl: null, printName: null,
+  id: `e${++_seq}`, casa: '', odd: '', aposte: '', link: '', observacao: '', freebet: false, lay: false, responsabilidade: '', printDataUrl: null, printName: null,
 });
+
+// Promoção (só nos templates temPromocao) — imagem + descrição + link, com
+// linha de chamada editável. Vai entre o texto e as entradas no Telegram.
+const PROMO_CHAMADA_DEFAULT = 'PARTICIPE DA PROMOÇÃO ✅';
+const MAX_PROMOCOES = 3;
+const TG_CAPTION_LIMIT = 1024; // limite de legenda de foto do Telegram
+interface Promocao {
+  id: string;
+  descricao: string;
+  link: string;
+  chamada: string;
+  printDataUrl: string | null; // imagem já com marca d'água
+  printName: string | null;
+}
+const novaPromocao = (): Promocao => ({
+  id: `p${++_seq}`, descricao: '', link: '', chamada: PROMO_CHAMADA_DEFAULT, printDataUrl: null, printName: null,
+});
+
+// Converte um valor BR ("1.234,56" / "6,50" / "50") em número. Vazio/ inválido = 0.
+function parseValorBR(v: string): number {
+  const s = (v ?? '').trim();
+  if (!s) return 0;
+  const n = parseFloat(s.replace(/\./g, '').replace(',', '.'));
+  return isNaN(n) ? 0 : n;
+}
+// Formata número em BR com 2 casas ("205" → "205,00").
+function fmtValorBR(n: number): string {
+  return n.toFixed(2).replace('.', ',');
+}
+// Soma o investimento das entradas: APOSTE (back) + RESPONSABILIDADE (lay).
+// Ignora valores vazios. Retorna '' se a soma der 0 (nenhum valor preenchido).
+function somaInvestimento(entradas: Entrada[]): string {
+  const total = entradas.reduce((acc, e) => acc + parseValorBR(e.lay ? e.responsabilidade : e.aposte), 0);
+  return total > 0 ? fmtValorBR(total) : '';
+}
 
 export default function EnvioProcedimentos() {
   // 1) Texto do procedimento — gerado pelos templates existentes (reusados da
@@ -80,6 +117,7 @@ export default function EnvioProcedimentos() {
     setCampos(init);
     setEventoData({});
     setTextoManual(null); // volta a gerar pelo template
+    setPromocoes([]);     // promoções são por-procedimento; zera ao trocar template
   }, [template]);
 
   // Campos enriquecidos: injeta evento1/evento1_data/evento1_hora a partir do
@@ -118,8 +156,34 @@ export default function EnvioProcedimentos() {
     return template.fields.filter((f) => !f.showIf || f.showIf(campos));
   }, [template, campos]);
 
+  // Promoções (só nos templates temPromocao). Ficam entre o texto e as entradas.
+  const [promocoes, setPromocoes] = useState<Promocao[]>([]);
+  const temPromocao = !!template?.temPromocao;
+  const addPromocao = () => setPromocoes((p) => (p.length >= MAX_PROMOCOES ? p : [...p, novaPromocao()]));
+  const removePromocao = (id: string) => setPromocoes((p) => p.filter((x) => x.id !== id));
+  const updatePromocao = (id: string, patch: Partial<Promocao>) =>
+    setPromocoes((p) => p.map((x) => (x.id === id ? { ...x, ...patch } : x)));
+  const movePromocao = (id: string, dir: -1 | 1) =>
+    setPromocoes((p) => {
+      const i = p.findIndex((x) => x.id === id);
+      const j = i + dir;
+      if (i < 0 || j < 0 || j >= p.length) return p;
+      const cp = [...p];
+      [cp[i], cp[j]] = [cp[j], cp[i]];
+      return cp;
+    });
+
   // 2) Entradas dinâmicas (1..N)
   const [entradas, setEntradas] = useState<Entrada[]>([novaEntrada()]);
+
+  // Auto-preenche "Investimento Total" no template com a soma das entradas
+  // (APOSTE das back + RESPONSABILIDADE das lay). Só atualiza quando o total
+  // muda — e aí volta pro texto gerado pra refletir o novo valor.
+  const totalInvestimento = useMemo(() => somaInvestimento(entradas), [entradas]);
+  useEffect(() => {
+    setCampos((p) => (p.investimento === totalInvestimento ? p : { ...p, investimento: totalInvestimento }));
+    setTextoManual(null);
+  }, [totalInvestimento]);
 
   // Casas cadastradas pro autocomplete: bookmakers + plataformas já usadas em
   // procedimentos, normalizado em UPPERCASE e deduplicado (igual Templates Bot).
@@ -208,16 +272,57 @@ export default function EnvioProcedimentos() {
     setCalcPrint({ dataUrl, name: file.name });
   };
 
+  // Imagem de uma promoção (com marca d'água).
+  const onPromoPrint = async (id: string, file: File | null) => {
+    if (!file) return;
+    const dataUrl = await aplicarMarcaDagua(file);
+    updatePromocao(id, { printDataUrl: dataUrl, printName: file.name });
+  };
+
+  // Colar/soltar VÁRIAS imagens de uma vez na seção de promoções: cada imagem
+  // preenche o primeiro card vazio ou cria um card novo (até MAX_PROMOCOES).
+  const onPromoMultiFiles = async (files: File[]) => {
+    const imgs = files.filter((f) => f.type.startsWith('image/'));
+    if (!imgs.length) return;
+    for (const file of imgs) {
+      const dataUrl = await aplicarMarcaDagua(file);
+      setPromocoes((prev) => {
+        if (prev.length >= MAX_PROMOCOES && prev.every((p) => p.printDataUrl)) return prev;
+        const idxVazio = prev.findIndex((p) => !p.printDataUrl);
+        if (idxVazio >= 0) {
+          const cp = [...prev];
+          cp[idxVazio] = { ...cp[idxVazio], printDataUrl: dataUrl, printName: file.name };
+          return cp;
+        }
+        if (prev.length >= MAX_PROMOCOES) return prev;
+        return [...prev, { ...novaPromocao(), printDataUrl: dataUrl, printName: file.name }];
+      });
+    }
+  };
+
+  // Promoções "preenchidas" (têm algum conteúdo) — só essas vão pro envio.
+  const promocoesValidas = useMemo(
+    () => promocoes.filter((p) => p.printDataUrl || p.link.trim() || p.descricao.trim()),
+    [promocoes],
+  );
+  // Uma promoção iniciada precisa ter imagem OU link (não só descrição solta).
+  const promocoesOk = useMemo(
+    () => promocoesValidas.every((p) => p.printDataUrl || p.link.trim()),
+    [promocoesValidas],
+  );
+
   // Validação mínima pra "disparar"
   const podeEnviar = useMemo(() => {
     if (!texto.trim()) return false;
     if (entradas.length === 0) return false;
+    if (!promocoesOk) return false;
     return entradas.every((e) => e.casa.trim() && e.odd.trim() && e.aposte.trim());
-  }, [texto, entradas]);
+  }, [texto, entradas, promocoesOk]);
 
   // Limpa o formulário após salvar um rascunho com sucesso.
   const resetForm = () => {
     setEntradas([novaEntrada()]);
+    setPromocoes([]);
     setCalcPrint(null);
     setCalcLink('');
     setCalcObs(CALC_OBS_DEFAULT);
@@ -263,6 +368,7 @@ export default function EnvioProcedimentos() {
           id: `e${++_seq}`,
           casa: e.casa ?? '', odd: e.odd ?? '', aposte: e.aposte ?? '',
           link: e.link ?? '', observacao: e.observacao ?? '', freebet: !!e.freebet,
+          lay: !!e.lay, responsabilidade: e.responsabilidade ?? '',
           printDataUrl: dataUrl, printName: dataUrl ? 'rascunho.png' : null,
         });
       }
@@ -278,6 +384,23 @@ export default function EnvioProcedimentos() {
         setCalcPrint(null);
         setCalcLink('');
         setCalcObs(CALC_OBS_DEFAULT);
+      }
+
+      // Promoções (reidrata as imagens do Storage).
+      if (Array.isArray(d.promocoes) && d.promocoes.length) {
+        const novasP: Promocao[] = [];
+        for (const p of d.promocoes) {
+          const img = await urlToDataUrl(draftImageUrl(p.image_path));
+          novasP.push({
+            id: `p${++_seq}`,
+            descricao: p.descricao ?? '', link: p.link ?? '',
+            chamada: p.chamada || PROMO_CHAMADA_DEFAULT,
+            printDataUrl: img, printName: img ? 'promo.png' : null,
+          });
+        }
+        setPromocoes(novasP);
+      } else {
+        setPromocoes([]);
       }
 
       // Texto: entra como manual pra preservar exatamente o que foi montado.
@@ -312,9 +435,13 @@ export default function EnvioProcedimentos() {
         texto,
         entradas: entradas.map((e) => ({
           casa: e.casa, odd: e.odd, aposte: e.aposte, link: e.link,
-          observacao: e.observacao, freebet: e.freebet, printDataUrl: e.printDataUrl,
+          observacao: e.observacao, freebet: e.freebet,
+          lay: e.lay, responsabilidade: e.responsabilidade, printDataUrl: e.printDataUrl,
         })),
         calc: (calcPrint || calcLink) ? { printDataUrl: calcPrint?.dataUrl ?? null, link: calcLink, obs: calcObs } : null,
+        promocoes: temPromocao ? promocoesValidas.map((p) => ({
+          descricao: p.descricao, link: p.link, chamada: p.chamada, printDataUrl: p.printDataUrl,
+        })) : [],
         createdByEmail: user?.email ?? null,
         createdById: user?.id ?? null,
       };
@@ -351,11 +478,16 @@ export default function EnvioProcedimentos() {
           entradas: d.entradas.map((e) => ({
             casa: e.casa, odd: e.odd, aposte: e.aposte, link: e.link,
             observacao: e.observacao, freebet: e.freebet,
+            lay: e.lay, responsabilidade: e.responsabilidade,
             printUrl: draftImageUrl(e.image_path),
           })),
           calc: d.calc && (d.calc.image_path || d.calc.link)
             ? { printUrl: draftImageUrl(d.calc.image_path), link: d.calc.link, obs: d.calc.obs ?? '' }
             : null,
+          promocoes: (d.promocoes ?? []).map((p) => ({
+            descricao: p.descricao, link: p.link, chamada: p.chamada,
+            printUrl: draftImageUrl(p.image_path),
+          })),
         },
       });
       if (error) throw error;
@@ -429,10 +561,13 @@ export default function EnvioProcedimentos() {
                 ))}
               </select>
 
-              {/* Campos do template */}
+              {/* Campos do template. Campos de largura cheia (toggle/evento/
+                  freebet_select) forçam col-start-1 pra não deixarem o grid
+                  reordenar visualmente os campos de 1 coluna (mantém a ordem
+                  do template: toggles no topo, partidas extras embaixo). */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
                 {camposVisiveis.map((f) => (
-                  <div key={f.id} className={cn((f.type === 'toggle' || f.type === 'evento' || f.type === 'freebet_select') && 'sm:col-span-2')}>
+                  <div key={f.id} className={cn((f.type === 'toggle' || f.type === 'evento' || f.type === 'freebet_select') && 'sm:col-span-2 sm:col-start-1')}>
                     {f.type === 'toggle' ? (
                       <label className="flex items-center justify-between gap-2 h-9 px-2.5 border border-border rounded bg-card cursor-pointer">
                         <span className="text-xs text-foreground/90">{f.label}</span>
@@ -502,6 +637,102 @@ export default function EnvioProcedimentos() {
               )}
             </section>
 
+            {/* Promoções — só nos templates de promoção. Vão entre o texto e
+                as entradas no Telegram (imagem + descrição + link). */}
+            {temPromocao && (
+              <section className="panel-bracket p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="telemetry-label text-primary flex items-center gap-1.5">
+                    <Megaphone className="w-3 h-3" /> [ PROMOÇÕES ({promocoes.length}) ]
+                  </p>
+                  <Button size="sm" variant="outline" onClick={addPromocao}
+                    disabled={promocoes.length >= MAX_PROMOCOES}
+                    className="h-7 gap-1 text-xs">
+                    <Plus className="w-3.5 h-3.5" /> Adicionar promoção
+                  </Button>
+                </div>
+
+                {promocoes.length === 0 ? (
+                  <PasteImageZone
+                    previewUrl={null}
+                    onFile={(file) => onPromoMultiFiles([file])}
+                    onFiles={onPromoMultiFiles}
+                    onClear={() => {}}
+                    label="Cole o(s) print(s) da promoção (Ctrl+V) — pode colar vários de uma vez"
+                  />
+                ) : (
+                  <div className="space-y-3">
+                    {promocoes.map((p, idx) => {
+                      const len = p.descricao.length;
+                      const acimaLimite = (p.descricao.trim().length + (p.chamada?.length ?? 0) + (p.link ? 30 : 0)) > TG_CAPTION_LIMIT;
+                      const incompleta = !p.printDataUrl && !p.link.trim();
+                      return (
+                        <div key={p.id} className="border border-border rounded-lg p-3 bg-card space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="telemetry-label text-muted-foreground">PROMOÇÃO {idx + 1}</span>
+                            <div className="flex items-center gap-1.5">
+                              <button onClick={() => movePromocao(p.id, -1)} disabled={idx === 0}
+                                className="text-muted-foreground/60 hover:text-foreground disabled:opacity-30" title="Subir">
+                                <ChevronUp className="w-3.5 h-3.5" />
+                              </button>
+                              <button onClick={() => movePromocao(p.id, 1)} disabled={idx === promocoes.length - 1}
+                                className="text-muted-foreground/60 hover:text-foreground disabled:opacity-30" title="Descer">
+                                <ChevronDown className="w-3.5 h-3.5" />
+                              </button>
+                              <button onClick={() => removePromocao(p.id)}
+                                className="text-muted-foreground/60 hover:text-destructive" title="Remover">
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                          {/* Imagem */}
+                          <PasteImageZone
+                            previewUrl={p.printDataUrl}
+                            onFile={(file) => onPromoPrint(p.id, file)}
+                            onClear={() => updatePromocao(p.id, { printDataUrl: null, printName: null })}
+                            onZoom={setZoomUrl}
+                            label="Cole o print da promoção (Ctrl+V), arraste ou selecione"
+                          />
+                          {/* Descrição (pode ser grande) */}
+                          <div>
+                            <Textarea value={p.descricao}
+                              onChange={(ev) => updatePromocao(p.id, { descricao: ev.target.value.toUpperCase() })}
+                              placeholder="DESCRIÇÃO DA PROMOÇÃO (OPCIONAL)"
+                              className="min-h-[60px] text-sm uppercase" />
+                            <p className={cn('text-[9px] mt-0.5 text-right', acimaLimite ? 'text-amber-400' : 'text-muted-foreground/50')}>
+                              {len} caracteres{acimaLimite && ' — descrição grande: irá em mensagem separada da imagem'}
+                            </p>
+                          </div>
+                          {/* Link */}
+                          <Input value={p.link} onChange={(ev) => updatePromocao(p.id, { link: ev.target.value })}
+                            placeholder="Link da promoção (fica escondido em 'LINK DA PROMOÇÃO')" className="text-sm" />
+                          {/* Chamada editável */}
+                          <div>
+                            <label className="block text-[10px] text-muted-foreground/70 mb-0.5">Linha de chamada</label>
+                            <Input value={p.chamada}
+                              onChange={(ev) => updatePromocao(p.id, { chamada: ev.target.value.toUpperCase() })}
+                              placeholder={PROMO_CHAMADA_DEFAULT} className="text-sm uppercase" />
+                          </div>
+                          {/* Preview + aviso de incompleta */}
+                          {incompleta ? (
+                            <p className="text-[10px] text-amber-400/90">⚠ Adicione uma imagem ou um link pra esta promoção entrar no envio.</p>
+                          ) : (
+                            <div className="text-[11px] text-muted-foreground/70 border border-border/60 rounded p-2 bg-background/50 space-y-1">
+                              <p className="text-[9px] text-muted-foreground/50">Sairá no Telegram:</p>
+                              {p.printDataUrl && <p>🖼️ imagem (com marca d'água)</p>}
+                              {p.descricao.trim() && <p className="whitespace-pre-wrap">{p.descricao.trim()}</p>}
+                              <p>{p.chamada.trim() || PROMO_CHAMADA_DEFAULT}</p>
+                              {p.link.trim() && <p>🔗 <span className="text-sky-400 underline">LINK DA PROMOÇÃO</span> 👆</p>}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+            )}
+
             {/* Entradas */}
             <section className="panel-bracket p-4">
               <div className="flex items-center justify-between mb-3">
@@ -524,7 +755,9 @@ export default function EnvioProcedimentos() {
                         </button>
                       )}
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {/* Casa/Odd/Aposte — e Responsabilidade ao lado quando LAY.
+                        3 colunas normalmente, 4 quando a entrada é lay. */}
+                    <div className={cn('grid grid-cols-1 gap-2', e.lay ? 'sm:grid-cols-4' : 'sm:grid-cols-3')}>
                       <Input value={e.casa} onChange={(ev) => updateEntrada(e.id, { casa: ev.target.value.toUpperCase() })}
                         placeholder="CASA" className="text-sm uppercase"
                         list="envio-casas-datalist" autoComplete="off" />
@@ -532,26 +765,41 @@ export default function EnvioProcedimentos() {
                         placeholder="ODD (ex: 45.00)" className="text-sm" />
                       <Input value={e.aposte} onChange={(ev) => updateEntrada(e.id, { aposte: ev.target.value })}
                         placeholder="APOSTE (ex: 6,50)" className="text-sm" />
+                      {e.lay && (
+                        <Input value={e.responsabilidade}
+                          onChange={(ev) => updateEntrada(e.id, { responsabilidade: ev.target.value })}
+                          placeholder="RESP. (ex: 15,00)" className="text-sm" />
+                      )}
                     </div>
                     <Input value={e.link} onChange={(ev) => updateEntrada(e.id, { link: ev.target.value })}
                       placeholder="Link da partida (fica escondido em 'LINK DA PARTIDA')" className="text-sm" />
                     <Input value={e.observacao} onChange={(ev) => updateEntrada(e.id, { observacao: ev.target.value.toUpperCase() })}
                       placeholder="OBSERVAÇÃO (OPCIONAL)" className="text-sm uppercase" />
-                    {/* Toggle: marca a entrada como aposta grátis (freebet). Quando
-                        ligado, sai "🎟️ FREEBET" no fim da linha principal da legenda. */}
-                    <label className="flex items-center justify-between gap-2 h-9 px-2.5 border border-border rounded bg-background cursor-pointer">
-                      <span className="text-xs text-foreground/90 flex items-center gap-1.5">
-                        <Ticket className="w-3.5 h-3.5 text-primary/70" /> Aposta grátis (freebet)
-                      </span>
-                      <Switch
-                        checked={e.freebet}
-                        onCheckedChange={(c) => updateEntrada(e.id, { freebet: c })}
-                      />
-                    </label>
+                    {/* Toggles: aposta grátis (freebet) e LAY (contra). */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <label className="flex items-center justify-between gap-2 h-9 px-2.5 border border-border rounded bg-background cursor-pointer">
+                        <span className="text-xs text-foreground/90 flex items-center gap-1.5">
+                          <Ticket className="w-3.5 h-3.5 text-primary/70" /> Aposta grátis (freebet)
+                        </span>
+                        <Switch
+                          checked={e.freebet}
+                          onCheckedChange={(c) => updateEntrada(e.id, { freebet: c })}
+                        />
+                      </label>
+                      <label className="flex items-center justify-between gap-2 h-9 px-2.5 border border-border rounded bg-background cursor-pointer">
+                        <span className="text-xs text-foreground/90 flex items-center gap-1.5">
+                          <Ticket className="w-3.5 h-3.5 text-amber-400/80" /> Lay (contra)
+                        </span>
+                        <Switch
+                          checked={e.lay}
+                          onCheckedChange={(c) => updateEntrada(e.id, { lay: c })}
+                        />
+                      </label>
+                    </div>
                     {/* Preview da legenda que vai pro Telegram */}
                     {(e.casa || e.odd || e.aposte) && (
                       <p className="text-[11px] text-muted-foreground/70">
-                        Sairá: <span className="text-foreground/90">{e.casa || 'Casa'} - <u>ODD {e.odd || '—'}</u> - APOSTE <u>{e.aposte || '—'}</u>{e.freebet && ' - 🎟️ FREEBET'}</span>
+                        Sairá: <span className="text-foreground/90">{e.casa || 'Casa'} - <u>{e.lay ? 'LAY ' : ''}ODD {e.odd || '—'}</u> - APOSTE <u>{e.aposte || '—'}</u>{e.lay && <> - RESP. <u>{e.responsabilidade || '—'}</u></>}{e.freebet && ' - 🎟️ FREEBET'}</span>
                       </p>
                     )}
                     {/* Print da entrada — colar (Ctrl+V), arrastar ou selecionar.

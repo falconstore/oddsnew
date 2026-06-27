@@ -12,7 +12,7 @@ import {
 } from '@/hooks/useProcedureDrafts';
 import {
   ClipboardCheck, CheckCircle2, XCircle, Clock, Send as SendIcon,
-  Ticket, Calculator, ZoomIn, Loader2, User, FileText, Ban,
+  Ticket, Calculator, ZoomIn, Loader2, User, FileText, Ban, Megaphone,
 } from 'lucide-react';
 
 const fmt = (iso: string | null) => {
@@ -186,6 +186,39 @@ function DraftCard({
         </pre>
       </div>
 
+      {/* Promoções (entre o texto e as entradas) */}
+      {Array.isArray(d.promocoes) && d.promocoes.length > 0 && (
+        <div>
+          <p className="telemetry-label text-muted-foreground flex items-center gap-1.5 mb-1">
+            <Megaphone className="w-3 h-3" /> PROMOÇÕES ({d.promocoes.length})
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {d.promocoes.map((p, i) => {
+              const url = draftImageUrl(p.image_path);
+              return (
+                <div key={i} className="border border-border rounded p-2.5 bg-card flex gap-3">
+                  <div className="flex-1 min-w-0 space-y-1">
+                    {p.descricao && <p className="text-[10px] text-foreground/80 whitespace-pre-wrap">{p.descricao.toUpperCase()}</p>}
+                    <p className="text-[10px] text-primary/80">{(p.chamada || 'PARTICIPE DA PROMOÇÃO ✅').toUpperCase()}</p>
+                    {p.link && <p className="text-[10px] text-sky-400 truncate">🔗 LINK DA PROMOÇÃO 👆</p>}
+                  </div>
+                  {url ? (
+                    <button onClick={() => onZoom(url)} className="relative group flex-shrink-0" title="Ampliar">
+                      <img src={url} alt="" className="h-16 w-16 object-cover rounded border border-border" />
+                      <span className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/40 rounded transition-colors">
+                        <ZoomIn className="w-4 h-4 text-white opacity-0 group-hover:opacity-100" />
+                      </span>
+                    </button>
+                  ) : (
+                    <div className="h-16 w-16 flex-shrink-0 rounded border border-dashed border-border flex items-center justify-center text-[9px] text-muted-foreground/40 text-center">sem img</div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Entradas */}
       <div>
         <p className="telemetry-label text-muted-foreground flex items-center gap-1.5 mb-1">
@@ -198,7 +231,8 @@ function DraftCard({
               <div key={i} className="border border-border rounded p-2.5 bg-card flex gap-3">
                 <div className="flex-1 min-w-0 space-y-1">
                   <p className="text-[11px] text-foreground/90 font-medium">
-                    {(e.casa || 'CASA').toUpperCase()} · <span className="text-primary/80">ODD {e.odd || '—'}</span> · APOSTE {e.aposte || '—'}
+                    {(e.casa || 'CASA').toUpperCase()} · <span className="text-primary/80">{e.lay ? 'LAY ' : ''}ODD {e.odd || '—'}</span> · APOSTE {e.aposte || '—'}
+                    {e.lay && e.responsabilidade && <span className="ml-1 text-amber-400/90">· RESP. {e.responsabilidade}</span>}
                     {e.freebet && <span className="ml-1 text-amber-400">🎟️ FREEBET</span>}
                   </p>
                   {e.observacao && <p className="text-[10px] text-muted-foreground/70 truncate">📝 {e.observacao.toUpperCase()}</p>}

@@ -26,6 +26,8 @@ interface Entrada {
   link: string;         // URL da partida (vai escondida em "LINK DA PARTIDA")
   observacao?: string;
   freebet?: boolean;    // entrada é aposta grátis → "🎟️ FREEBET" na legenda
+  lay?: boolean;            // entrada LAY (contra) → "LAY ODD" + responsabilidade
+  responsabilidade?: string; // valor exposto na lay
   printDataUrl?: string | null; // dataURL (base64) já com marca d'água
   printUrl?: string | null;     // URL pública da imagem (fluxo de revisão; alternativa ao dataURL)
 }
@@ -46,9 +48,12 @@ function montarLegenda(e: Entrada): string {
   const casa = esc(e.casa).trim().toUpperCase();   // casa sempre MAIÚSCULA
   const odd = esc(e.odd).trim();
   const aposte = esc(e.aposte).trim();
+  const resp = esc(e.responsabilidade ?? "").trim();
   let principal = casa;
-  if (odd) principal += ` - <b><u>ODD ${odd}</u></b>`;
+  // LAY: "LAY ODD X" + responsabilidade. BACK: "ODD X".
+  if (odd) principal += ` - <b><u>${e.lay ? "LAY " : ""}ODD ${odd}</u></b>`;
   if (aposte) principal += ` - <b><u>APOSTE ${aposte}</u></b>`;
+  if (e.lay && resp) principal += ` - <b><u>RESP. ${resp}</u></b>`;
   if (e.freebet) principal += ` - 🎟️ <b>FREEBET</b>`;
   blocos.push(principal);
   if (e.observacao && e.observacao.trim()) blocos.push(`📝 ${esc(e.observacao.trim().toUpperCase())}`);
@@ -75,6 +80,24 @@ function montarLegendaCalc(calc: { link?: string; obs?: string }): string {
   return blocos.join("\n\n");
 }
 
+// Legenda de uma promoção (vai na foto):
+//   <DESCRIÇÃO>
+//   (linha em branco)
+//   <CHAMADA> (ex: "PARTICIPE DA PROMOÇÃO ✅")
+//   (linha em branco)
+//   🔗 LINK DA PROMOÇÃO 👆
+const PROMO_CHAMADA_DEFAULT = "PARTICIPE DA PROMOÇÃO ✅";
+function montarLegendaPromo(p: Promocao): string {
+  const blocos: string[] = [];
+  const desc = (p.descricao ?? "").trim();
+  if (desc) blocos.push(esc(desc.toUpperCase()));
+  const chamada = ((p.chamada ?? "").trim() || PROMO_CHAMADA_DEFAULT).toUpperCase();
+  blocos.push(esc(chamada));
+  const link = (p.link ?? "").trim();
+  if (link) blocos.push(`🔗 <a href="${esc(link)}">LINK DA PROMOÇÃO</a> 👆`);
+  return blocos.join("\n\n");
+}
+
 interface SendPayload {
   action?: "send" | "delete"; // default "send"
   chatId: string | number;
@@ -82,8 +105,17 @@ interface SendPayload {
   texto: string;
   entradas: Entrada[];
   calc?: { printDataUrl?: string | null; printUrl?: string | null; link?: string; obs?: string } | null;
+  promocoes?: Promocao[];        // promoções (imagem + descrição + link) entre o texto e as entradas
   fechamento?: string;           // default "🦈 ✅"
   draftId?: string | null;       // rascunho aprovado a "consumir" (claim-then-send, evita reenvio)
+}
+
+interface Promocao {
+  descricao?: string;
+  link?: string;
+  chamada?: string;
+  printDataUrl?: string | null;
+  printUrl?: string | null;
 }
 
 // dataURL "data:image/png;base64,XXXX" → { bytes, mime }
@@ -222,7 +254,7 @@ serve(async (req) => {
     return json({ ok: true, apagadas, total: ids.length, falhas });
   }
 
-  const { chatId, gifFileId, texto, entradas = [], calc, fechamento, draftId } = payload;
+  const { chatId, gifFileId, texto, entradas = [], calc, fechamento, draftId, promocoes = [] } = payload;
   if (!chatId) return json({ error: "chatId obrigatório" }, { status: 400 });
   if (!texto?.trim()) return json({ error: "texto obrigatório" }, { status: 400 });
 
@@ -267,14 +299,50 @@ serve(async (req) => {
       sent.push("gif");
     }
 
+    // Separador 🦈🔥 entre os blocos da sequência (texto → promoções →
+    // entradas → calculadora). Disparado ANTES de cada bloco a partir do 2º.
+    let jaTeveBloco = false;
+    const sep = async () => {
+      if (jaTeveBloco) {
+        collect(await tgCall(token, "sendMessage", { chat_id: chatId, text: "🦈🔥" }));
+        sent.push("sep");
+      }
+    };
+
     // 2) Texto do procedimento — sempre em MAIÚSCULA (padrão Shark).
     collect(await tgCall(token, "sendMessage", { chat_id: chatId, text: (texto ?? "").toUpperCase() }));
     sent.push("texto");
+    jaTeveBloco = true;
 
-    // 3) Entradas — foto (se houver) com legenda; separador 🦈🔥 entre elas.
+    // 2.5) Promoções — entre o texto e as entradas. Imagem com legenda
+    //      (descrição + chamada + link). Se a legenda passar do limite do
+    //      Telegram (1024), manda a imagem sem legenda + o texto separado.
+    const TG_CAPTION_LIMIT = 1024;
+    for (let i = 0; i < promocoes.length; i++) {
+      const p = promocoes[i];
+      const legenda = montarLegendaPromo(p);
+      const temImagem = !!(p.printUrl || p.printDataUrl);
+      await sep();
+      if (temImagem) {
+        if (legenda.length <= TG_CAPTION_LIMIT) {
+          collect(await tgSendEntryPhoto(token, chatId, p, legenda));
+        } else {
+          // Legenda grande: imagem sem caption + texto numa mensagem à parte.
+          collect(await tgSendEntryPhoto(token, chatId, p, undefined));
+          collect(await tgCall(token, "sendMessage", { chat_id: chatId, text: legenda, parse_mode: "HTML" }));
+        }
+      } else if (legenda) {
+        // Sem imagem: só o texto (descrição + chamada + link).
+        collect(await tgCall(token, "sendMessage", { chat_id: chatId, text: legenda, parse_mode: "HTML" }));
+      }
+      sent.push(`promo_${i + 1}`);
+    }
+
+    // 3) Entradas — foto (se houver) com legenda; separador 🦈🔥 antes de cada.
     for (let i = 0; i < entradas.length; i++) {
       const e = entradas[i];
       const caption = montarLegenda(e);
+      await sep();
       const photoData = await tgSendEntryPhoto(token, chatId, e, caption);
       if (photoData) {
         collect(photoData);
@@ -282,15 +350,11 @@ serve(async (req) => {
         collect(await tgCall(token, "sendMessage", { chat_id: chatId, text: caption, parse_mode: "HTML" }));
       }
       sent.push(`entrada_${i + 1}`);
-      // Separador entre entradas (não após a última — depois vem a calc/fecho).
-      if (i < entradas.length - 1) {
-        collect(await tgCall(token, "sendMessage", { chat_id: chatId, text: "🦈🔥" }));
-        sent.push(`sep_${i + 1}`);
-      }
     }
 
     // 4) Calculadora — padrão: "🔗 LINK DA CALCULADORA 👆" + frase de orientação.
     if (calc) {
+      await sep();
       const capCalc = montarLegendaCalc(calc);
       const calcData = await tgSendEntryPhoto(token, chatId, calc, capCalc);
       if (calcData) {

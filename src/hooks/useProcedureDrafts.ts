@@ -20,6 +20,8 @@ export interface DraftEntrada {
   link: string;
   observacao: string;
   freebet: boolean;
+  lay?: boolean;             // entrada LAY (contra)
+  responsabilidade?: string; // valor exposto na lay
   image_path: string | null; // path no bucket procedure-images (ou null)
 }
 
@@ -29,6 +31,13 @@ export interface DraftCalc {
   obs?: string;
 }
 
+export interface DraftPromocao {
+  image_path: string | null;
+  descricao: string;
+  link: string;
+  chamada: string;
+}
+
 export interface ProcedureDraft {
   id: string;
   status: DraftStatus;
@@ -36,6 +45,7 @@ export interface ProcedureDraft {
   texto: string;
   entradas: DraftEntrada[];
   calc: DraftCalc | null;
+  promocoes?: DraftPromocao[];
   created_by_email: string | null;
   created_by_id: string | null;
   reviewed_by_email: string | null;
@@ -102,9 +112,11 @@ interface CreateDraftInput {
   texto: string;
   entradas: Array<{
     casa: string; odd: string; aposte: string; link: string;
-    observacao: string; freebet: boolean; printDataUrl: string | null;
+    observacao: string; freebet: boolean; lay: boolean; responsabilidade: string;
+    printDataUrl: string | null;
   }>;
   calc: { printDataUrl: string | null; link: string; obs: string } | null;
+  promocoes?: Array<{ descricao: string; link: string; chamada: string; printDataUrl: string | null }>;
   createdByEmail: string | null;
   createdById: string | null;
 }

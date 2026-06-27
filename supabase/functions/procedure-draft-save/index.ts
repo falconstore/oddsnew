@@ -30,6 +30,8 @@ interface EntradaIn {
   link?: string;
   observacao?: string;
   freebet?: boolean;
+  lay?: boolean;
+  responsabilidade?: string;
   printDataUrl?: string | null; // base64 com marca d'água (vira image_path)
 }
 
@@ -67,7 +69,7 @@ serve(async (req) => {
 
   // Sobe as imagens (dataURL → bucket) e devolve { entradas, calc } com os
   // image_path. Reaproveitado por create e resubmit. upsert=true sobrescreve.
-  async function montarConteudo(draftId: string, entradasIn: EntradaIn[], calcIn: any) {
+  async function montarConteudo(draftId: string, entradasIn: EntradaIn[], calcIn: any, promocoesIn: any[] = []) {
     const entradas: any[] = [];
     for (let i = 0; i < entradasIn.length; i++) {
       const e = entradasIn[i];
@@ -84,7 +86,8 @@ serve(async (req) => {
       }
       entradas.push({
         casa: e.casa ?? "", odd: e.odd ?? "", aposte: e.aposte ?? "",
-        link: e.link ?? "", observacao: e.observacao ?? "", freebet: !!e.freebet, image_path,
+        link: e.link ?? "", observacao: e.observacao ?? "", freebet: !!e.freebet,
+        lay: !!e.lay, responsabilidade: e.responsabilidade ?? "", image_path,
       });
     }
     let calc: any = null;
@@ -102,7 +105,29 @@ serve(async (req) => {
       }
       calc = { image_path: calc_path, link: calcIn.link ?? "", obs: calcIn.obs ?? "" };
     }
-    return { entradas, calc };
+    // Promoções (até 3) — sobe imagem e guarda descricao/link/chamada.
+    const promocoes: any[] = [];
+    for (let i = 0; i < (promocoesIn?.length ?? 0); i++) {
+      const p = promocoesIn[i];
+      let promo_path: string | null = null;
+      if (p?.printDataUrl) {
+        const parsed = dataUrlToBytes(p.printDataUrl);
+        if (parsed) {
+          const path = `drafts/${draftId}/promo-${i + 1}.${parsed.ext}`;
+          const { error: upErr } = await supa.storage
+            .from(BUCKET).upload(path, parsed.bytes, { contentType: parsed.mime, upsert: true });
+          if (upErr) throw new Error(`upload promo ${i + 1}: ${upErr.message}`);
+          promo_path = path;
+        }
+      }
+      promocoes.push({
+        image_path: promo_path,
+        descricao: p?.descricao ?? "",
+        link: p?.link ?? "",
+        chamada: p?.chamada ?? "",
+      });
+    }
+    return { entradas, calc, promocoes };
   }
 
   try {
@@ -129,13 +154,13 @@ serve(async (req) => {
       if (insErr) throw new Error(`insert draft: ${insErr.message}`);
       const draftId = created.id as string;
 
-      // 2) Sobe imagens + monta entradas/calc finais.
-      const { entradas, calc } = await montarConteudo(draftId, entradasIn, body?.calc);
+      // 2) Sobe imagens + monta entradas/calc/promoções finais.
+      const { entradas, calc, promocoes } = await montarConteudo(draftId, entradasIn, body?.calc, body?.promocoes);
 
-      // 3) Atualiza o draft com as entradas + calc finais.
+      // 3) Atualiza o draft com as entradas + calc + promoções finais.
       const { error: updErr } = await supa
         .from("procedure_drafts")
-        .update({ entradas, calc })
+        .update({ entradas, calc, promocoes })
         .eq("id", draftId);
       if (updErr) throw new Error(`update draft: ${updErr.message}`);
 
@@ -152,7 +177,7 @@ serve(async (req) => {
       const entradasIn: EntradaIn[] = Array.isArray(body?.entradas) ? body.entradas : [];
 
       // Sobe as imagens (reusa a pasta do próprio draft, com upsert).
-      const { entradas, calc } = await montarConteudo(id, entradasIn, body?.calc);
+      const { entradas, calc, promocoes } = await montarConteudo(id, entradasIn, body?.calc, body?.promocoes);
 
       // Reabre: volta pra pendente e limpa os dados da revisão anterior.
       // Só permite se ainda estiver 'rejeitado' (evita corrida/reabrir aprovado).
@@ -164,6 +189,7 @@ serve(async (req) => {
           template_id: body?.templateId ?? null,
           entradas,
           calc,
+          promocoes,
           reviewed_by_email: null,
           reviewed_at: null,
           reject_reason: null,

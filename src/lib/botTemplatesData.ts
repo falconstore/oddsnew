@@ -59,6 +59,9 @@ export interface TemplateConfig {
   emoji: string;
   fields: FieldConfig[];
   generate: (f: Record<string, string>) => string;
+  /** Templates de promoção: exibem o bloco "Promoções" no Envio (imagem +
+   *  descrição + link), entre o texto e as entradas. Só no Envio. */
+  temPromocao?: boolean;
 }
 
 export interface CustomTemplate {
@@ -140,6 +143,23 @@ export function buildPartidas(f: Record<string, string>): string[] {
   return partidas;
 }
 
+// Linha "INVESTIMENTO TOTAL DA OPERAÇÃO : X" que vai logo abaixo das partidas.
+// No Envio, f.investimento é auto-preenchido pela soma das entradas (aposte das
+// back + responsabilidade das lay). Vazio = linha não aparece.
+export function linhaInvestimento(f: Record<string, string>): string[] {
+  const v = (f.investimento ?? '').trim();
+  if (!v) return [];
+  return ['', `INVESTIMENTO TOTAL DA OPERAÇÃO : ${v}`];
+}
+
+// Campo "Investimento Total" — exibido nos templates (editável). No Envio é
+// auto-preenchido pela soma das entradas.
+const INVESTIMENTO_FIELD: FieldConfig = {
+  id: 'investimento', label: 'Investimento Total da Operação (ex: 205,00)',
+  placeholder: '205,00', type: 'text',
+  hint: 'No Envio, soma automática do APOSTE (back) + RESPONSABILIDADE (lay) das entradas. Pode ajustar à mão.',
+};
+
 // ─────────────────────────────────────────
 // Definição dos templates built-in
 // ─────────────────────────────────────────
@@ -154,17 +174,18 @@ const TEMPLATES_RAW: TemplateConfig[] = [
     dotColor: 'bg-primary',
     emoji: '🟢',
     fields: [
-      { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
-      { id: 'incluirDG', label: 'Chance de Duplo Green', placeholder: '', type: 'toggle', default: () => 'true' },
-      ...GIROS_TOGGLE,
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 130', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'numRef', label: 'Freebet a Queimar', placeholder: '', type: 'freebet_select', hint: 'Selecione o procedimento GANHAR_FB cuja freebet será queimada aqui.' },
       { id: 'casa', label: 'Casa de Apostas', placeholder: 'Ex: Bet365', type: 'text', uppercase: true },
       { id: 'evento1', label: 'Partida', placeholder: 'Ex: Flamengo x Palmeiras', type: 'evento' },
       { id: 'lucro', label: 'Lucro Previsto (ex: 17,00)', placeholder: '17,00', type: 'text' },
-      ...GIROS_SUBFIELDS,
+      INVESTIMENTO_FIELD,
       { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Freebet' },
+      { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
+      ...GIROS_TOGGLE,
+      ...GIROS_SUBFIELDS,
+      { id: 'incluirDG', label: 'Chance de Duplo Green', placeholder: '', type: 'toggle', default: () => 'true' },
       ...PARTIDAS_OPCIONAIS,
     ],
     generate: (f) => {
@@ -173,25 +194,32 @@ const TEMPLATES_RAW: TemplateConfig[] = [
       const partidas = buildPartidas(f);
       return [
         `🟢 PROCEDIMENTO ${f.isExtra === 'true' ? 'EXTRA ' : ''}${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
+        ``,
         linha2,
+        ``,
         `CASA: 🏠 ${(f.casa || 'CASA').toUpperCase()}`,
         ``,
         `UTILIZAREMOS O JOGO ENTRE:`,
         ...partidas,
+        ...linhaInvestimento(f),
         ``,
         `🟥 Atenção: sempre confere data e horário da partida nos bilhetes também.`,
+        ``,
         `🟥 Atenção: Sempre confira se os links dos bilhetes são os mesmos da imagem.`,
+        ``,
         `🔴 CASO HAJA ALTERAÇÃO NAS ODDS, CHAME O SUPORTE`,
         ``,
         `🟡 LUCRO: 💵 ${fmtVal(f.lucro)} 💵`,
-        ...(f.incluirGiros === 'true' ? [fmtGiros(f)] : []),
+        ...(f.incluirGiros === 'true' ? [``, fmtGiros(f)] : []),
+        ``,
         `📋 CATEGORIA: ${f.categoria || 'Freebet'}`,
-        ...(f.incluirDG !== 'false' ? [`😍 chance de duplo green 😍`] : []),
-      ].join('\n');
+        ...(f.incluirDG !== 'false' ? [``, `😍 chance de duplo green 😍`] : []),
+      ].join('\n').replace(/\n{3,}/g, '\n\n').trim();
     },
   },
   {
     id: 'ganhar_fb_promo',
+    temPromocao: true,
     name: 'Ganhar Freebet — Promoção',
     shortName: 'Ganhar FB (Promo)',
     description: 'Promoção da casa com aposta grátis. Ex: "Super Sextou".',
@@ -199,9 +227,6 @@ const TEMPLATES_RAW: TemplateConfig[] = [
     dotColor: 'bg-muted-foreground',
     emoji: '🟢',
     fields: [
-      { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
-      { id: 'incluirDG', label: 'Chance de Duplo Green', placeholder: '', type: 'toggle', default: () => 'true' },
-      ...GIROS_TOGGLE,
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 129', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'casa', label: 'Casa de Apostas', placeholder: 'Ex: Sportingbet', type: 'text', uppercase: true },
@@ -209,8 +234,12 @@ const TEMPLATES_RAW: TemplateConfig[] = [
       { id: 'evento1', label: 'Partida 1', placeholder: 'Ex: RB Leipzig x St Pauli', type: 'evento' },
       { id: 'freebetValor', label: 'Valor da Freebet (ex: 25,00)', placeholder: '25,00', type: 'text' },
       { id: 'obsRecompensa', label: 'Observação da Recompensa (opcional)', placeholder: 'Ex: A CADA GOL DO SANTOS', type: 'text', uppercase: true, hint: 'Aparece após "EM FREEBET". Deixe vazio se não houver condição especial.' },
+      INVESTIMENTO_FIELD,
+      { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Promoção' },
+      { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
+      ...GIROS_TOGGLE,
       ...GIROS_SUBFIELDS,
-      { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Freebet' },
+      { id: 'incluirDG', label: 'Chance de Duplo Green', placeholder: '', type: 'toggle', default: () => 'true' },
       ...PARTIDAS_OPCIONAIS,
     ],
     generate: (f) => {
@@ -218,24 +247,30 @@ const TEMPLATES_RAW: TemplateConfig[] = [
       const recompensa = `🟡 RECOMPENSA: 🎁 ${fmtVal(f.freebetValor)} EM FREEBET${f.obsRecompensa ? ` - ${f.obsRecompensa.toUpperCase()}` : ''}`;
       return [
         `🟢 PROCEDIMENTO ${f.isExtra === 'true' ? 'EXTRA ' : ''}${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
+        ``,
         `🟢 PROCEDIMENTO REFERENTE A PROMOÇÃO DA ${(f.casa || 'CASA').toUpperCase()} - ${(f.campanha || 'CAMPANHA').toUpperCase()} COM APOSTA GRÁTIS 🔥`,
         ``,
         `UTILIZAREMOS A PARTIDA ENTRE:`,
         ...partidas,
+        ...linhaInvestimento(f),
         ``,
         `🟥 Atenção: sempre confere data e horário da partida nos bilhetes também.`,
+        ``,
         `🟥 Atenção: Sempre confira se os links dos bilhetes são os mesmos da imagem.`,
+        ``,
         `🔴 CASO HAJA ALTERAÇÃO NAS ODDS, UTILIZE A CALCULADORA`,
         ``,
         recompensa,
-        ...(f.incluirGiros === 'true' ? [fmtGiros(f)] : []),
-        `📋 CATEGORIA: ${f.categoria || 'Freebet'}`,
-        ...(f.incluirDG !== 'false' ? [`😍 chance de duplo green 😍`] : []),
-      ].join('\n');
+        ...(f.incluirGiros === 'true' ? [``, fmtGiros(f)] : []),
+        ``,
+        `📋 CATEGORIA: ${f.categoria || 'Promoção'}`,
+        ...(f.incluirDG !== 'false' ? [``, `😍 chance de duplo green 😍`] : []),
+      ].join('\n').replace(/\n{3,}/g, '\n\n').trim();
     },
   },
   {
     id: 'ganhar_fb_missao',
+    temPromocao: true,
     name: 'Ganhar Freebet — Missão',
     shortName: 'Ganhar FB (Missão)',
     description: 'Missão da casa com recompensa em freebet ao completar.',
@@ -243,9 +278,6 @@ const TEMPLATES_RAW: TemplateConfig[] = [
     dotColor: 'bg-muted-foreground',
     emoji: '🟢',
     fields: [
-      { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
-      { id: 'incluirDG', label: 'Chance de Duplo Green', placeholder: '', type: 'toggle', default: () => 'true' },
-      ...GIROS_TOGGLE,
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 115', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'missao', label: 'Nome da Missão', placeholder: 'Ex: LIGA DOS CAMPEÕES', type: 'text', uppercase: true },
@@ -253,8 +285,12 @@ const TEMPLATES_RAW: TemplateConfig[] = [
       { id: 'evento1', label: 'Partida 1', placeholder: 'Ex: Bayern x PSG', type: 'evento' },
       { id: 'freebetValor', label: 'Valor da Freebet (ex: 50,00)', placeholder: '50,00', type: 'text' },
       { id: 'obsRecompensa', label: 'Observação da Recompensa (opcional)', placeholder: 'Ex: A CADA GOL DO SANTOS', type: 'text', uppercase: true, hint: 'Aparece após "EM FREEBET". Deixe vazio se não houver condição especial.' },
-      ...GIROS_SUBFIELDS,
+      INVESTIMENTO_FIELD,
       { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Extra' },
+      { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
+      ...GIROS_TOGGLE,
+      ...GIROS_SUBFIELDS,
+      { id: 'incluirDG', label: 'Chance de Duplo Green', placeholder: '', type: 'toggle', default: () => 'true' },
       ...PARTIDAS_OPCIONAIS,
     ],
     generate: (f) => {
@@ -262,20 +298,25 @@ const TEMPLATES_RAW: TemplateConfig[] = [
       const recompensa = `🟡 RECOMPENSA: 🎁 ${fmtVal(f.freebetValor)} EM FREEBET${f.obsRecompensa ? ` - ${f.obsRecompensa.toUpperCase()}` : ''}`;
       return [
         `🟢 PROCEDIMENTO ${f.isExtra === 'true' ? 'EXTRA ' : ''}${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
+        ``,
         `🟢 PROCEDIMENTO REFERENTE À MISSÃO ${(f.missao || 'NOME DA MISSÃO').toUpperCase()} 🔥`,
+        ``,
         `CASA: 🏠 ${(f.casa || 'CASA').toUpperCase()}`,
         ``,
         `UTILIZAREMOS A PARTIDA ENTRE:`,
         ...partidas,
+        ...linhaInvestimento(f),
         ``,
         `🟥 atenção: sempre confere data e horário da partida nos bilhetes também.`,
+        ``,
         `🔴 CASO HAJA ALTERAÇÃO NAS ODDS, UTILIZE A CALCULADORA`,
         ``,
         recompensa,
-        ...(f.incluirGiros === 'true' ? [fmtGiros(f)] : []),
+        ...(f.incluirGiros === 'true' ? [``, fmtGiros(f)] : []),
+        ``,
         `📋 CATEGORIA: ${f.categoria || 'Extra'}`,
-        ...(f.incluirDG !== 'false' ? [`😍 chance de duplo green para um lado 😍`] : []),
-      ].join('\n');
+        ...(f.incluirDG !== 'false' ? [``, `😍 chance de duplo green para um lado 😍`] : []),
+      ].join('\n').replace(/\n{3,}/g, '\n\n').trim();
     },
   },
   {
@@ -287,9 +328,6 @@ const TEMPLATES_RAW: TemplateConfig[] = [
     dotColor: 'bg-muted-foreground',
     emoji: '🔵',
     fields: [
-      { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
-      { id: 'incluirDG', label: 'Chance de Duplo Green', placeholder: '', type: 'toggle', default: () => 'true' },
-      ...GIROS_TOGGLE,
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 116', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'casa', label: 'Casa de Apostas', placeholder: 'Ex: Betesporte', type: 'text', uppercase: true, hint: 'A casa aparece na linha 2 ("DA BETESPORTE") — não precisa de linha CASA: separada neste tipo.' },
@@ -297,25 +335,32 @@ const TEMPLATES_RAW: TemplateConfig[] = [
       { id: 'lucroMin', label: 'Lucro Mínimo (ex: 17,63)', placeholder: '17,63', type: 'text' },
       { id: 'lucroMax', label: 'Lucro Máximo (ex: 248,00)', placeholder: '248,00 — ou vazio para valor único', type: 'text', hint: 'Deixe vazio para exibir valor único em vez de range.' },
       { id: 'valorDG', label: 'Possível Duplo Green (ex: 210,00)', placeholder: '210,00', type: 'text', showIf: (f) => f.incluirDG !== 'false' },
-      ...GIROS_SUBFIELDS,
+      INVESTIMENTO_FIELD,
       { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Superodd' },
+      { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
+      ...GIROS_TOGGLE,
+      ...GIROS_SUBFIELDS,
+      { id: 'incluirDG', label: 'Chance de Duplo Green', placeholder: '', type: 'toggle', default: () => 'true' },
       ...PARTIDAS_OPCIONAIS,
     ],
     generate: (f) => [
       `🔵 PROCEDIMENTO ${f.isExtra === 'true' ? 'EXTRA ' : ''}${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
+      ``,
       `🟢 PROCEDIMENTO REFERENTE A SUPERODD DA ${(f.casa || 'CASA').toUpperCase()} 🔥`,
       ``,
       `UTILIZAREMOS O JOGO ENTRE:`,
       ...buildPartidas(f),
+      ...linhaInvestimento(f),
       ``,
       `🔴 CASO HAJA ALTERAÇÃO NAS ODDS, UTILIZE CALCULADORA 🧮`,
       ``,
       `🟡 LUCRO: 💵 ${fmtRange(f.lucroMin, f.lucroMax)} 💵`,
-      ...(f.incluirDG !== 'false' ? [`🟡 POSSÍVEL DUPLO GREEN - 💵 ${fmtVal(f.valorDG)}`] : []),
-      ...(f.incluirGiros === 'true' ? [fmtGiros(f)] : []),
+      ...(f.incluirDG !== 'false' ? [``, `🟡 POSSÍVEL DUPLO GREEN - 💵 ${fmtVal(f.valorDG)}`] : []),
+      ...(f.incluirGiros === 'true' ? [``, fmtGiros(f)] : []),
+      ``,
       `📋 CATEGORIA: ${f.categoria || 'Superodd'}`,
-      ...(f.incluirDG !== 'false' ? [`😍 chance de duplo green 😍`] : []),
-    ].join('\n'),
+      ...(f.incluirDG !== 'false' ? [``, `😍 chance de duplo green 😍`] : []),
+    ].join('\n').replace(/\n{3,}/g, '\n\n').trim(),
   },
   {
     id: 'aumento_25',
@@ -326,9 +371,6 @@ const TEMPLATES_RAW: TemplateConfig[] = [
     dotColor: 'bg-primary',
     emoji: '🟢',
     fields: [
-      { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
-      { id: 'incluirDG', label: 'Chance de Duplo Green', placeholder: '', type: 'toggle', default: () => 'true' },
-      ...GIROS_TOGGLE,
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 141', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'casa', label: 'Casa de Apostas', placeholder: 'Ex: BET365', type: 'text', uppercase: true },
@@ -336,8 +378,12 @@ const TEMPLATES_RAW: TemplateConfig[] = [
       { id: 'evento1', label: 'Partida', placeholder: 'Ex: Real Oviedo x Getafe', type: 'evento' },
       { id: 'lucroMin', label: 'Lucro Mínimo (ex: 17,63)', placeholder: '17,63', type: 'text' },
       { id: 'lucroMax', label: 'Lucro Máximo (ex: 248,00)', placeholder: '248,00 — ou vazio para valor único', type: 'text', hint: 'Deixe vazio para exibir valor único em vez de range.' },
-      ...GIROS_SUBFIELDS,
+      INVESTIMENTO_FIELD,
       { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Promoção' },
+      { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
+      ...GIROS_TOGGLE,
+      ...GIROS_SUBFIELDS,
+      { id: 'incluirDG', label: 'Chance de Duplo Green', placeholder: '', type: 'toggle', default: () => 'true' },
       ...PARTIDAS_OPCIONAIS,
     ],
     generate: (f) => {
@@ -354,18 +400,19 @@ const TEMPLATES_RAW: TemplateConfig[] = [
         `🚨SERÁ NECESSÁRIO ${cpfLabel} NA ${(f.casa || 'CASA').toUpperCase()}🚨`,
         ``,
         `UTILIZAREMOS A PARTIDA ENTRE:`,
-        ``,
         ...buildPartidas(f),
+        ...linhaInvestimento(f),
         ``,
         `🟥 Atenção : sempre confere data e horário da partida nos bilhetes também.`,
+        ``,
         `🟥 Atenção: Sempre confira se os links dos bilhetes são os mesmo da imagem .`,
+        ``,
         `🔴 CASO HAJA ALTERAÇÃO NAS ODDS, UTILIZE A CALCULADORA!`,
         ``,
         `🟡LUCRO: 💵 ${fmtRange(f.lucroMin, f.lucroMax)}💵`,
-        ``,
-        ...(f.incluirGiros === 'true' ? [fmtGiros(f)] : []),
-        ...(f.incluirDG !== 'false' ? [`😍 chance de duplo green😍`] : []),
-      ].join('\n');
+        ...(f.incluirGiros === 'true' ? [``, fmtGiros(f)] : []),
+        ...(f.incluirDG !== 'false' ? [``, `😍 chance de duplo green😍`] : []),
+      ].join('\n').replace(/\n{3,}/g, '\n\n').trim();
     },
   },
   {
@@ -377,16 +424,17 @@ const TEMPLATES_RAW: TemplateConfig[] = [
     dotColor: 'bg-primary',
     emoji: '🟢',
     fields: [
-      { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
-      ...GIROS_TOGGLE,
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 120', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'casa', label: 'Casa de Apostas', placeholder: 'Ex: Betesporte', type: 'text', uppercase: true },
       { id: 'evento1', label: 'Partida', placeholder: 'Ex: Corinthians x Vasco', type: 'evento' },
       { id: 'valorDG', label: 'Valor Alvo Duplo Green (ex: 210,00)', placeholder: '210,00', type: 'text' },
       { id: 'lucro', label: 'Lucro Mínimo Garantido (ex: 17,00)', placeholder: '17,00', type: 'text' },
-      ...GIROS_SUBFIELDS,
+      INVESTIMENTO_FIELD,
       { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Tentativa de Duplo Green' },
+      { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
+      ...GIROS_TOGGLE,
+      ...GIROS_SUBFIELDS,
       ...PARTIDAS_OPCIONAIS,
     ],
     generate: (f) => [
@@ -396,18 +444,21 @@ const TEMPLATES_RAW: TemplateConfig[] = [
       ``,
       `UTILIZAREMOS O JOGO ENTRE:`,
       ...buildPartidas(f),
+      ...linhaInvestimento(f),
       ``,
       `🔴 CASO HAJA ALTERAÇÃO NAS ODDS, UTILIZE CALCULADORA 🧮`,
       ``,
       `🟡 OBJETIVO DUPLO GREEN - 💵 ${f.valorDG ? `R$ ${f.valorDG}` : 'R$ XXX,XX'}`,
+      ``,
       `🟡 LUCRO MÍNIMO GARANTIDO: 💵 ${f.lucro ? `R$ ${f.lucro}` : 'R$ XX,XX'}`,
-      ...(f.incluirGiros === 'true' ? [fmtGiros(f)] : []),
+      ...(f.incluirGiros === 'true' ? [``, fmtGiros(f)] : []),
       ``,
       `😍 chance de duplo green 😍`,
-    ].join('\n'),
+    ].join('\n').replace(/\n{3,}/g, '\n\n').trim(),
   },
   {
     id: 'promo_range',
+    temPromocao: true,
     name: 'Promoção — Lucro em Range',
     shortName: 'Promoção (Range)',
     description: 'Lucro varia entre valor mínimo e máximo. Ex: R$3,25 à R$3,75.',
@@ -415,9 +466,6 @@ const TEMPLATES_RAW: TemplateConfig[] = [
     dotColor: 'bg-warning',
     emoji: '🟢',
     fields: [
-      { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
-      { id: 'incluirDG', label: 'Chance de Duplo Green', placeholder: '', type: 'toggle', default: () => 'true' },
-      ...GIROS_TOGGLE,
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 117', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'campanha', label: 'Nome da Promoção/Campanha', placeholder: 'Ex: SUPER ODDS WEEK', type: 'text', uppercase: true },
@@ -425,28 +473,37 @@ const TEMPLATES_RAW: TemplateConfig[] = [
       { id: 'evento1', label: 'Partida', placeholder: 'Ex: São Paulo x Santos', type: 'evento' },
       { id: 'lucroMin', label: 'Lucro Mínimo (ex: 3,25)', placeholder: '3,25', type: 'text' },
       { id: 'lucroMax', label: 'Lucro Máximo (ex: 3,75)', placeholder: '3,75 — ou vazio para valor único', type: 'text', hint: 'Deixe vazio para exibir valor único em vez de range.' },
-      ...GIROS_SUBFIELDS,
+      INVESTIMENTO_FIELD,
       { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Promoção' },
+      { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
+      ...GIROS_TOGGLE,
+      ...GIROS_SUBFIELDS,
+      { id: 'incluirDG', label: 'Chance de Duplo Green', placeholder: '', type: 'toggle', default: () => 'true' },
       ...PARTIDAS_OPCIONAIS,
     ],
     generate: (f) => [
       `🟢 PROCEDIMENTO ${f.isExtra === 'true' ? 'EXTRA ' : ''}${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
+      ``,
       `🟢 PROCEDIMENTO REFERENTE À PROMOÇÃO ${(f.campanha || 'CAMPANHA').toUpperCase()} COM APOSTA GRÁTIS 🔥`,
+      ``,
       `CASA: 🏠 ${(f.casa || 'CASA').toUpperCase()}`,
       ``,
       `UTILIZAREMOS A PARTIDA ENTRE:`,
       ...buildPartidas(f),
+      ...linhaInvestimento(f),
       ``,
       `🔴 CASO HAJA ALTERAÇÃO NAS ODDS, UTILIZE A CALCULADORA 👆`,
       ``,
       `🟡 LUCRO: 💵 ${fmtRange(f.lucroMin, f.lucroMax, 'À')} 💵`,
-      ...(f.incluirGiros === 'true' ? [fmtGiros(f)] : []),
+      ...(f.incluirGiros === 'true' ? [``, fmtGiros(f)] : []),
+      ``,
       `📋 CATEGORIA: ${f.categoria || 'Promoção'}`,
-      ...(f.incluirDG !== 'false' ? [`😍 chance de duplo green 😍`] : []),
-    ].join('\n'),
+      ...(f.incluirDG !== 'false' ? [``, `😍 chance de duplo green 😍`] : []),
+    ].join('\n').replace(/\n{3,}/g, '\n\n').trim(),
   },
   {
     id: 'aposta_protegida',
+    temPromocao: true,
     name: 'Aposta Protegida',
     shortName: 'Aposta Protegida',
     description: 'Promoção OU lucra cash OU ganha freebet (cenários excludentes). Opção 2 vai para observações.',
@@ -454,9 +511,6 @@ const TEMPLATES_RAW: TemplateConfig[] = [
     dotColor: 'bg-warning',
     emoji: '🟢',
     fields: [
-      { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
-      { id: 'incluirDG', label: 'Chance de Duplo Green', placeholder: '', type: 'toggle', default: () => 'true' },
-      ...GIROS_TOGGLE,
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 138', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'casa', label: 'Casa de Apostas', placeholder: 'Ex: Sportingbet', type: 'text', uppercase: true },
@@ -464,33 +518,42 @@ const TEMPLATES_RAW: TemplateConfig[] = [
       { id: 'evento1', label: 'Partida', placeholder: 'Ex: Bahia x Cruzeiro', type: 'evento' },
       { id: 'lucro1', label: 'Opção 1 — Lucro cash se ganhar (ex: 2,00)', placeholder: '2,00', type: 'text' },
       { id: 'free1', label: 'Opção 1 — Freebet se ganhar fora (ex: 10,00)', placeholder: '10,00', type: 'text' },
-      ...GIROS_SUBFIELDS,
+      INVESTIMENTO_FIELD,
       { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Promoção' },
       { id: 'obs', label: 'Opção 2 (opcional) — vai para observações', placeholder: 'Ex: LUCRO DE 16,00 / FORA FREE DE 100,00', type: 'text', hint: 'Se houver uma segunda opção de valor, registre aqui. Fica salvo no campo Observações do procedimento.' },
+      { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
+      ...GIROS_TOGGLE,
+      ...GIROS_SUBFIELDS,
+      { id: 'incluirDG', label: 'Chance de Duplo Green', placeholder: '', type: 'toggle', default: () => 'true' },
       ...PARTIDAS_OPCIONAIS,
     ],
     generate: (f) => {
       const lines = [
         `🟢 PROCEDIMENTO ${f.isExtra === 'true' ? 'EXTRA ' : ''}${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
+        ``,
         `🟢 PROCEDIMENTO REFERENTE A PROMOÇÃO DA ${(f.casa || 'CASA').toUpperCase()} - ${(f.campanha || 'CAMPANHA').toUpperCase()} COM APOSTA GRÁTIS 🔥`,
+        ``,
         `CASA: 🏠 ${(f.casa || 'CASA').toUpperCase()}`,
         ``,
         `UTILIZAREMOS A PARTIDA ENTRE:`,
         ...buildPartidas(f),
+        ...linhaInvestimento(f),
         ``,
         `🟥 Atenção: sempre confere data e horário da partida nos bilhetes também.`,
+        ``,
         `🔴 CASO HAJA ALTERAÇÃO NAS ODDS, UTILIZE A CALCULADORA`,
         ``,
         `🟡 LUCRO: 💵 ${fmtVal(f.lucro1)}`,
+        ``,
         `🟡 RECOMPENSA: 🎁 ${fmtVal(f.free1)} EM FREEBET`,
       ];
-      if (f.incluirGiros === 'true') lines.push(fmtGiros(f));
+      if (f.incluirGiros === 'true') lines.push(``, fmtGiros(f));
       if (f.obs && f.obs.trim()) {
-        lines.push(`📝 OBS: OPÇÃO 2 — ${f.obs.trim().toUpperCase()}`);
+        lines.push(``, `📝 OBS: OPÇÃO 2 — ${f.obs.trim().toUpperCase()}`);
       }
-      lines.push(`📋 CATEGORIA: ${f.categoria || 'Promoção'}`);
-      if (f.incluirDG !== 'false') lines.push(`😍 chance de duplo green 😍`);
-      return lines.join('\n');
+      lines.push(``, `📋 CATEGORIA: ${f.categoria || 'Promoção'}`);
+      if (f.incluirDG !== 'false') lines.push(``, `😍 chance de duplo green 😍`);
+      return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
     },
   },
   {
@@ -502,17 +565,18 @@ const TEMPLATES_RAW: TemplateConfig[] = [
     dotColor: 'bg-muted-foreground',
     emoji: '🟢',
     fields: [
-      { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
-      { id: 'incluirDG', label: 'Chance de Duplo Green', placeholder: '', type: 'toggle', default: () => 'true' },
-      ...GIROS_TOGGLE,
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 140', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'valorTotal', label: 'Valor total a utilizar (ex: 100,00)', placeholder: '100,00', type: 'text' },
       { id: 'lucroMin', label: 'Lucro mínimo (ex: 8,00)', placeholder: '8,00', type: 'text' },
       { id: 'lucroMax', label: 'Lucro máximo (ex: 20,00)', placeholder: '20,00 — ou vazio para valor único', type: 'text', hint: 'Deixe vazio para valor único. "OU ANULA" é adicionado automaticamente.' },
       { id: 'evento1', label: 'Partida', placeholder: 'Ex: Corinthians x Vasco', type: 'evento' },
-      ...GIROS_SUBFIELDS,
+      INVESTIMENTO_FIELD,
       { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Superodd' },
+      { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
+      ...GIROS_TOGGLE,
+      ...GIROS_SUBFIELDS,
+      { id: 'incluirDG', label: 'Chance de Duplo Green', placeholder: '', type: 'toggle', default: () => 'true' },
       ...PARTIDAS_OPCIONAIS,
     ],
     generate: (f) => [
@@ -526,15 +590,18 @@ const TEMPLATES_RAW: TemplateConfig[] = [
       ``,
       `UTILIZAREMOS O JOGO ENTRE:`,
       ...buildPartidas(f),
+      ...linhaInvestimento(f),
       ``,
       `🟥 Atenção : sempre confere data e horário da partida nos bilhetes também.`,
+      ``,
       `🟥 Atenção: Sempre confira se os links dos bilhetes são os mesmos da imagem .`,
       ``,
       `🟡 LUCRO : 💵 ${fmtRange(f.lucroMin, f.lucroMax, 'À')} OU ANULA 💵`,
-      ...(f.incluirGiros === 'true' ? [fmtGiros(f)] : []),
+      ...(f.incluirGiros === 'true' ? [``, fmtGiros(f)] : []),
+      ``,
       `📋 CATEGORIA: ${f.categoria || 'Superodd'}`,
-      ...(f.incluirDG !== 'false' ? [`😍 chance de duplo green 😍`] : []),
-    ].join('\n'),
+      ...(f.incluirDG !== 'false' ? [``, `😍 chance de duplo green 😍`] : []),
+    ].join('\n').replace(/\n{3,}/g, '\n\n').trim(),
   },
   {
     id: 'tentativa_dg',
@@ -545,16 +612,17 @@ const TEMPLATES_RAW: TemplateConfig[] = [
     dotColor: 'bg-muted-foreground',
     emoji: '🟡',
     fields: [
-      { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
-      { id: 'incluirDG', label: 'Chance de Duplo Green', placeholder: '', type: 'toggle', default: () => 'true' },
-      ...GIROS_TOGGLE,
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 139', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'casa', label: 'Casa de Apostas', placeholder: 'Ex: Betano', type: 'text', uppercase: true },
       { id: 'evento1', label: 'Partida', placeholder: 'Ex: Manchester City x Brentford', type: 'evento' },
       { id: 'valorDG', label: 'Objetivo Duplo Green (ex: 706,64)', placeholder: '706,64', type: 'text' },
-      ...GIROS_SUBFIELDS,
+      INVESTIMENTO_FIELD,
       { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Superodd' },
+      { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
+      ...GIROS_TOGGLE,
+      ...GIROS_SUBFIELDS,
+      { id: 'incluirDG', label: 'Chance de Duplo Green', placeholder: '', type: 'toggle', default: () => 'true' },
       ...PARTIDAS_OPCIONAIS,
     ],
     generate: (f) => [
@@ -566,14 +634,16 @@ const TEMPLATES_RAW: TemplateConfig[] = [
       ``,
       `UTILIZAREMOS O JOGO ENTRE:`,
       ...buildPartidas(f),
+      ...linhaInvestimento(f),
       ``,
       `🔴 CASO HAJA ALTERAÇÃO NAS ODDS, UTILIZE CALCULADORA 🎲`,
       ``,
       `🟡 OBJETIVO DUPLO GREEN - 🟩 ${fmtVal(f.valorDG)}`,
-      ...(f.incluirGiros === 'true' ? [fmtGiros(f)] : []),
+      ...(f.incluirGiros === 'true' ? [``, fmtGiros(f)] : []),
+      ``,
       `📋 CATEGORIA: ${f.categoria || 'Superodd'}`,
-      ...(f.incluirDG !== 'false' ? [`😍 chance de duplo green 😍`] : []),
-    ].join('\n'),
+      ...(f.incluirDG !== 'false' ? [``, `😍 chance de duplo green 😍`] : []),
+    ].join('\n').replace(/\n{3,}/g, '\n\n').trim(),
   },
 ];
 
