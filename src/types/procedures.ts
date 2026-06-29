@@ -3,6 +3,7 @@ export type ProcedureCategory =
   | 'Cashback'
   | 'Freebet'
   | 'Superodd'
+  | 'Super Aumento'
   | 'Aposta Sem Risco'
   | 'Extra'
   | 'Ganhar Giros Gratis';
@@ -145,6 +146,7 @@ export const PROCEDURE_CATEGORIES: ProcedureCategory[] = [
   'Cashback',
   'Freebet',
   'Superodd',
+  'Super Aumento',
   'Aposta Sem Risco',
   'Extra',
   'Ganhar Giros Gratis'

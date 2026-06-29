@@ -100,8 +100,8 @@ const TOOL_SCHEMA = {
       },
       category: {
         type: "string",
-        enum: ["Superodd", "Extra", "Freebet", "Promoção"],
-        description: "Categoria do procedimento.",
+        enum: ["Superodd", "Super Aumento", "Extra", "Freebet", "Promoção"],
+        description: "Categoria do procedimento. 'Super Aumento' = casa aumenta a odd em X% (linha 'AUMENTO DE X%').",
       },
       tipo: {
         type: "string",

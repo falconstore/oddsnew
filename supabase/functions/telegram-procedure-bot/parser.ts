@@ -11,7 +11,7 @@ export interface ParsedProcedure {
   titulo: string;               // descrição limpa da 2ª linha
   date: string;                 // YYYY-MM-DD (data de referência)
   platform: string;             // "Bet365"
-  category: string;             // "Superodd" | "Extra" | "Freebet" | "Promoção"
+  category: string;             // "Superodd" | "Super Aumento" | "Extra" | "Freebet" | "Promoção"
   tipo: ProcedureTipo;
   prioridade: Prioridade;
   partida_descricao: string | null;
@@ -394,14 +394,26 @@ function detectTipo(text: string): ProcedureTipo {
   return "SEM_FB";
 }
 
+// O template envia o texto todo em MAIÚSCULA, então a linha explícita chega
+// como "CATEGORIA: SUPER AUMENTO". Normaliza as categorias conhecidas pro
+// casing canônico; categorias livres ficam como vieram (só trim).
+function canonicalCategory(raw: string): string {
+  const known = ["Superodd", "Super Aumento", "Aposta Sem Risco", "Extra", "Freebet", "Promoção"];
+  const norm = raw.trim().toLowerCase();
+  return known.find((k) => k.toLowerCase() === norm) ?? raw.trim();
+}
+
 function detectCategory(text: string, tipo: ProcedureTipo): string {
   // 1. Linha explícita emitida pelo template: 📋 CATEGORIA: X
   const explicit = text.match(/^📋?\s*CATEGORIA:\s*(.+?)(?:\s*[\n\r]|$)/im);
-  if (explicit && explicit[1].trim()) return explicit[1].trim();
+  if (explicit && explicit[1].trim()) return canonicalCategory(explicit[1]);
   // 2. Fallback por keyword
   // ASR (Aposta Sem Risco) agora é CATEGORIA (não status).
   if (tipo === "ASR") return "Aposta Sem Risco";
   if (/\bSUPERODD\b/i.test(text)) return "Superodd";
+  // "Super Aumento" (aumento de X% da casa). Cobre tanto a frase nova
+  // "SUPER AUMENTO DE X%" quanto a antiga "AUMENTO DE 25%".
+  if (/\bAUMENTO\s+DE\s+\d/i.test(text)) return "Super Aumento";
   if (/\bMISS[ÃA]O\b/i.test(text)) return "Extra";
   // Categoria Freebet só quando o procedimento de fato GANHA uma freebet
   // (tipo GANHAR_FB). Se tem LUCRO: mas menciona "aposta grátis" no título,

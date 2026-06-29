@@ -364,9 +364,9 @@ const TEMPLATES_RAW: TemplateConfig[] = [
   },
   {
     id: 'aumento_25',
-    name: 'Aumento 25%',
-    shortName: 'Aumento 25%',
-    description: 'Promoção de aumento de 25% da casa. Lucro em range mínimo–máximo. Quantidade de CPFs configurável.',
+    name: 'Super Aumento',
+    shortName: 'Super Aumento',
+    description: 'Promoção de aumento de odds da casa (% configurável). Lucro em range mínimo–máximo. Quantidade de CPFs configurável.',
     color: 'bg-primary/15 text-primary border-primary/30',
     dotColor: 'bg-primary',
     emoji: '🟢',
@@ -374,12 +374,13 @@ const TEMPLATES_RAW: TemplateConfig[] = [
       { id: 'num', label: 'Nº do Procedimento', placeholder: 'Ex: 141', type: 'text' },
       { id: 'dataProc', label: 'Data do Procedimento', placeholder: '', type: 'date', default: todayISO },
       { id: 'casa', label: 'Casa de Apostas', placeholder: 'Ex: BET365', type: 'text', uppercase: true },
+      { id: 'percentual', label: 'Percentual do aumento (%)', placeholder: 'Ex: 25', type: 'text', default: () => '25', hint: 'Aparece na linha 🟢 PROCEDIMENTO REFERENTE AO SUPER AUMENTO DE X%. Só o número.' },
       { id: 'cpfCount', label: 'Quantidade de CPFs necessários', placeholder: 'Ex: 1', type: 'text', default: () => '1', hint: 'Ex: 1, 2, 3... Aparece na linha 🚨SERÁ NECESSÁRIO N CPF(s)🚨' },
       { id: 'evento1', label: 'Partida', placeholder: 'Ex: Real Oviedo x Getafe', type: 'evento' },
       { id: 'lucroMin', label: 'Lucro Mínimo (ex: 17,63)', placeholder: '17,63', type: 'text' },
       { id: 'lucroMax', label: 'Lucro Máximo (ex: 248,00)', placeholder: '248,00 — ou vazio para valor único', type: 'text', hint: 'Deixe vazio para exibir valor único em vez de range.' },
       INVESTIMENTO_FIELD,
-      { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Promoção' },
+      { id: 'categoria', label: 'Categoria', placeholder: '', type: 'select', default: () => 'Super Aumento' },
       { id: 'isExtra', label: 'É EXTRA? (reenvio)', placeholder: '', type: 'toggle', default: () => 'false' },
       ...GIROS_TOGGLE,
       ...GIROS_SUBFIELDS,
@@ -390,10 +391,11 @@ const TEMPLATES_RAW: TemplateConfig[] = [
       const cpf = (f.cpfCount || '1').trim();
       const cpfNum = parseInt(cpf, 10);
       const cpfLabel = !isNaN(cpfNum) && cpfNum > 1 ? `${cpf} CPFs` : `${cpf} CPF`;
+      const pct = (f.percentual || '25').replace(/\s|%/g, '').trim() || '25';
       return [
         `🟢 PROCEDIMENTO ${f.isExtra === 'true' ? 'EXTRA ' : ''}${f.num || 'NNN'} - ${fmtDate(f.dataProc)}`,
         ``,
-        `🟢 PROCEDIMENTO REFERENTE AO AUMENTO DE 25%🔥`,
+        `🟢 PROCEDIMENTO REFERENTE AO SUPER AUMENTO DE ${pct}%🔥`,
         ``,
         `CASA: ${(f.casa || 'CASA').toUpperCase()}`,
         ``,
@@ -412,6 +414,8 @@ const TEMPLATES_RAW: TemplateConfig[] = [
         `🟡LUCRO: 💵 ${fmtRange(f.lucroMin, f.lucroMax)}💵`,
         ...(f.incluirGiros === 'true' ? [``, fmtGiros(f)] : []),
         ...(f.incluirDG !== 'false' ? [``, `😍 chance de duplo green😍`] : []),
+        ``,
+        `📋 CATEGORIA: ${f.categoria || 'Super Aumento'}`,
       ].join('\n').replace(/\n{3,}/g, '\n\n').trim();
     },
   },
