@@ -9,8 +9,9 @@
 -- DEFAULT_CHAT_ID). Trocar para o VIP é alterar a função (ou
 -- passar chatId no body via outra chamada).
 --
--- Reutiliza o vault secret 'trial_cron_secret' que já existe no
--- projeto (mesmo dos outros crons) — nenhum setup adicional.
+-- A função roda com verify_jwt=true (a plataforma valida o JWT), então o
+-- cron passa a service_role do Vault (SUPABASE_SERVICE_ROLE_KEY), que é um
+-- JWT válido e fica sincronizada com rotações de chave do projeto.
 -- 100% idempotente.
 -- =====================================================
 
@@ -38,7 +39,7 @@ SELECT cron.schedule(
       'Authorization', 'Bearer ' || (
         SELECT decrypted_secret
         FROM vault.decrypted_secrets
-        WHERE name = 'trial_cron_secret'
+        WHERE name = 'SUPABASE_SERVICE_ROLE_KEY'
         LIMIT 1
       )
     ),

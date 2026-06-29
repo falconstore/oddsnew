@@ -14,9 +14,11 @@
 //   - Botão no admin (aba Procedimentos) → POST { chatId } com a sessão.
 //   - Cron horário (pg_cron) → POST {} com Bearer <secret>; usa o chat default.
 //
-// Auth: aceita Bearer <SUPABASE_SERVICE_ROLE_KEY> (admin logado / chamada
-// interna) OU Bearer <TRIAL_CRON_SECRET> (pg_cron, mesmo secret dos outros
-// crons). Bot token: PROCEDURE_SEND_BOT_TOKEN (o mesmo que posta procedimentos).
+// Auth: verify_jwt=true (config.toml) — a plataforma Supabase valida o JWT do
+// app ANTES da função rodar, então basta exigir um Bearer presente. Imune à
+// rotação de chaves do projeto (não comparamos a chave crua). O cron passa a
+// service_role do Vault, que a plataforma também valida.
+// Bot token: PROCEDURE_SEND_BOT_TOKEN (o mesmo que posta procedimentos).
 // deno-lint-ignore-file
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -30,16 +32,6 @@ const log = (event: string, data: Record<string, unknown> = {}) =>
 const DEFAULT_CHAT_ID = -1002197121868;
 
 const TG_LIMIT = 3800; // folga sob o limite real de 4096 do Telegram
-
-function constantTimeEqual(a: string, b: string): boolean {
-  const enc = new TextEncoder();
-  const ab = enc.encode(a);
-  const bb = enc.encode(b);
-  const len = Math.max(ab.length, bb.length);
-  let diff = ab.length ^ bb.length;
-  for (let i = 0; i < len; i++) diff |= (ab[i] ?? 0) ^ (bb[i] ?? 0);
-  return diff === 0;
-}
 
 // Escapa caracteres especiais do HTML do Telegram.
 function esc(s: string): string {
@@ -151,18 +143,16 @@ async function tgSend(token: string, chatId: number | string, text: string) {
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
-  // ---- Auth: Bearer service_role OU cron secret ----
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-  const cronSecret = Deno.env.get("TRIAL_CRON_SECRET") ?? "";
+  // ---- Auth: basta um Bearer presente ----
+  // verify_jwt=true faz a plataforma Supabase validar o JWT do app antes de
+  // chegar aqui; o cron passa a service_role do Vault (também válida). Não
+  // comparamos a chave crua — imune à rotação de chaves do projeto.
   const auth = req.headers.get("Authorization") ?? "";
-  const presented = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
-  const ok =
-    (serviceKey && presented && constantTimeEqual(presented, serviceKey)) ||
-    (cronSecret && presented && constantTimeEqual(presented, cronSecret));
-  if (!ok) {
-    log("forbidden", { hasPresented: presented.length > 0 });
-    return json({ error: "forbidden" }, { status: 403 });
+  if (!auth.startsWith("Bearer ")) {
+    log("unauthorized", {});
+    return json({ error: "unauthorized" }, { status: 401 });
   }
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
   const token = Deno.env.get("PROCEDURE_SEND_BOT_TOKEN");
   if (!token) return json({ error: "PROCEDURE_SEND_BOT_TOKEN missing" }, { status: 500 });

@@ -22,7 +22,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.procedure-open-report]
-verify_jwt = false
+verify_jwt = true
 
 [functions.trial-webhook-guard]
 verify_jwt = false
