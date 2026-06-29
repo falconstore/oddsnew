@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { usePersistedState } from '@/hooks/usePersistedState';
 import { startOfMonth, endOfMonth, endOfDay, differenceInDays } from 'date-fns';
-import { Plus, FileText, Columns, Upload, List, Bot, Wand2 } from 'lucide-react';
+import { Plus, FileText, Columns, Upload, List, Bot, Wand2, Send } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabaseProcedures } from '@/lib/supabaseProcedures';
 
@@ -56,6 +56,7 @@ export default function ProcedureControl() {
   const [showColumnCustomizer, setShowColumnCustomizer] = useState(false);
   const [showRegisterBotModal, setShowRegisterBotModal] = useState(false);
   const [isNormalizingPlatforms, setIsNormalizingPlatforms] = useState(false);
+  const [isSendingReport, setIsSendingReport] = useState(false);
   const { toast } = useToast();
 
   const [filters, setFilters] = usePersistedState<FiltersType>('proc_filters', {
@@ -103,6 +104,32 @@ export default function ProcedureControl() {
       toast({ title: 'Erro ao normalizar', description: msg, variant: 'destructive' });
     } finally {
       setIsNormalizingPlatforms(false);
+    }
+  };
+
+  // Dispara o relatório de procedimentos EM ABERTO no grupo de teste
+  // (pré-envio). O cron horário usa o mesmo endpoint com o chat default.
+  // CHAT de teste = "GRUPO PRÉ ENVIO 🦈🔥" (igual ao usado no Envio).
+  const REPORT_TEST_CHAT_ID = -1002197121868;
+  const handleSendOpenReport = async () => {
+    setIsSendingReport(true);
+    try {
+      const { data, error } = await supabaseProcedures.functions.invoke('procedure-open-report', {
+        body: { chatId: REPORT_TEST_CHAT_ID },
+      });
+      if (error) throw error;
+      const total = (data as { total?: number })?.total ?? 0;
+      toast({
+        title: 'Relatório enviado',
+        description: total > 0
+          ? `${total} procedimento${total !== 1 ? 's' : ''} em aberto enviado${total !== 1 ? 's' : ''} ao grupo de teste.`
+          : 'Nenhum procedimento em aberto — mensagem de "lista vazia" enviada.',
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Erro desconhecido';
+      toast({ title: 'Erro ao enviar relatório', description: msg, variant: 'destructive' });
+    } finally {
+      setIsSendingReport(false);
     }
   };
 
@@ -220,6 +247,18 @@ export default function ProcedureControl() {
               >
                 <Bot className="w-3.5 h-3.5 mr-1.5" />
                 Registrar via Bot
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleSendOpenReport}
+                disabled={isSendingReport}
+                size="sm"
+                className="border-primary/30 hover:bg-primary/10 text-primary h-9"
+                data-testid="button-relatorio-abertos"
+                title="Envia ao grupo de teste a lista de procedimentos em aberto (status Partida em Aberto)"
+              >
+                <Send className="w-3.5 h-3.5 mr-1.5" />
+                {isSendingReport ? 'Enviando...' : 'Relatório de Abertos'}
               </Button>
               <Button
                 variant="outline"
