@@ -85,6 +85,19 @@ function dataBR(): string {
   return fmt.format(new Date());
 }
 
+// Primeiro dia do mês corrente (horário de Brasília) como "YYYY-MM-01".
+// Usado pra filtrar só os procedimentos criados no mês atual.
+function inicioMesBR(): string {
+  const partes = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+  }).formatToParts(new Date());
+  const ano = partes.find((p) => p.type === "year")!.value;
+  const mes = partes.find((p) => p.type === "month")!.value;
+  return `${ano}-${mes}-01`;
+}
+
 interface Row {
   procedure_number: string | null;
   platform: string | null;
@@ -166,24 +179,28 @@ serve(async (req) => {
     });
 
     // "Em aberto" = status "Enviada Partida em Aberto" (case-insensitive, pega
-    // a variação com "p" minúsculo) e não arquivado.
+    // a variação com "p" minúsculo) e não arquivado. Filtra só o MÊS CORRENTE
+    // por created_date (mês de criação no sistema; a coluna `date` tem datas
+    // de partida com erros de digitação, então não serve pra esse corte).
+    const inicioMes = inicioMesBR();
     const { data, error } = await supa
       .from("procedures")
-      .select("procedure_number, platform, category, telegram_link, status, archived")
+      .select("procedure_number, platform, category, telegram_link, status, archived, created_date")
       .ilike("status", "Enviada Partida em Aberto")
-      .eq("archived", false);
+      .eq("archived", false)
+      .gte("created_date", inicioMes);
     if (error) {
       log("query_error", { err: error.message });
       return json({ error: error.message }, { status: 500 });
     }
 
-    const rows = (data ?? []) as (Row & { status: string; archived: boolean })[];
+    const rows = (data ?? []) as (Row & { status: string; archived: boolean; created_date: string })[];
     rows.sort((a, b) => numKey(a.procedure_number) - numKey(b.procedure_number));
 
     const total = rows.length;
     const header =
       `🦈 <b>PROCEDIMENTOS EM ABERTO</b> — ${dataBR()}\n` +
-      `📊 ${total} em aberto`;
+      `📊 ${total} em aberto no mês`;
 
     if (total === 0) {
       await tgSend(token, chatId, `${header}\n\n✅ Nenhum procedimento em aberto no momento.`);
