@@ -134,6 +134,7 @@ interface Row {
   procedure_number: string | null;
   platform: string | null;
   category: string | null;
+  promotion_name: string | null;
   telegram_link: string | null;
   created_date: string | null;
 }
@@ -151,20 +152,30 @@ function montarLinha(r: Row): string {
   // Data de envio (created_date) ao lado do número, DD/MM/AAAA.
   const data = fmtDataEnvio(r.created_date);
   const dataHtml = data ? ` · ${data}` : "";
-  return `${emoji} ${numHtml}${dataHtml} — ${esc(casa)} — ${esc(cat)}`;
+  let linha = `${emoji} ${numHtml}${dataHtml} — ${esc(casa)} — ${esc(cat)}`;
+  // Nome (promotion_name) numa 2ª linha indentada, em itálico — só em Promoção
+  // e Super Aumento, onde o nome agrega ("Promoção da Sportybet - Missão...",
+  // "Super Aumento de 30%"). Em Superodd/Freebet o nome é redundante.
+  const catNorm = (r.category ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  const mostraNome = catNorm.includes("promo") || catNorm.includes("aumento");
+  const promo = titleCase((r.promotion_name ?? "").trim());
+  if (mostraNome && promo) linha += `\n     ↳ <i>${esc(promo)}</i>`;
+  return linha;
 }
 
-// Fatiamento: agrupa linhas em mensagens ≤ TG_LIMIT. Cabeçalho só na 1ª.
-function fatiar(header: string, linhas: string[]): string[] {
-  if (linhas.length === 0) return [header];
+// Fatiamento: agrupa os blocos (cada procedimento) em mensagens ≤ TG_LIMIT,
+// separando-os por uma LINHA EM BRANCO. Cabeçalho só na 1ª mensagem.
+function fatiar(header: string, blocos: string[]): string[] {
+  if (blocos.length === 0) return [header];
   const msgs: string[] = [];
   let buf = header;
-  for (const linha of linhas) {
-    if ((buf + "\n" + linha).length > TG_LIMIT) {
+  for (const bloco of blocos) {
+    // separador: linha em branco entre cabeçalho/itens e entre itens
+    if ((buf + "\n\n" + bloco).length > TG_LIMIT) {
       msgs.push(buf);
-      buf = "(continua…)\n" + linha;
+      buf = "(continua…)\n\n" + bloco;
     } else {
-      buf += "\n" + linha;
+      buf += "\n\n" + bloco;
     }
   }
   if (buf) msgs.push(buf);
@@ -222,7 +233,7 @@ serve(async (req) => {
     const inicioJanela = inicioMesAnteriorBR();
     const { data, error } = await supa
       .from("procedures")
-      .select("procedure_number, platform, category, telegram_link, status, archived, created_date")
+      .select("procedure_number, platform, category, promotion_name, telegram_link, status, archived, created_date")
       .ilike("status", "Enviada Partida em Aberto")
       .eq("archived", false)
       .gte("created_date", inicioJanela);
