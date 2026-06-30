@@ -38,15 +38,22 @@ function esc(s: string): string {
   return (s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-// Title Case simples (a casa/categoria vêm com grafia inconsistente no banco:
-// "PROMOÇÃO", "Promoção", "SUPERODD"...). Mantém siglas curtas em maiúscula.
+// Preposições/conectores que ficam em minúsculo no meio de nomes de casas
+// (ex.: "Bolsa de Aposta", "Esporte da Sorte", "Jogo de Ouro").
+const MINUSCULAS = new Set(["de", "da", "do", "das", "dos", "e"]);
+
+// Title Case (a casa/categoria vêm com grafia inconsistente no banco:
+// "PROMOÇÃO", "Promoção", "SUPERODD"...). Capitaliza cada palavra, mas mantém
+// preposições em minúsculo — exceto quando são a 1ª palavra.
 function titleCase(s: string): string {
   const t = (s ?? "").trim();
   if (!t) return t;
   return t
     .toLowerCase()
     .split(/\s+/)
-    .map((w) => (w.length <= 2 ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1)))
+    .map((w, i) =>
+      i > 0 && MINUSCULAS.has(w) ? w : w.charAt(0).toUpperCase() + w.slice(1),
+    )
     .join(" ");
 }
 
@@ -56,15 +63,17 @@ function emojiCategoria(cat: string): string {
     .toLowerCase()
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "");
-  if (c.includes("superodd")) return "🔵";
-  if (c.includes("super aumento") || c.includes("aumento")) return "🟢";
-  if (c.includes("aposta sem risco") || c === "asr") return "🛡️";
-  if (c.includes("cashback")) return "💸";
-  if (c.includes("freebet")) return "🎟️";
-  if (c.includes("giros")) return "🎰";
-  if (c.includes("extra")) return "🔁";
-  if (c.includes("promo")) return "🟢";
-  return "📌";
+  // Tudo bolinha colorida — a cor identifica a categoria (mais fácil de bater
+  // o olho que ícones variados).
+  if (c.includes("superodd")) return "🔵";              // azul
+  if (c.includes("super aumento") || c.includes("aumento")) return "🟢"; // verde
+  if (c.includes("aposta sem risco") || c === "asr") return "🟠"; // laranja
+  if (c.includes("cashback")) return "🟣";              // roxo
+  if (c.includes("freebet")) return "🟡";               // amarelo
+  if (c.includes("giros")) return "⚪";                 // branco
+  if (c.includes("extra")) return "🔴";                 // vermelho
+  if (c.includes("promo")) return "🟢";                 // verde
+  return "⚫";                                          // outras
 }
 
 // Ordena por prefixo numérico do procedure_number ("751", "751 EXTRA" → 751);
@@ -85,17 +94,34 @@ function dataBR(): string {
   return fmt.format(new Date());
 }
 
-// Primeiro dia do mês corrente (horário de Brasília) como "YYYY-MM-01".
-// Usado pra filtrar só os procedimentos criados no mês atual.
-function inicioMesBR(): string {
+// Primeiro dia do MÊS ANTERIOR (horário de Brasília) como "YYYY-MM-01".
+// Usado pra filtrar: o relatório carrega mês corrente + mês anterior, pra que
+// na virada do mês os procedimentos ainda em aberto não desapareçam.
+function inicioMesAnteriorBR(): string {
   const partes = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Sao_Paulo",
     year: "numeric",
     month: "2-digit",
   }).formatToParts(new Date());
-  const ano = partes.find((p) => p.type === "year")!.value;
-  const mes = partes.find((p) => p.type === "month")!.value;
-  return `${ano}-${mes}-01`;
+  let ano = parseInt(partes.find((p) => p.type === "year")!.value, 10);
+  let mes = parseInt(partes.find((p) => p.type === "month")!.value, 10);
+  // Volta um mês (janeiro → dezembro do ano anterior).
+  mes -= 1;
+  if (mes === 0) { mes = 12; ano -= 1; }
+  return `${ano}-${String(mes).padStart(2, "0")}-01`;
+}
+
+// Formata uma data ISO (created_date) como DD/MM/AAAA em horário de Brasília.
+function fmtDataEnvio(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  return new Intl.DateTimeFormat("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(d);
 }
 
 interface Row {
@@ -103,6 +129,7 @@ interface Row {
   platform: string | null;
   category: string | null;
   telegram_link: string | null;
+  created_date: string | null;
 }
 
 function montarLinha(r: Row): string {
@@ -115,7 +142,10 @@ function montarLinha(r: Row): string {
   const numHtml = link
     ? `<b><a href="${esc(link)}">${esc(num)}</a></b>`
     : `<b>${esc(num)}</b>`;
-  return `${emoji} ${numHtml} — ${esc(casa)} — ${esc(cat)}`;
+  // Data de envio (created_date) ao lado do número, DD/MM/AAAA.
+  const data = fmtDataEnvio(r.created_date);
+  const dataHtml = data ? ` · ${data}` : "";
+  return `${emoji} ${numHtml}${dataHtml} — ${esc(casa)} — ${esc(cat)}`;
 }
 
 // Fatiamento: agrupa linhas em mensagens ≤ TG_LIMIT. Cabeçalho só na 1ª.
@@ -179,28 +209,30 @@ serve(async (req) => {
     });
 
     // "Em aberto" = status "Enviada Partida em Aberto" (case-insensitive, pega
-    // a variação com "p" minúsculo) e não arquivado. Filtra só o MÊS CORRENTE
-    // por created_date (mês de criação no sistema; a coluna `date` tem datas
-    // de partida com erros de digitação, então não serve pra esse corte).
-    const inicioMes = inicioMesBR();
+    // a variação com "p" minúsculo) e não arquivado. Filtra MÊS CORRENTE +
+    // MÊS ANTERIOR por created_date (mês de criação no sistema; a coluna `date`
+    // tem datas de partida com erros de digitação, então não serve). Carregar
+    // o mês anterior evita que, na virada do mês, os em aberto desapareçam.
+    const inicioJanela = inicioMesAnteriorBR();
     const { data, error } = await supa
       .from("procedures")
       .select("procedure_number, platform, category, telegram_link, status, archived, created_date")
       .ilike("status", "Enviada Partida em Aberto")
       .eq("archived", false)
-      .gte("created_date", inicioMes);
+      .gte("created_date", inicioJanela);
     if (error) {
       log("query_error", { err: error.message });
       return json({ error: error.message }, { status: 500 });
     }
 
-    const rows = (data ?? []) as (Row & { status: string; archived: boolean; created_date: string })[];
+    const rows = (data ?? []) as (Row & { status: string; archived: boolean })[];
     rows.sort((a, b) => numKey(a.procedure_number) - numKey(b.procedure_number));
 
     const total = rows.length;
+    const plural = total === 1 ? "Procedimento em Aberto" : "Procedimentos em Aberto";
     const header =
       `🦈 <b>PROCEDIMENTOS EM ABERTO</b> — ${dataBR()}\n` +
-      `📊 ${total} em aberto no mês`;
+      `📊 ${total} ${plural}`;
 
     if (total === 0) {
       await tgSend(token, chatId, `${header}\n\n✅ Nenhum procedimento em aberto no momento.`);
