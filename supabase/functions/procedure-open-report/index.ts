@@ -83,6 +83,12 @@ function numKey(n: string | null): number {
   return m ? parseInt(m[1], 10) : Number.MAX_SAFE_INTEGER;
 }
 
+// Chave de data (só o dia, "YYYY-MM-DD") pra ordenar por data de envio. Linhas
+// do mesmo dia caem na mesma chave e são desempatadas pelo número.
+function dateKey(iso: string | null): string {
+  return (iso ?? "").slice(0, 10) || "9999-99-99"; // sem data vai pro fim
+}
+
 function dataBR(): string {
   // Data de hoje em America/Sao_Paulo (UTC-3) no formato DD/MM/AAAA.
   const fmt = new Intl.DateTimeFormat("pt-BR", {
@@ -226,7 +232,14 @@ serve(async (req) => {
     }
 
     const rows = (data ?? []) as (Row & { status: string; archived: boolean })[];
-    rows.sort((a, b) => numKey(a.procedure_number) - numKey(b.procedure_number));
+    // Ordena por DATA de envio (mais antigos primeiro) e, no mesmo dia, por
+    // número do procedimento.
+    rows.sort((a, b) => {
+      const da = dateKey(a.created_date);
+      const db = dateKey(b.created_date);
+      if (da !== db) return da < db ? -1 : 1;
+      return numKey(a.procedure_number) - numKey(b.procedure_number);
+    });
 
     const total = rows.length;
     const plural = total === 1 ? "Procedimento em Aberto" : "Procedimentos em Aberto";
