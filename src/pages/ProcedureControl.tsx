@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { usePersistedState } from '@/hooks/usePersistedState';
-import { startOfMonth, endOfMonth, endOfDay, differenceInDays } from 'date-fns';
+import { differenceInDays } from 'date-fns';
 import { Plus, FileText, Columns, Upload, List, Bot, Wand2, Send } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabaseProcedures } from '@/lib/supabaseProcedures';
@@ -36,7 +36,11 @@ import { PAGE_KEYS } from '@/types/auth';
 export default function ProcedureControl() {
   const { canEditPage } = useAuth();
   const canEdit = canEditPage(PAGE_KEYS.PROCEDURE_CONTROL);
-  const { data: procedures = [], refetch } = useProcedures();
+  // selectedMonth shared via localStorage with Dashboard (same key). Carrega só
+  // o mês selecionado do servidor (created_date) — evita o teto de 1000 linhas
+  // do Supabase com milhares de procedimentos. Trocar de mês busca aquele mês.
+  const [selectedMonth, setSelectedMonth] = usePersistedState('proc_month', new Date());
+  const { data: procedures = [], refetch } = useProcedures({ month: selectedMonth });
   const proceduresById = useMemo(() => {
     const m = new Map<string, Procedure>();
     for (const p of procedures) m.set(p.id, p);
@@ -49,8 +53,6 @@ export default function ProcedureControl() {
   const [showModal, setShowModal] = useState(false);
   const [editingProcedure, setEditingProcedure] = useState<Procedure | null>(null);
   const [resultProcedure, setResultProcedure] = useState<Procedure | null>(null);
-  // selectedMonth shared via localStorage with Dashboard (same key)
-  const [selectedMonth, setSelectedMonth] = usePersistedState('proc_month', new Date());
   const [showImportModal, setShowImportModal] = useState(false);
   const [showRelatorioModal, setShowRelatorioModal] = useState(false);
   const [showColumnCustomizer, setShowColumnCustomizer] = useState(false);
@@ -152,13 +154,12 @@ export default function ProcedureControl() {
   };
 
   const filteredProcedures = useMemo(() => {
-    const monthStart = startOfMonth(selectedMonth);
-    const monthEnd = endOfDay(endOfMonth(selectedMonth));
+    // O recorte de mês já é feito no servidor (useProcedures({ month })) por
+    // created_date — aqui só aplicamos os demais filtros da UI.
     const today = new Date();
 
     return procedures.filter(proc => {
       const procDate = parseDate(proc.date);
-      if (!procDate || procDate < monthStart || procDate > monthEnd) return false;
       if (!filters.showArchived && proc.archived) return false;
       if (filters.gameTime !== 'all' && getGameTimeBucket(proc, today) !== filters.gameTime) return false;
       if (filters.searchNumber && !proc.procedure_number?.toLowerCase().includes(filters.searchNumber.toLowerCase())) return false;
@@ -215,16 +216,11 @@ export default function ProcedureControl() {
       const numB = parseInt(b.procedure_number, 10) || 0;
       return numB - numA;
     });
-  }, [procedures, selectedMonth, filters]);
+  }, [procedures, filters]);
 
-  const monthProcedures = useMemo(() => {
-    const monthStart = startOfMonth(selectedMonth);
-    const monthEnd = endOfDay(endOfMonth(selectedMonth));
-    return procedures.filter(proc => {
-      const procDate = parseDate(proc.date);
-      return procDate && procDate >= monthStart && procDate <= monthEnd;
-    });
-  }, [procedures, selectedMonth]);
+  // `procedures` já vem só do mês selecionado (filtro server-side por
+  // created_date), então as estatísticas do mês usam o conjunto inteiro.
+  const monthProcedures = procedures;
 
   return (
     <Layout>

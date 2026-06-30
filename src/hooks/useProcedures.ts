@@ -7,34 +7,87 @@ import { normalizePlatformName } from '@/lib/procedureUtils';
 
 const PROCEDURES_KEY = ['procedures'];
 
-// Fetch all procedures (incluindo arquivados — o filtro "showArchived" mora na UI)
-export function useProcedures() {
+// Performance: NÃO trazer bot_raw_message (texto inteiro do Telegram por
+// procedimento — campo mais pesado e não usado na lista/cálculo). Com milhares
+// de procedimentos, isso reduz muito o payload e acelera a navegação. Quem
+// precisa do raw (RegisterBotMessageModal, BotTemplates) carrega à parte.
+const COLS = 'id,created_date,updated_date,created_by,date,procedure_number,platform,promotion_name,category,status,freebet_reference,freebet_value,profit_loss,telegram_link,dp,tags,is_favorite,data_partida,horario_partida,partida_descricao,tipo,archived,archived_at,lucro_prejuizo_previsto,freebet_valor_previsto,resultado_lucro,resultado_freebet_ganha,freebet_creditada,resultado_observacao,freebetpro_external_id,freebetpro_synced_at,freebetpro_last_error,freebetpro_numero,freebetpro_last_request_id,freebet_reference_id,freebet_reference_ids,is_extra,editado_por,kickoff_at,fixture_id,esporte,cenario_b_cash,tachado,tachado_em,reenviado_em,reenviado_count,duplo_green_confirmado,duplo_green_lucro,bot_needs_review,bot_missing_fields,observacoes';
+
+const PAGE = 1000; // teto de linhas por request do PostgREST
+
+// Limites ISO (UTC) do mês de uma data — usados pra filtrar created_date no
+// servidor. O mês é interpretado em America/Sao_Paulo (UTC-3): início é
+// dia 1 00:00 BRT = dia 1 03:00 UTC; fim é o início do mês seguinte.
+function mesRangeISO(month: Date): { gte: string; lt: string } {
+  const y = month.getFullYear();
+  const m = month.getMonth(); // 0-11
+  // 03:00 UTC = 00:00 BRT (UTC-3)
+  const gte = new Date(Date.UTC(y, m, 1, 3, 0, 0)).toISOString();
+  const lt = new Date(Date.UTC(y, m + 1, 1, 3, 0, 0)).toISOString();
+  return { gte, lt };
+}
+
+// Pagina uma query até trazer todas as linhas (ultrapassa o teto de 1000 do
+// PostgREST). `build` recebe o range e devolve a query já com filtros/ordem.
+async function fetchAllPages(
+  build: (from: number, to: number) => Promise<{ data: unknown[] | null; error: unknown }>,
+): Promise<Procedure[]> {
+  const all: Procedure[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await build(from, from + PAGE - 1);
+    if (error) {
+      console.error('Error fetching procedures:', error);
+      throw error;
+    }
+    const rows = (data || []) as unknown as Procedure[];
+    all.push(...rows);
+    if (rows.length < PAGE) break; // página incompleta = fim
+  }
+  return all;
+}
+
+export interface UseProceduresOptions {
+  // Quando passado, traz só os procedimentos criados nesse mês (filtro
+  // server-side por created_date). Sem ele, pagina e traz TODOS — usado por
+  // telas que só precisam da lista de plataformas/relatórios.
+  month?: Date;
+}
+
+// Fetch de procedimentos (incluindo arquivados — o filtro "showArchived" mora
+// na UI). Sem options → todos (paginado). Com { month } → só aquele mês.
+export function useProcedures(options?: UseProceduresOptions) {
+  const month = options?.month;
+  const monthKey = month ? `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, '0')}` : null;
+
   return useQuery({
-    queryKey: PROCEDURES_KEY,
+    queryKey: monthKey ? [...PROCEDURES_KEY, 'month', monthKey] : [...PROCEDURES_KEY, 'all'],
     queryFn: async (): Promise<Procedure[]> => {
       if (!isProceduresSupabaseConfigured()) {
         console.warn('Procedures Supabase not configured');
         return [];
       }
 
-      // Performance: NÃO trazer bot_raw_message (texto inteiro do Telegram por
-      // procedimento — campo mais pesado e não usado na lista/cálculo). Com
-      // milhares de procedimentos, isso reduz muito o payload e acelera a
-      // navegação. Quem precisa do raw (RegisterBotMessageModal, BotTemplates)
-      // carrega o registro à parte.
-      const COLS = 'id,created_date,updated_date,created_by,date,procedure_number,platform,promotion_name,category,status,freebet_reference,freebet_value,profit_loss,telegram_link,dp,tags,is_favorite,data_partida,horario_partida,partida_descricao,tipo,archived,archived_at,lucro_prejuizo_previsto,freebet_valor_previsto,resultado_lucro,resultado_freebet_ganha,freebet_creditada,resultado_observacao,freebetpro_external_id,freebetpro_synced_at,freebetpro_last_error,freebetpro_numero,freebetpro_last_request_id,freebet_reference_id,freebet_reference_ids,is_extra,editado_por,kickoff_at,fixture_id,esporte,cenario_b_cash,tachado,tachado_em,reenviado_em,reenviado_count,duplo_green_confirmado,duplo_green_lucro,bot_needs_review,bot_missing_fields,observacoes';
-      const { data, error } = await supabaseProcedures
-        .from('procedures')
-        .select(COLS)
-        .order('date', { ascending: false })
-        .limit(10000);
-
-      if (error) {
-        console.error('Error fetching procedures:', error);
-        throw error;
+      if (month) {
+        const { gte, lt } = mesRangeISO(month);
+        return fetchAllPages((from, to) =>
+          supabaseProcedures
+            .from('procedures')
+            .select(COLS)
+            .gte('created_date', gte)
+            .lt('created_date', lt)
+            .order('created_date', { ascending: false })
+            .range(from, to),
+        );
       }
 
-      return (data || []) as unknown as Procedure[];
+      // Sem mês: traz todos, paginando (ultrapassa o teto de 1000).
+      return fetchAllPages((from, to) =>
+        supabaseProcedures
+          .from('procedures')
+          .select(COLS)
+          .order('created_date', { ascending: false })
+          .range(from, to),
+      );
     },
     staleTime: 60000,
     refetchInterval: 120000,
@@ -318,20 +371,25 @@ export function useToggleTachado() {
       return data;
     },
     onMutate: async ({ id, tachado }) => {
-      // Optimistic update — reflete instantâneo na lista
+      // Optimistic update — reflete instantâneo na lista. Aplica em TODAS as
+      // queries de procedimentos (key 'all' e cada 'month/YYYY-MM'), via prefixo.
       await queryClient.cancelQueries({ queryKey: PROCEDURES_KEY });
-      const prev = queryClient.getQueryData<Procedure[]>(PROCEDURES_KEY);
+      const prev = queryClient.getQueriesData<Procedure[]>({ queryKey: PROCEDURES_KEY });
       const now = new Date().toISOString();
-      if (prev) {
+      for (const [key, list] of prev) {
+        if (!list) continue;
         queryClient.setQueryData<Procedure[]>(
-          PROCEDURES_KEY,
-          prev.map((p) => (p.id === id ? { ...p, tachado, tachado_em: tachado ? now : null } : p)),
+          key,
+          list.map((p) => (p.id === id ? { ...p, tachado, tachado_em: tachado ? now : null } : p)),
         );
       }
       return { prev };
     },
     onError: (error: Error, _vars, ctx) => {
-      if (ctx?.prev) queryClient.setQueryData(PROCEDURES_KEY, ctx.prev);
+      // Restaura cada cache ao valor anterior
+      if (ctx?.prev) {
+        for (const [key, list] of ctx.prev) queryClient.setQueryData(key, list);
+      }
       toast({
         title: 'Erro',
         description: `Falha ao atualizar tachado: ${error.message}`,
