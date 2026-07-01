@@ -15,7 +15,8 @@ import {
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
-import { Shield, ShieldAlert, ShieldOff, Settings, Trash2, Loader2, Save, Users, Clock, UserCog } from 'lucide-react';
+import { Shield, ShieldAlert, ShieldOff, Settings, Trash2, Loader2, Save, Users, Clock, UserCog, KeyRound } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { PageHeader } from '@/components/PageHeader';
 
 // Total de páginas liberáveis (não-admin, não-utilitárias).
@@ -23,7 +24,7 @@ const TOTAL_PERMISSION_PAGES = PERMISSION_PAGES.length;
 
 const AdminUsers = () => {
   const {
-    users, loading, updateAllowedPages, toggleSuperAdmin, revokeLegacyAdmin, deleteUserByEmail,
+    users, loading, updateAllowedPages, toggleSuperAdmin, revokeLegacyAdmin, deleteUserByEmail, resetPassword,
   } = useUserManagement();
 
   const [selectedUser, setSelectedUser] = useState<UserWithPermissions | null>(null);
@@ -31,6 +32,19 @@ const AdminUsers = () => {
   // Conjunto de keys de páginas liberadas pro usuário em edição.
   const [allowed, setAllowed] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
+
+  // Reset de senha (senha temporária) — só p/ usuário da equipe.
+  const [resetUser, setResetUser] = useState<UserWithPermissions | null>(null);
+  const [tempPassword, setTempPassword] = useState('');
+  const [resetting, setResetting] = useState(false);
+
+  const handleConfirmReset = async () => {
+    if (!resetUser || tempPassword.trim().length < 6) return;
+    setResetting(true);
+    const res = await resetPassword(resetUser.email, tempPassword.trim());
+    setResetting(false);
+    if (res.ok) { setResetUser(null); setTempPassword(''); }
+  };
 
   const openPermissions = (user: UserWithPermissions) => {
     setSelectedUser(user);
@@ -208,6 +222,12 @@ const AdminUsers = () => {
                               onClick={() => openPermissions(user)}
                             />
                             <ActionButton
+                              icon={KeyRound}
+                              intent="neutral"
+                              label="Resetar senha"
+                              onClick={() => { setResetUser(user); setTempPassword(''); }}
+                            />
+                            <ActionButton
                               icon={Trash2}
                               intent="delete"
                               label="Excluir"
@@ -289,6 +309,43 @@ const AdminUsers = () => {
                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Salvando...</>
               ) : (
                 <><Save className="h-4 w-4 mr-2" />Salvar Permissões</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal: resetar senha (senha temporária) — só usuário da equipe */}
+      <Dialog open={!!resetUser} onOpenChange={(o) => { if (!o) { setResetUser(null); setTempPassword(''); } }}>
+        <DialogContent className="max-w-md bg-card border border-white/10">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <KeyRound className="h-5 w-5" />
+              Resetar senha
+            </DialogTitle>
+            <DialogDescription>
+              Defina uma senha temporária para <span className="font-medium text-foreground">{resetUser?.email}</span>. Repasse ao usuário — ele pode trocá-la depois em "Esqueci a senha".
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2">
+            <label className="text-xs text-muted-foreground">Senha temporária (mín. 6 caracteres)</label>
+            <Input
+              type="text"
+              value={tempPassword}
+              onChange={(e) => setTempPassword(e.target.value)}
+              placeholder="Ex: Shark@2026"
+              autoFocus
+            />
+          </div>
+
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={() => { setResetUser(null); setTempPassword(''); }}>Cancelar</Button>
+            <Button onClick={handleConfirmReset} disabled={resetting || tempPassword.trim().length < 6}>
+              {resetting ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Definindo...</>
+              ) : (
+                <><KeyRound className="h-4 w-4 mr-2" />Definir senha</>
               )}
             </Button>
           </DialogFooter>

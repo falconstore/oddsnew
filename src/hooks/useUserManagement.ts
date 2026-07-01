@@ -121,6 +121,37 @@ export function useUserManagement() {
     }
   };
 
+  // Reseta a senha de um usuário DA EQUIPE definindo uma senha temporária.
+  // A Edge Function recusa qualquer email que não esteja em user_permissions
+  // (trava anti-PWA). O admin repassa a senha ao usuário.
+  const resetPassword = async (userEmail: string, tempPassword: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-users', {
+        body: { action: 'reset-password', email: userEmail, tempPassword },
+      });
+      // Erros de negócio (ex.: usuário sem conta) vêm no corpo com ok:false.
+      if (error) throw error;
+      if (data && data.ok === false) {
+        toast({
+          title: 'Não foi possível resetar',
+          description: data.error ?? 'Erro desconhecido.',
+          variant: 'destructive',
+        });
+        return { ok: false as const };
+      }
+      toast({
+        title: 'Senha redefinida',
+        description: 'Senha temporária definida. Repasse ao usuário.',
+      });
+      return { ok: true as const };
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Erro desconhecido';
+      console.error('Error resetting password:', error);
+      toast({ title: 'Erro ao resetar senha', description: msg, variant: 'destructive' });
+      return { ok: false as const };
+    }
+  };
+
   const deleteUserByEmail = async (userEmail: string) => {
     try {
       const { error } = await supabase
@@ -158,5 +189,6 @@ export function useUserManagement() {
     toggleSuperAdmin,
     revokeLegacyAdmin,
     deleteUserByEmail,
+    resetPassword,
   };
 }
