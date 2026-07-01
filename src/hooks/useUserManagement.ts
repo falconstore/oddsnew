@@ -8,8 +8,16 @@ export interface UserWithPermissions {
   permissions: UserPermissionRow;
 }
 
+// Status de acesso de cada usuário da equipe (vindo do Auth, só p/ a equipe).
+export interface UserStatus {
+  in_auth: boolean;
+  banned: boolean;
+  last_sign_in_at: string | null;
+}
+
 export function useUserManagement() {
   const [users, setUsers] = useState<UserWithPermissions[]>([]);
+  const [statuses, setStatuses] = useState<Record<string, UserStatus>>({});
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
@@ -29,6 +37,8 @@ export function useUserManagement() {
       }));
 
       setUsers(usersFromPerms);
+      // Enriquece com status de acesso (banido/em-auth) — só da equipe.
+      void fetchStatuses();
     } catch (error) {
       console.error('Error fetching users:', error);
       toast({
@@ -38,6 +48,49 @@ export function useUserManagement() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Busca o status de acesso (in_auth/banned/último login) só da equipe.
+  const fetchStatuses = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-users', {
+        body: { action: 'list-status' },
+      });
+      if (error) return; // status é opcional; falha não quebra a lista
+      setStatuses((data?.statuses ?? {}) as Record<string, UserStatus>);
+    } catch {
+      /* status é opcional */
+    }
+  };
+
+  // Ativa/desativa (bane/libera login) um usuário da equipe.
+  const setActive = async (userEmail: string, active: boolean) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-users', {
+        body: { action: 'set-active', email: userEmail, active },
+      });
+      if (error) {
+        let motivo = error instanceof Error ? error.message : 'Erro desconhecido';
+        const ctx = (error as any)?.context;
+        if (ctx && typeof ctx.json === 'function') {
+          try { const b = await ctx.json(); if (b?.error) motivo = b.error; } catch { /* noop */ }
+        }
+        toast({ title: 'Não foi possível alterar', description: motivo, variant: 'destructive' });
+        return { ok: false as const };
+      }
+      if (data && data.ok === false) {
+        toast({ title: 'Atenção', description: data.error ?? 'Erro.', variant: 'destructive' });
+        return { ok: false as const };
+      }
+      toast({ title: active ? 'Usuário ativado' : 'Usuário desativado', description: active ? 'O login foi liberado.' : 'O login foi bloqueado.' });
+      await fetchStatuses();
+      return { ok: true as const };
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Erro desconhecido';
+      console.error('Error set-active:', error);
+      toast({ title: 'Erro', description: msg, variant: 'destructive' });
+      return { ok: false as const };
     }
   };
 
@@ -232,6 +285,7 @@ export function useUserManagement() {
 
   return {
     users,
+    statuses,
     loading,
     fetchUsers,
     updateAllowedPages,
@@ -240,5 +294,6 @@ export function useUserManagement() {
     deleteUserByEmail,
     resetPassword,
     createUser,
+    setActive,
   };
 }
