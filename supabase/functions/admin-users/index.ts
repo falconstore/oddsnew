@@ -19,6 +19,10 @@
 //      nova no Auth (email já confirmado) + linha em user_permissions com as
 //      abas escolhidas. Recusa se o email já existir no Auth (não toca em conta
 //      existente — nem do PWA, nem da equipe).
+//   - "set-active"     → { email, active } bloqueia (active=false → ban) ou
+//      libera (active=true) o login de um usuário DA EQUIPE. Não exclui nada.
+//   - "list-status"    → retorna, SÓ para os emails da equipe (user_permissions),
+//      { email → { in_auth, banned, last_sign_in_at } }. Não varre o PWA.
 //
 // Auth: Bearer do usuário logado (JWT do app).
 // deno-lint-ignore-file
@@ -171,6 +175,75 @@ serve(async (req) => {
 
       log("create_ok", { email, pages: allowedPages.length });
       return json({ ok: true, email, id: created?.user?.id ?? null });
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // SET-ACTIVE — banir (active=false) ou liberar (active=true) o login.
+    // SÓ para usuário da equipe (trava anti-PWA).
+    // ─────────────────────────────────────────────────────────────
+    if (action === "set-active") {
+      const email = (body?.email ?? "").trim();
+      const active = body?.active === true;
+      if (!email) return json({ error: "email obrigatório" }, { status: 400 });
+
+      // Não deixa o admin desativar a si mesmo (evita se trancar pra fora).
+      if (!active && email.toLowerCase() === callerEmail.toLowerCase()) {
+        return json({ error: "você não pode desativar a si mesmo" }, { status: 400 });
+      }
+
+      // TRAVA ANTI-PWA: precisa estar em user_permissions (equipe).
+      const { data: alvoPerm } = await admin
+        .from("user_permissions")
+        .select("user_email")
+        .eq("user_email", email)
+        .maybeSingle();
+      if (!alvoPerm) {
+        log("setactive_not_team", { email });
+        return json({ error: "esse email não é um usuário do painel" }, { status: 403 });
+      }
+
+      const targetUser = await acharAuthUserPorEmail(admin, email);
+      if (!targetUser) {
+        return json({
+          ok: false, code: "no_auth_account",
+          error: "Este usuário ainda não tem conta de acesso.",
+        }, { status: 409 });
+      }
+
+      // active=false → bane por ~100 anos (efetivamente permanente até reativar).
+      // active=true  → remove o ban (ban_duration "none").
+      const { error: updErr } = await admin.auth.admin.updateUserById(targetUser.id, {
+        ban_duration: active ? "none" : "876000h",
+      });
+      if (updErr) throw updErr;
+
+      log("setactive_ok", { email, active });
+      return json({ ok: true, email, active });
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // LIST-STATUS — status (in_auth/banned/last_sign_in) SÓ da equipe.
+    // Não varre o PWA: parte de user_permissions e resolve email a email.
+    // ─────────────────────────────────────────────────────────────
+    if (action === "list-status") {
+      const { data: perms, error: permErr } = await admin
+        .from("user_permissions")
+        .select("user_email");
+      if (permErr) throw permErr;
+
+      const statuses: Record<string, { in_auth: boolean; banned: boolean; last_sign_in_at: string | null }> = {};
+      for (const p of perms ?? []) {
+        const email = (p.user_email ?? "").trim();
+        if (!email) continue;
+        const u = await acharAuthUserPorEmail(admin, email);
+        statuses[email.toLowerCase()] = {
+          in_auth: !!u,
+          banned: !!u?.banned_until && new Date(u.banned_until) > new Date(),
+          last_sign_in_at: u?.last_sign_in_at ?? null,
+        };
+      }
+      log("list_status_ok", { count: Object.keys(statuses).length });
+      return json({ ok: true, statuses });
     }
 
     return json({ error: "ação desconhecida" }, { status: 400 });

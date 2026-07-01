@@ -18,14 +18,21 @@ import {
 import { Shield, ShieldAlert, ShieldOff, Settings, Trash2, Loader2, Save, Users, Clock, UserCog, KeyRound, UserPlus } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { PageHeader } from '@/components/PageHeader';
+import { useAuth } from '@/contexts/AuthContext';
 
 // Total de páginas liberáveis (não-admin, não-utilitárias).
 const TOTAL_PERMISSION_PAGES = PERMISSION_PAGES.length;
 
 const AdminUsers = () => {
   const {
-    users, loading, updateAllowedPages, toggleSuperAdmin, revokeLegacyAdmin, deleteUserByEmail, resetPassword, createUser,
+    users, statuses, loading, updateAllowedPages, toggleSuperAdmin, revokeLegacyAdmin, deleteUserByEmail, resetPassword, createUser, setActive,
   } = useUserManagement();
+
+  // Status de acesso do usuário (banido/sem conta). statuses vem por email lower.
+  const statusOf = (email: string) => statuses[email.toLowerCase()];
+  // Email do próprio admin logado — não pode desativar a si mesmo.
+  const { user: authUser } = useAuth();
+  const meuEmail = (authUser?.email ?? '').toLowerCase();
 
   const [selectedUser, setSelectedUser] = useState<UserWithPermissions | null>(null);
   const [permissionsOpen, setPermissionsOpen] = useState(false);
@@ -196,6 +203,7 @@ const AdminUsers = () => {
                     <TableRow>
                       <TableHead>Email</TableHead>
                       <TableHead>Permissões</TableHead>
+                      <TableHead>Acesso</TableHead>
                       <TableHead>Super Admin</TableHead>
                       <TableHead className="text-right">Ações</TableHead>
                     </TableRow>
@@ -231,6 +239,28 @@ const AdminUsers = () => {
                               </Badge>
                             )}
                           </div>
+                        </TableCell>
+                        <TableCell>
+                          {(() => {
+                            const st = statusOf(user.email);
+                            if (!st || !st.in_auth) {
+                              return <span className="text-xs text-muted-foreground/60">Sem conta</span>;
+                            }
+                            const ehEuMesmo = user.email.toLowerCase() === meuEmail;
+                            return (
+                              <div className="flex items-center gap-2">
+                                <Switch
+                                  checked={!st.banned}
+                                  disabled={ehEuMesmo}
+                                  onCheckedChange={(checked) => setActive(user.email, checked)}
+                                  title={ehEuMesmo ? 'Você não pode desativar a si mesmo' : (st.banned ? 'Inativo — clique para ativar' : 'Ativo — clique para desativar')}
+                                />
+                                {st.banned && (
+                                  <Badge variant="outline" className="border-destructive text-destructive">Inativo</Badge>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </TableCell>
                         <TableCell>
                           <Switch
@@ -274,7 +304,7 @@ const AdminUsers = () => {
                     ))}
                     {users.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                        <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                           Nenhum usuário encontrado.
                         </TableCell>
                       </TableRow>
