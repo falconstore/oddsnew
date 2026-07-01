@@ -129,8 +129,24 @@ export function useUserManagement() {
       const { data, error } = await supabase.functions.invoke('admin-users', {
         body: { action: 'reset-password', email: userEmail, tempPassword },
       });
-      // Erros de negócio (ex.: usuário sem conta) vêm no corpo com ok:false.
-      if (error) throw error;
+
+      // Quando a função responde com status >= 400 (403 anti-PWA, 409 sem
+      // conta, etc.), o supabase-js joga em `error` (FunctionsHttpError) e o
+      // corpo real fica em error.context (um Response). Extraímos a mensagem
+      // de lá pra mostrar o motivo certo em vez de "non-2xx status code".
+      if (error) {
+        let motivo = error instanceof Error ? error.message : 'Erro desconhecido';
+        const ctx = (error as any)?.context;
+        if (ctx && typeof ctx.json === 'function') {
+          try {
+            const body = await ctx.json();
+            if (body?.error) motivo = body.error;
+          } catch { /* corpo não-JSON — mantém motivo */ }
+        }
+        toast({ title: 'Não foi possível resetar', description: motivo, variant: 'destructive' });
+        return { ok: false as const };
+      }
+
       if (data && data.ok === false) {
         toast({
           title: 'Não foi possível resetar',
@@ -139,6 +155,7 @@ export function useUserManagement() {
         });
         return { ok: false as const };
       }
+
       toast({
         title: 'Senha redefinida',
         description: 'Senha temporária definida. Repasse ao usuário.',
