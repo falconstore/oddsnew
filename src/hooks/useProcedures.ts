@@ -15,15 +15,16 @@ const COLS = 'id,created_date,updated_date,created_by,date,procedure_number,plat
 
 const PAGE = 1000; // teto de linhas por request do PostgREST
 
-// Limites ISO (UTC) do mês de uma data — usados pra filtrar created_date no
-// servidor. O mês é interpretado em America/Sao_Paulo (UTC-3): início é
-// dia 1 00:00 BRT = dia 1 03:00 UTC; fim é o início do mês seguinte.
+// Limites do mês pra filtrar created_date no servidor. O created_date dos
+// procedimentos é gravado como MEIA-NOITE UTC do dia (ex.: 2026-07-01T00:00Z),
+// alinhado com a data — não é um timestamp real com hora. Por isso o corte é
+// em UTC puro (dia 1 00:00Z): aplicar deslocamento de fuso (-3h) jogaria os
+// procedimentos do dia 1 pro mês anterior. Ver bug da virada jun→jul.
 function mesRangeISO(month: Date): { gte: string; lt: string } {
   const y = month.getFullYear();
   const m = month.getMonth(); // 0-11
-  // 03:00 UTC = 00:00 BRT (UTC-3)
-  const gte = new Date(Date.UTC(y, m, 1, 3, 0, 0)).toISOString();
-  const lt = new Date(Date.UTC(y, m + 1, 1, 3, 0, 0)).toISOString();
+  const gte = new Date(Date.UTC(y, m, 1, 0, 0, 0)).toISOString();
+  const lt = new Date(Date.UTC(y, m + 1, 1, 0, 0, 0)).toISOString();
   return { gte, lt };
 }
 
