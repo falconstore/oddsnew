@@ -27,6 +27,9 @@ verify_jwt = true
 [functions.admin-users]
 verify_jwt = false
 
+[functions.lastlink-report]
+verify_jwt = false
+
 [functions.trial-webhook-guard]
 verify_jwt = false
 

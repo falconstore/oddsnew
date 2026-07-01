@@ -17,6 +17,7 @@ import { importLastlinkFile, ImportResult } from '@/lib/lastlinkImport';
 import { LastlinkCalendar, DailyPoint } from '@/components/lastlink/LastlinkCalendar';
 import { UserRenewalsReport } from '@/components/lastlink/UserRenewalsReport';
 import { DaySalesModal } from '@/components/lastlink/DaySalesModal';
+import { LastlinkAiReport } from '@/components/lastlink/LastlinkAiReport';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -220,6 +221,9 @@ export default function LastlinkDashboard() {
             </button>
           )}
         </div>
+
+        {/* Relatório de vendas com IA (respeita o produto filtrado) */}
+        <LastlinkAiReport produto={produtoFiltro === ALL ? null : produtoFiltro} />
 
         {/* KPIs GERAIS (todo o histórico) */}
         <div>
