@@ -15,7 +15,7 @@ import {
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
-import { Shield, ShieldAlert, ShieldOff, Settings, Trash2, Loader2, Save, Users, Clock, UserCog, KeyRound } from 'lucide-react';
+import { Shield, ShieldAlert, ShieldOff, Settings, Trash2, Loader2, Save, Users, Clock, UserCog, KeyRound, UserPlus } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { PageHeader } from '@/components/PageHeader';
 
@@ -24,7 +24,7 @@ const TOTAL_PERMISSION_PAGES = PERMISSION_PAGES.length;
 
 const AdminUsers = () => {
   const {
-    users, loading, updateAllowedPages, toggleSuperAdmin, revokeLegacyAdmin, deleteUserByEmail, resetPassword,
+    users, loading, updateAllowedPages, toggleSuperAdmin, revokeLegacyAdmin, deleteUserByEmail, resetPassword, createUser,
   } = useUserManagement();
 
   const [selectedUser, setSelectedUser] = useState<UserWithPermissions | null>(null);
@@ -44,6 +44,35 @@ const AdminUsers = () => {
     const res = await resetPassword(resetUser.email, tempPassword.trim());
     setResetting(false);
     if (res.ok) { setResetUser(null); setTempPassword(''); }
+  };
+
+  // Criar novo usuário (email + senha temporária + abas)
+  const [createOpen, setCreateOpen] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [newAllowed, setNewAllowed] = useState<Set<string>>(new Set());
+  const [creating, setCreating] = useState(false);
+
+  const openCreate = () => {
+    setNewEmail(''); setNewPassword(''); setNewAllowed(new Set()); setCreateOpen(true);
+  };
+  const toggleNewPage = (key: string, value: boolean) => {
+    setNewAllowed(prev => {
+      const next = new Set(prev);
+      if (value) next.add(key); else next.delete(key);
+      return next;
+    });
+  };
+  const newAllChecked = useMemo(
+    () => PERMISSION_PAGES.every(p => newAllowed.has(p.key)),
+    [newAllowed]
+  );
+  const handleConfirmCreate = async () => {
+    if (!newEmail.includes('@') || newPassword.trim().length < 6) return;
+    setCreating(true);
+    const res = await createUser(newEmail.trim().toLowerCase(), newPassword.trim(), Array.from(newAllowed));
+    setCreating(false);
+    if (res.ok) setCreateOpen(false);
   };
 
   const openPermissions = (user: UserWithPermissions) => {
@@ -110,6 +139,12 @@ const AdminUsers = () => {
           title="Usuários"
           subtitle="GERENCIE PERMISSÕES E SUPER ADMINS DO SISTEMA"
           icon={UserCog}
+          actions={
+            <Button onClick={openCreate} size="sm" className="h-9 font-semibold">
+              <UserPlus className="h-3.5 w-3.5 mr-1.5" />
+              Novo usuário
+            </Button>
+          }
         />
 
         <div className="grid grid-cols-3 gap-3 sm:gap-4">
@@ -346,6 +381,91 @@ const AdminUsers = () => {
                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Definindo...</>
               ) : (
                 <><KeyRound className="h-4 w-4 mr-2" />Definir senha</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal: criar novo usuário (email + senha temporária + abas) */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto bg-card border border-white/10">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="h-5 w-5" />
+              Novo usuário
+            </DialogTitle>
+            <DialogDescription>
+              Cria uma conta com senha temporária. Repasse a senha ao usuário — ele pode trocá-la depois em "Esqueci a senha".
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">Email</label>
+                <Input
+                  type="email"
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  placeholder="usuario@email.com"
+                  autoFocus
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">Senha temporária (mín. 6)</label>
+                <Input
+                  type="text"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Ex: Shark@2026"
+                />
+              </div>
+            </div>
+
+            {/* Selecionar todas */}
+            <label className="flex items-center justify-between gap-3 border bg-primary/5 px-3 py-2 rounded-lg cursor-pointer">
+              <span className="font-medium text-sm">Selecionar todas as abas</span>
+              <Checkbox checked={newAllChecked} onCheckedChange={(c) => setNewAllowed(c ? new Set(PERMISSION_PAGES.map(p => p.key)) : new Set())} />
+            </label>
+
+            {/* Abas por seção */}
+            {PERMISSION_PAGES_BY_SECTION.map((group) => (
+              <div key={group.section} className="border rounded-lg overflow-hidden">
+                <div className="bg-muted/50 px-3 py-1.5 text-xs font-semibold tracking-wide text-muted-foreground">
+                  {group.section}
+                </div>
+                <div className="divide-y">
+                  {group.pages.map((page) => (
+                    <label
+                      key={page.key}
+                      className="flex items-center justify-between gap-3 px-3 py-2 cursor-pointer hover:bg-accent/40 transition-colors"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <page.icon className="h-4 w-4 text-muted-foreground/60 flex-shrink-0" />
+                        <div className="min-w-0">
+                          <p className="font-medium text-sm truncate">{page.label}</p>
+                          <p className="text-xs text-muted-foreground truncate">{page.description}</p>
+                        </div>
+                      </div>
+                      <Checkbox
+                        checked={newAllowed.has(page.key)}
+                        onCheckedChange={(c) => toggleNewPage(page.key, !!c)}
+                      />
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancelar</Button>
+            <Button onClick={handleConfirmCreate} disabled={creating || !newEmail.includes('@') || newPassword.trim().length < 6}>
+              {creating ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Criando...</>
+              ) : (
+                <><UserPlus className="h-4 w-4 mr-2" />Criar usuário</>
               )}
             </Button>
           </DialogFooter>
