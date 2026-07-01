@@ -101,20 +101,14 @@ function dataBR(): string {
 }
 
 // Primeiro dia do MÊS ANTERIOR (horário de Brasília) como "YYYY-MM-01".
-// Usado pra filtrar: o relatório carrega mês corrente + mês anterior, pra que
-// na virada do mês os procedimentos ainda em aberto não desapareçam.
-function inicioMesAnteriorBR(): string {
-  const partes = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Sao_Paulo",
-    year: "numeric",
-    month: "2-digit",
-  }).formatToParts(new Date());
-  let ano = parseInt(partes.find((p) => p.type === "year")!.value, 10);
-  let mes = parseInt(partes.find((p) => p.type === "month")!.value, 10);
-  // Volta um mês (janeiro → dezembro do ano anterior).
-  mes -= 1;
-  if (mes === 0) { mes = 12; ano -= 1; }
-  return `${ano}-${String(mes).padStart(2, "0")}-01`;
+// Início da janela do relatório: DIAS_JANELA dias atrás, como "YYYY-MM-DD"
+// (UTC puro, coerente com como o created_date é gravado — meia-noite UTC do
+// dia). Cobre a virada de mês naturalmente.
+const DIAS_JANELA = 90;
+function inicioJanelaISO(): string {
+  const agora = new Date();
+  const inicio = new Date(agora.getTime() - DIAS_JANELA * 24 * 60 * 60 * 1000);
+  return inicio.toISOString().slice(0, 10); // YYYY-MM-DD
 }
 
 // Formata uma data ISO (created_date) como DD/MM/AAAA em horário de Brasília.
@@ -226,11 +220,11 @@ serve(async (req) => {
     });
 
     // "Em aberto" = status "Enviada Partida em Aberto" (case-insensitive, pega
-    // a variação com "p" minúsculo) e não arquivado. Filtra MÊS CORRENTE +
-    // MÊS ANTERIOR por created_date (mês de criação no sistema; a coluna `date`
-    // tem datas de partida com erros de digitação, então não serve). Carregar
-    // o mês anterior evita que, na virada do mês, os em aberto desapareçam.
-    const inicioJanela = inicioMesAnteriorBR();
+    // a variação com "p" minúsculo) e não arquivado. Filtra os últimos 90 dias
+    // por created_date (mês de criação; a coluna `date` tem datas de partida
+    // com erros de digitação, então não serve). A janela de 90 dias cobre a
+    // virada de mês naturalmente.
+    const inicioJanela = inicioJanelaISO();
     const { data, error } = await supa
       .from("procedures")
       .select("procedure_number, platform, category, promotion_name, telegram_link, status, archived, created_date")
