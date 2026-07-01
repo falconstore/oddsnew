@@ -12,9 +12,13 @@
 //   3. Só então busca esse email no Auth por email EXATO (O(1), sem paginar)
 //      e age.
 //
-// AÇÕES (Etapa 1):
+// AÇÕES:
 //   - "reset-password" → { email, tempPassword } define uma senha temporária
 //      para um usuário DA EQUIPE. O admin repassa a senha ao usuário.
+//   - "create"         → { email, tempPassword, allowedPages[] } cria uma conta
+//      nova no Auth (email já confirmado) + linha em user_permissions com as
+//      abas escolhidas. Recusa se o email já existir no Auth (não toca em conta
+//      existente — nem do PWA, nem da equipe).
 //
 // Auth: Bearer do usuário logado (JWT do app).
 // deno-lint-ignore-file
@@ -115,6 +119,58 @@ serve(async (req) => {
 
       log("reset_ok", { email });
       return json({ ok: true, email });
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // CREATE — cria conta nova + permissões. Recusa email já existente.
+    // ─────────────────────────────────────────────────────────────
+    if (action === "create") {
+      const email = (body?.email ?? "").trim().toLowerCase();
+      const tempPassword = (body?.tempPassword ?? "").trim();
+      const allowedPages = Array.isArray(body?.allowedPages) ? body.allowedPages : [];
+      if (!email || !email.includes("@")) return json({ error: "email inválido" }, { status: 400 });
+      if (tempPassword.length < 6) {
+        return json({ error: "senha temporária deve ter ao menos 6 caracteres" }, { status: 400 });
+      }
+
+      // TRAVA ANTI-DUPLICAÇÃO: se o email já existe no Auth (PWA ou equipe),
+      // recusa. Não tocamos em conta existente.
+      const jaExiste = await acharAuthUserPorEmail(admin, email);
+      if (jaExiste) {
+        log("create_conflict", { email });
+        return json({
+          error: "Este email já está cadastrado. Se for da equipe, use 'Resetar senha'.",
+        }, { status: 409 });
+      }
+
+      // Cria a conta com email já confirmado (pode logar direto com a senha).
+      const { data: created, error: createErr } = await admin.auth.admin.createUser({
+        email,
+        password: tempPassword,
+        email_confirm: true,
+      });
+      if (createErr) throw createErr;
+
+      // Cria/atualiza a linha de permissões com as abas escolhidas.
+      const { error: permErr } = await admin
+        .from("user_permissions")
+        .upsert(
+          { user_email: email, allowed_pages: allowedPages, is_super_admin: false },
+          { onConflict: "user_email" },
+        );
+      if (permErr) {
+        // Usuário foi criado no Auth mas a permissão falhou — avisa pra ajustar.
+        log("create_perm_failed", { email, err: permErr.message });
+        return json({
+          ok: false,
+          code: "perm_failed",
+          error: "Conta criada, mas falhou ao salvar as permissões. Ajuste em 'Permissões'.",
+          email,
+        }, { status: 207 });
+      }
+
+      log("create_ok", { email, pages: allowedPages.length });
+      return json({ ok: true, email, id: created?.user?.id ?? null });
     }
 
     return json({ error: "ação desconhecida" }, { status: 400 });

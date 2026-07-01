@@ -169,6 +169,38 @@ export function useUserManagement() {
     }
   };
 
+  // Cria um novo usuário da equipe (conta no Auth + permissões). Recusa se o
+  // email já existe no Auth. Lê o motivo real do corpo em caso de erro >=400.
+  const createUser = async (email: string, tempPassword: string, allowedPages: string[]) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-users', {
+        body: { action: 'create', email, tempPassword, allowedPages },
+      });
+      if (error) {
+        let motivo = error instanceof Error ? error.message : 'Erro desconhecido';
+        const ctx = (error as any)?.context;
+        if (ctx && typeof ctx.json === 'function') {
+          try { const b = await ctx.json(); if (b?.error) motivo = b.error; } catch { /* noop */ }
+        }
+        toast({ title: 'Não foi possível criar', description: motivo, variant: 'destructive' });
+        return { ok: false as const };
+      }
+      if (data && data.ok === false) {
+        toast({ title: 'Atenção', description: data.error ?? 'Erro.', variant: 'destructive' });
+        await fetchUsers();
+        return { ok: false as const };
+      }
+      toast({ title: 'Usuário criado', description: `${email} criado. Repasse a senha temporária.` });
+      await fetchUsers();
+      return { ok: true as const };
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Erro desconhecido';
+      console.error('Error creating user:', error);
+      toast({ title: 'Erro ao criar usuário', description: msg, variant: 'destructive' });
+      return { ok: false as const };
+    }
+  };
+
   const deleteUserByEmail = async (userEmail: string) => {
     try {
       const { error } = await supabase
@@ -207,5 +239,6 @@ export function useUserManagement() {
     revokeLegacyAdmin,
     deleteUserByEmail,
     resetPassword,
+    createUser,
   };
 }
