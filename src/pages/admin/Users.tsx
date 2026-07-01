@@ -389,7 +389,7 @@ const AdminUsers = () => {
 
       {/* Modal: criar novo usuário (email + senha temporária + abas) */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto bg-card border border-white/10">
+        <DialogContent className="max-w-3xl bg-card border border-white/10">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <UserPlus className="h-5 w-5" />
@@ -400,7 +400,7 @@ const AdminUsers = () => {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <label className="text-xs text-muted-foreground">Email</label>
@@ -424,29 +424,27 @@ const AdminUsers = () => {
             </div>
 
             {/* Selecionar todas */}
-            <label className="flex items-center justify-between gap-3 border bg-primary/5 px-3 py-2 rounded-lg cursor-pointer">
+            <label className="flex items-center justify-between gap-3 border bg-primary/5 px-3 py-1.5 rounded-lg cursor-pointer">
               <span className="font-medium text-sm">Selecionar todas as abas</span>
               <Checkbox checked={newAllChecked} onCheckedChange={(c) => setNewAllowed(c ? new Set(PERMISSION_PAGES.map(p => p.key)) : new Set())} />
             </label>
 
-            {/* Abas por seção */}
+            {/* Abas por seção — grid de 2 colunas, compacto (sem rolagem) */}
             {PERMISSION_PAGES_BY_SECTION.map((group) => (
               <div key={group.section} className="border rounded-lg overflow-hidden">
-                <div className="bg-muted/50 px-3 py-1.5 text-xs font-semibold tracking-wide text-muted-foreground">
+                <div className="bg-muted/50 px-3 py-1 text-[10px] font-semibold tracking-wide text-muted-foreground">
                   {group.section}
                 </div>
-                <div className="divide-y">
+                <div className="grid grid-cols-1 sm:grid-cols-2">
                   {group.pages.map((page) => (
                     <label
                       key={page.key}
-                      className="flex items-center justify-between gap-3 px-3 py-2 cursor-pointer hover:bg-accent/40 transition-colors"
+                      title={page.description}
+                      className="flex items-center justify-between gap-2 px-3 py-1.5 cursor-pointer hover:bg-accent/40 transition-colors border-b border-white/5"
                     >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <page.icon className="h-4 w-4 text-muted-foreground/60 flex-shrink-0" />
-                        <div className="min-w-0">
-                          <p className="font-medium text-sm truncate">{page.label}</p>
-                          <p className="text-xs text-muted-foreground truncate">{page.description}</p>
-                        </div>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <page.icon className="h-3.5 w-3.5 text-muted-foreground/60 flex-shrink-0" />
+                        <span className="text-sm truncate">{page.label}</span>
                       </div>
                       <Checkbox
                         checked={newAllowed.has(page.key)}
